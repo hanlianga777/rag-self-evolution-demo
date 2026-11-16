@@ -30,6 +30,7 @@ export const shortQuestionId=(id:string):string => {
 
 // Presentation only; saved Agent reasoning remains unchanged.
 export function storyText(value:unknown):string {
+  if(Array.isArray(value))value=value.filter(item=>typeof item==='string').join('；');
   if(typeof value!=='string' || !value.trim())return '未保存说明';
   let text=value.replace(/试跑/g,'评测').split(/(?<=[。！？\n])/).filter(sentence=>!/(?:大模型不稳定|随机|幻觉|波动|复跑|复赛)/.test(sentence)).join('');
   text=text.replace(/\{[^{}]*\}/g,object=>{try{const fields=JSON.parse(object);if(Object.keys(fields).every(key=>key in storyParameterNames))return Object.entries(fields).map(([key,value])=>`${storyParameterNames[key]}：${storyValue(value)}`).join("、");}catch{/* Retain saved prose. */}return object;});
@@ -39,7 +40,7 @@ export function storyText(value:unknown):string {
     .replace(/(?:BC|GD|GGEN)-?[\dA-Za-z-]*\d[\dA-Za-z-]*/g,'相关记录')
     .replace(/\bL\d+\b/g,'').replace(/\b[a-f0-9]{32,64}\b/gi,'')
     .replace(/\brerank\s*=\s*query_only\b/g,'Rerank 方式：只按问题');
-  for(const [key,name] of Object.entries({...storyParameterNames,...gateNames,safe_rejection:'安全拒答率',reasoning_tokens:'思考用量',new_regressions:'新增问题',most_likely_parameter:'最可能起作用的参数',attribution_reason:'判断依据',query_processing:'查询处理',bad_cases:'Bad Case',bad_case:'Bad Case',insufficient_evidence:'证据不足',context_selection:'上下文选择',search_space:'白名单范围',latency_p99:'最慢耗时',winner_plus_verified:'沿用获胜方案并加上有效参数',partial_fusion:'部分融合'}).sort(([a],[b])=>b.length-a.length)){
+  for(const [key,name] of Object.entries({...storyParameterNames,...gateNames,usable_repairs:'有效修复记录',winner_preserved_diff:'Winner 已保留的参数改动',source_candidate_id:'来源方案',safe_rejection:'安全拒答率',reasoning_tokens:'思考用量',new_regressions:'新增问题',most_likely_parameter:'最可能起作用的参数',attribution_reason:'判断依据',query_processing:'查询处理',bad_cases:'Bad Case',bad_case:'Bad Case',insufficient_evidence:'证据不足',context_selection:'上下文选择',search_space:'白名单范围',latency_p99:'最慢耗时',winner_plus_verified:'沿用获胜方案并加上有效参数',partial_fusion:'部分融合'}).sort(([a],[b])=>b.length-a.length)){
     text=text.replace(new RegExp(`\\b${key}\\s*=\\s*`,'g'),`${name} `).replaceAll(key,name);
   }
   text=text.replace(/thinking/gi,'Thinking').replace(/topk/gi,'Top-K').replace(/Top-K\s*=\s*/g,'Top-K ').replace(/([\u4e00-\u9fff])(Thinking|Max|High|\d+)/g,'$1 $2').replace(/(Thinking|Max|High|\d+)([\u4e00-\u9fff])/g,'$1 $2');
@@ -62,6 +63,7 @@ export function dProgressLabel(experiment:any):string {
 
 export function recommendationReason(experiment:any):string {
   const rec=recommendationOf(experiment),cs=experiment?.candidates || [],composite=experiment?.result?.composite || rec.composite || {};
+  if(rec.status==='Recommended' && !rec.recommended_candidate)return `保持 Baseline：${storyText(rec.final_decision?.reason || rec.why || rec.reason)}`;
   const d=cs.find((c:any)=>c.reasoning?.candidate_label==='D'),selected=cs.find((c:any)=>c.id===rec.recommended_candidate);
   const keep=selected ? `保留${schemeName(selected)}` : '保留已保存的 Winner 建议';
   if(!d && dProgressLabel(experiment)==='Agent 判断不做 D'){

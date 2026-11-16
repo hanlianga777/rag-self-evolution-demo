@@ -1,0 +1,209 @@
+﻿证据文件,画面,尺寸,列表或列头,scrollWidth,clientWidth,容器scrollWidth,容器clientWidth
+手动复核 browser.json,knowledge,1440×900,文档名 / 文档类别 / 页数 / Parent 数 / Child 数 / 解析状态 / 索引状态 / 操作,1114,1114,1114,1114
+手动复核 browser.json,knowledge,1440×900,ui-kc-table,1070,1070,,
+手动复核 browser.json,knowledge-browser,1440×900,parent-list,210,210,,
+手动复核 browser.json,knowledge-bottom,1440×900,文档名 / 文档类别 / 页数 / Parent 数 / Child 数 / 解析状态 / 索引状态 / 操作,1114,1114,1114,1114
+手动复核 browser.json,knowledge-bottom,1440×900,ui-kc-table,1070,1070,,
+手动复核 browser.json,governance,1440×900,"题号 / 题型 / 问题 / 主题簇 / 负向子类 / 考查环节 / 出处 / 评分要点 / Probe
+i / QC
+i / ",1118,1118,1118,1118
+手动复核 browser.json,governance-tab0,1440×900,"题号 / 题型 / 问题 / 主题簇 / 负向子类 / 考查环节 / 出处 / 评分要点 / Probe
+i / QC
+i / ",1118,1118,1118,1118
+手动复核 browser.json,governance-tab0-bottom,1440×900,"题号 / 题型 / 问题 / 主题簇 / 负向子类 / 考查环节 / 出处 / 评分要点 / Probe
+i / QC
+i / ",1118,1118,1118,1118
+手动复核 browser.json,governance-tab1,1440×900,"问题 / 题型 / 主题簇 / 负向子类 / 考查环节 / Probe
+i / QC
+i / 来源 / 质量状态 / ",1118,1118,1118,1118
+手动复核 browser.json,governance-tab1-bottom,1440×900,"问题 / 题型 / 主题簇 / 负向子类 / 考查环节 / Probe
+i / QC
+i / 来源 / 质量状态 / ",1118,1118,1118,1118
+手动复核 browser.json,governance-bottom,1440×900,"问题 / 题型 / 主题簇 / 负向子类 / 考查环节 / Probe
+i / QC
+i / 来源 / 质量状态 / ",1118,1118,1118,1118
+手动复核 browser.json,evaluation,1440×900,ui-blb-bads,617,617,,
+手动复核 browser.json,evaluation-tab0,1440×900,ui-blb-bads,617,617,,
+手动复核 browser.json,evaluation-tab0-bottom,1440×900,ui-blb-bads,617,617,,
+手动复核 browser.json,evaluation-tab2,1440×900,"题号 / 问题 / 题型 / 负向子类 / 主题 / 层级与细分 / 缺了什么 / 严重程度
+i / ",1118,1118,1118,1118
+手动复核 browser.json,evaluation-tab2-bottom,1440×900,"题号 / 问题 / 题型 / 负向子类 / 主题 / 层级与细分 / 缺了什么 / 严重程度
+i / ",1118,1118,1118,1118
+手动复核 browser.json,evaluation-bottom,1440×900,"题号 / 问题 / 题型 / 负向子类 / 主题 / 层级与细分 / 缺了什么 / 严重程度
+i / ",1118,1118,1118,1118
+手动复核 browser.json,evolution-tab1,1440×900," / Baseline / R1-A
+未通过 / R1-B
+未通过 / R1-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",1118,1118,1118,1118
+手动复核 browser.json,evolution-tab1-bottom,1440×900," / Baseline / R1-A
+未通过 / R1-B
+未通过 / R1-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",1118,1118,1118,1118
+手动复核 browser.json,evolution-tab2,1440×900,Candidate / 修好 / 新增严重 / 新增普通 / Hard Gate / 判定,1118,1118,1118,1118
+手动复核 browser.json,evolution-tab2-bottom,1440×900,Candidate / 修好 / 新增严重 / 新增普通 / Hard Gate / 判定,1118,1118,1118,1118
+手动复核 browser.json,evolution-Round-1,1440×900," / Baseline / R1-A
+未通过 / R1-B
+未通过 / R1-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",1118,1118,1118,1118
+手动复核 browser.json,evolution-Round-1-bottom,1440×900," / Baseline / R1-A
+未通过 / R1-B
+未通过 / R1-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",1118,1118,1118,1118
+手动复核 browser.json,evolution-Round-1-drawer,1440×900,题号 / 问题 / Baseline结果 / Candidate结果 / Regression 严重级别 / 查看对比,710,710,710,710
+手动复核 browser.json,evolution-Round-1-drawer,1440×900,问题 / 判定 / 诊断,710,710,710,710
+手动复核 browser.json,evolution-Round-1-drawer,1440×900,参数 / 基线值 / Candidate 值 / 预期影响,710,710,710,710
+手动复核 browser.json,evolution-Round-1-drawer,1440×900,参数 / Before / After,672,672,672,672
+手动复核 browser.json,evolution-Round-2,1440×900," / Baseline / R2-A
+未通过 / R2-B
+未通过 / R2-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",1118,1118,1118,1118
+手动复核 browser.json,evolution-Round-2-bottom,1440×900," / Baseline / R2-A
+未通过 / R2-B
+未通过 / R2-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",1118,1118,1118,1118
+手动复核 browser.json,evolution-Round-2-drawer,1440×900,题号 / 问题 / Baseline结果 / Candidate结果 / Regression 严重级别 / 查看对比,710,710,710,710
+手动复核 browser.json,evolution-Round-2-drawer,1440×900,问题 / 判定 / 诊断,710,710,710,710
+手动复核 browser.json,evolution-Round-2-drawer,1440×900,参数 / 基线值 / Candidate 值 / 预期影响,710,710,710,710
+手动复核 browser.json,evolution-Round-2-drawer,1440×900,参数 / Before / After,672,672,672,672
+手动复核 browser.json,evolution-Round-2-drawer,1440×900,参数 / Before / After,672,672,672,672
+手动复核 browser.json,evolution-Round-3,1440×900," / Baseline / R3-A
+Winner / R3-B
+未通过 / R3-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",1118,1118,1118,1118
+手动复核 browser.json,evolution-Round-3-bottom,1440×900," / Baseline / R3-A
+Winner / R3-B
+未通过 / R3-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",1118,1118,1118,1118
+手动复核 browser.json,evolution-Round-3-drawer,1440×900,题号 / 问题 / Baseline结果 / Candidate结果 / Regression 严重级别 / 查看对比,710,710,710,710
+手动复核 browser.json,evolution-Round-3-drawer,1440×900,问题 / 判定 / 诊断,710,710,710,710
+手动复核 browser.json,evolution-Round-3-drawer,1440×900,参数 / 基线值 / Candidate 值 / 预期影响,710,710,710,710
+手动复核 browser.json,evolution-Round-3-drawer,1440×900,参数 / Before / After,672,672,672,672
+手动复核 browser.json,evolution-Round-3-drawer,1440×900,参数 / Before / After,672,672,672,672
+手动复核 browser.json,evolution-Candidate-D-drawer,1440×900,题号 / 问题 / Baseline结果 / Candidate结果 / Regression 严重级别 / 查看对比,710,710,710,710
+手动复核 browser.json,evolution-Candidate-D-drawer,1440×900,问题 / 判定 / 诊断,710,710,710,710
+手动复核 browser.json,evolution-Candidate-D-drawer,1440×900,参数 / Before / After,672,672,672,672
+手动复核 browser.json,evolution-Candidate-D-drawer,1440×900,参数 / Before / After,672,672,672,672
+手动复核 browser.json,versions,1440×900,版本 / 来源 / 创建时间 / 关键配置 / 状态 / 操作,1122,1122,1122,1122
+手动复核 browser.json,versions-bottom,1440×900,版本 / 来源 / 创建时间 / 关键配置 / 状态 / 操作,1122,1122,1122,1122
+手动复核 browser.json,verification-tab1,1440×900,conversation-list,156,156,,
+手动复核 browser.json,verification-tab1-bottom,1440×900,conversation-list,156,156,,
+手动复核 browser.json,verification-tab2,1440×900,时间 / 问题 / 耗时 / 引用数 / 标注状态 / 操作,721,721,721,721
+手动复核 browser.json,verification-tab2,1440×900,monitoring-triggers,721,721,,
+手动复核 browser.json,verification-tab2-bottom,1440×900,时间 / 问题 / 耗时 / 引用数 / 标注状态 / 操作,721,721,721,721
+手动复核 browser.json,verification-tab2-bottom,1440×900,monitoring-triggers,721,721,,
+手动复核 browser.json,monitoring,1440×900,时间 / 问题 / 耗时 / 引用数 / 标注状态 / 操作,721,721,721,721
+手动复核 browser.json,monitoring,1440×900,monitoring-triggers,721,721,,
+手动复核 browser.json,verification-bottom,1440×900,时间 / 问题 / 耗时 / 引用数 / 标注状态 / 操作,721,721,721,721
+手动复核 browser.json,verification-bottom,1440×900,monitoring-triggers,721,721,,
+手动复核 browser.json,knowledge,1280×800,文档名 / 文档类别 / 页数 / Parent 数 / Child 数 / 解析状态 / 索引状态 / 操作,954,954,954,954
+手动复核 browser.json,knowledge,1280×800,ui-kc-table,910,910,,
+手动复核 browser.json,knowledge-browser,1280×800,parent-list,180,180,,
+手动复核 browser.json,knowledge-bottom,1280×800,文档名 / 文档类别 / 页数 / Parent 数 / Child 数 / 解析状态 / 索引状态 / 操作,954,954,954,954
+手动复核 browser.json,knowledge-bottom,1280×800,ui-kc-table,910,910,,
+手动复核 browser.json,governance,1280×800,"题号 / 题型 / 问题 / 主题簇 / 负向子类 / 考查环节 / 出处 / 评分要点 / Probe
+i / QC
+i / ",958,958,958,958
+手动复核 browser.json,governance-tab0,1280×800,"题号 / 题型 / 问题 / 主题簇 / 负向子类 / 考查环节 / 出处 / 评分要点 / Probe
+i / QC
+i / ",958,958,958,958
+手动复核 browser.json,governance-tab0-bottom,1280×800,"题号 / 题型 / 问题 / 主题簇 / 负向子类 / 考查环节 / 出处 / 评分要点 / Probe
+i / QC
+i / ",958,958,958,958
+手动复核 browser.json,governance-tab1,1280×800,"问题 / 题型 / 主题簇 / 负向子类 / 考查环节 / Probe
+i / QC
+i / 来源 / 质量状态 / ",958,958,958,958
+手动复核 browser.json,governance-tab1-bottom,1280×800,"问题 / 题型 / 主题簇 / 负向子类 / 考查环节 / Probe
+i / QC
+i / 来源 / 质量状态 / ",958,958,958,958
+手动复核 browser.json,governance-bottom,1280×800,"问题 / 题型 / 主题簇 / 负向子类 / 考查环节 / Probe
+i / QC
+i / 来源 / 质量状态 / ",958,958,958,958
+手动复核 browser.json,evaluation,1280×800,ui-blb-bads,526,526,,
+手动复核 browser.json,evaluation-tab0,1280×800,ui-blb-bads,526,526,,
+手动复核 browser.json,evaluation-tab0-bottom,1280×800,ui-blb-bads,526,526,,
+手动复核 browser.json,evaluation-tab2,1280×800,"题号 / 问题 / 题型 / 负向子类 / 主题 / 层级与细分 / 缺了什么 / 严重程度
+i / ",958,958,958,958
+手动复核 browser.json,evaluation-tab2-bottom,1280×800,"题号 / 问题 / 题型 / 负向子类 / 主题 / 层级与细分 / 缺了什么 / 严重程度
+i / ",958,958,958,958
+手动复核 browser.json,evaluation-bottom,1280×800,"题号 / 问题 / 题型 / 负向子类 / 主题 / 层级与细分 / 缺了什么 / 严重程度
+i / ",958,958,958,958
+手动复核 browser.json,evolution-tab1,1280×800," / Baseline / R1-A
+未通过 / R1-B
+未通过 / R1-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",958,958,958,958
+手动复核 browser.json,evolution-tab1-bottom,1280×800," / Baseline / R1-A
+未通过 / R1-B
+未通过 / R1-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",958,958,958,958
+手动复核 browser.json,evolution-tab2,1280×800,Candidate / 修好 / 新增严重 / 新增普通 / Hard Gate / 判定,958,958,958,958
+手动复核 browser.json,evolution-tab2-bottom,1280×800,Candidate / 修好 / 新增严重 / 新增普通 / Hard Gate / 判定,958,958,958,958
+手动复核 browser.json,evolution-Round-1,1280×800," / Baseline / R1-A
+未通过 / R1-B
+未通过 / R1-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",958,958,958,958
+手动复核 browser.json,evolution-Round-1-bottom,1280×800," / Baseline / R1-A
+未通过 / R1-B
+未通过 / R1-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",958,958,958,958
+手动复核 browser.json,evolution-Round-1-drawer,1280×800,题号 / 问题 / Baseline结果 / Candidate结果 / Regression 严重级别 / 查看对比,710,710,710,710
+手动复核 browser.json,evolution-Round-1-drawer,1280×800,问题 / 判定 / 诊断,710,710,710,710
+手动复核 browser.json,evolution-Round-1-drawer,1280×800,参数 / 基线值 / Candidate 值 / 预期影响,710,710,710,710
+手动复核 browser.json,evolution-Round-1-drawer,1280×800,参数 / Before / After,672,672,672,672
+手动复核 browser.json,evolution-Round-2,1280×800," / Baseline / R2-A
+未通过 / R2-B
+未通过 / R2-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",958,958,958,958
+手动复核 browser.json,evolution-Round-2-bottom,1280×800," / Baseline / R2-A
+未通过 / R2-B
+未通过 / R2-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",958,958,958,958
+手动复核 browser.json,evolution-Round-2-drawer,1280×800,题号 / 问题 / Baseline结果 / Candidate结果 / Regression 严重级别 / 查看对比,710,710,710,710
+手动复核 browser.json,evolution-Round-2-drawer,1280×800,问题 / 判定 / 诊断,710,710,710,710
+手动复核 browser.json,evolution-Round-2-drawer,1280×800,参数 / 基线值 / Candidate 值 / 预期影响,710,710,710,710
+手动复核 browser.json,evolution-Round-2-drawer,1280×800,参数 / Before / After,672,672,672,672
+手动复核 browser.json,evolution-Round-2-drawer,1280×800,参数 / Before / After,672,672,672,672
+手动复核 browser.json,evolution-Round-3,1280×800," / Baseline / R3-A
+Winner / R3-B
+未通过 / R3-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",958,958,958,958
+手动复核 browser.json,evolution-Round-3-bottom,1280×800," / Baseline / R3-A
+Winner / R3-B
+未通过 / R3-C
+未通过 / Candidate D
+未通过 / 答对 / 新增 Bad Case / Hard Gate / 安全拒答率 / P50 / P99 / 全部原 Bad Case 修好 / 指定目标修好 / 新增 Bad Case 明细 / 其他问题改善 / 净改善 / Regression Check",958,958,958,958
+手动复核 browser.json,evolution-Round-3-drawer,1280×800,题号 / 问题 / Baseline结果 / Candidate结果 / Regression 严重级别 / 查看对比,710,710,710,710
+手动复核 browser.json,evolution-Round-3-drawer,1280×800,问题 / 判定 / 诊断,710,710,710,710
+手动复核 browser.json,evolution-Round-3-drawer,1280×800,参数 / 基线值 / Candidate 值 / 预期影响,710,710,710,710
+手动复核 browser.json,evolution-Round-3-drawer,1280×800,参数 / Before / After,672,672,672,672
+手动复核 browser.json,evolution-Round-3-drawer,1280×800,参数 / Before / After,672,672,672,672
+手动复核 browser.json,evolution-Candidate-D-drawer,1280×800,题号 / 问题 / Baseline结果 / Candidate结果 / Regression 严重级别 / 查看对比,710,710,710,710
+手动复核 browser.json,evolution-Candidate-D-drawer,1280×800,问题 / 判定 / 诊断,710,710,710,710
+手动复核 browser.json,evolution-Candidate-D-drawer,1280×800,参数 / Before / After,672,672,672,672
+手动复核 browser.json,evolution-Candidate-D-drawer,1280×800,参数 / Before / After,672,672,672,672
+手动复核 browser.json,versions,1280×800,版本 / 来源 / 创建时间 / 关键配置 / 状态 / 操作,962,962,962,962
+手动复核 browser.json,versions-bottom,1280×800,版本 / 来源 / 创建时间 / 关键配置 / 状态 / 操作,962,962,962,962
+手动复核 browser.json,verification-tab1,1280×800,conversation-list,156,156,,
+手动复核 browser.json,verification-tab1-bottom,1280×800,conversation-list,156,156,,
+手动复核 browser.json,verification-tab2,1280×800,时间 / 问题 / 耗时 / 引用数 / 标注状态 / 操作,614,614,614,614
+手动复核 browser.json,verification-tab2,1280×800,monitoring-triggers,614,614,,
+手动复核 browser.json,verification-tab2-bottom,1280×800,时间 / 问题 / 耗时 / 引用数 / 标注状态 / 操作,614,614,614,614
+手动复核 browser.json,verification-tab2-bottom,1280×800,monitoring-triggers,614,614,,
+手动复核 browser.json,monitoring,1280×800,时间 / 问题 / 耗时 / 引用数 / 标注状态 / 操作,614,614,614,614
+手动复核 browser.json,monitoring,1280×800,monitoring-triggers,614,614,,
+手动复核 browser.json,verification-bottom,1280×800,时间 / 问题 / 耗时 / 引用数 / 标注状态 / 操作,614,614,614,614
+手动复核 browser.json,verification-bottom,1280×800,monitoring-triggers,614,614,,

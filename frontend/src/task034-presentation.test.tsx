@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import {act} from 'react';
 import {createRoot} from 'react-dom/client';
-import {afterEach,expect,it} from 'vitest';
+import {afterEach,expect,it,vi} from 'vitest';
 import {CaseAnswer} from './components/CaseAnswer';
 import {RoundStrategy,RoundConclusion} from './components/RoundStrategy';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
 let root:ReturnType<typeof createRoot>;
 async function render(node:any){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));}
-afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';});
+afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();sessionStorage.clear();history.replaceState(null,'','/');});
 it('uses source footnotes without raw audit copies and keeps model wording',async()=>{
  const text='1. 第一步原话。\n2. 第二步原话。（来源：《操作手册》，第 3 页）';
  await render(<CaseAnswer text={text} final={[{document:'操作手册',document_id:'doc',page_start:3,content:'原文'}] as any}/>);
@@ -67,4 +67,48 @@ it('does not turn an unknown atomic verdict into a missing answer point',async()
  expect(document.querySelector('.answer-evidence li')?.textContent).toContain('判定未知');
  expect(document.querySelector('.answer-evidence li')?.textContent).not.toContain('没答到');
  expect(document.querySelectorAll('.point-path')).toHaveLength(1);
+});
+
+it('shows a saved keep-Baseline decision in the overview, D conclusion and four-part recommendation',async()=>{
+ const {EvolutionPage}=await import('./pages/EvolutionPage');
+ const {DStory,recommendationReason}=await import('./components/EvolutionStory');
+ const evaluation={id:'base',status:'completed',config:{top_k:4},result:{total:50,bad_case_count:8,gates:{passed_count:10,total:11},metrics:{latency_p50_seconds:3.1,latency_p99_seconds:4.4}}};
+ const experiment={id:'exp',status:'completed',result:{causal_evidence:true,report_confirmation:{winner_id:'EXP-test-R3-A'}},candidates:[{id:'EXP-test-R3-A',status:'evaluated',reasoning:{candidate_label:'A',round:3},result:{total:50,bad_case_count:4,gates:{passed:true},qualification:{qualified:true},release_qualification:{qualified:false}}},{id:'EXP-test-D',status:'evaluated',reasoning:{candidate_label:'D'},result:{total:50,bad_case_count:6,gates:{passed:false},qualification:{qualified:false}}}],recommendation:{status:'Recommended',recommended_candidate:null,final_decision:{decision:'保持 Baseline'},why:'Winner 候选合格但不具备发布资格，D也未满足推荐条件'}};
+ const before=JSON.stringify(experiment);
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response('{}')));
+ expect(recommendationReason(experiment)).toContain(experiment.recommendation.why);
+ await render(<EvolutionPage data={{evaluation,optimization:experiment}}/>);
+ expect(document.querySelector('.agent-overview-result h2')?.textContent).toBe('最终方案：保持 Baseline');
+ expect(document.querySelector('.agent-overview-result')?.textContent).not.toContain('等待中');
+ expect(document.querySelector('.agent-overview-params')?.textContent).toContain('保持 Baseline，参数不变');
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='回归与推荐')!.click());
+ const lines=[...document.querySelectorAll('.ui-fin-reason > li')].map(n=>n.textContent);
+ expect(lines).toHaveLength(4);
+ expect(lines[0]).toContain('42 / 50');expect(lines[1]).toContain('10 / 11');expect(lines[2]).toContain('3.1 秒');expect(lines[3]).toContain('新增');
+ expect(document.body.textContent).not.toContain('最终推荐结论未保存');
+ expect(document.querySelectorAll('.candidate-rejections > button')).toHaveLength(2);
+ expect(document.querySelector('.candidate-rejections')?.textContent).toContain('候选合格，但保存的发布资格未通过');
+ await act(async()=>root.render(<DStory experiment={experiment} evaluation={evaluation}/>));
+ expect(document.querySelector('.d-story section:last-child')?.textContent).toContain(experiment.recommendation.why);
+ expect(JSON.stringify(experiment)).toBe(before);
+});
+
+it.each([true,false,undefined])('shows a historical failure label only for a current failed verdict (%s)',async(passed)=>{
+ const {CaseDetails}=await import('./pages/EvaluationPage');
+ const item={passed,question:'保存题目',model_answer:'保存回答',baseline_review_label:'单遍判错'};
+ const before=JSON.stringify(item);
+ await render(<CaseDetails item={item} snapshot={{}} config={{}} gates={[]}/>);
+ expect(document.querySelector('.case-review')?.textContent?.includes('本次判定未通过')).toBe(passed===false);
+ expect(JSON.stringify(item)).toBe(before);
+});
+
+it('translates saved D protocol names and preserves an array of prediction risks',async()=>{
+ const {storyText,DStory}=await import('./components/EvolutionStory');
+ const risks=['核对 Q04 不被翻回。','安全拒答率必须过线。'];
+ const experiment={result:{causal_evidence:true},candidates:[{reasoning:{candidate_label:'D',hypothesis:'usable_repairs 中单参数最小改动，不撤销 winner_preserved_diff。source_candidate_id=EXP-test-R1-B',changes:[{reason:'扩大候选',target_question_ids:['Q29'],side_effect_check:{risk_checklist:risks}}]}}]};
+ const before=JSON.stringify(experiment);
+ expect(storyText(experiment.candidates[0].reasoning.hypothesis)).not.toMatch(/\b[a-z]+(?:_[a-z]+)+\b|=/);
+ await render(<DStory experiment={experiment}/>);
+ for(const risk of risks)expect(document.body.textContent).toContain(risk);
+ expect(JSON.stringify(experiment)).toBe(before);
 });

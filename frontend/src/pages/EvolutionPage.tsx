@@ -109,6 +109,7 @@ export function EvolutionPage({ data }: { data: any }) {
   const roundChoices=[...new Set<number>(abc.map(item=>item.reasoning?.round || 1))].sort((a,b)=>a-b);
   const displayedCandidates=abc.filter(item=>(item.reasoning?.round || 1)===displayRound);
   const recommendation = experiment?.recommendation?.result || experiment?.recommendation || {};
+  const keepBaseline = recommendation.status === "Recommended" && !recommendation.recommended_candidate;
   const savedRecommended=candidates.find(item=>item.id===recommendation.recommended_candidate);
   const confirmation = experiment?.result?.report_confirmation || recommendation.report_confirmation;
   const composite = experiment?.result?.composite || recommendation.composite;
@@ -222,7 +223,7 @@ export function EvolutionPage({ data }: { data: any }) {
   const production = data.overview?.production || data.versions?.find((item: any) => item.status === "active");
   const productionReleased = production?.provenance === "published" && !!savedRecommended && production.snapshot?.candidate_id === savedRecommended.id;
   const phaseDetails = [...new Set(steps.filter(step => step.state === "current" || step.state === "blocked").map(step => step.detail))].join(" · ");
-  const agentStatus = hasRunning || busy ? `${activeCandidate ? `${schemeName(activeCandidate)} · ${candidateProgress(activeCandidate, activeOperation(activeCandidate.id), sandboxPause)}` : "Agent 评测中"} · ${dProgressLabel(experiment)}${savedRecommended ? ` · 当前保存推荐：${schemeName(savedRecommended)}` : ""}` : productionReleased ? schemeName(savedRecommended).replace(/^Round \d+ · /, "") : savedRecommended ? `推荐 ${schemeName(savedRecommended)}，待人工发布 · ${dProgressLabel(experiment)}` : sandboxPause ? "已暂停，进度已保存" : `${latestRound ? `Round ${latestRound.round} · ${latestRound.evaluated ?? "未知"}/${latestRound.total ?? "未知"} · ` : ""}${phaseDetails || "等待生成优化 Candidate"}${!budgetKnown && experiment ? " · 预算尚未同步" : ""}`;
+  const agentStatus = hasRunning || busy ? `${activeCandidate ? `${schemeName(activeCandidate)} · ${candidateProgress(activeCandidate, activeOperation(activeCandidate.id), sandboxPause)}` : "Agent 评测中"} · ${dProgressLabel(experiment)}${savedRecommended ? ` · 当前保存推荐：${schemeName(savedRecommended)}` : ""}` : keepBaseline ? '评测已完成，保持 Baseline' : productionReleased ? schemeName(savedRecommended).replace(/^Round \d+ · /, "") : savedRecommended ? `推荐 ${schemeName(savedRecommended)}，待人工发布 · ${dProgressLabel(experiment)}` : sandboxPause ? "已暂停，进度已保存" : `${latestRound ? `Round ${latestRound.round} · ${latestRound.evaluated ?? "未知"}/${latestRound.total ?? "未知"} · ` : ""}${phaseDetails || "等待生成优化 Candidate"}${!budgetKnown && experiment ? " · 预算尚未同步" : ""}`;
 
   const sandboxCandidates = [...displayedCandidates, ...(d ? [d] : [])];
   const comparisonSources = [evaluation, ...sandboxCandidates];
@@ -300,7 +301,12 @@ export function EvolutionPage({ data }: { data: any }) {
         onRelease={() => { location.hash = "versions"; }}
         releaseLabel={productionReleased || savedRecommended?.release_state?.human_release ? "查看发布记录" : "去发布"}
         onOpen={id => setSelectedCandidate(candidates.find(candidate => candidate.id === id))}
-      /></> : <><Section title="最终推荐"><h3>{recommendationTitle}</h3><div className="muted-prose"><TruncatedText lines={3}>{storyText(recommendationReason(experiment))}</TruncatedText></div></Section>{regressionSummary}</>}
+      /></> : <><Section title="最终推荐"><h3>{recommendationTitle}</h3>{keepBaseline ? <ol className="ui-fin-reason">
+        <li>一、质量：Baseline 答对 {typeof evaluation.result?.total === 'number' && typeof evaluation.result?.bad_case_count === 'number' ? evaluation.result.total-evaluation.result.bad_case_count : '未知'} / {evaluation.result?.total ?? '未知'}。{recommendationReason(experiment)}</li>
+        <li>二、安全：Baseline 上线门槛 {metricText(evaluation.result,'gates')}；各 Candidate 的门槛结果见下表。</li>
+        <li>三、速度：Baseline 中位耗时 {metricText(evaluation.result,'latency_p50_seconds')}；最慢耗时 {metricText(evaluation.result,'latency_p99_seconds')}。</li>
+        <li>四、回归：候选修好和新增问题见下表；修好不能抵消新增 Bad Case，本轮不推荐 Candidate。</li>
+      </ol> : <div className="muted-prose"><TruncatedText lines={3}>{storyText(recommendationReason(experiment))}</TruncatedText></div>}</Section>{regressionSummary}{keepBaseline && <Section title="落选原因"><div className="candidate-rejections">{reviewCandidates.map(candidate=><button type="button" key={candidate.id} onClick={()=>setSelectedCandidate(candidate)}><strong>{schemeName(candidate)}</strong><span>{qualificationExplanation(candidate)}</span><Icon name="go" size={14}/></button>)}</div></Section>}</>}
 {!chosenView && confirmation && <p>人工报告确认已完成。</p>}{confirmation && !d && (!composite || composite.status === 'failed') && !compositeWaiting && <button className="secondary" disabled={busy || policyBlocked || hasRunning} onClick={()=>requestPaid("生成智能组合建议","在 Winner 基础上融合",()=>void action("生成智能组合建议",()=>postJson(`/api/experiments/${experiment.id}/composite`,{authorize_provider:true})))}>{composite?.status === 'failed' ? '重新生成 Candidate D' : '生成智能组合建议'}</button>}
 {!confirmation && qualified.length > 0 && abc.every(item => item.status === "skipped" || item.status === "evaluated" && item.result?.evaluation_complete !== false) && <div className="review-batch"><label>人工确认 · 确认 A/B/C 报告并选择合格 Winner<FilterButtons label="选择合格 Winner" value={selectedWinner} onChange={setWinnerId} options={qualified.map(candidate=>({value:candidate.id,label:candidateName(candidate)}))} /></label><button className="primary" disabled={busy || policyBlocked} onClick={() => requestPaid("确认报告与 Winner", "确认已保存的 A/B/C 报告并记录人工选择。", () => void action("确认 A/B/C 报告", () => postJson(`/api/experiments/${experiment.id}/recommendation`, { candidate_id: selectedWinner, actor: "human" })))}>确认报告与 Winner</button></div>}
 </>}
@@ -418,6 +424,10 @@ function targetRows(candidate: any, rows: any[]): any[] {
 }
 function qualificationExplanation(candidate:any):string {
   if(candidate.status!=="evaluated")return candidate.status==="failed"?"运行失败；部分结果不能代表资格结论。":"实验尚未完成，不预判资格。";
+  if(candidate.result?.qualification?.qualified===true && candidate.result?.release_qualification?.qualified===false){
+    const releaseNames:Record<string,string>={hard_gates:'Hard Gate 未通过',zero_new_failures:'存在新增 Bad Case，不满足零新增的发布条件',at_least_one_fixed:'未修好原问题'};
+    return Object.entries(candidate.result.release_qualification.checks || {}).filter(([,passed])=>passed===false).map(([key])=>releaseNames[key] || '其他保存的发布条件未通过').join('；') || '候选合格，但保存的发布资格未通过。';
+  }
   const names:Record<string,string>={hard_gates:"Hard Gate 未通过",regression:"Regression Check 未通过",target_bad_case_fixed:"未满足目标修复条件",total_bad_cases_reduced:"未满足失败总数减少条件"};
   const failed=Object.entries(candidate.result?.qualification?.checks || {}).filter(([,passed])=>passed===false).map(([key])=>names[key] || "其他保存的资格条件未通过");
   return failed.join("；") || (candidate.result?.qualification?.qualified===true?"保存的质量、安全与 Regression 资格通过；正式推荐以已保存决策为准。":"历史未保存具体未通过原因。");

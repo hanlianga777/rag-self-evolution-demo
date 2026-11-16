@@ -69,7 +69,7 @@ export function SettingsPage({ data }: { data: any }) {
           value: draft[key], baseline: baseline[key], online: published ? onlineConfig?.[key] : undefined,
           disabled: busy || key === "hybrid_alpha" && !draft.hybrid_search, changed: changed.includes(key),
         })),
-      })) as ParamGroup[]} onChange={change} legend={{baseline: pipeline?.baseline_config ? changed.length ? "白底 = 当前草稿；灰点 = Baseline 起点" : "白底 = Baseline 起点" : undefined, online: published ? "蓝点 = 当前线上" : undefined}} />
+      })) as ParamGroup[]} onChange={change} legend={{baseline: pipeline?.baseline_config ? changed.length ? "白底：当前草稿；灰点：Baseline 起点" : "白底：Baseline 起点" : undefined, online: published ? "蓝点：当前线上" : undefined}} />
       {(changed.length > 0 || pipeline?.config_draft) && <div className="pipeline-draft-actions">
         <span role="status">{changed.length} 项已修改{pipeline?.config_draft && !pipeline.draft_stale ? " · 配置草稿已保存" : ""}</span>
         <div className="pipeline-draft-chips">{changed.map(key => <ParamChip key={key} label={parameterNames[key] || key} from={formatValue(base[key])} to={formatValue(draft[key])} />)}</div>
