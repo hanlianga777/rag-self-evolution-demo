@@ -96,6 +96,7 @@ def main(argv=None):
                 outcome = case.get('evaluation_outcome') or {}
                 judged = {k: v for k, v in (case.get('judge_result') or {}).items()
                           if k not in {'token_usage', 'stages', 'estimated_cost', 'cost_estimation'}}
+                judged.update(outcome.get('rubric_scores') or {})
                 state['cases'][key] = {'result': {
                     'id': item['id'], 'category': item['test_category'], 'negative_subtype': item.get('negative_subtype'),
                     'passed': case.get('passed'), 'verdict_reason': outcome.get('reason'),
