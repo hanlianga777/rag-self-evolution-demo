@@ -67,8 +67,13 @@ def validate_round_conclusion(review, candidates):
                 or set(plan.get('matched_question_ids', [])) != fixed & predicted
                 or type(plan.get('prediction_match_count')) is not int or plan['prediction_match_count'] != len(fixed & predicted)):
             raise ValueError('本轮结论修好/弄坏/预测吻合题号和数量必须与保存结果一致')
-        if any(not isinstance(plan.get(k), str) or not plan[k].strip() for k in ('unmatched_reason','parameter_assessment','evidence_reason','conclusion')):
-            raise ValueError('本轮结论缺少预测不符原因、参数有效/有害判断、检索证据或结论')
+        # 预测与结果完全吻合、也没有弄坏题时，"预测不符原因"本来就无话可说，允许留空并记为吻合。
+        if fixed == predicted and not broken and not (isinstance(plan.get('unmatched_reason'), str) and plan['unmatched_reason'].strip()):
+            plan['unmatched_reason'] = '预测与结果一致，无不符'
+        names = {'unmatched_reason': '预测不符原因', 'parameter_assessment': '参数有效/有害判断', 'evidence_reason': '检索证据', 'conclusion': '结论'}
+        missing = [names[k] for k in names if not isinstance(plan.get(k), str) or not plan[k].strip()]
+        if missing:
+            raise ValueError(f"本轮结论 {plan['candidate_id']} 缺少：{'、'.join(missing)}（字段 {', '.join(k for k in names if names[k] in missing)} 必须是非空文字）")
     if not isinstance(review.get('lessons'), list) or not review['lessons'] or any(not isinstance(s, str) or not s.strip() for s in review['lessons']):
         raise ValueError('本轮结论缺少带入下一轮的经验lessons')
     return review

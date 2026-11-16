@@ -1,4 +1,5 @@
 """规则总表（指挥/规则总表.md，2026-11-16）对应的纯逻辑测试：不连模型、不建数据库。"""
+import unittest
 import pytest
 
 from app import policy
@@ -186,3 +187,33 @@ def test_generation_thinking_is_not_forced_off():
     assert thinking_config("candidate", "high")["reasoning_effort"] == "high"
     assert thinking_config("candidate", "off")["thinking"]["type"] == "disabled"
     assert thinking_config("query_rewrite", "max")["thinking"]["type"] == "disabled"
+
+
+class RoundConclusionLeniencyTests(unittest.TestCase):
+    """044c：第 2 轮总结因预测完全吻合时"预测不符原因"留空被连续拒绝，导致循环 failed。"""
+
+    def _candidate(self, fixed, predicted, broken=()):
+        return {'id': 'C1', 'reasoning': {'predicted_fixed_question_ids': list(predicted)},
+                'result': {'all_fixed_question_ids': list(fixed), 'comparison': {'new_failure_question_ids': list(broken)}}}
+
+    def _plan(self, fixed, predicted, **overrides):
+        plan = {'candidate_id': 'C1', 'fixed_question_ids': list(fixed), 'new_failure_question_ids': [],
+                'matched_question_ids': sorted(set(fixed) & set(predicted)), 'prediction_match_count': len(set(fixed) & set(predicted)),
+                'unmatched_reason': '', 'parameter_assessment': '有效', 'evidence_reason': '召回了标准证据', 'conclusion': '保留'}
+        plan.update(overrides)
+        return plan
+
+    def test_matched_prediction_allows_empty_unmatched_reason(self):
+        from app.agent_strategy import validate_round_conclusion, new_failure_ids
+        candidate = self._candidate(['Q21'], ['Q21'])
+        if new_failure_ids(candidate['result']):
+            self.skipTest('new_failure_ids 读取口径不同')
+        plan = self._plan(['Q21'], ['Q21'])
+        validate_round_conclusion({'plans': [plan], 'lessons': ['先单独验证思考档位'], 'carry_forward_lessons': True}, [candidate])
+        self.assertEqual(plan['unmatched_reason'], '预测与结果一致，无不符')
+
+    def test_mismatch_still_requires_reason_and_names_field(self):
+        from app.agent_strategy import validate_round_conclusion
+        candidate = self._candidate([], ['Q21'])
+        with self.assertRaisesRegex(ValueError, 'C1 缺少：预测不符原因'):
+            validate_round_conclusion({'plans': [self._plan([], ['Q21'])]}, [candidate])
