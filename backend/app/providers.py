@@ -18,11 +18,14 @@ from .evaluation_contract import abstention_valid, claim_consistent, normalize, 
 
 
 DEFAULT_TASK_THINKING = {
-    'baseline': 'off', 'generation': 'off', 'answer': 'off', 'candidate': 'off',
+    'baseline': 'max', 'generation': 'max', 'answer': 'max', 'candidate': 'max',
     'judge': 'low', 'agent': 'high', 'query_rewrite': 'off', 'multi_query': 'off',
     'hyde': 'off', 'query_decompose': 'off', 'query': 'off', 'auxiliary': 'off',
 }
-DETERMINISTIC_TASKS = frozenset(DEFAULT_TASK_THINKING) - {'judge', 'agent'}
+# 规则总表三.3：只有检索辅助调用（改写、多问法、HyDE 等）固定关闭思考；
+# 回答生成按配置里的 generation_thinking 实际请求，Judge、Agent 各自独立。
+GENERATION_TASKS = frozenset({'baseline', 'generation', 'answer', 'candidate'})
+DETERMINISTIC_TASKS = frozenset(DEFAULT_TASK_THINKING) - {'judge', 'agent'} - GENERATION_TASKS
 _thinking_task = ContextVar('provider_thinking_task', default=None)
 _judge_thinking = ContextVar('provider_judge_thinking', default=None)
 _answer_content = ContextVar("answer_content", default=None)

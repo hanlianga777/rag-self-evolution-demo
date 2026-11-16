@@ -127,7 +127,7 @@ def usable_repairs(facts):
                         supported = type(rank) is int and final=='未进入' and winner[key]<rank<=value
                     elif key=='candidate_k':
                         supported = candidate=='未进入' and value>winner[key]
-                    elif key in {'generation_thinking','prompt_strategy','retrieval_max_tokens'}:
+                    elif key in {'generation_thinking','retrieval_max_tokens'}:
                         supported = type(final) is int
                     elif key in {'rerank','min_score'}:
                         supported = type(candidate) is int and final=='未进入'
@@ -205,7 +205,8 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
             if not selected or any(cid not in sources for cid in selected):raise ValueError('D来源不属于本实验同身份的保存结果')
             contrast_ids=row.get('contrast_ids',[])
             valid_contrasts=[c for c in facts['contrasts'] if c['id'] in contrast_ids and c['parameter']==key and any(type(v) is type(value) and v==value for v in c['values'])]
-            if kind=='partial' and not valid_contrasts:raise ValueError('部分取用必须有真实拆分对照证据 contrast_ids')
+            # 规则总表五.7：允许只合并一部分参数；有拆分对照的记为已验证，没有的记为待验证。
+            row['partial_contrast_verified'] = bool(valid_contrasts) if kind=='partial' else None
             for cid in selected:
                 source=sources[cid];source_config=pipeline_config(source['config'])
                 if type(source_config[key]) is not type(value) or source_config[key]!=value:raise ValueError('来源取值与D不一致')
@@ -213,6 +214,6 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
                 if not set(record['fixed_question_ids']) & set(targets):raise ValueError('已验证来源须曾修好针对的剩余 Bad Case')
                 bundle=parameter_diff(source_config,base)
                 whole=all(config[k]==v and type(config[k]) is type(v) for k,v in bundle.items())
-                if not whole and (kind!='partial' or not valid_contrasts):raise ValueError('多参数来源必须整组取用；部分取用必须引用拆分对照证据')
+                if not whole and kind!='partial':raise ValueError('多参数来源只取一部分时，source_type须写partial（部分取用）')
         records.append({**row,'source_type':kind})
     return effective_config,records

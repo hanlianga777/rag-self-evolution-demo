@@ -284,7 +284,11 @@ class EvaluationRunner:
             config.setdefault('candidate_k', index_info['knowledge_config']['candidate_k'])
             config.setdefault('top_k', index_info['knowledge_config']['top_k'])
         if not source:
-            config['generation_thinking'] = 'off'
+            # 规则总表三.1/三.3：新 Baseline 固定 Strict，Thinking 取 BASELINE_THINKING（默认 max），配置即实际请求档位。
+            config['prompt_strategy'] = 'Strict'
+            config['generation_thinking'] = getattr(getattr(getattr(self.runtime, 'provider', None), 'settings', None), 'baseline_thinking', 'max')
+            if config['generation_thinking'] not in {'off', 'low', 'high', 'max'}:
+                raise ValueError('BASELINE_THINKING必须为off/low/high/max')
         judge_meta = {"model": self.runtime.model, **VERSIONS, "temperature":0, "baseline_version": production.get("id"), "execution_snapshot": {"embedding_model": index_info.get("embedding_model"), "vector_index": index_info.get("vector_index"), "generation_model": self.runtime.model, "temperature": 0.2}}
         from .paid_run import current_paid_run
         limits=current_paid_run().output_limits if current_paid_run() else (source or {}).get('judge',{}).get('execution_snapshot',{}).get('request_limits')
@@ -1082,7 +1086,7 @@ class EvaluationRunner:
         qualification = qualify_candidate(run["result"]["gates"], regression, comparison['target_bad_cases_fixed'], len(failed), comparison['bad_case_count'])
         if run['status'] != 'completed':
             qualification = {**qualification, 'qualified': False}
-        result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], "error": run.get("error_message"), **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "release_qualification": qualify_release(run["result"]["gates"], regression, len(comparison["all_fixed_question_ids"])), "recommendation": None}
+        result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], "error": run.get("error_message"), **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "release_qualification": qualify_release(run["result"]["gates"], regression, len(comparison["all_fixed_question_ids"]), len(failed), comparison['bad_case_count']), "recommendation": None}
         result['estimated_cost'] = sandbox_cost(list(candidate_cases.values()))
         if candidate['reasoning'].get('candidate_label') == 'D':
             result['qualification'] = result['release_qualification']

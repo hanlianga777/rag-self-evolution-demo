@@ -121,7 +121,7 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                 return save('qualified', 'review')
             winner = min(qualified, key=candidate_rank)
             store.confirm_experiment_report(experiment_id, winner['id'], authorization['actor'],
-                                            audit_note='用户 2026-11-14 预先授权')
+                                            audit_note='用户 2026-11-16 预先授权')
         if not authorization.get('enabled'):
             return save('qualified', 'review')
         check_cycle_stop(store,experiment_id)
@@ -135,6 +135,9 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
             store.refresh_recommendation(experiment_id)
             return save('recommended', 'before_release')
         return None
+
+    if store.experiment(experiment_id, light=True)['result'].get('round_policy', {}).get('stop_rule') == STAGED_RULE:
+        return _run_staged(store, runtime, experiment_id, state, save, advance_qualified, runner, agent)
 
     try:
         while True:
@@ -255,6 +258,155 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
             empty_rounds = empty_rounds+1 if len(experiment['candidates'])==before else 0
             if empty_rounds >= 3:
                 return save('analysis_exhausted', 'analysis', '连续3轮没有合法草案，已停止；试跑预算未额外扣减')
+    except InterruptedError as error:
+        return save('stopped',state.get('phase','sandbox'),str(error))
+    except Exception as error:
+        return save('failed', state.get('phase','analysis'), str(error))
+
+
+STAGED_RULE = 'staged-v1'
+
+
+def staged_decision(round_number, qualified_count, used):
+    """规则总表五.6，纯函数，方便单测。返回 'next_round' / 'composite' / 'finish_winner' / 'agent_failed'。"""
+    if round_number >= 1 and qualified_count >= 2:
+        return 'composite' if used < MAX_EVALS else 'finish_winner'
+    if round_number >= 3 and qualified_count == 1:
+        return 'composite' if used < MAX_EVALS else 'finish_winner'
+    if round_number < 3:
+        return 'next_round' if used < MAX_EVALS else ('finish_winner' if qualified_count else 'agent_failed')
+    if round_number == 3:   # 前 9 个全不合格
+        return 'next_round' if used < MAX_EVALS else 'agent_failed'
+    return 'agent_failed'   # 第 4 轮结束仍无合格（有合格时已在上面转入 D）
+
+
+def _qualified_abc(experiment):
+    return [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}
+            and c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True]
+
+
+def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, runner, agent):
+    """规则总表五.6/五.7 分阶段停止：
+    每轮 3 个跑完再统计；累计合格 ≥2 → D；第 3 轮后只有 1 个合格 → D；前 9 个全不合格 → 第 4 轮，
+    第 4 轮一出现合格就停止本轮剩余方案、用剩余预算做 D；12 个全不合格 → 本次 Agent 优化失败。总预算 12 次含 D。"""
+    from .agent_strategy import conclude_round
+
+    def execute(candidate):
+        save('running', 'sandbox')
+        finished = candidate
+        while True:
+            if finished['status']=='running':
+                runner.recover_run(finished['result']['evaluation_run_id'])
+                finished = store.candidate(candidate['id'])
+            elif finished['status']=='generated':
+                finished = runner.run_candidate(candidate['id'], automatic=True)
+            check_cycle_stop(store,experiment_id)
+            if finished['status']=='evaluated':
+                return finished, None
+            run = store.evaluation_run(finished['result'].get('evaluation_run_id'))
+            if not run:
+                return None, save('failed','sandbox','试跑没有可用断点，不能安全续跑')
+            result = run['result']
+            if result.get('stop_request') and run['id'] not in state.get('resume_stopped_runs',[]):
+                return None, save('stopped','sandbox','用户已停止试跑，保留断点')
+            errors=result.get('technical_errors',[])
+            if any(e.get('provider_error',{}).get('status_code') in {400,401,402,403}
+                   or e.get('provider_error',{}).get('http_status') in {400,401,402,403} for e in errors):
+                return None, save('failed','sandbox',run.get('error_message') or 'Provider请求、权限或余额错误，已停止')
+            error = run.get('error_message') or str(result.get('technical_errors') or '试跑未完整结束')
+            recovery = state.setdefault('sandbox_recovery', {}).setdefault(candidate['id'], {'resumes':0, 'error':error})
+            if recovery['error'] != error:
+                recovery.update(error=error, resumes=0)
+            if recovery['resumes'] >= 2:
+                return None, save('failed','sandbox',f'同一故障连续2次续跑仍未恢复：{error}')
+            plan = runner.candidate_resume_plan(candidate['id'])
+            if not plan['can_resume']:
+                return None, save('failed','sandbox',plan.get('reason') or '冻结身份或费用账本不允许续跑')
+            recovery['resumes'] += 1
+            save('running','sandbox',f"断点续跑第{recovery['resumes']}次：{error}")
+            finished = runner.run_candidate(candidate['id'], automatic=True)
+
+    def finish(experiment, qualified, decision):
+        if decision == 'agent_failed':
+            store.refresh_recommendation(experiment_id)
+            return save('agent_failed', 'review', '全部方案都不合格，本次 Agent 优化失败（规则总表五.6）')
+        def find_d():
+            current = store.experiment(experiment_id, light=True)
+            return next((c for c in current['candidates'] if c['reasoning'].get('candidate_label')=='D'), None)
+        d = find_d()
+        if not (d and d['status'] == 'evaluated'):
+            terminal = advance_qualified(experiment, qualified)
+            if terminal and terminal.get('status') != 'recommended':
+                return terminal
+            d = find_d()
+        if d is None:
+            store.refresh_recommendation(experiment_id)
+            return save('recommended', 'before_release')
+        if d['status'] != 'evaluated':
+            finished, stopped = execute(d)
+            if stopped:
+                return stopped
+        if 'D' not in (store.experiment(experiment_id, light=True)['result'].get('round_conclusions') or {}) or \
+                (store.experiment(experiment_id, light=True)['result']['round_conclusions']['D'].get('status') != 'saved'):
+            save('running', 'composite_review')
+            try:
+                conclude_round(store, runtime, experiment_id, final_d=True)
+            except ValueError as error:
+                state['d_review_error'] = str(error)
+        store.refresh_recommendation(experiment_id)
+        return save('recommended', 'before_release')
+
+    try:
+        while True:
+            check_cycle_stop(store,experiment_id)
+            experiment = store.experiment(experiment_id, light=True)
+            store.require_current_baseline(experiment['baseline_run_id'])
+            if experiment['result'].get('report_confirmation'):
+                return finish(experiment, _qualified_abc(experiment), 'composite')
+            abc = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}]
+            number = max((c['reasoning'].get('round', 1) for c in abc), default=0)
+            current = [c for c in abc if c['reasoning'].get('round', 1) == number]
+            for candidate in current:
+                candidate = store.candidate(candidate['id'])
+                runnable = candidate['status'] in {'generated','running'} or candidate['status']=='failed' and candidate['result'].get('evaluation_run_id')
+                if not runnable:
+                    continue
+                experiment = store.experiment(experiment_id, light=True)
+                if number >= 4 and _qualified_abc(experiment) or experiment['evaluation_budget']['used'] >= MAX_EVALS and candidate['status']=='generated':
+                    store.skip_candidate(candidate['id'], '自动循环', '第4轮已出现合格方案或预算用完，未运行', automatic=True)
+                    continue
+                check_cycle_stop(store,experiment_id)
+                finished, stopped = execute(candidate)
+                if stopped:
+                    return stopped
+            if current:
+                conclude_round(store, runtime, experiment_id)
+            experiment = store.experiment(experiment_id, light=True)
+            qualified = _qualified_abc(experiment)
+            used = experiment['evaluation_budget']['used']
+            decision = staged_decision(number, len(qualified), used) if number else 'next_round'
+            state['staged_decision'] = {'round': number, 'qualified': [c['id'] for c in qualified], 'used': used, 'decision': decision}
+            if decision != 'next_round':
+                return finish(experiment, qualified, decision)
+            if state.get('current_round_only'):
+                return save('round_completed','review')
+            save('running', 'analysis')
+            try:
+                def price_state(pause):
+                    state['price_pause']=pause
+                    save('running','analysis')
+                wait_for_off_peak(store,'cycle:'+experiment_id,price_state,lambda:check_cycle_stop(store,experiment_id))
+                agent.generate(experiment['baseline_run_id'], experiment_id=experiment_id)
+            except ProposalValidationExhausted as error:
+                failures = state.setdefault('proposal_generation_failures', [])
+                failures.append({'round':number+1, 'reason':str(error), 'sandbox_budget_used':0,
+                                 'at':datetime.now(timezone.utc).isoformat()})
+                if sum(f['round'] == number+1 for f in failures) < 3:
+                    save('running','analysis',str(error))
+                    continue
+                if qualified:
+                    return finish(experiment, qualified, 'composite')
+                return save('analysis_exhausted','analysis',str(error))
     except InterruptedError as error:
         return save('stopped',state.get('phase','sandbox'),str(error))
     except Exception as error:

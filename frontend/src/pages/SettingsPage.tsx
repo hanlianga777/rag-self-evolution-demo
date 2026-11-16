@@ -40,7 +40,7 @@ export function SettingsPage({ data }: { data: any }) {
     ["分块", knowledge.chunk_strategy ? `Parent-Child 分块 · Parent ${knowledge.parent_tokens} / Child ${knowledge.child_tokens} / 重叠 ${knowledge.overlap_tokens}` : data.documents?.[0]?.chunk_strategy],
     ["Embedding 模型", knowledge.embedding_model || index.embedding_model], ["实际维度", index.dimension != null ? `${index.dimension} 维` : null],
     ["索引", index.vector_index], ["Rerank 模型", knowledge.rerank_model],
-    ["回答生成模型", pipeline?.frozen_models?.generation], ["Judge 模型", pipeline?.frozen_models?.judge],
+    ["回答生成模型", pipeline?.frozen_models?.generation], ["回答策略", "Strict（分级回答）"], ["Judge 模型", pipeline?.frozen_models?.judge],
   ];
   const change = (key: string, value: any) => setDraft(previous => {
     const next = { ...previous, [key]: value };

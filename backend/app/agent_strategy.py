@@ -83,13 +83,18 @@ def _save(store, experiment_id, number, saved):
 
 
 @provider_task('agent')
-def conclude_round(store, runtime, experiment_id):
+def conclude_round(store, runtime, experiment_id, *, final_d=False):
+    """每轮 A/B/C 跑完后的 Agent 复盘；final_d=True 时对 D 做同样的事后复盘（规则总表五.7）。"""
     experiment = store.experiment(experiment_id, light=True)
     if experiment['result'].get('strategy_contract') not in {'agent-strategy-3','agent-strategy-4'}:
         return
-    abc = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}]
-    number = max((c['reasoning'].get('round', 1) for c in abc), default=0)
-    current = [c for c in abc if c['reasoning'].get('round', 1) == number]
+    if final_d:
+        current = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') == 'D']
+        number = 'D'
+    else:
+        abc = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}]
+        number = max((c['reasoning'].get('round', 1) for c in abc), default=0)
+        current = [c for c in abc if c['reasoning'].get('round', 1) == number]
     if not current or any(c['status'] not in {'evaluated','skipped'} for c in current):
         return
     saved = experiment['result'].get('round_conclusions', {}).get(str(number), {'status':'pending', 'attempts':[]})
@@ -140,7 +145,7 @@ def conclude_round(store, runtime, experiment_id):
             if experiment['result'].get('causal_evidence'):
                 mapping = {r['题号']:r['题目键'] for rows in facts['case_comparisons'].values() for r in rows}
                 response = business_output(normalize_question_references(response, mapping), mapping,
-                    {c['id']:f"第{c['reasoning'].get('round',1)}轮方案{c['reasoning'].get('candidate_label','')}" for c in evaluated})
+                    {c['id']:('方案D' if c['reasoning'].get('candidate_label')=='D' else f"第{c['reasoning'].get('round',1)}轮方案{c['reasoning'].get('candidate_label','')}") for c in evaluated})
             review = validate_round_conclusion(response, evaluated)
             if experiment['result'].get('causal_evidence'):
                 for plan in review['plans']:
@@ -156,19 +161,32 @@ def conclude_round(store, runtime, experiment_id):
     raise ValueError('本轮结论连续校验拒绝：'+saved['attempts'][-1]['error'])
 
 
-def validate_d_mode(suggestion, winner, history):
+def validate_d_mode(suggestion, winner, history, facts=None):
+    """规则总表五.7：≥2个合格→部分合并（D须取用另一个合格方案的参数）；只有1个合格→在它上面至少再加1个参数。
+    优先用验证过的参数；没验证过的参数可以用，但已有可用的验证参数时不能全部用新参数。D 必须生成。"""
     mode = suggestion.get('combination_mode')
-    if mode not in {'partial_fusion','winner_plus_verified'} or not isinstance(suggestion.get('mode_reason'), str) or not suggestion['mode_reason'].strip():
-        raise ValueError('D须选择部分融合或Winner加有效参数，并说明原因')
+    if mode == 'winner_plus_verified':
+        mode = suggestion['combination_mode'] = 'winner_plus'
+    if mode not in {'partial_fusion','winner_plus'} or not isinstance(suggestion.get('mode_reason'), str) or not suggestion['mode_reason'].strip():
+        raise ValueError('D须选择partial_fusion（部分合并）或winner_plus（在合格方案上加参数），并说明原因')
     if suggestion.get('should_generate_d') is not True:
-        return
+        raise ValueError('有合格方案时必须生成D（规则总表五.7）')
+    qualified = {c['id'] for c in history if c.get('status') == 'evaluated' and c['reasoning'].get('candidate_label') in {'A','B','C'}
+                 and c['result'].get('qualification', {}).get('qualified') is True}
     changes = suggestion.get('changes', [])
-    selected = {winner['id']} | {cid for c in changes for cid in c.get('source_candidates', [])}
-    qualified = {c['id'] for c in history if c['result'].get('qualification', {}).get('qualified') is True}
-    if mode == 'partial_fusion' and (len(selected & qualified) < 2 or not selected <= qualified):
-        raise ValueError('部分融合须引用两个以上合格方案的有效且不冲突参数')
-    if any(c.get('source_type') not in {'verified','partial','已验证','部分取用'} for c in changes):
-        raise ValueError('本次D只取已验证有效参数，不能新增未验证取值')
+    if not isinstance(changes, list) or not changes:
+        raise ValueError('D至少要改1个参数')
+    if len(qualified) >= 2:
+        if mode != 'partial_fusion':
+            raise ValueError('已有2个及以上合格方案，D须为partial_fusion')
+        others = qualified - {winner['id']}
+        if not any(set(c.get('source_candidates') or []) & others for c in changes if isinstance(c, dict)):
+            raise ValueError('partial_fusion须取用另一个合格方案的有效参数')
+    elif mode != 'winner_plus':
+        raise ValueError('只有1个合格方案，D须为winner_plus')
+    kinds = [{'已验证':'verified','部分取用':'partial','新尝试':'new_attempt'}.get(c.get('source_type'), c.get('source_type')) for c in changes if isinstance(c, dict)]
+    if (facts or {}).get('usable_repairs') and kinds and all(k == 'new_attempt' for k in kinds):
+        raise ValueError('事实表已有可用的验证参数（usable_repairs），须优先使用，未验证参数只能作为补充')
 
 
 def validate_causal_proposals(response, comparisons):

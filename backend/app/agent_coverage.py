@@ -45,7 +45,7 @@ def plan_coverage(rows,base,candidates,*,round_number=1,labels=None):
     uncovered={q for q,m in matrix.items() if not m['candidates']}
     # Bounded single-stage templates. No retrieval calls, new evidence or guessed causal roots.
     options=[]
-    for key,direction in [('candidate_k','candidate_recall'),('top_k','context_selection'),('rerank','context_selection'),('prompt_strategy','grounded_generation')]:
+    for key,direction in [('candidate_k','candidate_recall'),('top_k','context_selection'),('rerank','context_selection'),('generation_thinking','grounded_generation')]:
         values=list(ALLOWED_SEARCH_SPACE[key])
         if key=='rerank':values.sort(key=lambda value:0 if value=='query_only' else 1)
         for value in values:
@@ -90,7 +90,7 @@ def _proposal(label,direction,diff,rows,views):
     observation={'candidate_recall':'candidate_pool_gap','context_selection':'context_pool_gap','grounded_generation':'answer_requirement_gap'}[direction]
     explanation={'candidate_recall':'扩大候选池，检验冻结规范缺失是否可被补回',
         'context_selection':'调整上下文选择，检验候选已含但Final遗漏的规范能否恢复',
-        'grounded_generation':'调整有据回答策略，检验已保存要求的遗漏能否改善'}[direction]
+        'grounded_generation':'调整 Thinking 档位，检验已保存要求的遗漏能否改善'}[direction]
     return {'id':label,'target_bad_cases':list(roots),'root_cause_evidence':list(roots),'target_root_causes':roots,
         'root_cause':next(iter(set(roots.values()))) if len(set(roots.values()))==1 else 'Unknown',
         'experiment_kind':'exploratory','intervention_direction':direction,'config_diff':diff,

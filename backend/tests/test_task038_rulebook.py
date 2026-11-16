@@ -1,0 +1,188 @@
+"""规则总表（指挥/规则总表.md，2026-11-16）对应的纯逻辑测试：不连模型、不建数据库。"""
+import pytest
+
+from app import policy
+from app.policy import (qualify_candidate, qualify_release, protected_question, validate_candidate_config,
+                        select_final_candidate, is_downgrade_with_retrieval, DEFAULT_PIPELINE_CONFIG,
+                        ALLOWED_SEARCH_SPACE)
+from app.optimization_cycle import staged_decision
+from app.optimization import validate_round_contract, downgrade_required
+from app.agent_strategy import validate_d_mode
+from app.providers import thinking_config
+
+
+GATES_OK = {"passed": True}
+
+
+def regression(critical, ordinary):
+    r = policy.evaluate_regression(new_critical_failures=critical, new_ordinary_failures=ordinary)
+    r["new_regressions"] = critical + ordinary
+    return r
+
+
+def base_config():
+    return {k: v for k, v in DEFAULT_PIPELINE_CONFIG.items()}
+
+
+# ---------- 一、二：搜索空间与固定参数 ----------
+
+def test_defaults_are_strict_and_max():
+    assert DEFAULT_PIPELINE_CONFIG["prompt_strategy"] == "Strict"
+    assert DEFAULT_PIPELINE_CONFIG["generation_thinking"] == "max"
+    assert "prompt_strategy" not in ALLOWED_SEARCH_SPACE
+    assert ALLOWED_SEARCH_SPACE["generation_thinking"] == ("off", "low", "high", "max")
+
+
+def test_prompt_strategy_is_fixed_not_tunable():
+    config = base_config()
+    assert validate_candidate_config(config)["valid"]
+    config["generation_thinking"] = "high"
+    assert validate_candidate_config(config)["valid"]
+    config["prompt_strategy"] = "Grounded"
+    assert not validate_candidate_config(config)["valid"]
+
+
+# ---------- 五.5：统一合格标准 ----------
+
+@pytest.mark.parametrize("critical,ordinary,base_bad,cand_bad,ok", [
+    (0, 0, 8, 7, True),
+    (0, 1, 8, 7, True),     # 修好2、新增1普通，净少1
+    (0, 2, 8, 6, False),    # 新增普通超过1道
+    (1, 0, 8, 6, False),    # 新增严重题
+    (0, 1, 8, 8, False),    # 修好1新增1，总数没少
+    (0, 0, 8, 8, False),
+])
+def test_candidate_and_release_use_one_rule(critical, ordinary, base_bad, cand_bad, ok):
+    reg = regression(critical, ordinary)
+    assert qualify_candidate(GATES_OK, reg, 0, base_bad, cand_bad)["qualified"] is ok
+    assert qualify_release(GATES_OK, reg, base_bad - cand_bad + ordinary + critical, base_bad, cand_bad)["qualified"] is ok
+
+
+def test_gate_failure_blocks():
+    assert not qualify_candidate({"passed": False}, regression(0, 0), 1, 8, 6)["qualified"]
+    assert not qualify_release({"passed": False}, regression(0, 0), 2, 8, 6)["qualified"]
+
+
+def test_target_fix_is_not_a_condition_anymore():
+    assert qualify_candidate(GATES_OK, regression(0, 0), 0, 8, 7)["qualified"]
+
+
+# ---------- 一.6：严重题只看冻结题卷 ----------
+
+def test_protected_question_ignores_dynamic_severity():
+    assert protected_question({"severity": "critical"}, {}) is False
+    assert protected_question({}, {"negative_subtype": "prompt_injection"}) is True
+    assert protected_question({}, {"negative_subtype": "safety_critical"}) is True
+    assert protected_question({}, {"criticality": "high"}) is True
+    assert protected_question({"negative_subtype": "clarify"}, {}) is False
+
+
+# ---------- 五.6：分阶段停止 ----------
+
+@pytest.mark.parametrize("round_number,qualified,used,decision", [
+    (1, 2, 3, "composite"),       # 第1轮就有2个合格 → 直接 D
+    (1, 1, 3, "next_round"),
+    (2, 2, 6, "composite"),
+    (2, 1, 6, "next_round"),
+    (3, 1, 9, "composite"),       # 3轮后只有1个 → D
+    (3, 0, 9, "next_round"),      # 前9个全不合格 → 第4轮
+    (4, 1, 10, "composite"),      # 第4轮第10个就合格 → 用剩余预算做 D
+    (4, 1, 12, "finish_winner"),  # 第12个才合格 → 没预算，不做 D
+    (4, 0, 12, "agent_failed"),
+])
+def test_staged_decision(round_number, qualified, used, decision):
+    assert staged_decision(round_number, qualified, used) == decision
+
+
+# ---------- 五.4：降档补位；五.1：最多改两个参数 ----------
+
+def _prior(config_diff, label="A", round_number=1):
+    return {"id": f"R{round_number}-{label}", "status": "evaluated", "config": {**base_config(), **config_diff},
+            "reasoning": {"candidate_label": label, "round": round_number}, "result": {}}
+
+
+def test_downgrade_detection():
+    base = base_config()
+    assert is_downgrade_with_retrieval({**base, "generation_thinking": "high", "candidate_k": 24}, base)
+    assert not is_downgrade_with_retrieval({**base, "generation_thinking": "high"}, base)
+    assert not is_downgrade_with_retrieval({**base, "candidate_k": 24}, base)
+
+
+def test_downgrade_required_only_in_round3_when_never_tried():
+    base = base_config()
+    tried = [_prior({"generation_thinking": "high", "top_k": 6})]
+    never = [_prior({"candidate_k": 24})]
+    assert downgrade_required(never, base, 3)
+    assert not downgrade_required(tried, base, 3)
+    assert not downgrade_required(never, base, 2)
+
+
+def test_round3_c_must_fill_downgrade():
+    base = base_config()
+    prior = [_prior({"candidate_k": 24})]
+    no_downgrade = [{"id": "A", "config_diff": {"top_k": 6}}, {"id": "B", "config_diff": {"hyde": True}},
+                    {"id": "C", "config_diff": {"min_score": 0.1}}]
+    with pytest.raises(ValueError, match="降档补位"):
+        validate_round_contract(no_downgrade, base, prior, round_number=3)
+    ok = [{"id": "A", "config_diff": {"top_k": 6}}, {"id": "B", "config_diff": {"hyde": True}},
+          {"id": "C", "config_diff": {"generation_thinking": "high", "candidate_k": 24}}]
+    validate_round_contract(ok, base, prior, round_number=3)
+
+
+def test_max_two_parameters_per_candidate():
+    base = base_config()
+    too_many = [{"id": "A", "config_diff": {"top_k": 6, "hyde": True, "min_score": 0.1}},
+                {"id": "B", "config_diff": {"candidate_k": 24}}, {"id": "C", "config_diff": {"rerank": False}}]
+    with pytest.raises(ValueError, match="最多改两个参数"):
+        validate_round_contract(too_many, base, [], round_number=1)
+
+
+# ---------- 五.7：D 规则与最终选择 ----------
+
+def _qualified(cid, bad, label="A"):
+    return {"id": cid, "status": "evaluated", "config": base_config(),
+            "reasoning": {"candidate_label": label, "round": 1},
+            "result": {"qualification": {"qualified": True}, "bad_case_count": bad, "regression": {}, "metrics": {"latency_p99_seconds": 30}}}
+
+
+def _suggestion(mode, sources, kind="verified"):
+    return {"combination_mode": mode, "mode_reason": "原因", "should_generate_d": True,
+            "changes": [{"parameter": "top_k", "source_type": kind, "source_candidates": sources}]}
+
+
+def test_d_partial_fusion_needs_second_qualified_source():
+    winner, other = _qualified("R1-A", 5), _qualified("R1-B", 6, "B")
+    validate_d_mode(_suggestion("partial_fusion", ["R1-B"]), winner, [winner, other])
+    with pytest.raises(ValueError, match="另一个合格方案"):
+        validate_d_mode(_suggestion("partial_fusion", ["R1-A"]), winner, [winner, other])
+    with pytest.raises(ValueError, match="partial_fusion"):
+        validate_d_mode(_suggestion("winner_plus", ["R1-B"]), winner, [winner, other])
+
+
+def test_d_single_qualified_may_use_new_attempt_but_prefers_verified():
+    winner = _qualified("R1-A", 5)
+    validate_d_mode(_suggestion("winner_plus", [], "new_attempt"), winner, [winner])
+    with pytest.raises(ValueError, match="优先使用"):
+        validate_d_mode(_suggestion("winner_plus", [], "new_attempt"), winner, [winner], {"usable_repairs": [{"x": 1}]})
+    with pytest.raises(ValueError, match="必须生成D"):
+        validate_d_mode({**_suggestion("winner_plus", []), "should_generate_d": False}, winner, [winner])
+
+
+def test_select_final_candidate():
+    winner = _qualified("R1-A", 5)
+    better_d = {**_qualified("EXP-D", 4, "D")}
+    worse_d = {**_qualified("EXP-D", 6, "D")}
+    failed_d = {**_qualified("EXP-D", 3, "D"), "result": {"qualification": {"qualified": False}}}
+    assert select_final_candidate([winner], better_d)["candidate_id"] == "EXP-D"
+    assert select_final_candidate([winner], worse_d)["candidate_id"] == "R1-A"
+    assert select_final_candidate([winner], failed_d)["candidate_id"] == "R1-A"
+    assert select_final_candidate([], None)["decision"] == "本次 Agent 优化失败"
+
+
+# ---------- 三.3：配置的档位就是实际请求的档位 ----------
+
+def test_generation_thinking_is_not_forced_off():
+    assert thinking_config("baseline", "max")["reasoning_effort"] == "max"
+    assert thinking_config("candidate", "high")["reasoning_effort"] == "high"
+    assert thinking_config("candidate", "off")["thinking"]["type"] == "disabled"
+    assert thinking_config("query_rewrite", "max")["thinking"]["type"] == "disabled"

@@ -17,14 +17,14 @@ from .agent_inputs import prepare_baseline_rows, retrieval_facts, is_optimizatio
 from .paid_run import provider_task
 from .paid_schedule import wait_for_off_peak, clear_run_now
 from .telemetry import collect_usage, measure, cost_fields
-from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, MAX_EVALS, canonicalize_config, search_space_contract, validate_candidate_config
+from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, MAX_EVALS, canonicalize_config, search_space_contract, validate_candidate_config, is_downgrade_with_retrieval
 
 
 INTERVENTIONS = {
     'query_expansion': ({'query_rewrite','multi_query','hyde'}, {'recall_missing'}),
     'candidate_recall': ({'candidate_k','hybrid_search','hybrid_alpha'}, {'recall_missing'}),
     'context_selection': ({'top_k','rerank','min_score','retrieval_max_tokens'}, {'ranking_omission','retrieval_noise'}),
-    'grounded_generation': ({'prompt_strategy','generation_thinking'}, {'final_sufficient','confirmed_claim','safety_failure'}),
+    'grounded_generation': ({'generation_thinking'}, {'final_sufficient','confirmed_claim','safety_failure'}),
     'stage_performance': (set(search_space_contract()), {'measured_latency'}),
 }
 
@@ -33,7 +33,7 @@ DIRECTION_PARAMETERS = {
     'Query Rewrite':['query_rewrite'], 'HyDE':['hyde'], 'Multi-Query':['multi_query'],
     '候选数':['candidate_k'], 'Hybrid Search':['hybrid_search','hybrid_alpha'],
     'Rerank':['rerank'], '保留条数':['top_k'], '最低分数线':['min_score'],
-    '回答策略':['prompt_strategy'], '上下文窗口':['retrieval_max_tokens'], 'Thinking 档位':['generation_thinking'], '降低 Thinking 档位':['generation_thinking'],
+    '上下文窗口':['retrieval_max_tokens'], 'Thinking 档位':['generation_thinking'], '降低 Thinking 档位':['generation_thinking'],
     '关闭耗时环节':['hyde','multi_query','query_rewrite','rerank'], '调整检索参数':['candidate_k','top_k'],
 }
 PRIORITY_PARAMETERS = {row['label']:list(dict.fromkeys(key for direction in row['directions'] for key in DIRECTION_PARAMETERS.get(direction, []))) for row in DIAGNOSTIC_CATEGORIES}
@@ -42,7 +42,7 @@ PARAMETER_ACTIONS = {
     'candidate_k':'调整候选池','top_k':'调整 Top-K','min_score':'调整最低分数线',
     'hybrid_search':'调整 Hybrid Search','hybrid_alpha':'调整混合比例','rerank':'调整 Rerank',
     'query_rewrite':'调整 Query Rewrite','multi_query':'调整 Multi-Query','hyde':'调整 HyDE',
-    'prompt_strategy':'调整回答策略','generation_thinking':'调整 Thinking 档位',
+    'generation_thinking':'调整 Thinking 档位',
     'retrieval_max_tokens':'调整检索长度上限',
 }
 
@@ -78,8 +78,16 @@ def gate_harming_changes(prior_candidates, baseline_gates=None):
 
 
 def efficiency_optimization(prior_candidates, completed):
-    return completed >= 6 and not any(c.get('result', {}).get('qualification', {}).get('qualified') is True
-                                     for c in prior_candidates if c.get('status') == 'evaluated')
+    """Legacy name kept for callers; see downgrade_required (规则总表五.4)."""
+    return False
+
+
+def downgrade_required(prior_candidates, baseline, round_number):
+    """规则总表五.4：截至第3轮C生成时，之前所有方案都没出现"降档+检索补强"，本轮须补上（C兜底）。"""
+    if round_number != 3 or baseline.get('generation_thinking', 'max') == 'off':
+        return False
+    return not any(is_downgrade_with_retrieval({**baseline, **(c.get('config') or {})}, baseline)
+                   for c in prior_candidates if c.get('reasoning', {}).get('candidate_label') in {'A', 'B', 'C'})
 
 
 def inherited_base(candidate, baseline, prior_candidates, round_number, round_policy):
@@ -134,27 +142,29 @@ def parse_agent_json(content, audit):
         return result
 
 
-def validate_round_contract(candidates, baseline, prior_candidates, baseline_gates=None, *, completed=0, labels=None):
+def validate_round_contract(candidates, baseline, prior_candidates, baseline_gates=None, *, completed=0, labels=None, round_number=None):
     labels = labels if labels is not None else list('ABC')
     if len(candidates)!=len(labels) or any(not isinstance(c,dict) for c in candidates) or {c.get('id') for c in candidates}!=set(labels):
         raise ValueError('每轮必须恰好提供A/B/C三套方案' if labels == list('ABC') else '每轮必须恰好提供'+ '/'.join(labels) +'方案')
     used=set()
-    compensated_high = False
+    downgrades = {}
     for candidate in candidates:
         diff=candidate.get('config_diff')
         if not isinstance(diff,dict) or not diff:raise ValueError('Config Diff必须包含实际参数改动')
+        if len(diff) > 2:raise ValueError('每个方案相对底座最多改两个参数（规则总表五.1）')
         if used & set(diff):raise ValueError('同轮方案不得共用参数：'+','.join(sorted(used & set(diff))))
         used.update(diff)
         current=baseline.get('generation_thinking','max')
         proposed=diff.get('generation_thinking',current)
         if current not in THINKING_LEVELS or proposed not in THINKING_LEVELS:raise ValueError('未知Thinking档位')
-        compensated_high |= current == 'max' and proposed == 'high' and bool(EFFICIENCY_PARAMETERS & {k for k,v in diff.items() if v!=baseline.get(k)})
+        effective = {**baseline, **(candidate.get('inherited_parameters') or {}), **diff}
+        downgrades[candidate.get('id')] = is_downgrade_with_retrieval(effective, baseline)
         for previous in gate_harming_changes(prior_candidates,baseline_gates):
             harmed=previous['config_diff']
             if harmed and diff == harmed:
                 raise ValueError('不得照搬已证明伤害 Hard Gate 的相同改动')
-    if baseline.get('generation_thinking', 'max') == 'max' and efficiency_optimization(prior_candidates, completed) and not compensated_high:
-        raise ValueError('Agent 策略 · 效率优化：6次评测后无合格方案，须有一个Max降到High并实际修改检索补偿参数的Candidate')
+    if round_number is not None and downgrade_required(prior_candidates, baseline, round_number) and not any(downgrades.values()):
+        raise ValueError('降档补位（规则总表五.4）：之前所有方案都没有出现"Thinking从Max降档+至少一个检索参数改动"，第3轮C必须是这种方案')
 
 
 def validate_prior_round_review(result, prior_candidates):
@@ -332,20 +342,20 @@ def enhancement_latency_deltas(baseline_config, baseline_result, candidates):
 
 
 def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, labels, *, baseline_gates=None, evaluation_budget=None, failed_parameter_signatures=None,
-                       baseline_result=None, baseline_cases=None, candidate_cases=None, golden_questions=None, round_conclusions=None, round_policy=None, causal_evidence=False):
+                       baseline_result=None, baseline_cases=None, candidate_cases=None, golden_questions=None, round_conclusions=None, round_policy=None, causal_evidence=False, round_number=None):
     """Build the exact Agent request without a Provider or persistence side effect."""
     system = ('你是RAG优化Agent。根据保存的错题诊断提出优化方案。'
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
               '先读程序生成的基线诊断摘要、速度事实、逐题变化及已被证明有害的改动清单gate_harming_changes。每轮恰好ABC三套，direction由你根据事实自行确定，不预设方向。同轮修改参数互斥。不得照搬gate_harming_changes。'
-              '生成回答固定关闭思考，不能调整思考档位；如需提速，从检索开销和上下文长度寻找依据。'
+              '回答策略固定为Strict（分级回答），不是可调参数。generation_thinking可选off/low/high/max，Baseline是max；把Thinking从max降档并配合至少一个检索参数补强，用来验证较低档位能否同样修好Bad Case，是重要方向。每个方案相对其底座最多改两个参数。'
               '有害改动仅禁止完整配置差异原样重复；叠加其他参数的组合只提示风险，不能推断单参数有害。'
               '先写前几轮复盘prior_round_review：summary首轮写无；plans逐一覆盖所有已完成历史方案，每条含candidate_id、changes、fixed_question_ids、new_failure_question_ids（均用保存的正式question_id）、evidence_reason（证据位置、速度、单/多参数归因）、conclusion（有效/有害/待验证及依据）；多参数必须说明无法单独确定并给most_likely_parameter和attribution_reason；baseline_remaining_assessment总结Baseline剩余错题；conclusions为[{id,conclusion}]。首轮plans为空，conclusions从Baseline事实归纳。每套方案必须用review_conclusion_ids引用其中结论。'
               '第二部分bad_case_summary：groups逐字采用bad_case_groups的layer/subtype/question_ids/count，focus指出最集中问题，conclusions为[{id,conclusion}]。第三部分每个Candidate必须有bad_case_conclusion_ids引用第二部分，predicted_fixed_question_ids写预计修好的正式题号数组；并写参数值、针对的问题、风险、依据。第四部分本轮结论将在试跑完成后另行请你根据保存结果撰写，previous_round_conclusions是下一轮必须吸收的经验。'
               '导致门槛未过的错题分类优先级升为1，按optimization_priorities及其原因安排优化。每个参数的用途与各可选值说明见allowed_parameter_values。'
               '每个参数的预期影响须点名预计修好的目标题号；风险须说明可能弄坏的题号或指标及原因；不得重复失败组合签名。'
               'target_bad_cases可用展示题号（例如Q04）、正式题目ID或Bad Case ID，必须引用当前bad_cases。'
-              '没有合格方案就回到分析并再出一轮，最多12次试跑，其中1次留给D。D仅合并已验证有效改动；'
-              'D无新增错题且至少修好1道才发布，否则保留赢家；发布规则与门槛不变。'
+              '合格标准：11项门槛全过；错题总数比Baseline至少少1道；新增错题最多1道且只能是普通题，严重题（安全关键、提示注入）不得新增错误。'
+              '每轮三套跑完后统计：累计合格达到2个就停止出新方案、转入D；第3轮跑完仍只有1个合格也转入D；前三轮全不合格再出第4轮；全部试跑（含D）合计最多12次。'
               '设计方案时要留余量，让预期能修好的题数明显多于可能弄坏的题数，不要只追求刚好多修1道。'
               '只返回JSON，格式：{"prior_round_review":{"summary":"无","plans":[],"baseline_remaining_assessment":"整体判断","conclusions":[{"id":"L1","conclusion":"事实结论"}]},"bad_case_summary":{"groups":[],"focus":"最集中问题","conclusions":[{"id":"B1","conclusion":"统计事实"}]},"candidates":[{"id":"A","review_conclusion_ids":["L1"],"bad_case_conclusion_ids":["B1"],"predicted_fixed_question_ids":["正式题目ID"],"action_name":"中文动作短语",'
               '"direction":"检索召回增强","strategy_name":"「动作名」（检索优先）","core_idea":"一两句话",'
@@ -366,7 +376,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
                      'priority':priority_by_category.get(view.get('diagnosis_category'),{}).get('priority',view.get('priority')),
                      'priority_note':priority_by_category.get(view.get('diagnosis_category'),{}).get('priority_note',''),
                      'retrieval_facts':row.get('retrieval_facts') or retrieval_facts(row['result'])})
-    budget = {**{'used': 0, 'max': MAX_EVALS, 'reserved_for_d': 1}, **(evaluation_budget or {})}
+    budget = {**{'used': 0, 'max': MAX_EVALS, 'reserved_for_d': 0}, **(evaluation_budget or {})}
     budget.update(remaining=max(0, budget['max'] - budget['used']), remaining_for_abc=max(0, budget['max'] - budget['used'] - budget['reserved_for_d']))
     baseline_by_id={case['question_id']:case for case in baseline_cases or []}
     questions = {q['id']:q for q in golden_questions or []}
@@ -400,13 +410,13 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
         'optimization_priorities':priorities,
         'evaluation_budget':budget, 'next_action':'analyze_and_propose' if budget['remaining_for_abc'] else 'review_for_d',
         'failed_parameter_signatures':failed_parameter_signatures or [],
-        'goal':{'objective':'通过11项门槛、错题总数少于Baseline、至少修好1道目标错题，安全关键题和提示注入题无新错。普通新错留给方案D处理。',
+        'goal':{'objective':'11项门槛全过；错题总数比Baseline至少少1道；新增错题最多1道且只能是普通题；安全关键题和提示注入题不得新增错误。',
                 'failed_gates':failed_gates,'candidate_labels':labels,'baseline_configuration':base_config},
         'bad_cases':rows,
         'baseline_performance':performance_facts(baseline_result or {},baseline_cases or []),
-        'priority_parameters':{key:[p for p in values if p != 'generation_thinking'] for key,values in PRIORITY_PARAMETERS.items()},
-        'allowed_parameter_values':{key:rule for key,rule in search_space_contract().items() if key != 'generation_thinking'},
-        'round_contract':{'count':3,'efficiency_optimization':base_config.get('generation_thinking', 'max') == 'max' and efficiency_optimization(prior_candidates, budget['used']),'parameters_disjoint':True},
+        'priority_parameters':PRIORITY_PARAMETERS,
+        'allowed_parameter_values':search_space_contract(),
+        'round_contract':{'count':3,'downgrade_required':downgrade_required(prior_candidates, base_config, round_number),'parameters_disjoint':True,'max_changed_parameters':2},
         'previous_round_conclusions':round_conclusions or {},
         'gate_harming_changes':gate_harming_changes(prior_candidates,gates),
         'prior_sandbox_results':prior_results,
@@ -419,7 +429,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
     if (round_policy or {}).get('mode') == 'full_rounds':
         from .policy import candidate_rank
         system = system.replace('每轮恰好ABC三套', '每轮恰好提供goal.candidate_labels指定的方案，预算不足三套时按标签数量提供')
-        system += ('本实验按round_policy跑满轮次，合格后仍继续。针对best_qualified_candidate的剩余Bad Case和离门槛最近的指标提出不同方向；'
+        system += ('本实验按round_policy分阶段停止（见合格标准后的停止规则）。若round_contract.downgrade_required为true，本轮至少一个方案（A、B都不是时由C承担）必须把generation_thinking从max降档并改至少一个检索参数。针对best_qualified_candidate的剩余Bad Case和离门槛最近的指标提出不同方向；'
                    '第2轮起想在合格方案上继续优化，就用继承字段；同轮几个方案的新改动必须互不相同。'
                    '可选inherited_from为本实验前几轮已评测合格ABC的完整ID；inherited_parameters只取该方案相对Baseline改过参数的子集，值和类型完全一致。'
                    'changed_parameters只写新增改动（config_diff是其兼容字段，两者同时写须一致），不得重复列出未变化的继承参数。'
@@ -456,8 +466,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
                    'prior_round_review.plans每条新增causal_claims数组，每项含question_id（Q29形式）、parameter（中文参数名）、conclusion（有效、无效、不确定或未改变证据）。'
                    '每道修好、新错题都要有归因条目；未变的证据不能支持检索参数因果判断。'
                    'previous_round_conclusions必须读取并用于本轮选择。所有说明、理由、风险使用中文业务短句、中文参数名、Q29形式题号；不出现内部编号或英文下划线字段名。结构键和config_diff等机器字段保留协议格式。'
-                   '相同配置允许提出，执行时复用已保存结果，不重复付费。')
-        system = system.replace('历史相同配置仍拒绝', '历史相同配置复用保存结果')
+                   '与历史方案完全相同的配置不得再次提出。')
         system += '机器题号数组也可写Q29形式，程序会按冻结题卷解析；参数配置对象仍用协议字段名。'
     return system,prompt
 
@@ -587,7 +596,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
         candidates = result['candidates']
     audit['prior_round_review'] = validate_prior_round_review(result, prior_candidates)
     validate_round_contract(candidates,base_config,prior_candidates,(audit.get('baseline_gate_results') or {}).get('gates'),completed=completed,
-                            labels=labels if audit.get('strategy_contract') == 'agent-strategy-4' else None)
+                            labels=labels if audit.get('strategy_contract') == 'agent-strategy-4' else None, round_number=round_number)
     if audit.get('strategy_contract') in {'agent-strategy-3','agent-strategy-4'}:
         from .agent_strategy import validate_strategy
         validate_strategy(result, prior_candidates, audit, {item['question_id'] for item in bad_cases})
@@ -652,7 +661,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
             if config.get("hybrid_search") is False and "hybrid_alpha" not in diff:
                 config.pop("hybrid_alpha", None)
             audit["validation_stage"] = "search_space"
-            check = validate_candidate_config(config, prior_configs=() if audit.get('causal_evidence') else prior, completed_evals=completed)
+            check = validate_candidate_config(config, prior_configs=prior, completed_evals=completed)
             if not check["valid"]:
                 audit["validation_issues"] = check["issues"]
                 if check["issues"]:
@@ -664,7 +673,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
             validate_intervention(candidate,target_cases,effective_base)
             target_ids = [item['diagnostic_view'].get('display_question_id') or item['question_id'] for item in selected]
             target_mentions = target_ids + [item['question_id'] for item in selected]
-            focus = '速度优先' if 'generation_thinking' in diff and len(diff) == 1 else '回答优先' if set(diff) <= {'prompt_strategy','generation_thinking'} else '检索优先'
+            focus = '速度优先' if 'generation_thinking' in diff else '检索优先'
             candidate.setdefault('strategy_name', f'「{candidate["action_name"]}」（{focus}）')
             candidate.setdefault('core_idea', candidate['hypothesis'])
             candidate.setdefault('adjustments', [{'parameter':key, 'baseline_value':effective_base.get(key), 'candidate_value':value,
@@ -822,8 +831,8 @@ class OptimizationAgent:
             target_reference_map[item["question_id"]] = reference
         if event:
             target_reference_map[event["id"]] = {"source": "monitoring_event", "event_id": event["id"], "trigger_id": trigger_id}
-        evaluation_budget = {"used": completed, "max": MAX_EVALS, "reserved_for_d": 1,
-                             "remaining":MAX_EVALS-completed,"remaining_for_abc":max(0,MAX_EVALS-1-completed)}
+        evaluation_budget = {"used": completed, "max": MAX_EVALS, "reserved_for_d": 0,
+                             "remaining":MAX_EVALS-completed,"remaining_for_abc":max(0,MAX_EVALS-completed)}
         gate_results = baseline["result"].get("gates")
         persisted_gates = (gate_results or {}).get("gates")
         failed_gates = [gate for gate in persisted_gates if gate.get("passed") is False] if isinstance(persisted_gates, list) else None
@@ -849,7 +858,7 @@ class OptimizationAgent:
             baseline_gates=persisted_gates,evaluation_budget=evaluation_budget,failed_parameter_signatures=audit['failed_parameter_signatures'],
             baseline_result=baseline['result'],baseline_cases=saved_cases(baseline_run_id),
             candidate_cases={c['id']:saved_cases(c.get('result',{}).get('evaluation_run_id')) for c in prior_candidates},
-            golden_questions=list(questions.values()),round_conclusions=context.get('round_conclusions'),round_policy=context.get('round_policy'),causal_evidence=context.get('causal_evidence') is True)
+            golden_questions=list(questions.values()),round_conclusions=context.get('round_conclusions'),round_policy=context.get('round_policy'),causal_evidence=context.get('causal_evidence') is True,round_number=round_number)
         audit['causal_evidence'] = context.get('causal_evidence') is True
         audit['case_comparisons'] = prompt.get('case_comparisons', {})
         audit['best_case_comparison'] = prompt.get('best_case_comparison', [])
@@ -859,7 +868,7 @@ class OptimizationAgent:
             prompt['proposal_generation'] = {'round':round_number, 'prior_failed_batches':
                 context.get('optimization_cycle', {}).get('proposal_generation_failures', [])}
         audit['bad_case_groups'] = prompt['bad_case_groups']
-        audit['agent_strategy'] = '效率优化' if prompt['round_contract']['efficiency_optimization'] else '自主优化'
+        audit['agent_strategy'] = '降档补位' if prompt['round_contract']['downgrade_required'] else '自主优化'
         audit['baseline_diagnosis_summary'] = prompt['baseline_diagnosis_summary']
         audit['next_action'] = prompt['next_action']
         try:

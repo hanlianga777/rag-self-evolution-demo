@@ -188,7 +188,10 @@ def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fin
                       execution_verified=not gaps,
                       analysis_category='not_applicable' if category == '通过' else 'insufficient_evidence' if category == '记录缺失' else 'rag_failure')
         result['diagnostic_gaps'] = [{'condition': gap} for gap in gaps]
-        result.update(severity_label=definition.get('severity','记录缺失' if category=='记录缺失' else '无'),
+        # 规则总表四.2：严重度看冻结题卷的业务后果（严重题名单），不按根因大类写死。
+        frozen = golden.get('raw') or golden
+        protected = (golden.get('negative_subtype') or case.get('negative_subtype')) in {'safety_critical','prompt_injection'} or frozen.get('criticality') == 'high'
+        result.update(severity_label=('记录缺失' if category=='记录缺失' else '无' if category=='通过' else '严重' if protected else '普通'),
                       tuning_directions=definition.get('directions',[]),repair_hint=definition.get('repair_hint',reason))
         return result
     verdict = _saved_verdict(case)

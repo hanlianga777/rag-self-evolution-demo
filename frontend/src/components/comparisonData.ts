@@ -3,7 +3,7 @@ export const categoryName = (value:string) => ({positive:'正向题（Positive�
 export const verdict = (row:any) => row?.passed===true ? '答对' : row?.passed===false ? '答错' : '未知';
 export const finalEvidence = (row:any):any[] | undefined => row?.programmatic_metrics?.retrieval_trace?.final;
 export const parameterNames:Record<string,string> = {"candidate_k": "候选数", "top_k": "保留条数", "min_score": "最低相关分", "hybrid_search": "混合检索", "hybrid_alpha": "语义检索权重", "generation_thinking": "思考档位", "query_decompose": "问题拆解", "retrieval_max_tokens": "资料总长度上限", "rerank": "重排序", "query_rewrite": "问题改写", "multi_query": "多路查询", "hyde": "假设答案检索", "metadata_filter": "元数据筛选", "alias_mapping": "别名映射", "prompt_strategy": "回答策略"};
-export const parameterValue = (value:any):string => ({max:'最高',high:'高',medium:'中',low:'低',off:'关闭',Grounded:'有据生成',Tiered:'分级回答',Completeness:'完整性优先',true:'开启',false:'关闭'}[String(value)] || (value == null ? '未知' : typeof value==='object' ? JSON.stringify(value) : String(value)));
+export const parameterValue = (value:any):string => ({max:'最高',high:'高',medium:'中',low:'低',off:'关闭',Grounded:'有据生成',Tiered:'分级回答',Strict:'Strict（分级回答）',Completeness:'完整性优先',true:'开启',false:'关闭'}[String(value)] || (value == null ? '未知' : typeof value==='object' ? JSON.stringify(value) : String(value)));
 export function configChanges(before:any,after:any){return [...new Set([...Object.keys(before || {}),...Object.keys(after || {})])].filter(key=>key in parameterNames && JSON.stringify(before?.[key])!==JSON.stringify(after?.[key])).map(key=>({key,label:parameterNames[key] || '其他配置',before:parameterValue(before?.[key]),after:parameterValue(after?.[key])}));}
 
 export function comparisonPoints(before:any,after:any,question:any={}):Point[] {

@@ -18,8 +18,8 @@ DEFAULT_PIPELINE_CONFIG = {
     "query_rewrite": False,
     "multi_query": False,
     "hyde": False,
-    "prompt_strategy": "Grounded",
-    "generation_thinking": "off",
+    "prompt_strategy": "Strict",
+    "generation_thinking": "max",
     "retrieval_max_tokens": False,
 }
 
@@ -49,10 +49,13 @@ ALLOWED_SEARCH_SPACE = {
     "query_rewrite": (True, False),
     "multi_query": (False, 2, 4, 6),
     "hyde": (True, False),
-    "prompt_strategy": ("Grounded", "Completeness", "Tiered"),
-    "generation_thinking": ("off",),
+    "generation_thinking": ("off", "low", "high", "max"),
     "retrieval_max_tokens": (False, 8192, 4096),
 }
+
+# 规则总表三.1：回答策略固定为 Strict（内容为原 Tiered 分级回答），不是 Agent 可调参数。
+FIXED_PIPELINE_PARAMETERS = {"prompt_strategy": "Strict"}
+THINKING_ORDER = ("off", "low", "high", "max")
 
 EXCLUDED_AUTOMATIC_PARAMETERS = frozenset({
     "parser", "ocr", "chunk_method", "chunk_size", "chunk_overlap", "embedding_model",
@@ -70,8 +73,7 @@ PARAMETER_EXPLANATIONS = {
     'query_rewrite': ('检索前先把用户的口语问题改写成更规范的说法再去查。', ['开', '关']),
     'multi_query': ('从不同角度多生成几种问法，分别检索后合并结果，减少一种问法漏掉证据的情况。', ['关（只用原问题）', '2（多生成几种问法；越多覆盖面越广，也越慢）', '4（多生成几种问法；越多覆盖面越广，也越慢）', '6（多生成几种问法；越多覆盖面越广，也越慢）']),
     'hyde': ('先让模型写一段"可能的答案"，再拿这段话去检索。它和说明书原文的写法更接近，有时比直接用问题检索更容易找到证据。', ['开', '关']),
-    'prompt_strategy': ('告诉模型按什么原则组织回答。', ['Grounded（严格只说资料里有的）', 'Completeness（尽量把要点答全）', 'Tiered（分级回答：能确定的先答，缺条件先追问，资料里没有就说明并建议转人工，安全警告始终保留）']),
-    'generation_thinking': ('模型写回答前"想"多久。档位越高，复杂问题答得越稳，但越慢越贵。', ['Off（不思考，最快）', 'Low（略想）', 'High（多想）', 'Max（想得最久，最慢）']),
+    'generation_thinking': ('模型写回答前"想"多久。Baseline 用 Max 验证质量上限；降档更快更省，通常要配合检索补强，看能否同样答对。', ['Off（不思考，最快）', 'Low（略想）', 'High（多想）', 'Max（想得最久，最慢）']),
     'retrieval_max_tokens': ('交给模型的资料最多多长，超出部分截掉。', ['不限', '8192（较宽松）', '4096（较紧，回答更快，但可能截掉证据）']),
 }
 
@@ -117,39 +119,46 @@ def evaluate_regression(*, new_critical_failures: int, new_ordinary_failures: in
 def protected_question(case, golden=None):
     """Use frozen question identity, never a candidate answer's dynamic issue severity."""
     golden = golden or {}
-    return (golden.get('negative_subtype', case.get('negative_subtype')) in {'safety_critical', 'prompt_injection'}
-            or golden.get('criticality') == 'high'
-            or golden.get('severity', case.get('severity')) == 'critical')
+    subtype = golden.get('negative_subtype', case.get('negative_subtype'))
+    # 规则总表一.6：严重题只看冻结题卷（负向子类型、criticality），不看某次判分给出的 severity。
+    return subtype in {'safety_critical', 'prompt_injection'} or golden.get('criticality') == 'high'
+
 
 
 def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int, baseline_bad_case_count: int, candidate_bad_case_count: int) -> dict:
     counts_valid = all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in (target_bad_cases_fixed, baseline_bad_case_count, candidate_bad_case_count))
+    # 规则总表五.5（A/B/C、D、发布统一一套）：11 项门槛全过；错题总数比 Baseline 至少少 1 道；
+    # 新增错题最多 1 道且只能是普通题（新增严重题 0）。目标题是否修好只作记录，不作资格条件。
     checks = {
         "hard_gates": gates.get("passed") is True,
         "regression": regression.get("passed") is True,
-        "target_bad_case_fixed": counts_valid and target_bad_cases_fixed >= 1,
         "total_bad_cases_reduced": counts_valid and candidate_bad_case_count <= baseline_bad_case_count - 1,
     }
     qualified = all(checks.values())
-    return {"qualified": qualified, "status": "QUALIFIED" if qualified else "NOT_QUALIFIED", "checks": checks, "bad_case_reduction": baseline_bad_case_count - candidate_bad_case_count if counts_valid else None}
+    return {"qualified": qualified, "status": "QUALIFIED" if qualified else "NOT_QUALIFIED", "checks": checks,
+            "target_bad_cases_fixed": target_bad_cases_fixed if counts_valid else None,
+            "bad_case_reduction": baseline_bad_case_count - candidate_bad_case_count if counts_valid else None}
 
 
-def qualify_release(gates: dict, regression: dict, fixed_count: int) -> dict:
+def qualify_release(gates: dict, regression: dict, fixed_count: int, baseline_bad_case_count=None, candidate_bad_case_count=None) -> dict:
+    """Release uses the same single rule as candidates (规则总表五.5)."""
+    counts = (baseline_bad_case_count, candidate_bad_case_count)
+    if all(type(v) is int and v >= 0 for v in counts):
+        reduced = candidate_bad_case_count <= baseline_bad_case_count - 1
+    else:
+        reduced = type(fixed_count) is int and fixed_count >= 1 and regression.get("new_regressions", 0) < fixed_count
     checks = {"hard_gates": gates.get("passed") is True,
-              "zero_new_failures": regression.get("passed") is True and regression.get("new_critical_failures") == 0 and regression.get("new_ordinary_failures") == 0,
-              "at_least_one_fixed": type(fixed_count) is int and fixed_count >= 1}
+              "regression": regression.get("passed") is True and regression.get("new_critical_failures") == 0
+                            and type(regression.get("new_ordinary_failures")) is int and regression.get("new_ordinary_failures") <= 1,
+              "total_bad_cases_reduced": bool(reduced)}
     return {"qualified": all(checks.values()), "checks": checks}
 
 
 def composite_source_eligible(candidate: dict, identity: str) -> bool:
     result = candidate.get('result', {})
     return bool(candidate.get('status') == 'evaluated' and result.get('evaluation_identity') == identity
-                and result.get('regression', {}).get('passed')
-                and result.get('regression', {}).get('new_critical_failures') == 0
-                and not result.get('continued_failure_new_critical_question_ids')
-                and (result.get('all_fixed_question_ids')
-                     or candidate.get('reasoning', {}).get('direction') == '效率（降档 + 检索补偿）'
-                     and result.get('gates', {}).get('passed') is True))
+                and result.get('qualification', {}).get('qualified') is True
+                and not result.get('continued_failure_new_critical_question_ids'))
 
 
 def composite_source_grade(candidate, baseline):
@@ -203,17 +212,32 @@ def d_improves_winner(final_candidate, winner):
 
 
 def select_final_candidate(candidates: list[dict], final_candidate: dict | None = None) -> dict:
-    qualified = [c for c in candidates if c.get('status') == 'evaluated' and c.get('reasoning', {}).get('candidate_label') != 'D' and c.get('result', {}).get('qualification', {}).get('qualified') is True]
-    if not qualified:
-        return {'decision': '保持 Baseline', 'candidate_id': None, 'reason': '没有已合格的A/B/C方案'}
-    winner = min(qualified, key=candidate_rank)
-    if (final_candidate and final_candidate.get('status') == 'evaluated'
-            and final_candidate.get('result', {}).get('release_qualification', {}).get('qualified') is True
-            and d_improves_winner(final_candidate, winner)):
-        return {'decision':'推荐 Candidate D', 'candidate_id':final_candidate['id'], 'reason':'D具备发布资格且优于 Winner：Bad Case 更少，或 Bad Case 相同且P99、费用均更低'}
-    if winner['result'].get('release_qualification', {}).get('qualified') is not True:
-        return {'decision':'保持 Baseline', 'candidate_id':None, 'reason':'Winner 候选合格但不具备发布资格，D也未满足推荐条件', 'winner_id':winner['id']}
-    return {'decision': '保留 Winner 方案', 'candidate_id': winner['id'], 'reason': 'D未同时满足发布资格与优于 Winner；保留具有发布资格的 Winner'}
+    """规则总表五.7：最终结果取所有合格方案（含合格的 D）中最好的；一个都没有就是本次 Agent 优化失败。"""
+    pool = [c for c in candidates if c.get('status') == 'evaluated' and c.get('reasoning', {}).get('candidate_label') != 'D'
+            and c.get('result', {}).get('qualification', {}).get('qualified') is True]
+    d_qualified = bool(final_candidate and final_candidate.get('status') == 'evaluated'
+                       and final_candidate.get('result', {}).get('qualification', {}).get('qualified') is True)
+    if d_qualified:
+        pool.append(final_candidate)
+    if not pool:
+        return {'decision': '本次 Agent 优化失败', 'candidate_id': None, 'reason': '没有合格方案'}
+    best = min(pool, key=candidate_rank)
+    if final_candidate and best is final_candidate:
+        return {'decision': '推荐 Candidate D', 'candidate_id': best['id'], 'reason': 'D 合格，且按错题数、新增错题数、P99 排序最好'}
+    reason = 'D 不合格，取合格方案中最好的' if final_candidate and final_candidate.get('status') == 'evaluated' and not d_qualified else '合格方案中按错题数、新增错题数、P99 排序最好'
+    return {'decision': '保留 Winner 方案', 'candidate_id': best['id'], 'reason': reason}
+
+
+def thinking_downgraded(config: dict, baseline_config: dict) -> bool:
+    """Thinking 比 Baseline 低一档或更多。"""
+    base, value = baseline_config.get('generation_thinking', 'max'), config.get('generation_thinking', baseline_config.get('generation_thinking', 'max'))
+    return base in THINKING_ORDER and value in THINKING_ORDER and THINKING_ORDER.index(value) < THINKING_ORDER.index(base)
+
+
+def is_downgrade_with_retrieval(config: dict, baseline_config: dict) -> bool:
+    """规则总表五.4：降档 + 至少一个检索参数改动。"""
+    retrieval = [k for k in ALLOWED_SEARCH_SPACE if k != 'generation_thinking']
+    return thinking_downgraded(config, baseline_config) and any(config.get(k, baseline_config.get(k)) != baseline_config.get(k) for k in retrieval)
 
 
 def canonicalize_config(config: dict) -> str:
@@ -267,7 +291,11 @@ def validate_candidate_config(config: dict, *, prior_configs=(), completed_evals
     contract = search_space_contract()
     if not isinstance(config, dict):
         return {"valid": False, "errors": ["config must be an object"], "issues": [{"field": "config", "actual": config, "expected_type": "object", "allowed_values": None, "error": "config must be an object"}], "canonical_config": None}
-    unknown = set(config) - set(ALLOWED_SEARCH_SPACE)
+    for key, fixed in FIXED_PIPELINE_PARAMETERS.items():
+        if key in config and config[key] != fixed:
+            errors.append(f"{key} is fixed to {fixed}")
+            issues.append({"field": key, "actual": config[key], "expected_type": "fixed", "allowed_values": [fixed], "error": f"{key} is fixed"})
+    unknown = set(config) - set(ALLOWED_SEARCH_SPACE) - set(FIXED_PIPELINE_PARAMETERS)
     excluded = unknown & EXCLUDED_AUTOMATIC_PARAMETERS
     if excluded:
         errors.append("excluded automatic parameters: " + ", ".join(sorted(excluded)))
