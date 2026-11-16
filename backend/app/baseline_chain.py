@@ -27,14 +27,14 @@ def restore_initial_config(store):
         now = datetime.now(timezone.utc)
         version_id = 'initial-' + now.strftime('%Y%m%d%H%M%S%f')
         snapshot = {'knowledge_identity':manifest_identity(current_manifest()), 'corpus_fingerprint':manifest_identity(current_manifest()),
-                    'actor':'用户', 'audit_note':'用户 2026-11-14 授权新版本恢复初始配置', 'previous_version_id':previous['id'] if previous else None}
+                    'actor':'用户', 'audit_note':'用户 2026-11-16 授权新版本恢复初始配置', 'previous_version_id':previous['id'] if previous else None}
         db.execute("UPDATE production_versions SET status='archived' WHERE status='active'")
         db.execute('INSERT INTO production_versions(id,status,config_json,previous_version_id,created_at,snapshot_json) VALUES (?,?,?,?,?,?)',
                    (version_id, 'active', json.dumps(DEFAULT_PIPELINE_CONFIG), previous['id'] if previous else None, now.isoformat(), json.dumps(snapshot, ensure_ascii=False)))
     return store.active_production()
 
 
-def arm_chain(store, baseline_id, *, round_policy=None, paid_run=None, causal_evidence=False):
+def arm_chain(store, baseline_id, *, round_policy=None, paid_run=None, causal_evidence=False, audit_note='用户 2026-11-16 预先授权'):
     previous = chain_status(store)
     if previous and previous.get('baseline_id') != baseline_id and causal_evidence:
         experiment = store.experiment(previous.get('experiment_id'), light=True) if previous.get('experiment_id') else None
@@ -52,7 +52,7 @@ def arm_chain(store, baseline_id, *, round_policy=None, paid_run=None, causal_ev
     if not run or run['config'].get('run_target') != 'baseline':
         raise ValueError('串联只能绑定显式Baseline')
     state = {'baseline_id':baseline_id, 'snapshot_id':run['dataset_version_id'], 'status':'waiting_baseline', 'designated':False,
-             'actor':'用户', 'audit_note':'用户 2026-11-14 预先授权', 'authorized_at':datetime.now(timezone.utc).isoformat(), 'budget':12}
+             'actor':'用户', 'audit_note':audit_note, 'authorized_at':datetime.now(timezone.utc).isoformat(), 'budget':12}
     if round_policy: state['round_policy'] = round_policy
     if paid_run: state['paid_run'] = paid_run
     if causal_evidence: state['causal_evidence'] = True
