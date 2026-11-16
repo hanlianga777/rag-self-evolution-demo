@@ -103,6 +103,33 @@ class RefinementTests(unittest.TestCase):
         self.assertEqual(self.store.create_composite(self.experiment,provider)['id'],result['id'])
         self.assertEqual(provider.complete.call_count,2)
 
+    def test_d_uses_agent_output_limit_and_restores_outer_task(self):
+        from unittest.mock import Mock
+        from app.paid_run import current_request_limit, execution_limits, provider_task
+
+        def complete(*args, **kwargs):
+            self.assertEqual(current_request_limit(), 32768)
+            return json.dumps(self.suggestion())
+
+        provider = Mock(complete=Mock(side_effect=complete), settings=context.Settings('fixture','https://example.invalid','fixture'))
+        with execution_limits({'agent':32768, 'answer':65536}):
+            candidate = self.store.create_composite(self.experiment, provider)
+            self.assertEqual(candidate['status'], 'generated', candidate.get('reason'))
+            with provider_task('answer'):
+                self.assertEqual(self.store.create_composite(self.experiment, provider)['id'], candidate['id'])
+                self.assertEqual(current_request_limit(), 65536)
+
+    def test_d_recovers_only_missing_closing_brackets_without_another_request(self):
+        from unittest.mock import Mock
+        raw = json.dumps(self.suggestion())[:-2]
+        provider = Mock(complete=Mock(return_value=raw), settings=context.Settings('fixture','https://example.invalid','fixture'))
+        candidate = self.store.create_composite(self.experiment, provider)
+        self.assertEqual(candidate['status'], 'generated', candidate.get('reason'))
+        decision = self.store.experiment(self.experiment)['result']['composite']
+        self.assertEqual(decision['provider_calls'], 1)
+        self.assertEqual(decision['attempts'][0]['provider_raw_text'], raw)
+        self.assertEqual(decision['attempts'][0]['syntax_repair']['appended'], ']}')
+
     def test_single_winner_can_decline_and_recommendation_recomputed(self):
         from unittest.mock import Mock
         self.store.finish_candidate(self.other['id'],'failed',{})

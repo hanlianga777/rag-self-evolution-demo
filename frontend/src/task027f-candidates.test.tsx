@@ -21,6 +21,25 @@ beforeEach(()=>{
 afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();});
 async function mount(){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<EvolutionPage data={data}/>));}
 async function click(text:string){await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===text)!.click());}
+it.each(['suggestion_failed','validation_failed'])('allows retry after D generation fails (%s)',async(outcome)=>{
+ const experiment=data.optimization;
+ experiment.candidates=experiment.candidates.filter((c:any)=>c.reasoning.candidate_label!=='D');
+ experiment.result.report_confirmation={winner_id:experiment.candidates.find((c:any)=>c.result.qualification.qualified).id};
+ experiment.result.composite={status:'failed',outcome,reason:'Frozen task limit unavailable'};
+ await mount();await click('回归与推荐');
+ const retry=[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='重新生成 Candidate D');
+ expect(retry).toBeDefined();expect(retry?.disabled).toBe(false);
+ await act(async()=>retry!.click());
+ expect(document.querySelector('[role=dialog]')?.textContent).toContain('生成智能组合建议');
+});
+it.each(['analyzing','unknown','no_effective_composite'])('does not offer duplicate D generation for %s',async(status)=>{
+ const experiment=data.optimization;
+ experiment.candidates=experiment.candidates.filter((c:any)=>c.reasoning.candidate_label!=='D');
+ experiment.result.report_confirmation={winner_id:experiment.candidates.find((c:any)=>c.result.qualification.qualified).id};
+ experiment.result.composite={status};
+ await mount();await click('回归与推荐');
+ expect([...document.querySelectorAll('button')].some(b=>b.textContent==='重新生成 Candidate D')).toBe(false);
+});
 it('shows saved D design, open issue cards and ranking without old disclosures',async()=>{
  const before=JSON.stringify(data);await mount();await click('进化路线');await click('Candidate D');
  expect(document.querySelector('.d-design h3')?.textContent).toBe('D 的设计');expect(document.querySelector('.d-agent-prediction')?.textContent).toContain('第二句仍然保留。');
