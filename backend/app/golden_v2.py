@@ -592,7 +592,7 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
         errors.append('invalid reference_answer')
         answer = ''
     if group == 'negative':
-        if c.get('expected_behavior') not in NEGATIVE_EXPECTED_BEHAVIORS or evidence or answer or kind != 'Ordinary':
+        if c.get('expected_behavior') not in NEGATIVE_EXPECTED_BEHAVIORS or evidence or kind != 'Ordinary':
             errors.append('invalid negative behavior/evidence')
         if not c.get('negative_subtype'):
             warnings.append('negative_subtype 未采集，需补充复核')

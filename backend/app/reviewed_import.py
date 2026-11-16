@@ -56,10 +56,10 @@ def import_batch(store, candidates, source_sha256, source, review_note, *, machi
             prepared = []
             for candidate in candidates:
                 candidate = {**candidate}
-                # Negative expected text/norms are not positive retrieval targets.
+                # Negative reference examples are behavior guidance, not retrieval targets.
                 if candidate['test_category'] == 'negative':
                     candidate.update(expected_response=candidate.get('expected_response') or candidate.get('reference_answer'),
-                                     reference_answer=None, evidence=[], acceptable_evidence=[])
+                                     evidence=[], acceptable_evidence=[])
                 validation = validate_golden_candidate(candidate, chunks)
                 if not validation['valid']:
                     raise ValueError('机器检查导入 ' + candidate['coverage_slot'] + '：' + '；'.join(validation['blocking_errors']))

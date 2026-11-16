@@ -58,11 +58,27 @@ class MachineChecksImportTests(unittest.TestCase):
         requirements = copy.deepcopy(candidates[-1]['business_requirements'])
         imported = self.machine_import(candidates)
         negative = self.store.question(imported['question_ids'][-1])
-        self.assertIsNone(negative['reference_answer'])
+        self.assertEqual(negative['reference_answer'], '手册没有说明，不猜测。')
         self.assertEqual(negative['evidence'], [])
         self.assertEqual(negative['raw']['expected_response'], '手册没有说明，不猜测。')
         self.assertEqual(negative['raw']['business_requirements'], requirements)
         self.assertEqual(candidates[-1]['reference_answer'], '手册没有说明，不猜测。')
+
+        from app.evaluation import EvaluationRunner
+        snapshot = {'question_ids': [negative['id']], 'questions': [negative['raw']]}
+        item = EvaluationRunner(self.store, None).snapshot_items(snapshot)[0]
+        self.assertEqual(item['reference_answer'], candidates[-1]['reference_answer'])
+        self.assertEqual(item['expected_behavior'], candidates[-1]['expected_behavior'])
+
+    def test_negative_reference_example_is_valid_but_evidence_is_not(self):
+        from app.golden_v2 import validate_golden_candidate
+        self.chunks[0]['document_id'] = 'D1'
+        candidate = {**self.candidates[-1], 'reference_answer': '手册没有说明，不猜测。'}
+        result = validate_golden_candidate(candidate, self.chunks)
+        self.assertTrue(result['valid'], result['blocking_errors'])
+        candidate['evidence'] = [{'source_chunk_ids': ['C1']}]
+        self.assertIn('invalid negative behavior/evidence',
+                      validate_golden_candidate(candidate, self.chunks)['blocking_errors'])
 
     def test_machine_hard_validation_cannot_be_replaced_by_old_approval(self):
         candidates = copy.deepcopy(self.candidates)
