@@ -297,7 +297,7 @@ class EvaluationRunner:
             limits=REQUEST_LIMITS
         if limits:
             judge_meta['execution_snapshot']['request_limits'] = {key:limits[key] for key in ('answer','judge','query')}
-        from .evaluation_contract import BUSINESS_JUDGE_PROMPT
+        from .evaluation_contract import CURRENT_JUDGE_PROMPT as BUSINESS_JUDGE_PROMPT
         from .ai_service import generation_contract
         import hashlib
         contract = getattr(self.runtime, 'generation_contract', None)
@@ -468,6 +468,9 @@ class EvaluationRunner:
         return {**({'scoring_contract':frozen_contract} if frozen_contract else {}),**({'judge_correction':judge_correction} if judge_correction else {}), 'contract_version':VERSIONS['scoring_policy'], 'retrieval_candidates':trace.get('candidates',[]), 'sources_legend':json.loads(generation_context(final).split('\n',1)[0])['sources'], 'golden_evidence': item['evidence'], 'golden_norms':norms, '_canonical_chunks':chunks, 'scope_sources':[{**c,'content':c.get('chunk_text',c.get('text',''))} for c in chunks if c['chunk_id'] in {(e.get('source_scope') or {}).get('source_id') for e in final}], 'final_context': final, 'category': item['test_category'], 'negative_subtype': item.get('negative_subtype'), 'expected_behavior': item['raw'].get('expected_behavior'), 'source_constraints': observation['source_constraints'], 'programmatic_evidence_observation': observation}
 
     def score_execution(self, item, execution, *, judge_correction=None):
+        from .rubric_judge import RUBRIC_VERSION
+        if VERSIONS['scoring_policy'] == RUBRIC_VERSION:
+            return self._score_rubric(item, execution)
         expected = item["reference_answer"] or item["raw"].get("expected_behavior", "拒答或澄清")
         context=self.judge_context(item,execution,judge_correction)
         trace=execution.get('retrieval_trace') or {};final=trace.get('final',[])
@@ -542,6 +545,47 @@ class EvaluationRunner:
         basis = 'verified_answer_claim' if primary == 'Generation' and located_failure else 'measured_latency' if primary == 'Performance' else 'explicit_safety_failure' if primary == 'Safety' else analysis['retrieval_failure_stage'] if primary == 'Retrieval' else 'unresolved_evaluation_evidence' if primary == 'Unknown' else coverage['diagnostic_basis']
         case = {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "diagnosis": diagnostic, "evaluation_outcome":outcome, "programmatic_metrics": {"generation_thinking": execution.get("generation_thinking"), "behavior_contract":behavior_contract, "evidence_sufficiency": sufficiency, "claim_assessment": claims, "retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnostic_basis": basis}, "passed": not failure_tags, "redline_pass": not redline}
 
+        return self._finalize_diagnosis(case, item)
+
+    def _score_rubric(self, item, execution):
+        """规则总表第二节：朋友同款三维 Judge；逐题对错与门槛平均来自同一份分数。不跑本地正则安全守卫。"""
+        from .rubric_judge import RUBRIC_VERSION, final_texts, rubric_verdict, legacy_quality, failure_tags
+        from .retrieval import evidence_coverage
+        from .policy import protected_question
+        trace = execution.get('retrieval_trace') or {}
+        final = trace.get('final', execution.get('retrieval', [])) or []
+        category = item['test_category']
+        expected = item.get('reference_answer') or (item.get('raw') or {}).get('reference_answer') or (item.get('raw') or {}).get('expected_behavior', '拒答或澄清')
+        context = {'contract_version': RUBRIC_VERSION, 'category': category, 'negative_subtype': item.get('negative_subtype'),
+                   'final_texts': final_texts(final)}
+        judge = self.runtime.judge(item['question'], expected, execution['answer'], category, context=context)
+        verdict = rubric_verdict(category, judge)
+        passed = verdict['passed']
+        quality = legacy_quality(category, judge)
+        required = {c for e in item.get('evidence', []) for c in e.get('source_chunk_ids', [])}
+        coverage = evidence_coverage(trace, required)
+        retrieved = [c for e in execution.get('retrieval', []) for c in e.get('matched_child_ids', [e.get('chunk_id')])]
+        matching = [i + 1 for i, c in enumerate(retrieved) if c in required]
+        metrics = {k: execution.get(k) for k in ('generation_thinking','latency_ms','ttft_ms','input_tokens','output_tokens','provider_cost','stages','token_usage','estimated_cost','cost_estimation')}
+        metrics.update(retrieval_hit=bool(matching) if required else None,
+                       retrieval_precision=len(matching) / len(retrieved) * 100 if required and retrieved else None,
+                       retrieval_rank=matching[0] if matching else None, retrieval_trace=trace, evidence_coverage=coverage,
+                       behavior_contract={'effective_pass': passed, 'raw_judge_pass': passed, 'violations': []},
+                       judge_usage=judge.get('token_usage'), judge_stages=judge.get('stages'), judge_cost=judge.get('estimated_cost'),
+                       judge_cost_estimation=judge.get('cost_estimation'))
+        severity = 'critical' if protected_question({}, {**(item.get('raw') or {}), 'negative_subtype': item.get('negative_subtype')}) else 'ordinary'
+        scores = {d: judge.get(d) for d in ('correctness', 'faithfulness', 'completeness')} if category != 'negative' else {}
+        outcome = {'contract_version': VERSIONS['scoring_policy'], 'execution_complete': True, 'verdict': 'PASS' if passed else 'FAIL',
+                   'raw_judge_verdict': 'PASS' if passed else 'FAIL', 'failed_dimensions': verdict['failed_dimensions'],
+                   'rubric_scores': scores, 'safety_review_required': False, 'qualification_blocking': not passed,
+                   'reason': verdict['reason']}
+        overall = round(sum(scores.values()) / 3, 2) if scores else (100.0 if passed else 0.0)
+        case = {'question': item['question'], 'reference_answer': expected, 'test_category': category, 'negative_subtype': item.get('negative_subtype'),
+                'severity': severity, 'model_answer': execution['answer'], 'retrieved_chunks': execution.get('retrieval', []),
+                'programmatic_metrics': metrics,
+                'judge_result': {**judge, **quality, 'verdict': 'PASS' if passed else 'FAIL', 'behavior_pass': passed, 'reason': verdict['reason'], 'issues': []},
+                'evaluation_outcome': outcome, 'passed': passed, 'redline_pass': passed, 'overall_score': overall,
+                'failure_tags': failure_tags(category, judge, verdict)}
         return self._finalize_diagnosis(case, item)
 
     def _score_business(self, item, execution, judge, expected, *, canonical_chunks=None):

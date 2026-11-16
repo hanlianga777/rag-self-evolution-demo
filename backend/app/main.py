@@ -29,7 +29,8 @@ from .full_text import CORPUS_LOCK
 from .corpus_management import CorpusManager, require_consistent_switch
 from .config import load_settings
 from .evaluation import EvaluationRunner, gate_details
-from .evaluation_contract import policy_current, VERSIONS, BUSINESS_JUDGE_PROMPT, validate_business_judgment
+from .evaluation_contract import policy_current, VERSIONS, validate_business_judgment
+from .evaluation_contract import CURRENT_JUDGE_PROMPT as BUSINESS_JUDGE_PROMPT
 from .governance import GovernanceStore, GENERATION_PROFILES
 from .optimization import OptimizationAgent
 from .diagnostics import diagnostic_view

@@ -299,6 +299,13 @@ class AiService:
     def judge(self, question, expected, answer, category, *, context=None):
         from .request_reuse import reuse_result
         context = context or {}
+        from .rubric_judge import RUBRIC_VERSION, reuse_parts
+        if context.get('contract_version') == RUBRIC_VERSION:
+            parts = reuse_parts(question, expected, answer, category, context.get('negative_subtype'), context.get('final_texts', []), thinking_config('judge'))
+            result = reuse_result('judge', parts, lambda:self._judge_uncached(question,expected,answer,category,context=context))
+            if result.get('reused_from'):
+                result.update(token_usage=[], estimated_cost=0, response_recovery=[])
+            return result
         # Scores and candidate-pool bookkeeping do not change the evidence shown
         # to generation. Frozen canonical sources and scoring versions are in scope.
         semantic = {k:v for k,v in context.items() if k not in {'retrieval_candidates','final_context','judge_correction','programmatic_evidence_observation'} and not k.startswith('_')}
