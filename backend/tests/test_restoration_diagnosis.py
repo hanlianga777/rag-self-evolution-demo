@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from app.evaluation import EvaluationRunner, root_cause_layers
 from app.governance import GovernanceStore
+from rubric_fixture import rubric_judge_output
 
 
 class DiagnosisTests(unittest.TestCase):
@@ -29,10 +30,10 @@ class DiagnosisTests(unittest.TestCase):
             def answer(self, question, config):
                 return {'answer': 'fixture wrong answer', 'retrieval': [], 'retrieval_trace': {'candidates': [], 'final': []}, 'latency_ms': 1}
             def judge(self, *args, **kwargs):
-                return {'correctness': 0, 'faithfulness': 1, 'completeness': 0, 'behavior_pass': True, 'unsupported_claims': [], 'evidence_sufficiency': {'status':'insufficient','source_applicable':True,'conflicts':[],'reason':'Fixture final context empty','fact_support':[]}}
+                return rubric_judge_output(args[3], False)
         item = {'question': 'fixture question', 'reference_answer': 'fixture expected', 'raw': {}, 'test_category': 'positive', 'evidence': [{'source_chunk_ids': ['c1'], 'quote': 'fixture expected'} ]}
         result = EvaluationRunner(None, OfflineRuntime())._case_result(item, {})
-        self.assertEqual(result['failure_tags'], ['Generation Failure', 'Retrieval Failure'])
+        self.assertEqual(result['failure_tags'], ['Generation Failure'])
         self.assertFalse(result['passed'])
         self.assertEqual(result['primary_root_cause'], 'Retrieval')
         self.assertNotIn('diagnosis_status', result['root_cause'])

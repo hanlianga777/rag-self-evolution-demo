@@ -7,7 +7,7 @@ from app.governance import GovernanceStore
 from app.evaluation import EvaluationRunner
 from app.providers import ProviderTimeout
 from app.telemetry import record_usage,collect_usage
-from identity_fixture import context_judgment
+from rubric_fixture import rubric_judge_output
 
 class Runtime:
     model='fixture'
@@ -22,7 +22,7 @@ class Runtime:
         self.judges.append(q)
         with collect_usage():record_usage({'provider':'fixture','prompt_tokens':30,'completion_tokens':40,'status':'ok'})
         if q=='Q2' and self.fail=='judge':raise ProviderTimeout('fixture judge timeout')
-        return context_judgment({'correctness':4,'faithfulness':1,'completeness':1,'behavior_pass':True,'reason':'fixture','missing_points':[],'unsupported_claims':[]},context)
+        return rubric_judge_output(category)
 
 class ResumeTests(unittest.TestCase):
     def setUp(self):

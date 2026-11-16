@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.ai_service import AiService
+from rubric_fixture import rubric_judge_output
 from app.config import Settings, load_settings
 from app.governance import GovernanceStore
 from app.providers import DeepSeekProvider, judge_thinking, thinking_config
@@ -55,17 +56,19 @@ class JudgeRecoveryTests(unittest.TestCase):
                 settings = SimpleNamespace(model='test')
                 def judge(self, *args, **kwargs):
                     calls.append(thinking_config('judge'))
-                    return {'verdict':'PASS', 'quality':{'correctness':4,'faithfulness':1,'completeness':1}, 'attempt':len(calls)}
+                    return {**rubric_judge_output(kwargs['context']['category']), 'attempt':len(calls)}
             service = AiService(store, None, Provider(), False)
+            from app.rubric_judge import RUBRIC_VERSION
+            context = {'contract_version':RUBRIC_VERSION, 'category':'positive', 'final_texts':['资料']}
             with reuse_scope(store, run):
                 with judge_thinking('off'):
-                    first = service.judge('题','参考','回答','positive')
-                    same = service.judge('题','参考','回答','positive')
+                    first = service.judge('题','参考','回答','positive',context=context)
+                    same = service.judge('题','参考','回答','positive',context=context)
                 with judge_thinking('low'):
-                    low = service.judge('题','参考','回答','positive')
-                    with patch('app.evaluation_contract.BUSINESS_JUDGE_PROMPT', '新版判分提示词'):
-                        changed = service.judge('题','参考','回答','positive')
-                        repeated = service.judge('题','参考','回答','positive')
+                    low = service.judge('题','参考','回答','positive',context=context)
+                    with patch('app.rubric_judge.RUBRIC_PROMPT_SHA256', '新版判分提示词哈希'):
+                        changed = service.judge('题','参考','回答','positive',context=context)
+                        repeated = service.judge('题','参考','回答','positive',context=context)
             self.assertEqual([first['attempt'], same['attempt'], low['attempt'], changed['attempt'], repeated['attempt']], [1,1,2,3,3])
             self.assertEqual(same['reused_from']['run_id'], 'BASE')
             self.assertNotIn('reused_from', low)

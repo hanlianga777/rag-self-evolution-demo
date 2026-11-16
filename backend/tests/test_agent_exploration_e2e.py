@@ -15,7 +15,8 @@ from app.governance import GovernanceStore
 from app.optimization import OptimizationAgent
 from app.retrieval import VectorRetriever
 import test_optimization_contract as contracts
-from offline_contract_fixture import bind_snapshot, atomic_judgment
+from offline_contract_fixture import bind_snapshot
+from rubric_fixture import rubric_judge_output
 
 
 class FixtureProvider:
@@ -29,7 +30,7 @@ class FixtureProvider:
         answer = '证据不足，无法回答。' if n >= 30 else '请核对手册。' if passed else '暂未给出核对步骤。'
         return {'content':answer,'ttft_ms':1,'input_tokens':10,'output_tokens':5,'usage':{}}
     def judge(self,q,expected,answer,**kwargs):
-        return atomic_judgment(kwargs['context'], answer, answer in {'请核对手册。', '证据不足，无法回答。'})
+        return rubric_judge_output(kwargs['context']['category'], answer in {'请核对手册。', '证据不足，无法回答。'})
 
 
 class Sandbox50Tests(unittest.TestCase):

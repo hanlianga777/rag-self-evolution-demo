@@ -8,7 +8,8 @@ from fastapi.testclient import TestClient
 
 from api_fixture import main
 from app.evaluation import EvaluationRunner
-from identity_fixture import completed_baseline, context_judgment
+from identity_fixture import completed_baseline
+from rubric_fixture import rubric_judge_output
 from app.governance import GovernanceStore
 from app.optimization import OptimizationAgent
 from app.policy import DEFAULT_PIPELINE_CONFIG
@@ -136,7 +137,7 @@ class FakeEvaluationRuntime:
         return {"retrieval_trace":{"candidates":final,"final":final}, "answer": "第一次调试前完整阅读操作说明书。", "retrieval": [{"chunk_id": "KIRA-B50-CHUNK-0003", "score": 0.9}], "latency_ms": 7, "input_tokens": 3, "output_tokens": 4}
 
     def judge(self, question, expected, answer, category, *, context=None):
-        return context_judgment({"correctness": 4, "completeness": 1, "faithfulness": 1, "behavior_pass": True, "reason": "Fixture exact context", "missing_points": [], "unsupported_claims": []}, context)
+        return rubric_judge_output(category)
 
 
 class EvaluationRunnerTests(unittest.TestCase):

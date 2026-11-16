@@ -14,7 +14,8 @@ from api_fixture import main
 from app.ai_service import AiService
 from app.governance import GovernanceStore
 from app.policy import qualify_candidate
-from offline_contract_fixture import business_requirements, atomic_judgment
+from offline_contract_fixture import business_requirements
+from rubric_fixture import rubric_judge_output
 from test_v11_e2e import FixtureCorpus, FixtureProvider, FixtureRetriever, FixtureEvaluationRuntime
 
 FINGERPRINT = {'synthetic-fixture': 'v14-api-lifecycle'}
@@ -125,13 +126,7 @@ class LifecycleService(AiService):
         return result
 
     def judge(self, question, expected, answer, category, *, context=None):
-        result = atomic_judgment(context, answer, answer != '错误答案')
-        check = result['checks'][0]
-        if category != 'negative' and not check['met']:
-            check.update(scope_resolved=True,
-                reference_support=[{'source_id':s['chunk_id'],'quote':s['quote']} for s in context['scoring_contract']['canonical_sources']],
-                candidate_support=[{'source_id':c['chunk_id'],'quote':c['content']} for c in context['retrieval_candidates']])
-        return result
+        return rubric_judge_output(category, answer != '错误答案')
 
 
 class ApiLifecycleTests(unittest.TestCase):

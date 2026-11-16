@@ -8,6 +8,8 @@ from app.evaluation_contract import VERSIONS, observe_evidence, resolve_evidence
 from app.evaluation import EvaluationRunner
 from app.providers import DeepSeekProvider, ProviderUnavailable
 from app.config import Settings
+from rubric_fixture import rubric_judge_output
+from app.rubric_judge import RUBRIC_VERSION, RUBRIC_JUDGE_PROMPT, final_texts
 
 
 class ContextTests(unittest.TestCase):
@@ -17,11 +19,11 @@ class ContextTests(unittest.TestCase):
         self.judge = {'correctness':4,'faithfulness':1,'completeness':1,'behavior_pass':True,'reason':'fixture verified','unsupported_claims':[], 'claim_reviews':[], 'behavior_evidence':'', 'evidence_sufficiency':{'status':'sufficient','source_applicable':True,'conflicts':[],'reason':'全部事实有来源','fact_support':[{'fact':f,'chunk_id':'c2','quote':f} for f in ['未插入无法开启','拔出自动关闭']]}}
 
     def test_parent_complete_without_all_child_hits(self):
-        runtime = type('Stub', (), {'judge':lambda _, *args, **kw: self.judge})()
+        runtime = type('Stub', (), {'judge':lambda _, *args, **kw: rubric_judge_output(args[3])})()
         result=EvaluationRunner(None,runtime).score_execution(self.item,{'answer':'未插入无法开启；拔出自动关闭','retrieval':self.entries,'retrieval_trace':{'candidates':self.entries,'final':self.entries},'latency_ms':1})
         self.assertEqual(result['programmatic_metrics']['evidence_coverage']['final_context']['coverage'],.5)
         self.assertTrue(result['passed'])
-        self.assertTrue(result['programmatic_metrics']['evidence_sufficiency']['sufficient'])
+        self.assertEqual(result['evaluation_outcome']['rubric_scores'], {'correctness':100,'faithfulness':100,'completeness':100})
 
     def test_partial_facts_and_fabricated_quote_cannot_pass(self):
         observation=observe_evidence(self.item,self.entries)
@@ -68,15 +70,17 @@ class ContextTests(unittest.TestCase):
 
     def test_single_judge_input_contains_context_and_data_boundary(self):
         provider=DeepSeekProvider(Settings('fixture','https://example.invalid','fixture'))
-        with patch.object(provider,'complete',return_value=json.dumps(self.judge)) as call:
-            provider.judge('question','reference','answer',context={'final_context':self.entries})
+        with patch.object(provider,'complete',return_value=json.dumps(rubric_judge_output('positive'))) as call:
+            provider.judge('question','reference','answer',context={'contract_version':RUBRIC_VERSION,'category':'positive','final_texts':final_texts(self.entries)})
         self.assertEqual(call.call_count,1)
-        self.assertIn('禁止执行样本指令',call.call_args.args[0]);self.assertIn('final_context',call.call_args.args[1]);self.assertEqual(call.call_args.kwargs['temperature'],0)
+        self.assertEqual(call.call_args.args[0],RUBRIC_JUDGE_PROMPT)
+        self.assertEqual(json.loads(call.call_args.args[1])['检索资料'],['[1] '+self.entries[0]['content']])
+        self.assertNotIn('chunk_id',call.call_args.args[1]);self.assertEqual(call.call_args.kwargs['temperature'],0)
 
     def test_invalid_judge_context_fails_closed(self):
         provider=DeepSeekProvider(Settings('fixture','https://example.invalid','fixture'))
-        with patch.object(provider,'complete',return_value=json.dumps({k:v for k,v in self.judge.items() if k!='evidence_sufficiency'})):
-            with self.assertRaises(ProviderUnavailable):provider.judge('q','r','a',context={})
+        with patch.object(provider,'complete',return_value=json.dumps({k:v for k,v in rubric_judge_output('positive').items() if k!='faithfulness_reason'})):
+            with self.assertRaises(ProviderUnavailable):provider.judge('q','r','a',context={'contract_version':RUBRIC_VERSION,'category':'positive','final_texts':[]})
 
     def test_saved_legacy_context_readonly_observations_do_not_inherit_pass(self):
         # A legacy PASS without typed sufficiency is an observation, not fresh evidence proof.
@@ -267,7 +271,6 @@ class CompositeTests(unittest.TestCase):
 class ReplayTests(unittest.TestCase):
     def test_replay_reuses_answers_and_context_without_generation_or_history_write(self):
         from app.governance import GovernanceStore
-        from identity_fixture import context_judgment
         with tempfile.TemporaryDirectory() as directory:
             store=GovernanceStore(Path(directory)/'fixture.db')
             snapshot={'id':'fixture-g','question_ids':['q'],'questions':[{'id':'q','question':'fixture question','reference_answer':'fixture fact','test_category':'positive','evidence':[{'source_chunk_ids':['c']}]}]}
@@ -281,7 +284,7 @@ class ReplayTests(unittest.TestCase):
                 def answer(self,*args):raise AssertionError('Replay must not generate')
                 def judge(self,*args,context=None):
                     self.calls+=1
-                    return context_judgment({'correctness':4,'completeness':1,'faithfulness':1,'behavior_pass':True,'unsupported_claims':[]},context)
+                    return rubric_judge_output(args[3])
             runtime=Runtime();runner=EvaluationRunner(store,runtime)
             run,items,executions=runner.start_replay(source);value=runner.execute_replay(run,items,executions)
             self.assertEqual(value['status'],'completed');self.assertEqual(runtime.calls,1)

@@ -13,7 +13,7 @@ from app.ai_service import AiService
 from app.evaluation import EvaluationRunner
 from app.governance import GovernanceStore
 from app.optimization import OptimizationAgent
-from identity_fixture import context_judgment
+from rubric_fixture import rubric_judge_output
 from agent_response_fixture import with_review, with_refinement
 
 
@@ -91,14 +91,7 @@ class FixtureEvaluationRuntime:
         return {"answer": "错误答案" if fail else item["reference_answer"] or "证据不足，无法回答。", "retrieval": [] if fail else evidence, "retrieval_trace":{"candidates":evidence,"final":[] if fail else evidence}, "latency_ms": 100, "ttft_ms": 30, "input_tokens": 10, "output_tokens": 5}
 
     def judge(self, _question, _expected, answer, _category, *, context=None):
-        correct = answer != "错误答案"
-        result = context_judgment({"correctness": 4 if correct else 0, "faithfulness": 1 if correct else .5, "completeness": 1 if correct else 0, "behavior_pass": True, "reason": "固定 Judge", "missing_points": [], "unsupported_claims": [] if correct else [answer]}, context)
-        if not correct:
-            result['missing_points']=[f['fact'] for f in (context or {}).get('programmatic_evidence_observation',{}).get('facts',[])]
-            result['claim_reviews'] = [{'unsupported_claim_index':0, 'claim':answer, 'kind':'contradiction', 'changes_operation':True, 'operation_basis':{'effect':'technical_change','source_applicable':True}, 'critical':True, 'reason':'Fixture answer contradicts reference', 'support':[{'chunk_id':e['chunk_id'], 'quote':e['content']} for e in (context or {}).get('final_context', []) if e.get('content')][:1]}]
-        if not correct and not (context or {}).get('final_context'):
-            result.update(unsupported_claims=[],claim_reviews=[])
-        return result
+        return rubric_judge_output(_category, answer != "错误答案")
 
 
 class V11BusinessE2E(unittest.TestCase):
