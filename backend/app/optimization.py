@@ -348,6 +348,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
               '先读程序生成的基线诊断摘要、速度事实、逐题变化及已被证明有害的改动清单gate_harming_changes。每轮恰好ABC三套，direction由你根据事实自行确定，不预设方向。同轮修改参数互斥。不得照搬gate_harming_changes。'
               '回答策略固定为Strict（分级回答），不是可调参数。generation_thinking可选off/low/high/max，Baseline是max；把Thinking从max降档并配合至少一个检索参数补强，用来验证较低档位能否同样修好Bad Case，是重要方向。每个方案相对其底座最多改两个参数。'
+              'prior_sandbox_results里带no_effect的方案：50题回答与已跑结果完全相同，说明它改的参数在当前条件下没有改变交给模型的资料，不要再提出同类无效改动。'
               '有害改动仅禁止完整配置差异原样重复；叠加其他参数的组合只提示风险，不能推断单参数有害。'
               '先写前几轮复盘prior_round_review：summary首轮写无；plans逐一覆盖所有已完成历史方案，每条含candidate_id、changes、fixed_question_ids、new_failure_question_ids（均用保存的正式question_id）、evidence_reason（证据位置、速度、单/多参数归因）、conclusion（有效/有害/待验证及依据）；多参数必须说明无法单独确定并给most_likely_parameter和attribution_reason；baseline_remaining_assessment总结Baseline剩余错题；conclusions为[{id,conclusion}]。首轮plans为空，conclusions从Baseline事实归纳。每套方案必须用review_conclusion_ids引用其中结论。'
               '第二部分bad_case_summary：groups逐字采用bad_case_groups的layer/subtype/question_ids/count，focus指出最集中问题，conclusions为[{id,conclusion}]。第三部分每个Candidate必须有bad_case_conclusion_ids引用第二部分，predicted_fixed_question_ids写预计修好的正式题号数组；并写参数值、针对的问题、风险、依据。第四部分本轮结论将在试跑完成后另行请你根据保存结果撰写，previous_round_conclusions是下一轮必须吸收的经验。'
@@ -397,7 +398,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
         diff=candidate.get('reasoning',{}).get('changed_parameters_vs_baseline',candidate.get('reasoning',{}).get('changed_parameters',{}))
         prior_results.append({'id':candidate['id'],'action_name':candidate.get('reasoning',{}).get('action_name'),
             'hypothesis':candidate.get('reasoning',{}).get('hypothesis'),'configuration':candidate['config'],'status':candidate['status'],
-            'result':{key:result.get(key) for key in ('qualification','bad_case_count','all_fixed_question_ids','regression','gates')} | {'new_failure_question_ids':new_failure_ids(result)},
+            'result':{key:result.get(key) for key in ('qualification','bad_case_count','all_fixed_question_ids','regression','gates','no_effect')} | {'new_failure_question_ids':new_failure_ids(result)},
             'failed_questions':[{'question_id':q, 'display_question_id':case.get('display_question_id') or q,
                 'judge_reason':case.get('judge_result',{}).get('reason'), 'retrieval_facts':retrieval_facts(case, questions.get(q), candidate.get('config'))}
                 for q,case in saved.items() if case.get('passed') is False],

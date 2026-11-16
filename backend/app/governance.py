@@ -116,7 +116,8 @@ def product_interruption(candidate):
 def sandbox_attempts_used(candidate):
     attempts=candidate.get('reasoning',{}).get('sandbox_attempts',[])
     count=len(attempts) or int(candidate.get('status') in {'evaluated','failed','running'})
-    return max(0,count-int(candidate.get('status')=='failed' and product_interruption(candidate)))
+    refunded=int(candidate.get('status')=='evaluated' and (candidate.get('result') or {}).get('no_effect',{}).get('budget_refunded') is True)
+    return max(0,count-int(candidate.get('status')=='failed' and product_interruption(candidate))-refunded)
 
 
 class GovernanceStore:

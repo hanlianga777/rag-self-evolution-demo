@@ -32,6 +32,10 @@ def reuse_result(kind, payload, action):
     scope = _scope.get()
     if scope is None:
         return action()
+    import os
+    if kind == 'judge' and os.environ.get('JUDGE_REUSE_BYPASS') == '1':
+        # 仅供内部"同一批回答判两遍"的一致率测试；结果不写入复用表，也不进入正式成绩。
+        return action()
     store, identity, origin = scope
     request_hash = digest(payload)
     with _lock:

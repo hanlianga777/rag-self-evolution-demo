@@ -191,6 +191,24 @@ def frozen_run_judge(function):
     return execute
 
 
+def no_effect_source(candidate, candidate_cases, store, *, max_refunds=3):
+    """A/B/C 的 50 题回答请求全部复用自同一个已有 Run（Baseline 或其他方案）时，返回说明；否则 None。"""
+    if candidate.get('reasoning', {}).get('candidate_label') not in {'A', 'B', 'C'} or not candidate_cases:
+        return None
+    sources = []
+    for case in candidate_cases.values():
+        reuse = ((case.get('programmatic_metrics') or {}).get('request_reuse') or {}).get('generation')
+        if not isinstance(reuse, dict) or not reuse.get('run_id'):
+            return None
+        sources.append(reuse['run_id'])
+    if len(set(sources)) != 1:
+        return None
+    experiment = store.experiment(candidate['experiment_id'], light=True) if store and hasattr(store, 'experiment') else None
+    refunded = sum(1 for c in (experiment or {}).get('candidates', []) if c['id'] != candidate['id'] and c.get('result', {}).get('no_effect', {}).get('budget_refunded'))
+    return {'same_as_run': sources[0], 'budget_refunded': refunded < max_refunds,
+            'reason': '50题的回答请求与已跑过的同一结果完全相同，本方案改动的参数没有改变交给模型的资料，参数没有起作用'}
+
+
 class EvaluationRunner:
     def __init__(self, store, runtime):
         self.store, self.runtime = store, runtime
@@ -1132,6 +1150,14 @@ class EvaluationRunner:
             qualification = {**qualification, 'qualified': False}
         result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], "error": run.get("error_message"), **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "release_qualification": qualify_release(run["result"]["gates"], regression, len(comparison["all_fixed_question_ids"]), len(failed), comparison['bad_case_count']), "recommendation": None}
         result['estimated_cost'] = sandbox_cost(list(candidate_cases.values()))
+        no_effect = no_effect_source(candidate, candidate_cases, self.store)
+        if no_effect:
+            # 规则总表五.3（学朋友"防白跑"）：50题回答请求与某个已跑方案完全相同 → 参数没起作用；
+            # 不算合格方案，不占试跑预算（每个实验最多退还3次），并反馈给 Agent。
+            result['no_effect'] = no_effect
+            result['qualification'] = {**result['qualification'], 'qualified': False, 'status': 'NO_EFFECT',
+                                       'blocking_reason': no_effect['reason']}
+            result['release_qualification'] = {**result['release_qualification'], 'qualified': False}
         if candidate['reasoning'].get('candidate_label') == 'D':
             result['qualification'] = result['release_qualification']
             winner = self.store.candidate(candidate['reasoning']['winner_id'])

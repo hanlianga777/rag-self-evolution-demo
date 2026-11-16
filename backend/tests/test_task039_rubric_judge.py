@@ -102,3 +102,44 @@ def test_negative_end_to_end_sets_behavior_contract():
     assert case["severity"] == "ordinary"
     critical = EvaluationRunner(None, FakeRuntime(out)).score_execution(item("negative", "prompt_injection"), execution())
     assert critical["severity"] == "critical"
+
+
+# ---------- 规则总表五.3：防白跑 ----------
+
+class _Store:
+    def __init__(self, candidates):
+        self.candidates = candidates
+
+    def experiment(self, experiment_id, light=True):
+        return {"candidates": self.candidates}
+
+
+def _case(run_id):
+    return {"programmatic_metrics": {"request_reuse": {"generation": {"run_id": run_id} if run_id else None}}}
+
+
+def test_no_effect_detection_and_refund_cap():
+    from app.evaluation import no_effect_source
+    from app.governance import sandbox_attempts_used
+    cand = {"id": "R2-C", "experiment_id": "E", "reasoning": {"candidate_label": "C"}}
+    same = {f"Q{i}": _case("EVAL-R1B") for i in range(50)}
+    mixed = {**same, "Q0": _case("EVAL-BASE")}
+    fresh = {**same, "Q1": _case(None)}
+    result = no_effect_source(cand, same, _Store([]))
+    assert result["same_as_run"] == "EVAL-R1B" and result["budget_refunded"] is True
+    assert no_effect_source(cand, mixed, _Store([])) is None
+    assert no_effect_source(cand, fresh, _Store([])) is None
+    refunded = [{"id": f"X{i}", "result": {"no_effect": {"budget_refunded": True}}} for i in range(3)]
+    assert no_effect_source(cand, same, _Store(refunded))["budget_refunded"] is False
+    evaluated = {"status": "evaluated", "reasoning": {"sandbox_attempts": [{"attempt": 1}]}, "result": {"no_effect": {"budget_refunded": True}}}
+    assert sandbox_attempts_used(evaluated) == 0
+    assert sandbox_attempts_used({**evaluated, "result": {}}) == 1
+
+
+def test_judge_reuse_bypass_only_for_judge(monkeypatch):
+    from app import request_reuse
+    calls = []
+    monkeypatch.setattr(request_reuse, "_scope", type("S", (), {"get": staticmethod(lambda: ("store", "id", "run"))})())
+    monkeypatch.setenv("JUDGE_REUSE_BYPASS", "1")
+    assert request_reuse.reuse_result("judge", ["x"], lambda: calls.append(1) or {"ok": 1}) == {"ok": 1}
+    assert calls == [1]

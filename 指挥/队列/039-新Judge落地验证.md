@@ -40,3 +40,9 @@
 - 不调用付费模型，不跑 Baseline 或 Agent，不做 Gate，不发布。
 - 不提交数据库、`.env`、密钥。
 - 报告写在 `指挥/报告/039.md`。完成后按值班规则移入历史任务。
+
+## 追加（总指挥 11:20 推送，一并验证）
+
+- **防白跑**（规则总表五.3）：`evaluation.py::no_effect_source` 判断"A/B/C 的 50 题回答请求全部复用自同一个已有 Run"。命中时标 `result.no_effect`，该方案不算合格；`governance.sandbox_attempts_used` 退还预算，每个实验最多退 3 次；Agent 输入里可以看到 `no_effect`。
+- **一致率测试开关**：环境变量 `JUDGE_REUSE_BYPASS=1` 时，判分不读也不写复用表，只供内部"同一批回答判两遍"的测试用，正式评测不要设置。
+- 测试：`test_task039_rubric_judge.py` 末尾新增 2 项。
