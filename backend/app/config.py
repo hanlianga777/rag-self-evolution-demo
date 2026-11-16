@@ -11,6 +11,7 @@ class Settings:
     timeout_seconds: float = 240.0
     baseline_thinking: str = "max"
     judge_thinking: str = "low"
+    judge_samples: int = 3
 
     @property
     def configured(self) -> bool:
@@ -41,6 +42,9 @@ def load_settings(env: dict[str, str] | None = None, env_file: Path | None = Non
     judge_thinking = values.get("JUDGE_THINKING", "low")
     if judge_thinking not in {"off", "low", "high", "max"}:
         raise ValueError("JUDGE_THINKING must be off/low/high/max")
+    judge_samples = int(values.get("JUDGE_SAMPLES", "3"))
+    if judge_samples not in {1, 3, 5}:
+        raise ValueError("JUDGE_SAMPLES must be 1, 3 or 5")
     return Settings(
         api_key=values.get("DEEPSEEK_API_KEY", "").strip(),
         base_url=values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/"),
@@ -48,4 +52,5 @@ def load_settings(env: dict[str, str] | None = None, env_file: Path | None = Non
         timeout_seconds=timeout,
         baseline_thinking=baseline_thinking,
         judge_thinking=judge_thinking,
+        judge_samples=judge_samples,
     )

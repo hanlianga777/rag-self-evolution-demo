@@ -312,9 +312,8 @@ class VectorRetriever:
                     if chunk_id in by_id:
                         query_hits["bm25"].append(chunk_id)
                         bm25_scores[chunk_id] = max(bm25_scores.get(chunk_id, float("-inf")), score)
-            if config.get('query_decompose'):
-                query_sources.append({'query': query, 'source': 'original' if len(query_sources) == 0 else 'auxiliary',
-                                      'chunk_ids': query_hits, 'latency_ms': round((time.perf_counter()-query_started)*1000, 3)})
+            query_sources.append({'query': query, 'source': 'original' if len(query_sources) == 0 else 'auxiliary',
+                                  'chunk_ids': query_hits, 'latency_ms': round((time.perf_counter()-query_started)*1000, 3)})
         if trace is not None and config.get('query_decompose'):
             trace['query_sources'] = query_sources
             trace['query_merge'] = {'method': 'max_score_per_chunk_then_shared_fusion_candidate_cap',
@@ -353,7 +352,9 @@ class VectorRetriever:
             with measure(stages, 'parent_expand', 'retrieval'):
                 parents = json.loads((self._bundle['path']/'parents.json').read_text())
                 final = expand_parents(reranked, parents, int(config.get('top_k', 4)))
-            if trace is not None: trace.update(status='completed', reranked=reranked, final=final, parent_expand=True)
+            if trace is not None:
+                trace.update(status='completed', reranked=reranked, final=final, parent_expand=True)
+                trace['enhancement'] = enhancement_effect(query_sources, (trace or {}).get('query_labels'), ranked, final)
             return final
         output = []
         query_terms = _terms(" ".join(query_list))
@@ -378,7 +379,38 @@ class VectorRetriever:
             trace['final'] = [{**item, 'rank': rank} for rank, item in enumerate(final, 1)]
             trace['timings'] = deepcopy(stages[stage_start:])
             trace['timing_unit'] = 'ms'
+            trace['enhancement'] = enhancement_effect(query_sources, trace.get('query_labels'), ranked, final)
         return final
+
+
+def enhancement_effect(query_sources, labels, candidates, final):
+    """增强生效遥测（朋友报告里的"HyDE 生效 N 次、multi_query 生效 N 次、增强带来新命中 N 次"）。
+    新命中 = 只由辅助查询找到、原问题自己查不到的资料；分"进了候选池"和"进了最终交给模型的资料"两级统计。"""
+    labels = list(labels or [])
+    original = set()
+    found_by = {}
+    for index, source in enumerate(query_sources or []):
+        ids = set(source['chunk_ids'].get('vector', [])) | set(source['chunk_ids'].get('bm25', []))
+        if index == 0:
+            original = ids
+            continue
+        label = labels[index - 1] if index - 1 < len(labels) else 'auxiliary'
+        for chunk_id in ids:
+            found_by.setdefault(chunk_id, set()).add(label)
+    new_ids = {chunk_id: by for chunk_id, by in found_by.items() if chunk_id not in original}
+    candidate_ids = {item['chunk_id'] for item in candidates or []}
+    final_ids = set()
+    for item in final or []:
+        final_ids.add(item.get('chunk_id'))
+        final_ids.update(item.get('matched_child_ids') or [])
+    per_label = {}
+    for label in dict.fromkeys(labels):
+        mine = {chunk_id for chunk_id, by in new_ids.items() if label in by}
+        per_label[label] = {'queries': labels.count(label), 'new_candidates': len(mine & candidate_ids),
+                            'new_final_hits': len(mine & final_ids)}
+    return {'version': 'enhancement-effect-1', 'enabled': list(dict.fromkeys(labels)), 'by_method': per_label,
+            'new_candidates': len(set(new_ids) & candidate_ids), 'new_final_hits': len(set(new_ids) & final_ids),
+            'effective': bool(set(new_ids) & final_ids)}
 
 
 def evidence_coverage(trace, required_ids):

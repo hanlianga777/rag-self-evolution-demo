@@ -260,25 +260,30 @@ class AiService:
     @provider_task('query')
     def _retrieval_queries(self, question: str, config: dict, trace=None, stages=None) -> list[str]:
         """Only enabled search-space features may create auxiliary retrieval queries."""
-        queries = []
+        queries, labels = [], []
         if config["query_rewrite"]:
             with thinking_task('query_rewrite'):
                 queries.append(self.provider.complete("只改写检索查询，不回答问题，不补充事实。", question).strip())
+            labels.append('query_rewrite')
         count = config["multi_query"]
         if count:
             with thinking_task('multi_query'):
                 text = self.provider.complete("将问题改写为互补检索查询，每行一条，不回答问题，不补充事实。", f"问题：{question}\n数量：{count}")
-            queries.extend(line.strip("-• ") for line in text.splitlines() if line.strip())
-            queries = queries[:count]
+            extra = [line.strip("-• ") for line in text.splitlines() if line.strip()]
+            queries.extend(extra); labels.extend('multi_query' for _ in extra)
+            queries, labels = queries[:count], labels[:count]
         if config["hyde"]:
             with thinking_task('hyde'):
                 queries.append(self.provider.complete("生成仅用于检索的假设性文档摘要，不作为事实或答案。", question).strip())
+            labels.append('hyde')
         if config.get('query_decompose', False):
             from .retrieval import prepare_decomposed_queries
             with measure(stages, 'query_decompose', parent='query_processing'):
                 subqueries, decomposition = prepare_decomposed_queries(question, self.decompose_query(question))
-            queries.extend(subqueries)
+            queries.extend(subqueries); labels.extend('query_decompose' for _ in subqueries)
             if trace is not None: trace['query_decompose'] = decomposition
+        # 增强生效遥测：记下每条辅助查询来自哪个增强手段，检索后统计它们带来了几条原问题查不到的新资料。
+        if trace is not None: trace['query_labels'] = labels
         return queries
 
     @thinking_task('query_decompose')
@@ -301,10 +306,23 @@ class AiService:
         context = context or {}
         from .rubric_judge import RUBRIC_VERSION, reuse_parts
         if context.get('contract_version') == RUBRIC_VERSION:
-            parts = reuse_parts(question, expected, answer, category, context.get('negative_subtype'), context.get('final_texts', []), thinking_config('judge'))
-            result = reuse_result('judge', parts, lambda:self._judge_uncached(question,expected,answer,category,context=context))
-            if result.get('reused_from'):
-                result.update(token_usage=[], estimated_cost=0, response_recovery=[])
+            from .rubric_judge import aggregate_samples
+            from .config import load_settings
+            count = load_settings().judge_samples
+            samples, usage, recovery, costs, reused = [], [], [], [], []
+            for sample in range(1, count + 1):
+                parts = reuse_parts(question, expected, answer, category, context.get('negative_subtype'), context.get('final_texts', []), thinking_config('judge'), sample)
+                one = reuse_result('judge', parts, lambda:self._judge_uncached(question,expected,answer,category,context=context))
+                if one.get('reused_from'):
+                    reused.append(one['reused_from'])
+                else:
+                    usage.extend(one.get('token_usage') or []); recovery.extend(one.get('response_recovery') or [])
+                    costs.append(one.get('estimated_cost') or 0)
+                samples.append(one)
+            result = {**aggregate_samples(category, samples), 'stages': [s for one in samples for s in (one.get('stages') or [])],
+                      'token_usage': usage, 'response_recovery': recovery, 'estimated_cost': sum(costs)}
+            if len(reused) == count:
+                result['reused_from'] = reused[0]
             return result
         # Scores and candidate-pool bookkeeping do not change the evidence shown
         # to generation. Frozen canonical sources and scoring versions are in scope.

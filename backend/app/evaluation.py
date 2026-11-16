@@ -93,6 +93,21 @@ def candidate_comparison(baseline, candidate, targets, golden_questions=None):
             'regression_interpretation': '按单遍结果计新增 Bad Case；严重新增上限0、普通新增上限1；修好不能抵消新增退化'}
 
 
+def enhancement_summary(cases):
+    """整卷汇总：每个增强手段在几道题上开启、在几道题上真的带来新资料（生效）、共带来几条新命中。"""
+    methods = {}
+    for case in cases:
+        effect = ((case.get("programmatic_metrics") or {}).get("retrieval_trace") or {}).get("enhancement") or {}
+        for method, row in (effect.get("by_method") or {}).items():
+            entry = methods.setdefault(method, {"questions": 0, "effective_questions": 0, "new_candidates": 0, "new_final_hits": 0})
+            entry["questions"] += 1
+            entry["effective_questions"] += bool(row.get("new_final_hits"))
+            entry["new_candidates"] += row.get("new_candidates", 0)
+            entry["new_final_hits"] += row.get("new_final_hits", 0)
+    return {"version": "enhancement-effect-1", "by_method": methods,
+            "effective_questions": sum(bool((((c.get("programmatic_metrics") or {}).get("retrieval_trace") or {}).get("enhancement") or {}).get("effective")) for c in cases)}
+
+
 def summarize_evaluation_cases(cases: list[dict], *, complete=True) -> dict:
     """Aggregate persisted case records without inventing absent group metrics."""
     groups = {"positive": [], "ablation": [], "negative": []}
@@ -147,6 +162,8 @@ def summarize_evaluation_cases(cases: list[dict], *, complete=True) -> dict:
         "metrics": metrics, "gates": evaluate_gates(metrics), "overall_score": overall["score"], "overall_score_status": overall["status"],
         "comparison_metrics": {"ttft_seconds": _mean(ttfts), "ttft_target_status": "WARNING" if ttfts and _mean(ttfts) > 5 else "OK" if ttfts else "NOT_MEASURED", "input_tokens": sum(input_tokens) if input_tokens else None, "output_tokens": sum(output_tokens) if output_tokens else None, "token_cost": round(sum(provider_costs), 6) if provider_costs else None, "token_cost_status": "MEASURED" if provider_costs else "Token Usage / Provider Cost unavailable", "recall_at_k": round(100 * sum(bool(hit) for hit in hits) / len(hits), 2) if hits else None, "precision_at_k": _mean(precisions), "mrr": _mean(reciprocal_ranks)},
         "bad_case_count": sum(not item.get("passed", False) for item in cases),
+        "enhancement_telemetry": enhancement_summary(cases),
+        "borderline_question_ids": [c.get("question_id") for c in cases if (c.get("evaluation_outcome") or {}).get("borderline")],
     }
     if not complete:
         result.update(overall_score=None, overall_score_status='NOT_EVALUABLE',partial_bad_case_count=result['bad_case_count'],bad_case_count=None, gates={**evaluate_gates({}), 'passed':None,'passed_count':None})
@@ -567,7 +584,7 @@ class EvaluationRunner:
 
     def _score_rubric(self, item, execution):
         """规则总表第二节：朋友同款三维 Judge；逐题对错与门槛平均来自同一份分数。不跑本地正则安全守卫。"""
-        from .rubric_judge import RUBRIC_VERSION, final_texts, rubric_verdict, legacy_quality, failure_tags
+        from .rubric_judge import RUBRIC_VERSION, final_texts, rubric_verdict, legacy_quality, failure_tags, borderline
         from .retrieval import evidence_coverage
         from .policy import protected_question
         trace = execution.get('retrieval_trace') or {}
@@ -596,7 +613,8 @@ class EvaluationRunner:
         outcome = {'contract_version': VERSIONS['scoring_policy'], 'execution_complete': True, 'verdict': 'PASS' if passed else 'FAIL',
                    'raw_judge_verdict': 'PASS' if passed else 'FAIL', 'failed_dimensions': verdict['failed_dimensions'],
                    'rubric_scores': scores, 'safety_review_required': False, 'qualification_blocking': not passed,
-                   'reason': verdict['reason']}
+                   'reason': verdict['reason'], 'borderline': borderline(category, judge),
+                   'judge_aggregation': judge.get('aggregation')}
         overall = round(sum(scores.values()) / 3, 2) if scores else (100.0 if passed else 0.0)
         case = {'question': item['question'], 'reference_answer': expected, 'test_category': category, 'negative_subtype': item.get('negative_subtype'),
                 'severity': severity, 'model_answer': execution['answer'], 'retrieved_chunks': execution.get('retrieval', []),

@@ -13,6 +13,7 @@ from pathlib import Path
 
 ROUND_POLICY = {'mode': 'full_rounds', 'max_rounds': 4, 'stop_rule': 'staged-v1'}
 AUDIT_NOTE = '用户 2026-11-16 预先授权'
+MIN_BASELINE_BAD_CASES = 5   # 用户 2026-11-16 晚拍板：Baseline 错题达到 5 道才启动 Agent，不分类型；不到就停下汇报
 
 
 def main(argv=None):
@@ -34,6 +35,9 @@ def main(argv=None):
     result = run.get('result') or {}
     if run['status'] != 'completed' or result.get('evaluation_complete') is not True or result.get('technical_failed') != 0:
         raise ValueError(f"Baseline 未完整结束：status={run['status']} complete={result.get('evaluation_complete')} technical_failed={result.get('technical_failed')}")
+    bad_cases = result.get('bad_case_count')
+    if not isinstance(bad_cases, int) or bad_cases < MIN_BASELINE_BAD_CASES:
+        raise ValueError(f'开跑检查未通过：Baseline 错题 {bad_cases} 道，少于 {MIN_BASELINE_BAD_CASES} 道，按用户规则不启动 Agent，先汇报')
     latest = store.dataset_snapshots()[0]
     snapshot_id = latest.get('id') or latest.get('snapshot_id')
     if run['dataset_version_id'] != snapshot_id:
