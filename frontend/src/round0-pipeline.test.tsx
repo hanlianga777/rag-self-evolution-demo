@@ -16,6 +16,9 @@ it("saves freely selected Thinking and context, preserves saved drafts and remov
  const posts:any[]=[];
  vi.stubGlobal("fetch",vi.fn(async (_url:string,init?:RequestInit)=>{if(init?.method==="POST"){posts.push(JSON.parse(String(init.body)));pipeline.config_draft={config:posts.at(-1).config};}return new Response(JSON.stringify(pipeline));}));
  await render(<SettingsPage data={{}}/>);
+ expect(document.querySelector('.frozen-facts')?.textContent).toContain('回答策略Strict（分级回答）');
+ expect(document.querySelector('[data-parameter="prompt_strategy"]')).toBeNull();
+ expect([...document.querySelectorAll('[data-parameter="generation_thinking"] button[role="radio"]')].map(b=>b.textContent)).toEqual(['Off','低','高','最高']);
  expect(document.querySelector('[data-parameter="generation_thinking"] .badge')).toBeNull();
  expect(document.querySelector('[data-parameter="query_decompose"]')).toBeNull();
  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('[data-parameter="generation_thinking"] button')].find(b=>b.textContent==='最高')!.click());

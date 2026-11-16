@@ -103,7 +103,7 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
         experiment = store.experiment(experiment_id, light=True)
         used = experiment['evaluation_budget']['used']
         state.update(status=status, phase=phase, used=used, remaining=max(0, MAX_EVALS-used),
-                     reserved_for_d=1, last_error=error,
+                     reserved_for_d=0 if experiment['result'].get('round_policy', {}).get('stop_rule') == STAGED_RULE else 1, last_error=error,
                      round=max([c['reasoning'].get('round', 1) for c in experiment['candidates']] or [0]))
         _save_state(store, experiment_id, **state)
         return dict(state)

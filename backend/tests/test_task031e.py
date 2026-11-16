@@ -23,16 +23,16 @@ class FullRoundsTests(unittest.TestCase):
         set_settings(self.store, False)
         set_unattended_authorization(self.store, True, '用户')
 
-    def run_cycle(self, *, full=True, used=0, qualified=True):
+    def run_cycle(self, *, full=True, used=0, qualified=True, first_qualified_at=None):
         from app.optimization_cycle import run_until_qualified
         store, exp = self.store, self.exp
         events = []
         with store.connection() as db:
             db.execute('UPDATE experiments SET result_json=? WHERE id=?', (json.dumps({
                 'strategy_contract':'agent-strategy-4' if full else 'agent-strategy-3',
-                **({'round_policy':{'mode':'full_rounds','max_rounds':3}} if full else {})}), exp))
+                **({'round_policy':{'mode':'full_rounds','max_rounds':4,'stop_rule':'staged-v1'}} if full else {})}), exp))
         for i in range(used):
-            store.save_candidate(exp, 'old-'+str(i), DEFAULT_PIPELINE_CONFIG, {'round':1,'candidate_label':'A','sandbox_attempts':[{}]})
+            store.save_candidate(exp, 'old-'+str(i), DEFAULT_PIPELINE_CONFIG, {'round':i//3+1,'candidate_label':'A','sandbox_attempts':[{}]})
             store.finish_candidate(exp+'-old-'+str(i), 'evaluated', {'qualification':{'qualified':False}})
 
         class Agent:
@@ -41,7 +41,7 @@ class FullRoundsTests(unittest.TestCase):
                 e = store.experiment(exp, light=True)
                 number = max([c['reasoning'].get('round', 1) for c in e['candidates']] or [0])+1
                 events.append(('generate', number))
-                for label in 'ABC'[:min(3, 11-e['evaluation_budget']['used'])]:
+                for label in 'ABC'[:min(3, 12-e['evaluation_budget']['used'])]:
                     store.save_candidate(exp, f'R{number}-{label}', DEFAULT_PIPELINE_CONFIG, {'round':number,'candidate_label':label})
 
         class Runner:
@@ -52,13 +52,16 @@ class FullRoundsTests(unittest.TestCase):
                 events.append(('evaluate', cid.split(exp+'-')[1]))
                 return store.finish_candidate(cid, 'evaluated', {
                     **comparison_identity(store, 'BASE'), 'evaluation_complete':True, 'bad_case_count':1,
-                    'qualification':{'qualified':qualified and label in {'A','D'}}})
+                    'qualification':{'qualified':qualified and (label=='D' or (used+sum(e[0]=='evaluate' for e in events)==first_qualified_at if first_qualified_at else label=='A'))}})
 
         original_confirm = store.confirm_experiment_report
         def confirm(*args, **kwargs):
             events.append(('gate2', len([e for e in events if e[0]=='conclude'])))
             return original_confirm(*args, **kwargs)
+        original_composite = store.create_composite
         def composite(*args):
+            if store.experiment(exp)['evaluation_budget']['used'] >= 12:
+                return original_composite(*args)
             events.append(('D', len(store.experiment(exp)['candidates'])))
             cid = exp+'-D'
             with store.connection() as db:
@@ -67,7 +70,9 @@ class FullRoundsTests(unittest.TestCase):
                 state['composite'] = {'status':'generated','candidate_id':cid}
                 db.execute('UPDATE experiments SET result_json=? WHERE id=?', (json.dumps(state), exp))
             return store.candidate(cid)
-        def conclude(*args):
+        def conclude(*args, **kwargs):
+            if kwargs.get('final_d'):
+                events.append(('conclude','D'));return
             e = store.experiment(exp)
             if not e['candidates']: return
             number = max(c['reasoning'].get('round',1) for c in e['candidates'] if c['reasoning'].get('candidate_label')!='D')
@@ -79,28 +84,45 @@ class FullRoundsTests(unittest.TestCase):
             state = run_until_qualified(store, SimpleNamespace(provider=object()), exp)
         return state, events, store.experiment(exp)
 
-    def test_a_qualified_still_runs_bc_and_three_rounds_before_gate2_d(self):
+    def test_two_qualified_finish_complete_round_before_gate2_d(self):
         state, events, exp = self.run_cycle()
         self.assertEqual(state['status'], 'recommended', state)
-        self.assertEqual([e[1] for e in events if e[0]=='evaluate'], [f'R{n}-{l}' for n in range(1,4) for l in 'ABC']+['D'])
-        self.assertEqual([e[1] for e in events if e[0]=='generate'], [1,2,3])
-        self.assertLess(events.index(('conclude',3)), next(i for i,e in enumerate(events) if e[0]=='gate2'))
-        self.assertEqual(next(e for e in events if e[0]=='D'), ('D',9))
+        self.assertEqual([e[1] for e in events if e[0]=='evaluate'], [f'R{n}-{l}' for n in range(1,3) for l in 'ABC']+['D'])
+        self.assertEqual([e[1] for e in events if e[0]=='generate'], [1,2])
+        self.assertLess(events.index(('conclude',2)), next(i for i,e in enumerate(events) if e[0]=='gate2'))
+        self.assertEqual(next(e for e in events if e[0]=='D'), ('D',6))
+        self.assertIn(('conclude','D'),events)
         self.assertEqual(exp['result']['report_confirmation']['actor'], '用户')
-        self.assertEqual(exp['result']['report_confirmation']['audit_note'], '用户 2026-11-14 预先授权')
+        self.assertEqual(exp['result']['report_confirmation']['audit_note'], '用户 2026-11-16 预先授权')
 
     def test_budget_stops_early_and_reserves_d(self):
         state, events, exp = self.run_cycle(used=9)
         self.assertEqual(state['status'], 'recommended', state)
-        self.assertEqual([e[1] for e in events if e[0]=='evaluate'], ['R2-A','R2-B','D'])
-        self.assertEqual(exp['evaluation_budget']['used'],12)
+        self.assertEqual([e[1] for e in events if e[0]=='evaluate'], ['R4-A','D'])
+        self.assertEqual(exp['evaluation_budget']['used'],11)
+        self.assertEqual(state['reserved_for_d'],0)
 
-    def test_no_winner_stops_after_three_rounds_without_d(self):
+    def test_no_winner_uses_twelve_attempts_then_reports_agent_failure(self):
         state, events, exp = self.run_cycle(qualified=False)
-        self.assertEqual(state['status'],'budget_exhausted',state)
+        self.assertEqual(state['status'],'agent_failed',state)
         self.assertEqual(state['phase'],'review')
-        self.assertEqual(exp['evaluation_budget']['used'],9)
+        self.assertEqual(exp['evaluation_budget']['used'],12)
         self.assertFalse(any(e[0] in {'gate2','D'} for e in events))
+
+    def test_single_qualified_after_three_rounds_runs_d(self):
+        state, events, exp = self.run_cycle(first_qualified_at=7)
+        self.assertEqual(state['status'],'recommended',state)
+        self.assertEqual(exp['evaluation_budget']['used'],10)
+        self.assertEqual([e[1] for e in events if e[0]=='evaluate'],[f'R{n}-{l}' for n in range(1,4) for l in 'ABC']+['D'])
+        self.assertIn(('conclude','D'),events)
+
+    def test_twelfth_attempt_can_win_without_d_budget(self):
+        state, events, exp = self.run_cycle(used=9, first_qualified_at=12)
+        self.assertEqual(state['status'],'recommended',state)
+        self.assertEqual(exp['evaluation_budget']['used'],12)
+        self.assertEqual([e[1] for e in events if e[0]=='evaluate'],['R4-A','R4-B','R4-C'])
+        self.assertFalse(any(e[0]=='D' for e in events))
+        self.assertEqual(self.store.recommendation(self.exp)['result']['final_decision']['candidate_id'],self.exp+'-R4-C')
 
     def test_no_policy_preserves_early_qualification(self):
         state, events, exp = self.run_cycle(full=False)
@@ -125,7 +147,7 @@ class FullRoundsTests(unittest.TestCase):
         self.assertEqual(facts['hard_gates'][0]['margin'],5)
         self.assertEqual(facts['latency_p99_seconds'],51.8)
         self.assertEqual(prompt['round_contract']['count'],2)
-        self.assertFalse(prompt['round_contract']['efficiency_optimization'])
+        self.assertFalse(prompt['round_contract']['downgrade_required'])
         self.assertIn('剩余',system)
         validate_round_contract([{'id':'A','config_diff':{'top_k':6}},{'id':'B','config_diff':{'candidate_k':24}}],DEFAULT_PIPELINE_CONFIG,[],labels=['A','B'])
 
@@ -204,7 +226,7 @@ class AgentGenerationTests(unittest.TestCase):
         with store.connection() as db:
             db.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps({'strategy_contract':'agent-strategy-4','round_policy':{'mode':'full_rounds','max_rounds':3}}),exp))
         for i in range(9):
-            store.save_candidate(exp,'old-'+str(i),DEFAULT_PIPELINE_CONFIG,{'round':1,'candidate_label':'A','sandbox_attempts':[{}]})
+            store.save_candidate(exp,'old-'+str(i),DEFAULT_PIPELINE_CONFIG,{'round':i//3+1,'candidate_label':'A','sandbox_attempts':[{}]})
             store.finish_candidate(exp+'-old-'+str(i),'evaluated',{'qualification':{'qualified':False},'all_fixed_question_ids':[],'new_failure_question_ids':[]})
         class Provider:
             calls = 0
@@ -224,9 +246,9 @@ class AgentGenerationTests(unittest.TestCase):
         provider = Provider()
         result = OptimizationAgent(store,provider).generate('EVAL-test',experiment_id=exp)
         self.assertEqual(provider.calls,1)
-        self.assertEqual(provider.prompt['goal']['candidate_labels'],['A','B'])
-        self.assertEqual(len(result['candidates']),11)
-        self.assertIn('2',result['result']['agent_strategies'])
+        self.assertEqual(provider.prompt['goal']['candidate_labels'],['A','B','C'])
+        self.assertEqual(len(result['candidates']),12)
+        self.assertIn('4',result['result']['agent_strategies'])
         self.assertEqual(result['result']['strategy_contract'],'agent-strategy-4')
 
 
@@ -250,7 +272,7 @@ class CompositeV4Tests(unittest.TestCase):
         rejected=self.store.create_composite(self.experiment,provider)
         self.assertEqual(rejected['status'],'failed')
         self.assertIn('D须选择',rejected['reason'])
-        value.update(combination_mode='winner_plus_verified',mode_reason='只增加历史已修好剩余题的参数')
+        value.update(combination_mode='partial_fusion',mode_reason='部分合并其他合格方案已修好剩余题的参数')
         provider.complete.return_value=json.dumps(value)
         generated=self.store.create_composite(self.experiment,provider)
         self.assertEqual(generated['status'],'generated')

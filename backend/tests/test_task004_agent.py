@@ -53,7 +53,7 @@ class AgentTask004Tests(unittest.TestCase):
         self.assertEqual(audit['rejected_candidates'],[])
 
     def test_priority_map_is_advice_and_does_not_forbid_cross_layer_changes(self):
-        candidate={**self.proposal(),'config_diff':{'query_rewrite':True,'prompt_strategy':'Completeness'}}
+        candidate={**self.proposal(),'config_diff':{'query_rewrite':True,'retrieval_max_tokens':8192}}
         batch,_=self.prepare(candidate)
         self.assertEqual(len(batch),3)
 
@@ -66,11 +66,11 @@ class AgentTask004Tests(unittest.TestCase):
         from app.optimization import build_agent_prompt
         system,prompt=build_agent_prompt(self.rows(),DEFAULT_PIPELINE_CONFIG,[],[],['A','B','C'])
         self.assertIn('action_name',system)
-        self.assertEqual(set(prompt['allowed_parameter_values']),set(DEFAULT_PIPELINE_CONFIG))
+        self.assertEqual(set(prompt['allowed_parameter_values']),set(DEFAULT_PIPELINE_CONFIG)-{'prompt_strategy'})
         self.assertEqual(prompt['bad_cases'][0]['question_id'],'Q1')
         self.assertEqual(prompt['bad_cases'][0]['diagnosis_category'],'生成层问题')
         self.assertTrue(prompt['bad_cases'][0]['reason'])
         self.assertIn('retrieval_trace',self.rows()[0]['result']['programmatic_metrics'])
         self.assertNotIn('retrieval_trace',prompt['bad_cases'][0])
         self.assertNotIn('coverage_obligations',prompt)
-        self.assertEqual(prompt['priority_parameters']['生成层问题'],['prompt_strategy','generation_thinking','retrieval_max_tokens'])
+        self.assertEqual(prompt['priority_parameters']['生成层问题'],['generation_thinking','retrieval_max_tokens','top_k'])

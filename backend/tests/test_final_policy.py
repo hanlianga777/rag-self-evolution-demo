@@ -61,7 +61,7 @@ class FinalPolicyTests(unittest.TestCase):
 
         self.assertTrue(result["qualified"])
         self.assertEqual(result["status"], "QUALIFIED")
-        self.assertFalse(qualify_candidate(gates, regression, 0, 4, 3)["qualified"])
+        self.assertTrue(qualify_candidate(gates, regression, 0, 4, 3)["qualified"])
 
     def test_config_is_canonical_and_rejects_dependencies_exclusions_duplicates_and_budget(self):
         config = {
@@ -73,7 +73,7 @@ class FinalPolicyTests(unittest.TestCase):
             "query_rewrite": True,
             "multi_query": 2,
             "hyde": False,
-            "prompt_strategy": "Grounded",
+            "prompt_strategy": "Strict",
             "min_score": 0.2,
         }
         canonical = canonicalize_config(config)

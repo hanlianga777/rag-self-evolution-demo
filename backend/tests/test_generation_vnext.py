@@ -45,7 +45,7 @@ class GenerationVNextTests(unittest.TestCase):
     def test_explicit_legacy_versions_remain_readable(self):
         old, provider = self.service(generation_prompt_version='generation-vnext-1')
         new, _ = self.service(generation_prompt_version='generation-vnext-2')
-        old.answer('问题')
+        old.answer('问题', {'prompt_strategy':'Grounded'})
         self.assertEqual(provider.requests[0][0], '你是机器人官方 PDF 知识助手。只能基于给定证据回答；证据不足时明确说明。' + GENERATION_BOUNDARY + '回答使用中文，简洁、可执行。')
         self.assertEqual(old.generation_contract['generation_prompt_version'], 'generation-vnext-1')
         self.assertEqual(old.generation_contract['generation_boundary_sha256'], hashlib.sha256(GENERATION_BOUNDARY.encode()).hexdigest())
@@ -71,9 +71,14 @@ class GenerationVNextTests(unittest.TestCase):
     def test_frozen_generation_mismatch_blocks_before_case_execution(self):
         from unittest.mock import Mock
         service, provider = self.service(generation_prompt_version='generation-vnext-2')
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        from app.governance import GovernanceStore
+        temp=TemporaryDirectory();self.addCleanup(temp.cleanup)
         store = Mock()
-        # Deliberately no question/checkpoint prerequisites: contract guard is first.
-        store.evaluation_run.return_value = {'status': 'queued', 'result': {}, 'judge': {'generation_prompt_version': 'generation-vnext-1', 'generation_boundary_sha256': hashlib.sha256(GENERATION_BOUNDARY.encode()).hexdigest()}}
+        store.connection = GovernanceStore(Path(temp.name)/'test.db').connection
+        # No question/checkpoint prerequisites: the contract guard is first inside the frozen scope.
+        store.evaluation_run.return_value = {'id':'old-run', 'dataset_snapshot_json':'{}', 'config':{}, 'status': 'queued', 'result': {}, 'judge': {'generation_prompt_version': 'generation-vnext-1', 'generation_boundary_sha256': hashlib.sha256(GENERATION_BOUNDARY.encode()).hexdigest()}}
         with self.assertRaisesRegex(ValueError, 'Generation'):
             EvaluationRunner(store, service).execute_baseline('old-run', [], {})
         self.assertEqual(provider.requests, [])

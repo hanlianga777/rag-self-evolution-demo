@@ -6,7 +6,7 @@ import { FrozenQuestionDetails } from './pages/FrozenQuestionDetails';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => { document.body.innerHTML = ''; });
 it('groups saved scoring points, resolves QC citations and hides original IDs from the retired technical details', async () => {
- const row={id:'internal-question',question:'如何维护？',test_category:'positive',reference_answer:'先断电',probe_status:'probe_passed',qc_status:'qc_passed',raw:{business_scenario:'现场维护',business_requirements:{required_checks:[{requirement:'断开电源'}],auxiliary_information:['擦干表面'],prohibited:['带电清洗']}},evidence_details:[{chunks:[{chunk_id:'DOC-001-C-00180',document_name:'维护手册.pdf',page_start:12,chunk_text:'先断开电源。'}]}],qc:{score:90,reason:'DOC-001-C-00180 支持答案'},probe:{score:95}};
+ const row={id:'internal-question',question:'如何维护？',test_category:'positive',reference_answer:'先断电',probe_status:'probe_passed',qc_status:'qc_passed',raw:{business_scenario:'现场维护',business_requirements:{required_checks:[{requirement:'断开电源'}],auxiliary_information:['擦干表面'],prohibited:['带电清洗']}},evidence_details:[{chunks:[{chunk_id:'DOC-001-C-00180',document_name:'维护手册.pdf',page_start:12,chunk_text:'先断开电源。'}]}],qc:{score:90,reason:'DOC-001-C-00180 支持答案；DOC-999-C-00000 未提供来源信息'},probe:{score:95}};
  const root=createRoot(document.body.appendChild(document.createElement('div')));
  await act(async()=>root.render(<FrozenQuestionDetails row={row}/>));
  expect([...document.querySelectorAll('.drawer-section h3')].map(e=>e.textContent)).toEqual(['业务场景','问题','参考答案','核心证据','评分要点','质检结果']);
@@ -15,6 +15,8 @@ it('groups saved scoring points, resolves QC citations and hides original IDs fr
  expect(document.querySelector('.golden-scoring-points')?.textContent).toContain('禁止带电清洗');
  expect(document.querySelector('.golden-quality-results')?.textContent).toContain('维护手册 · p12 支持答案');
  expect(document.querySelector('.golden-quality-results')?.textContent).not.toContain('DOC-001');
+ expect(document.querySelector('.golden-quality-results')?.textContent).not.toContain('暂无');
+ expect(document.querySelector('.golden-quality-results')?.textContent).toContain('原质检引用片段');
  expect(document.querySelector('.disclosure')).toBeNull();
  expect(document.body.textContent).not.toContain('DOC-001-C-00180');
  await act(async()=>root.unmount());
@@ -47,6 +49,7 @@ it('hides empty optional cards, groups duplicate evidence and preserves the save
  expect(document.querySelectorAll('.golden-evidence')).toHaveLength(1);
  expect(document.querySelector('.golden-evidence strong')?.textContent).toBe('设备手册 · p12 · 命中 3 处');
  expect(document.querySelectorAll('.golden-quality-results .ui-clamp').length).toBeGreaterThanOrEqual(3);
+ expect(document.querySelector('.golden-quality-results')?.textContent).not.toContain('暂无');
  expect(JSON.stringify(row)).toBe(saved);
  await act(async()=>root.unmount());
 });

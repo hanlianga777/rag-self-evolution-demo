@@ -14,7 +14,7 @@ class RefinementTests(unittest.TestCase):
         clock=patch('app.paid_schedule.utc_now',return_value=__import__('datetime').datetime(2026,11,7,tzinfo=__import__('datetime').timezone.utc))
         clock.start();self.addCleanup(clock.stop)
         context.CompositeTests.setUp(self)
-        self.winner_config = {**DEFAULT_PIPELINE_CONFIG, 'candidate_k':24, 'generation_thinking':'off'}
+        self.winner_config = {**DEFAULT_PIPELINE_CONFIG, 'candidate_k':24, 'generation_thinking':'high'}
         self.snapshot['questions'] = [{'id':q,'evidence':[{'source_chunk_ids':['c']}]} for q in ('q','q2','q3')]
         self.snapshot['question_ids'] = ['q','q2','q3']
         with self.store.connection() as db:
@@ -58,7 +58,6 @@ class RefinementTests(unittest.TestCase):
         v=self.suggestion();v['proposed_config_diff']={'candidate_k':12};cases.append((v,'Winner'))
         v=self.suggestion();del v['changes'][0]['side_effect_check'];cases.append((v,'副作用'))
         v=self.suggestion();v['proposed_config_diff']={'hyde':True};v['changes'][0].update(parameter='hyde',source_type='new_attempt',source_candidates=[]);cases.append((v,'已验证'))
-        v=self.suggestion();v['changes'][0]['source_type']='partial';cases.append((v,'拆分'))
         v=self.suggestion();v['changes'][0]['target_question_ids']=['q3'];cases.append((v,'剩余 Bad Case'))
         for value,message in cases:
             with self.subTest(message=message),self.assertRaisesRegex(ValueError,message):self.validate(value)
@@ -67,7 +66,7 @@ class RefinementTests(unittest.TestCase):
         v=self.suggestion();v['proposed_config_diff']={'hyde':True};v['changes'][0].update(parameter='hyde',source_type='new_attempt',source_candidates=[],why_not_verified='top_k=6伴随q3翻错，保护题重叠')
         self.assertTrue(self.validate(v)[0]['hyde'])
 
-    def test_partial_requires_real_single_parameter_contrast(self):
+    def test_partial_records_contrast_but_does_not_require_it(self):
         with self.store.connection() as db:
             db.execute('insert into candidate_configs values (?,?,?,?,?,?,?)',(self.experiment+'-C',self.experiment,'generated',json.dumps({**DEFAULT_PIPELINE_CONFIG,'top_k':6,'multi_query':2}),json.dumps({'candidate_label':'C','round':1}),'{}','now'))
         bundle=self.store.finish_candidate(self.experiment+'-C','evaluated',self.other['result'])
@@ -75,7 +74,10 @@ class RefinementTests(unittest.TestCase):
         v=self.suggestion();v['changes'][0].update(source_type='partial',source_candidates=[bundle['id']],contrast_ids=[next(c['id'] for c in facts['contrasts'] if c['parameter']=='top_k')])
         self.assertEqual(validate_d_refinement(v,self.winner,history,DEFAULT_PIPELINE_CONFIG,facts)[0]['top_k'],6)
         v['changes'][0]['contrast_ids']=['invented']
-        with self.assertRaisesRegex(ValueError,'拆分'):validate_d_refinement(v,self.winner,history,DEFAULT_PIPELINE_CONFIG,facts)
+        _,records=validate_d_refinement(v,self.winner,history,DEFAULT_PIPELINE_CONFIG,facts)
+        self.assertFalse(records[0]['partial_contrast_verified'])
+        v['changes'][0].pop('contrast_ids')
+        self.assertFalse(validate_d_refinement(v,self.winner,history,DEFAULT_PIPELINE_CONFIG,facts)[1][0]['partial_contrast_verified'])
 
     def test_facts_match_saved_cases_and_cover_every_option(self):
         from app.policy import ALLOWED_SEARCH_SPACE
@@ -130,15 +132,16 @@ class RefinementTests(unittest.TestCase):
         self.assertEqual(decision['attempts'][0]['provider_raw_text'], raw)
         self.assertEqual(decision['attempts'][0]['syntax_repair']['appended'], ']}')
 
-    def test_single_winner_can_decline_and_recommendation_recomputed(self):
+    def test_single_winner_must_generate_d_and_invalid_decline_is_recorded(self):
         from unittest.mock import Mock
         self.store.finish_candidate(self.other['id'],'failed',{})
         value=self.suggestion();value.update(should_generate_d=False,proposed_config_diff={},changes=[],explanation='剩余错题没有可靠改法；q3和安全拒答风险不可接受')
         p=Mock(complete=Mock(return_value=json.dumps(value)),settings=context.Settings('fixture','https://example.invalid','fixture'))
         result=self.store.create_composite(self.experiment,p)
-        self.assertEqual(result['status'],'no_effective_composite')
-        self.assertEqual(result['outcome'],'declined')
-        self.assertEqual(p.complete.call_count,1)
+        self.assertEqual(result['status'],'failed')
+        self.assertEqual(result['outcome'],'validation_failed')
+        self.assertIn('必须生成D',result['reason'])
+        self.assertEqual(p.complete.call_count,3)
         self.assertEqual(self.store.recommendation(self.experiment)['result']['recommended_candidate'],self.winner['id'])
 
     def test_three_invalid_decisions_distinct_from_decline(self):

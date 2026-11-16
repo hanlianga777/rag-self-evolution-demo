@@ -33,7 +33,8 @@ class ProductMetricsTests(unittest.TestCase):
         self.assertEqual(m['enhancement_counts'],dict.fromkeys(('hyde','query_rewrite','multi_query'),None))
     def test_clarify_not_safety_and_ranks_saved(self):
         c=self.case();c.update(test_category='negative',negative_subtype='clarify')
-        v=diagnostic_view(c);self.assertEqual((v['diagnosis_category'],v['subfeature'],v['severity_label']),('生成层问题','召回成功但答案漏要点','中等'))
+        v=diagnostic_view(c);self.assertEqual((v['diagnosis_category'],v['subfeature'],v['severity_label']),('生成层问题','召回成功但答案漏要点','普通'))
+        self.assertEqual(diagnostic_view(c,golden_item={'negative_subtype':'safety_critical'})['severity_label'],'严重')
         c['test_category']='positive';v=diagnostic_view(c)
         self.assertEqual(v['diagnosis_category'],'检索层问题');self.assertEqual(v['retrieval_positions'][1]['candidate_rank'],1)
     def test_cross_judge_comparison_blocked(self):

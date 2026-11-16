@@ -17,17 +17,17 @@ class Task004PolicyTests(unittest.TestCase):
         self.assertFalse(policy.qualify_candidate({'passed': True}, regression, 4, 6, 6)['qualified'])
         self.assertFalse(policy.evaluate_regression(new_critical_failures=1, new_ordinary_failures=0)['passed'])
 
-    def test_final_requires_zero_regressions_and_keeps_least_wrong_abc(self):
+    def test_final_allows_one_ordinary_regression_and_selects_best_qualified(self):
         regression = policy.evaluate_regression(new_critical_failures=0, new_ordinary_failures=1)
-        self.assertFalse(policy.qualify_release({'passed': True}, regression, 2)['qualified'])
+        self.assertTrue(policy.qualify_release({'passed': True}, regression, 2, 6, 5)['qualified'])
         self.assertTrue(policy.qualify_release({'passed': True}, policy.evaluate_regression(new_critical_failures=0, new_ordinary_failures=0), 1)['qualified'])
         self.assertFalse(policy.qualify_release({'passed': False}, regression, 2)['qualified'])
         rows = [{'id': label, 'status': 'evaluated', 'reasoning': {'candidate_label': label}, 'result': {'bad_case_count': count, 'qualification': {'qualified': True},'release_qualification':{'qualified':True}}} for label, count in [('A', 4), ('B', 2), ('C', 3)]]
         self.assertEqual(policy.select_final_candidate(rows)['candidate_id'], 'B')
         self.assertEqual(policy.select_final_candidate([*rows, {'id': 'missing', 'status': 'evaluated', 'reasoning': {'candidate_label': 'A'}, 'result': {'qualification': {'qualified': True}, 'bad_case_count': None}}])['candidate_id'], 'B')
-        self.assertEqual(policy.select_final_candidate([])['decision'], '保持 Baseline')
+        self.assertEqual(policy.select_final_candidate([])['decision'], '本次 Agent 优化失败')
         self.assertEqual(policy.select_final_candidate(rows, {'id': 'D', 'status': 'failed', 'result': {'release_qualification': {'qualified': True}}})['candidate_id'], 'B')
-        self.assertEqual(policy.select_final_candidate(rows, {'id': 'D', 'status': 'evaluated', 'result': {'release_qualification': {'qualified': True},'bad_case_count':1}})['decision'], '推荐 Candidate D')
+        self.assertEqual(policy.select_final_candidate(rows, {'id': 'D', 'status': 'evaluated', 'result': {'qualification': {'qualified': True},'bad_case_count':1}})['decision'], '推荐 Candidate D')
 
     def test_review_request_is_disabled_without_new_answers_or_judgments(self):
         with tempfile.TemporaryDirectory() as directory:

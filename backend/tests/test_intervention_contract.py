@@ -30,7 +30,7 @@ def target(root='Generation', final=True):
 
 
 def proposal(direction='grounded_generation', diff=None, observation='confirmed_claim'):
-    return {'intervention_direction':direction,'config_diff':diff or {'prompt_strategy':'Grounded'},
+    return {'intervention_direction':direction,'config_diff':diff or {'generation_thinking':'high'},
         'target_bad_cases':['q'],'root_cause':'Generation','evidence_assertions':[{'target_id':'q','observation':observation}],
         'parameter_dependencies':[],'hypothesis':'只移除无来源操作','why':'原回答有定位主张','expected_improvement':'减少无来源操作','risk':'遗漏有据步骤'}
 
@@ -46,7 +46,7 @@ class InterventionTests(unittest.TestCase):
         case=target();p=proposal('query_expansion',{'query_rewrite':True},'recall_missing')
         validate_intervention(p,{'q':case},{'query_rewrite':False})
         self.assertNotIn('recall_missing',diagnostic_view(case)['trace_observations'])
-        validate_intervention(proposal(),{'q':case},{'prompt_strategy':'Abstention'})
+        validate_intervention(proposal(),{'q':case},{'prompt_strategy':'Strict'})
 
     def test_complete_semantic_evidence_suppresses_missing_source_id_hypothesis(self):
         case=target()
@@ -69,8 +69,8 @@ class InterventionTests(unittest.TestCase):
         validate_intervention(p,{'q':case},{'candidate_k':12})
 
     def test_invalid_parameters_rejected_but_direction_dependencies_are_advisory(self):
-        p=proposal(diff={'prompt_strategy':'Grounded','metadata_filter':'STRICT'})
-        with self.assertRaisesRegex(ValueError,'unsupported parameters: metadata_filter'):validate_intervention(p,{'q':target()},{'prompt_strategy':'Abstention','metadata_filter':'OFF'})
+        p=proposal(diff={'generation_thinking':'high','metadata_filter':'STRICT'})
+        with self.assertRaisesRegex(ValueError,'unsupported parameters: metadata_filter'):validate_intervention(p,{'q':target()},{'prompt_strategy':'Strict','metadata_filter':'OFF'})
         case=target(final=False);case['programmatic_metrics']['retrieval_trace']['candidates']=[]
         p=proposal('query_expansion',{'query_rewrite':True,'multi_query':2},'recall_missing');p['root_cause']='Retrieval'
         validate_intervention(p,{'q':case},{'query_rewrite':False,'multi_query':False})
@@ -130,9 +130,9 @@ class InterventionTests(unittest.TestCase):
 
     def test_target_requires_saved_records_but_root_metadata_is_advisory(self):
         case=target();case['programmatic_metrics']['retrieval_trace']={}
-        with self.assertRaisesRegex(ValueError,'目标记录缺失'):validate_intervention(proposal(),{'q':case},{'prompt_strategy':'Abstention'})
+        with self.assertRaisesRegex(ValueError,'目标记录缺失'):validate_intervention(proposal(),{'q':case},{'prompt_strategy':'Strict'})
         case=target('Safety')
-        validate_intervention(proposal(),{'q':case},{'prompt_strategy':'Abstention'})
+        validate_intervention(proposal(),{'q':case},{'prompt_strategy':'Strict'})
         self.assertEqual(diagnostic_view(case)['primary_root_cause'],'Safety')
 
     def test_formal_blocking_is_not_confirmed_business_regression(self):

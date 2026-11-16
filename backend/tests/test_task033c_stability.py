@@ -19,37 +19,43 @@ class StableRequests(unittest.TestCase):
             env = Path(folder) / '.env'
             env.write_text('')
             settings = load_settings({}, env)
-            self.assertEqual(settings.baseline_thinking, 'off')
+            self.assertEqual(settings.baseline_thinking, 'max')
             self.assertEqual(settings.judge_thinking, 'low')
             self.assertEqual(load_settings({'JUDGE_THINKING':'off'}, env).judge_thinking, 'off')
         with judge_thinking('off'):
             self.assertEqual(thinking_config('judge'), {'task':'judge', 'thinking':{'type':'disabled'}})
 
-    def test_generation_and_query_calls_force_off_and_zero_despite_old_override(self):
+    def test_generation_uses_configured_max_while_query_calls_remain_off(self):
         provider = DeepSeekProvider(Settings('fixture', 'https://example.invalid', 'deepseek-flash'))
         for task in ('baseline','candidate','generation','answer','query_rewrite','multi_query','hyde','query_decompose','query','auxiliary'):
             with self.subTest(task=task), thinking_task(task, 'max'):
                 payload = json.loads(provider._request('system', 'user', False, False, .9).data)
-                self.assertEqual(payload['thinking'], {'type':'disabled'})
-                self.assertEqual(payload['temperature'], 0)
-                self.assertNotIn('reasoning_effort', payload)
+                if task in {'baseline','candidate','generation','answer'}:
+                    self.assertEqual(payload['thinking'], {'type':'enabled'})
+                    self.assertEqual(payload['reasoning_effort'], 'max')
+                    self.assertNotIn('temperature', payload)
+                else:
+                    self.assertEqual(payload['thinking'], {'type':'disabled'})
+                    self.assertEqual(payload['temperature'], 0)
+                    self.assertNotIn('reasoning_effort', payload)
                 self.assertNotIn('seed', payload)  # DeepSeek API has no documented seed.
         with judge_thinking('off'), thinking_task('judge'):
             payload = json.loads(provider._request('system', 'user', True, False, .9).data)
             self.assertEqual(payload['temperature'], 0)
 
-    def test_off_baseline_never_requires_thinking_efficiency_compensation(self):
+    def test_round_three_requires_downgrade_with_retrieval_if_never_tried(self):
         from app.optimization import validate_round_contract, build_agent_prompt
-        candidates = [{'id':label, 'config_diff':diff} for label,diff in zip('ABC', ({'top_k':6},{'candidate_k':24},{'prompt_strategy':'Tiered'}))]
+        candidates = [{'id':label, 'config_diff':diff} for label,diff in zip('ABC', ({'top_k':6},{'candidate_k':24},{'generation_thinking':'high','hyde':True}))]
         validate_round_contract(candidates, DEFAULT_PIPELINE_CONFIG, [], completed=6)
-        system, prompt = build_agent_prompt([], DEFAULT_PIPELINE_CONFIG, [], [], list('ABC'), evaluation_budget={'used':6})
-        self.assertFalse(prompt['round_contract']['efficiency_optimization'])
-        self.assertNotIn('generation_thinking', prompt['allowed_parameter_values'])
+        system, prompt = build_agent_prompt([], DEFAULT_PIPELINE_CONFIG, [], [], list('ABC'), evaluation_budget={'used':6}, round_number=3)
+        self.assertTrue(prompt['round_contract']['downgrade_required'])
+        self.assertIn('generation_thinking', prompt['allowed_parameter_values'])
+        self.assertNotIn('prompt_strategy', prompt['allowed_parameter_values'])
         self.assertNotIn('Max降到High', system)
 
-    def test_agent_cannot_tune_generation_thinking(self):
-        self.assertEqual(DEFAULT_PIPELINE_CONFIG['generation_thinking'], 'off')
-        self.assertEqual(ALLOWED_SEARCH_SPACE['generation_thinking'], ('off',))
+    def test_agent_can_tune_all_four_generation_thinking_levels(self):
+        self.assertEqual(DEFAULT_PIPELINE_CONFIG['generation_thinking'], 'max')
+        self.assertEqual(ALLOWED_SEARCH_SPACE['generation_thinking'], ('off','low','high','max'))
 
 
 class StableRanking(unittest.TestCase):

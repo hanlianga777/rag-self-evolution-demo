@@ -152,11 +152,11 @@ class CompositeTests(unittest.TestCase):
 
     def test_cross_stage_source_union_does_not_require_provider_authorization(self):
         with self.store.connection() as connection:
-            connection.execute('UPDATE candidate_configs SET config_json=? WHERE id=?',(json.dumps({**self.winner['config'],'prompt_strategy':'Abstention'}),self.winner['id']))
+            connection.execute('UPDATE candidate_configs SET config_json=? WHERE id=?',(json.dumps({**self.winner['config'],'prompt_strategy':'Strict'}),self.winner['id']))
         provider=self.provider()
         result=self.store.create_composite(self.experiment,provider,False)
-        self.assertEqual(result['status'],'failed')
-        self.assertEqual(provider.complete.call_count,3)
+        self.assertEqual(result['status'],'generated')
+        self.assertEqual(provider.complete.call_count,1)
         self.assertEqual(self.store.experiment(self.experiment)['result']['report_confirmation']['winner_id'],self.winner['id'])
 
     def test_coherent_multi_parameter_d_needs_saved_evidence_and_dependencies(self):
@@ -224,12 +224,15 @@ class CompositeTests(unittest.TestCase):
         self.assertEqual(value['status'],'failed');self.assertFalse(any(c['reasoning'].get('candidate_label')=='D' for c in self.store.candidates(self.experiment)))
         self.assertEqual(provider.complete.call_count,3)
         self.store.create_composite(self.experiment,provider,True);self.assertEqual(provider.complete.call_count,6)
-        self.assertEqual(self.store.recommendation(self.experiment)['result']['recommended_candidate'],self.winner['id'])
+        self.assertEqual(self.store.recommendation(self.experiment)['result']['recommended_candidate'],self.other['id'])
 
-    def test_model_can_decline_d_without_config(self):
+    def test_model_cannot_decline_required_d_without_config(self):
         provider=self.provider(generate=False,diff={})
-        self.assertEqual(self.store.create_composite(self.experiment,provider,True)['status'],'no_effective_composite')
-        self.assertEqual(self.store.recommendation(self.experiment)['result']['recommended_candidate'],self.winner['id'])
+        result=self.store.create_composite(self.experiment,provider,True)
+        self.assertEqual(result['status'],'failed')
+        self.assertIn('必须生成D', result['reason'])
+        self.assertEqual(provider.complete.call_count,3)
+        self.assertEqual(self.store.recommendation(self.experiment)['result']['recommended_candidate'],self.other['id'])
 
     def test_d_concurrent_clicks_call_once(self):
         from concurrent.futures import ThreadPoolExecutor
@@ -252,8 +255,8 @@ class CompositeTests(unittest.TestCase):
     def test_single_qualified_winner_still_calls_agent(self):
         self.store.finish_candidate(self.other['id'],'failed',{'error':'fixture'})
         provider=self.provider(generate=False,diff={})
-        self.assertEqual(self.store.create_composite(self.experiment,provider,False)['status'],'no_effective_composite')
-        provider.complete.assert_called_once()
+        self.assertEqual(self.store.create_composite(self.experiment,provider,False)['status'],'failed')
+        self.assertEqual(provider.complete.call_count,3)
 
     def test_legacy_baseline_cannot_reserve_or_confirm(self):
         with self.store.connection() as c:c.execute('UPDATE evaluation_runs SET judge_json=? WHERE id=?',(json.dumps({'model':'fixture','prompt_version':'judge-v1','scoring_policy':'v1.0.1-gates'}),self.baseline))

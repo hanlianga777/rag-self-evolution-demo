@@ -18,11 +18,11 @@ def pipeline_config(config):
     result = {k:config.get(k, DEFAULT_PIPELINE_CONFIG[k]) for k in ALLOWED_SEARCH_SPACE}
     for key,value in result.items():
         result[key] = next((v for v in ALLOWED_SEARCH_SPACE[key] if v==value and (type(v) is type(value) or type(v) in (int,float) and type(value) in (int,float))),value)
-    return result
+    return {**result, 'prompt_strategy':'Strict'}
 
 
 def parameter_diff(config, base):
-    return {k:v for k,v in pipeline_config(config).items() if type(v) is not type(base.get(k)) or v != base.get(k)}
+    return {k:v for k,v in pipeline_config(config).items() if k in ALLOWED_SEARCH_SPACE and (type(v) is not type(base.get(k)) or v != base.get(k))}
 
 
 def build_d_facts(store, baseline, winner, history):
@@ -206,7 +206,6 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
             contrast_ids=row.get('contrast_ids',[])
             valid_contrasts=[c for c in facts['contrasts'] if c['id'] in contrast_ids and c['parameter']==key and any(type(v) is type(value) and v==value for v in c['values'])]
             # 规则总表五.7：允许只合并一部分参数；有拆分对照的记为已验证，没有的记为待验证。
-            row['partial_contrast_verified'] = bool(valid_contrasts) if kind=='partial' else None
             for cid in selected:
                 source=sources[cid];source_config=pipeline_config(source['config'])
                 if type(source_config[key]) is not type(value) or source_config[key]!=value:raise ValueError('来源取值与D不一致')
@@ -215,5 +214,5 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
                 bundle=parameter_diff(source_config,base)
                 whole=all(config[k]==v and type(config[k]) is type(v) for k,v in bundle.items())
                 if not whole and kind!='partial':raise ValueError('多参数来源只取一部分时，source_type须写partial（部分取用）')
-        records.append({**row,'source_type':kind})
+        records.append({**row,'source_type':kind, **({'partial_contrast_verified':bool(valid_contrasts)} if kind=='partial' else {})})
     return effective_config,records

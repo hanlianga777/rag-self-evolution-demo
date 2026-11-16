@@ -10,24 +10,24 @@ from test_task008b_agent_input import fixture
 
 
 class AcceptanceTests(unittest.TestCase):
-    def test_legacy_strategy_keeps_original_prompt_and_new_choice_is_tiered(self):
+    def test_legacy_strategy_stays_readable_and_new_strategy_is_fixed_strict(self):
         service, provider = generation_fixture.GenerationVNextTests().service()
         service.answer('问题', {'prompt_strategy': 'Abstention'})
         self.assertIn('证据不足、风险不明或问题应拒答时，明确拒答或要求澄清；不得补造事实。', provider.requests[-1][0])
         self.assertNotIn('采用分级回答', provider.requests[-1][0])
-        service.answer('问题', {'prompt_strategy': 'Tiered'})
+        service.answer('问题', {'prompt_strategy': 'Strict'})
         self.assertIn('采用分级回答', provider.requests[-1][0])
-        self.assertEqual(search_space_contract()['prompt_strategy']['allowed'], ['Grounded', 'Completeness', 'Tiered'])
+        self.assertNotIn('prompt_strategy', search_space_contract())
 
     def test_all_parameter_choices_explain_their_meaning(self):
         contract = search_space_contract()
-        self.assertEqual(set(contract),set(DEFAULT_PIPELINE_CONFIG))
+        self.assertEqual(set(contract),set(DEFAULT_PIPELINE_CONFIG)-{'prompt_strategy'})
         for key, rule in contract.items():
             with self.subTest(key=key):
                 self.assertTrue(rule['description'])
                 self.assertEqual([option['value'] for option in rule['options']], rule['allowed'])
                 self.assertTrue(all(option['description'] for option in rule['options']))
-        self.assertIn('不调用 Rerank 模型', contract['rerank']['options'][2]['description'])
+        self.assertIn('不调用排序模型', contract['rerank']['options'][2]['description'])
 
     def test_negative_and_unreviewed_are_not_missing_records(self):
         facts = retrieval_facts({'test_category': 'negative', 'judge_result': {'checks': []}})

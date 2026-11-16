@@ -18,8 +18,8 @@ class ReleaseWiringTests(unittest.TestCase):
         with self.store.connection() as c:
             c.execute('INSERT INTO experiments VALUES (?,?,?,?,?)',('E0','B0','active','{}','now'))
 
-    def candidate(self,label,bad,new=0,release=False):
-        result={'qualification':{'qualified':True},'release_qualification':{'qualified':release},
+    def candidate(self,label,bad,new=0,qualified=True):
+        result={'qualification':{'qualified':qualified},'release_qualification':{'qualified':qualified},
             'evaluation_identity':self.identity,'bad_case_count':bad,
             'gates':{'passed':True},'regression':{'passed':True,'new_critical_failures':0,'new_ordinary_failures':new}}
         with self.store.connection() as c:
@@ -31,27 +31,29 @@ class ReleaseWiringTests(unittest.TestCase):
             c.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps(fields),'E0'))
 
     def test_suggested_winner_is_fewest_errors_even_with_ordinary_regressions(self):
-        self.candidate('A',5,0);self.candidate('B',2,3)
+        self.candidate('A',5,0);self.candidate('B',2,1)
         result=self.store.refresh_recommendation('E0')
         self.assertEqual(result['suggested_winner'],'B')
-        self.assertEqual(result['final_decision']['decision'],'保持 Baseline')
+        self.assertEqual(result['final_decision']['candidate_id'],'B')
 
-    def test_failed_final_keeps_confirmed_winner_with_fewer_error_alternative(self):
-        self.candidate('A',5,release=True);self.candidate('B',2,release=True);self.candidate('D',4,release=False)
+    def test_failed_final_selects_best_qualified_even_if_gate2_chose_another(self):
+        self.candidate('A',5,qualified=True);self.candidate('B',2,qualified=True);self.candidate('D',4,qualified=False)
         self.state(report_confirmation={'winner_id':'A'},composite={'status':'generated','candidate_id':'D'})
         result=self.store.refresh_recommendation('E0')
-        self.assertEqual(result['recommended_candidate'],'A')
+        self.assertEqual(result['recommended_candidate'],'B')
         self.assertEqual(result['suggested_winner'],'B')
         self.assertEqual(result['final_decision']['decision'],'保留 Winner 方案')
 
-    def test_no_qualified_candidate_records_keep_baseline(self):
+    def test_no_qualified_candidate_records_agent_failure(self):
         result=self.store.refresh_recommendation('E0')
-        self.assertEqual(result['final_decision']['decision'],'保持 Baseline')
+        self.assertEqual(result['final_decision']['decision'],'本次 Agent 优化失败')
         self.assertIsNone(result['recommended_candidate'])
 
-    def test_selected_winner_with_new_errors_cannot_publish(self):
-        self.candidate('A',2,new=1,release=False)
+    def test_selected_winner_with_one_ordinary_error_has_release_qualification(self):
+        self.candidate('A',2,new=1)
         self.state(report_confirmation={'winner_id':'A'},composite={'status':'no_effective_composite'})
         self.store.refresh_recommendation('E0')
-        with self.assertRaisesRegex(ValueError,'发布规则'):
-            self.store.publish_candidate('A','test human')
+        state=self.store.release_state(self.store.candidate('A'))
+        self.assertTrue(state['qualified'])
+        self.assertTrue(state['recommended'])
+        self.assertFalse(state['human_release'])

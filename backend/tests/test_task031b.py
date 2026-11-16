@@ -157,10 +157,12 @@ class PromptV3Tests(unittest.TestCase):
         task = Path(__file__).resolve().parents[2] / '指挥'
         paths = list((task/'队列').glob('031b-*.md')) + list((task/'历史任务').glob('031b-*.md'))
         literal = re.search(r'```\n(你是机器人设备的官方客服助手.*?)\n```', paths[0].read_text(), re.S)[1]
-        self.assertEqual(generation_contract()['generation_prompt_version'], 'generation-vnext-3')
+        self.assertEqual(generation_contract()['generation_prompt_version'], 'generation-vnext-4')
         self.assertEqual(generation_boundary('generation-vnext-3'), literal)
-        self.assertEqual(generation_contract()['generation_boundary_sha256'], '10dfcf4cb390f55e7c7e209dd3ff29a744f0f06fa859d2b1841c7fce1bc0dd8f')
-        self.assertEqual(generation_contract()['generation_boundary_sha256'], hashlib.sha256(literal.encode()).hexdigest())
+        self.assertEqual(generation_contract('generation-vnext-3')['generation_boundary_sha256'], '10dfcf4cb390f55e7c7e209dd3ff29a744f0f06fa859d2b1841c7fce1bc0dd8f')
+        self.assertEqual(generation_contract('generation-vnext-3')['generation_boundary_sha256'], hashlib.sha256(literal.encode()).hexdigest())
+        self.assertIn('不要让用户自己去翻手册查页码', generation_boundary('generation-vnext-4'))
+        self.assertEqual(generation_contract()['generation_boundary_sha256'], hashlib.sha256(generation_boundary('generation-vnext-4').encode()).hexdigest())
 
     def test_numbering_and_answer_mapping_follow_retrieval_order(self):
         entries = [{'chunk_id':'C9', 'content':'甲证据'}, {'chunk_id':'C3', 'content':'乙证据'}]
@@ -172,7 +174,7 @@ class PromptV3Tests(unittest.TestCase):
         class Provider:
             settings = SimpleNamespace(configured=True, model='mock')
             def complete_with_metrics(inner, system, user, **kwargs):
-                self.assertIn(generation_boundary('generation-vnext-3'), system)
+                self.assertIn(generation_boundary('generation-vnext-4'), system)
                 return {'content':'先做乙事项。[2] 再做甲事项。[1][2] 无效标号[0][9]。', 'ttft_ms':0, 'input_tokens':0, 'output_tokens':0}
         for target in ('baseline', 'sandbox_candidate', 'online'):
             service = AiService(object(), object(), Provider(), False)
@@ -180,14 +182,14 @@ class PromptV3Tests(unittest.TestCase):
             result = service.answer('问题', {'run_target':target})
             self.assertEqual(result['citation_markers'], {'[2]':1, '[1]':0})
             self.assertEqual(result['retrieval'][result['citation_markers']['[2]']]['chunk_id'], 'C3')
-            self.assertEqual(result['generation_prompt_version'], 'generation-vnext-3')
+            self.assertEqual(result['generation_prompt_version'], 'generation-vnext-4')
 
     def test_new_evaluation_version_and_legacy_rows_round_trip(self):
         from app.governance import GovernanceStore
         from test_round0_identity import BaselineConfigTests
         runner = BaselineConfigTests().runtime_store()
         snapshot, _, config, judge = runner.baseline_inputs()
-        self.assertEqual(judge['generation_prompt_version'], 'generation-vnext-3')
+        self.assertEqual(judge['generation_prompt_version'], 'generation-vnext-4')
         with tempfile.TemporaryDirectory() as directory:
             store = GovernanceStore(Path(directory)/'fixture.db')
             with store.connection() as connection:
@@ -195,9 +197,9 @@ class PromptV3Tests(unittest.TestCase):
                                    (snapshot['id'], 'approved', 'fixture', json.dumps(snapshot), 'offline'))
             judge['baseline_version'] = store.active_production()['id']
             run_id = store.create_baseline_run(snapshot, config, judge)
-            self.assertEqual(store.evaluation_run(run_id)['judge']['generation_prompt_version'], 'generation-vnext-3')
+            self.assertEqual(store.evaluation_run(run_id)['judge']['generation_prompt_version'], 'generation-vnext-4')
             # Read old stored JSON without version migration or rewriting it.
-            for version in ('generation-vnext-1', 'generation-vnext-2'):
+            for version in ('generation-vnext-1', 'generation-vnext-2', 'generation-vnext-3'):
                 with store.connection() as connection:
                     connection.execute('UPDATE evaluation_runs SET judge_json=? WHERE id=?', (json.dumps(generation_contract(version)), run_id))
                 self.assertEqual(store.evaluation_run(run_id)['judge'], generation_contract(version))

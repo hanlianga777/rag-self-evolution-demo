@@ -3062,7 +3062,9 @@ class GovernanceStore:
                 raise ValueError('Winner评测身份不一致')
             if not winner or winner['status'] != 'evaluated' or not winner['result'].get('qualification', {}).get('qualified'):
                 raise ValueError('至少需要一个合格 A/B/C Winner')
-            if experiment['evaluation_budget']['used'] >= MAX_EVALS:
+            if experiment['evaluation_budget']['used'] >= MAX_EVALS and not (
+                    experiment['result'].get('round_policy', {}).get('stop_rule') == 'staged-v1'
+                    and experiment['evaluation_budget']['used'] == MAX_EVALS):
                 raise ValueError('缺少 D 评测额度')
             confirmation = {'winner_id': winner_id, 'actor': actor, 'confirmed_at': _now(), 'candidates': [{'id': item['id'], 'status': item['status'], 'result': item['result'], 'config': item['config']} for item in candidates]}
             if audit_note:
@@ -3237,8 +3239,8 @@ class GovernanceStore:
                 fields = ['root_cause_alignment', 'complementary_capabilities', 'expected_improvement', 'risks', 'explanation']
                 if any(not suggestion.get(f) for f in fields) or any(not isinstance(suggestion.get(f), str) or not suggestion[f].strip() for f in fields):
                     raise ValueError('D建议缺少依据/收益/风险：root_cause_alignment和complementary_capabilities须非空；expected_improvement、risks、explanation须非空字符串，不要数组或对象')
-                if not suggestion['should_generate_d'] and facts['usable_repairs']:
-                    raise ValueError('事实表存在可用修题参数，必须生成D；预测副作用不能作为放弃理由：'+_json(facts['usable_repairs']))
+                if not suggestion['should_generate_d']:
+                    raise ValueError('有合格方案且有预算时必须生成D；预测副作用不能作为放弃理由')
                 if experiment['result'].get('strategy_contract') in {'agent-strategy-3','agent-strategy-4'}:
                     from .agent_strategy import validate_d_mode
                     validate_d_mode(suggestion, winner, eligible, facts)
@@ -3303,7 +3305,7 @@ class GovernanceStore:
             identity = baseline.get('judge', {}).get('evaluation_identity')
             qualified = sorted([item for item in candidates if item['reasoning'].get('candidate_label') != 'D' and item['status'] == 'evaluated' and item['result'].get('qualification', {}).get('qualified') and policy_current(baseline.get('judge', {})) and identity and item['result'].get('evaluation_identity') == identity], key=candidate_rank)
             final = next((c for c in candidates if c['reasoning'].get('candidate_label') == 'D' and c['status'] == 'evaluated' and c['result'].get('evaluation_identity') == identity), None)
-            decision = select_final_candidate([c for c in qualified if c['id'] == confirmation['winner_id']] if confirmation else qualified, final)
+            decision = select_final_candidate(qualified, final)
             selected = None
             if any(item['status'] in {'running', 'generated'} or item['result'].get('evaluation_complete') is False for item in candidates if item['reasoning'].get('candidate_label') != 'D'):
                 status = 'WAITING_FOR_ROUND_COMPLETION'

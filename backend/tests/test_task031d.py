@@ -17,17 +17,17 @@ class StrategyTests(unittest.TestCase):
     def rows(self):
         return [{'id':'A','direction':'检索召回增强','config_diff':{'candidate_k':24}},
                 {'id':'B','direction':'检索召回增强','config_diff':{'query_rewrite':True}},
-                {'id':'C','direction':'回答策略','config_diff':{'prompt_strategy':'Tiered'}}]
+                {'id':'C','direction':'上下文预算','config_diff':{'retrieval_max_tokens':8192}}]
 
-    def test_no_preset_directions_and_trigger_after_six_only_without_winner(self):
+    def test_no_preset_directions_and_round_three_downgrade_required(self):
         rows=self.rows()
         validate_round_contract(rows,DEFAULT_PIPELINE_CONFIG,[],completed=0)
-        _,p=build_agent_prompt([],DEFAULT_PIPELINE_CONFIG,[],[],list('ABC'),evaluation_budget={'used':6})
-        self.assertFalse(p['round_contract']['efficiency_optimization'])
+        _,p=build_agent_prompt([],DEFAULT_PIPELINE_CONFIG,[],[],list('ABC'),evaluation_budget={'used':6}, round_number=3)
+        self.assertTrue(p['round_contract']['downgrade_required'])
         validate_round_contract(rows,DEFAULT_PIPELINE_CONFIG,[],completed=6)
         winner={'id':'old','status':'evaluated','config':DEFAULT_PIPELINE_CONFIG,'result':{'qualification':{'qualified':True}}}
-        _,p=build_agent_prompt([],DEFAULT_PIPELINE_CONFIG,[winner],[],list('ABC'),evaluation_budget={'used':6})
-        self.assertFalse(p['round_contract']['efficiency_optimization'])
+        _,p=build_agent_prompt([],DEFAULT_PIPELINE_CONFIG,[winner],[],list('ABC'),evaluation_budget={'used':6}, round_number=3)
+        self.assertTrue(p['round_contract']['downgrade_required'])
         validate_round_contract(self.rows(),DEFAULT_PIPELINE_CONFIG,[winner],completed=6)
 
     def test_disjoint_parameters_remain_required(self):
@@ -132,16 +132,19 @@ class ConclusionTests(unittest.TestCase):
 
     def test_d_only_uses_two_authorized_modes_and_verified_changes(self):
         from app.agent_strategy import validate_d_mode
-        winner={'id':'A','result':{'qualification':{'qualified':True}}}
-        other={'id':'B','result':{'qualification':{'qualified':True}}}
+        winner={'id':'A','status':'evaluated','reasoning':{'candidate_label':'A'},'result':{'qualification':{'qualified':True}}}
+        other={'id':'B','status':'evaluated','reasoning':{'candidate_label':'B'},'result':{'qualification':{'qualified':True}}}
         suggestion={'should_generate_d':True,'combination_mode':'partial_fusion','mode_reason':'两套已验证且不冲突','changes':[{'source_type':'partial','source_candidates':['B']}]}
         validate_d_mode(suggestion,winner,[winner,other])
         other['result']['qualification']['qualified']=False
         with self.assertRaises(ValueError):validate_d_mode(suggestion,winner,[winner,other])
         suggestion['combination_mode']='winner_plus_verified'
         validate_d_mode(suggestion,winner,[winner,other])
+        self.assertEqual(suggestion['combination_mode'],'winner_plus')
         suggestion['changes'][0]['source_type']='new_attempt'
-        with self.assertRaises(ValueError):validate_d_mode(suggestion,winner,[winner,other])
+        validate_d_mode(suggestion,winner,[winner,other])
+        with self.assertRaisesRegex(ValueError,'优先使用'):
+            validate_d_mode(suggestion,winner,[winner,other],{'usable_repairs':[{'parameter':'top_k'}]})
 
     def test_saved_stage_shares_are_visible_to_agent(self):
         from app.optimization import performance_facts

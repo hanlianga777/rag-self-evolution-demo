@@ -70,12 +70,12 @@ class BaselineConfigTests(unittest.TestCase):
         runtime=SimpleNamespace(model='deepseek-flash',generation_contract=generation_contract())
         return EvaluationRunner(store,runtime)
 
-    def test_new_baseline_uses_current_production_strategy(self):
+    def test_new_baseline_fixes_strict_and_preserves_saved_production(self):
         _,_,config,judge=self.runtime_store().baseline_inputs()
-        self.assertEqual(config['prompt_strategy'],'Abstention')
+        self.assertEqual(config['prompt_strategy'],'Strict')
         self.assertEqual(config['generation_thinking'],'max')
         self.assertEqual(judge['judge_thinking']['reasoning_effort'],'low')
-        self.assertEqual(judge['generation_prompt_version'],'generation-vnext-3')
+        self.assertEqual(judge['generation_prompt_version'],'generation-vnext-4')
 
     def test_current_draft_is_consumed_but_stale_draft_blocks(self):
         from app.policy import DEFAULT_PIPELINE_CONFIG
@@ -85,11 +85,11 @@ class BaselineConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'Draft'):
             self.runtime_store({**draft,'identity':{'fixture':'stale'}}).baseline_inputs()
 
-    def test_baseline_keeps_draft_thinking(self):
+    def test_new_baseline_overrides_draft_thinking_with_default_max(self):
         from app.policy import DEFAULT_PIPELINE_CONFIG
         draft={'identity':{'fixture':'same'},'config':{**DEFAULT_PIPELINE_CONFIG,'generation_thinking':'low'}}
         _,_,config,_=self.runtime_store(draft).baseline_inputs()
-        self.assertEqual(config['generation_thinking'],'low')
+        self.assertEqual(config['generation_thinking'],'max')
 
     def test_hybrid_off_draft_does_not_reintroduce_alpha(self):
         from app.policy import DEFAULT_PIPELINE_CONFIG

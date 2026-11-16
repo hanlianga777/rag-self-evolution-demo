@@ -18,7 +18,7 @@ from test_optimization_contract import drafts, trace_case
 class InheritanceTests(unittest.TestCase):
     def setUp(self):
         self.base = dict(DEFAULT_PIPELINE_CONFIG)
-        self.inherited = {'retrieval_max_tokens':8192,'prompt_strategy':'Tiered'}
+        self.inherited = {'retrieval_max_tokens':8192,'generation_thinking':'high'}
         self.prior = [{'id':'R1-A','status':'evaluated','config':{**self.base, **self.inherited},
                        'reasoning':{'round':1,'candidate_label':'A','changed_parameters':self.inherited},
                        'result':{'qualification':{'qualified':True}}}]
@@ -224,7 +224,7 @@ class ProposalCycleTests(unittest.TestCase):
         with self.store.connection() as db:
             approvals=[dict(r) for r in db.execute('select * from approvals')]
             self.assertFalse(any(r['gate']=='human_release' for r in approvals))
-            self.assertEqual(exp['result']['report_confirmation']['audit_note'],'用户 2026-11-14 预先授权')
+            self.assertEqual(exp['result']['report_confirmation']['audit_note'],'用户 2026-11-16 预先授权')
 
     def test_fresh_retry_is_reached(self):
         state,calls,_=self.run_cycle(succeeds=True)

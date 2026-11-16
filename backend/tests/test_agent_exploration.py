@@ -47,14 +47,14 @@ class ExplorationTests(unittest.TestCase):
 
     def test_priority_directions_are_advisory_but_required_fields_are_checked(self):
         q,c,chunks=example()
-        validate_intervention(proposal(c,'grounded_generation','recall_missing',{'prompt_strategy':'Completeness'}),{q['id']:c},DEFAULT_PIPELINE_CONFIG)
+        validate_intervention(proposal(c,'grounded_generation','recall_missing',{'generation_thinking':'high'}),{q['id']:c},DEFAULT_PIPELINE_CONFIG)
         for change in [{'hypothesis':''}, {'why':''}, {'expected_improvement':''}, {'risk':''}]:
             p={**proposal(c),**change}
             with self.subTest(change=change),self.assertRaises(ValueError):validate_intervention(p,{q['id']:c},DEFAULT_PIPELINE_CONFIG)
 
     def test_context_and_generation_are_located_from_saved_stage_text(self):
         for stage,root,direction,observation,diff in [('context','Ranking','context_selection','ranking_omission',{'top_k':6}),
-                ('answer','Generation','grounded_generation','final_sufficient',{'prompt_strategy':'Completeness'})]:
+                ('answer','Generation','grounded_generation','final_sufficient',{'generation_thinking':'high'})]:
             q,c,chunks=example(stage)
             with patch('app.diagnostics._current_corpus',return_value=(chunks,'new-corpus')):
                 self.assertEqual(diagnostic_view(c)['primary_root_cause'],root)
@@ -114,10 +114,10 @@ class ProgressTests(unittest.TestCase):
             'fixed_question_ids':ids,'new_failure_question_ids':[],
             'evidence_reason':'offline saved candidate result','conclusion':'keep configuration results separate',
         } for candidate,ids in zip(exp['candidates'],[['Q1'],['Q2'],[]])]
-        for row,diff in zip(response['candidates'],[{'query_rewrite':True},{'generation_thinking':'low','hyde':True},{'prompt_strategy':'Tiered'}]):
+        for row,diff in zip(response['candidates'],[{'query_rewrite':True},{'generation_thinking':'low','hyde':True},{'retrieval_max_tokens':8192}]):
             row['config_diff']=diff
             row['hypothesis']+=' second round'
-        response['candidates'][2]['direction']='回答策略'
+        response['candidates'][2]['direction']='上下文预算'
         next_round=OptimizationAgent(self.store,contracts.FixedProvider(json.dumps(response))).generate('EVAL-test',experiment_id=exp['id'])
         progress=next_round['result']['processing_progress']
         self.assertEqual(len(progress['fixed_question_ids']),1)

@@ -56,14 +56,15 @@ class AgentFactsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'复盘'):
             prepare_response(json.dumps(drafts),DEFAULT_PIPELINE_CONFIG,[],[],0,1,list('ABC'),None,[],{})
 
-    def test_d_must_strictly_improve_release_eligible_winner(self):
+    def test_final_selects_best_qualified_by_errors_new_failures_and_p99(self):
         winner=result_candidate('A')
         self.assertEqual(select_final_candidate([winner],result_candidate('D',bad=4))['candidate_id'],'A')
-        self.assertEqual(select_final_candidate([winner],result_candidate('D',p99=29,cost=2))['candidate_id'],'A')
+        self.assertEqual(select_final_candidate([winner],result_candidate('D',p99=29,cost=2))['candidate_id'],'D')
         self.assertEqual(select_final_candidate([winner],result_candidate('D',p99=29,cost=1))['candidate_id'],'D')
         self.assertEqual(select_final_candidate([winner],result_candidate('D',bad=2))['candidate_id'],'D')
-        winner['result']['release_qualification']['qualified']=False
-        self.assertIsNone(select_final_candidate([winner],result_candidate('D',release=False))['candidate_id'])
+        winner['result']['qualification']['qualified']=False
+        failed_d=result_candidate('D');failed_d['result']['qualification']['qualified']=False
+        self.assertIsNone(select_final_candidate([winner],failed_d)['candidate_id'])
 
 class CompositeSourceTests(unittest.TestCase):
     def test_multi_parameter_source_must_be_taken_whole_and_have_reason(self):

@@ -46,7 +46,7 @@ class ThinkingTests(unittest.TestCase):
         self.assertEqual(load_settings({'DEEPSEEK_MODEL':'deepseek-v4-flash'}, empty).model, 'deepseek-flash')
 
     def test_tasks_independent_and_off_has_no_effort(self):
-        for task, effort in {'baseline':'off','judge':'low','agent':'high','query_rewrite':'off','multi_query':'off','hyde':'off','query_decompose':'off'}.items():
+        for task, effort in {'baseline':'max','judge':'low','agent':'high','query_rewrite':'off','multi_query':'off','hyde':'off','query_decompose':'off'}.items():
             with providers.thinking_task(task):
                 payload = self.payload()
                 self.assertEqual(payload['thinking'], {'type':'disabled' if effort == 'off' else 'enabled'})
@@ -91,7 +91,7 @@ class ThinkingTests(unittest.TestCase):
         with patch('urllib.request.urlopen', side_effect=socket.timeout()), patch('app.paid_run.payment_usage'):
             with self.assertRaises(providers.ProviderTimeout):self.provider.complete('system','user')
 
-    def test_v3_default_candidate_off_auxiliary_tasks_and_no_golden_leakage(self):
+    def test_v4_default_candidate_off_auxiliary_tasks_and_no_golden_leakage(self):
         calls = []
         class Provider:
             settings = SimpleNamespace(configured=True, model='fixture')
@@ -104,7 +104,7 @@ class ThinkingTests(unittest.TestCase):
         service = AiService(object(),object(),Provider(),False)
         service.retriever = SimpleNamespace(retrieve=lambda *a,**kw:[{'chunk_id':'C1','content':'source'}])
         result = service.answer('question', {'run_target':'sandbox_candidate','generation_thinking':'off','query_rewrite':True,'multi_query':1,'hyde':True,'reference_answer':'GOLDEN SECRET','required_checks':['GOLDEN SECRET']})
-        self.assertEqual(result['generation_prompt_version'], 'generation-vnext-3')
+        self.assertEqual(result['generation_prompt_version'], 'generation-vnext-4')
         self.assertTrue(all(c[2]['thinking'] == {'type':'disabled'} for c in calls[:-1]))
         self.assertEqual(calls[-1][2]['thinking'], {'type':'disabled'})
         self.assertNotIn('GOLDEN SECRET', repr(calls))
@@ -121,8 +121,8 @@ class ThinkingTests(unittest.TestCase):
             for effort in ('max', 'max', 'off', 'off'):
                 with provider_task('answer'), providers.thinking_task('candidate', effort):
                     self.assertEqual(self.provider.complete('system','user'), 'answer')
-        self.assertEqual(http.call_count, 1)
-        self.assertEqual(len(checkpoint['provider_requests']), 1)
+        self.assertEqual(http.call_count, 2)
+        self.assertEqual(len(checkpoint['provider_requests']), 2)
 
     def test_invalid_and_http_error_responses_do_not_save_reasoning_or_fallback(self):
         import urllib.error
@@ -136,7 +136,7 @@ class ThinkingTests(unittest.TestCase):
             self.assertNotIn('PRIVATE THINKING', failure.exception.raw_provider_response)
             self.assertNotIn('PRIVATE THINKING', str(failure.exception))
 
-    def test_generation_ignores_old_high_and_judge_keeps_explicit_low(self):
+    def test_generation_uses_configured_high_and_judge_keeps_explicit_low(self):
         calls = []
         class Provider:
             settings = SimpleNamespace(configured=True, model='fixture')
@@ -151,7 +151,7 @@ class ThinkingTests(unittest.TestCase):
         with providers.thinking_task('candidate','off'):
             service.answer('question', {'run_target':'baseline','generation_thinking':'high'})
             service.judge('question','golden','answer','positive')
-        self.assertEqual([c.get('reasoning_effort', 'off') for c in calls], ['off','low'])
+        self.assertEqual([c.get('reasoning_effort', 'off') for c in calls], ['high','low'])
 
     def test_decompose_strict_bounded_json_and_disabled_thinking(self):
         class Provider:
@@ -181,7 +181,7 @@ class ThinkingTests(unittest.TestCase):
         from app.optimization import validate_intervention
         from app.policy import DEFAULT_PIPELINE_CONFIG
         case = {'programmatic_metrics':{'retrieval_trace':{'candidates':[],'final':[]}}}
-        for direction, observation, diff in [('grounded_generation','final_sufficient',{'prompt_strategy':'Tiered'}),
+        for direction, observation, diff in [('grounded_generation','final_sufficient',{'generation_thinking':'high'}),
                                              ('query_expansion','recall_missing',{'query_rewrite':True}),
                                              ('context_selection','retrieval_noise',{'top_k':6})]:
             view = {'target_eligible':True,'primary_root_cause':'Generation','trace_observations':[observation], 'context_selection_options':[]}
