@@ -60,6 +60,32 @@ def to_candidate(row):
     return candidate
 
 
+def read_rows(data: bytes):
+    """读 CSV 必须保留单元格内的换行：证据列一格多行（每行一段）。
+    旧写法 splitlines() 会把引号内的换行吃掉，多段证据被拼成一行，导致 049 dry-run 19 题误报。"""
+    return list(csv.DictReader(io.StringIO(data.decode('utf-8-sig'), newline='')))
+
+
+def check_rows(rows, chunks):
+    """逐题硬校验。正式导入（main）和总指挥的离线自检（golden_offline_check.py）共用这一个函数，保证验的就是要跑的那条路径。"""
+    from app.golden_v2 import validate_golden_candidate
+    from app.reviewed_import import validate_friend_content
+    report, candidates = [], []
+    for row in rows:
+        errors = []
+        try:
+            candidate = to_candidate(row)
+            validate_friend_content(candidate, chunks)
+            checked = {**candidate, 'evidence': [] if candidate['test_category'] == 'negative' else candidate['evidence']}
+            errors.extend(validate_golden_candidate(checked, chunks)['blocking_errors'])
+            candidates.append(candidate)
+        except (ValueError, KeyError) as error:
+            errors.append(str(error))
+        report.append({'题号': row.get('题号'), 'errors': errors})
+    return {'rows': len(rows), 'error_rows': sum(bool(r['errors']) for r in report),
+            'errors': [r for r in report if r['errors']]}, candidates
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--database', type=Path)
@@ -72,27 +98,11 @@ def main(argv=None):
     os.environ['RAG_SAFE_START'] = '1'
     from app.main import store
     from app.corpus import CorpusStore
-    from app.golden_v2 import validate_golden_candidate
-    from app.reviewed_import import FRIEND_CONTRACT, import_batch, validate_friend_content
+    from app.reviewed_import import FRIEND_CONTRACT, import_batch
     data = args.csv.read_bytes()
-    # 单元格内有换行（多段证据、分行答案），不能先 splitlines 再交给 csv。
-    rows = list(csv.DictReader(io.StringIO(data.decode('utf-8-sig'), newline='')))
-    chunks = CorpusStore().chunks()
-    report, candidates = [], []
-    for row in rows:
-        errors = []
-        try:
-            candidate = to_candidate(row)
-            validate_friend_content(candidate, chunks)
-            checked = {**candidate, 'evidence': [] if candidate['test_category'] == 'negative' else candidate['evidence']}
-            result = validate_golden_candidate(checked, chunks)
-            errors.extend(result['blocking_errors'])
-            candidates.append(candidate)
-        except (ValueError, KeyError) as error:
-            errors.append(str(error))
-        report.append({'题号': row.get('题号'), 'errors': errors})
-    summary = {'rows': len(rows), 'error_rows': sum(bool(r['errors']) for r in report),
-               'errors': [r for r in report if r['errors']], 'dry_run': not args.apply}
+    rows = read_rows(data)
+    summary, candidates = check_rows(rows, CorpusStore().chunks())
+    summary['dry_run'] = not args.apply
     if args.apply:
         if summary['error_rows']:
             raise SystemExit(json.dumps(summary, ensure_ascii=False, indent=1))
