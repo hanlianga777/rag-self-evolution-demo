@@ -40,7 +40,7 @@ it('opens a compact Golden row by clicking truncated text or pressing Enter whil
   vi.spyOn(Element.prototype, 'scrollHeight', 'get').mockReturnValue(200);
   vi.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(20);
   const rows = [
-    { id: 'q1', slot: 'Q01', question: '完整问题原文', test_category: 'positive', source_summary: '操作说明.pdf · 第 54–55 页', scoring_summary: { required: 2 }, baseline_result: { passed: false, diagnosis_category: '检索层问题' } },
+    { id: 'q1', generation_method: '事实查询', slot: 'Q01', question: '完整问题原文', test_category: 'positive', source_summary: '操作说明.pdf · 第 54–55 页', scoring_summary: { required: 2 }, baseline_result: { passed: false, diagnosis_category: '检索层问题' } },
     { id: 'q2', slot: 'Q02', question: '未判定问题', test_category: 'negative', source_summary: '操作说明.pdf · 第 2 页', scoring_summary: { required: 1 }, baseline_result: { passed: null } },
   ];
   await mount(<QuestionTable rows={rows} onDetail={onDetail} />);
@@ -49,7 +49,7 @@ it('opens a compact Golden row by clicking truncated text or pressing Enter whil
   expect(row.textContent).toContain('正向');
   expect(row.textContent).not.toContain('Positive');
   expect(row.textContent).toContain('操作说明 · p54–55');
-  expect(row.textContent).toContain('2 条');
+  expect(row.textContent).toContain('事实查询');
   expect(row.querySelector('.ui-verdict')).toBeNull();
   expect(document.querySelector('thead')?.textContent).not.toContain('Baseline');
   expect(document.querySelectorAll('tbody tr')[1].querySelector('.ui-verdict')).toBeNull();

@@ -36,7 +36,7 @@ it("keeps Baseline conclusions and saved identity inside the report, and preserv
   expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(cell => cell.textContent)).toEqual(["题号", "问题", "题型", "负向子类", "主题", "层级与细分", "缺了什么", "严重程度i", ""]);
   expect(document.querySelector(".product-diagnosis-table tbody tr td:nth-child(6)")?.textContent).toContain("检索失败");
   await act(async()=>document.querySelector<HTMLElement>(".product-diagnosis-table tbody tr")!.click());
-  expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["业务问题", "答案对比", "必答要点与检索路径", "优化方向"]);
+  expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["业务问题", "答案对比", "判分与检索路径", "优化方向"]);
   expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("技术详情");
   expect(document.querySelector(".bad-case-details > details")).toBeNull();expect(document.querySelector(".bad-case-details > .story-disclosure")).toBeNull();
   expect(JSON.stringify(input)).toBe(frozen);

@@ -22,7 +22,7 @@ it('preloads the light list and every case before local filtering/searching',asy
  expect(document.querySelector('.comparison-rail')?.textContent).toContain('修好的1');
  expect([...document.querySelectorAll('.comparison-step .comparison-t')].map(n=>n.textContent)).toEqual(['配置变化','证据位置变化','结果变化']);
  expect(document.querySelector('.comparison-steps')?.textContent).toContain('保留条数 4 → 6');
- expect(document.querySelector('.comparison-steps')?.textContent).toContain('必答要点 ①');
+ expect(document.querySelector('.comparison-steps')?.textContent).toContain('达标的维度 ①');
  expect(document.querySelectorAll('.comparison-ptable .ui-clamp')).toHaveLength(0);
  expect(document.querySelector('mark')?.textContent).toContain('只在室内');
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='仍未修好1')!.click());

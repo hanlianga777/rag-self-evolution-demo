@@ -47,6 +47,7 @@ class JudgeRecoveryTests(unittest.TestCase):
                 result = runner.execute('OLD')
             self.assertEqual(result, {'task':'judge','thinking':{'type':'disabled'}})
 
+    @patch.dict('os.environ', {'JUDGE_SAMPLES': '3'})
     def test_judge_reuse_includes_effective_effort_and_prompt(self):
         with tempfile.TemporaryDirectory() as folder:
             store = GovernanceStore(Path(folder) / 'test.db')
@@ -56,7 +57,7 @@ class JudgeRecoveryTests(unittest.TestCase):
                 settings = SimpleNamespace(model='test')
                 def judge(self, *args, **kwargs):
                     calls.append(thinking_config('judge'))
-                    return {**rubric_judge_output(kwargs['context']['category']), 'attempt':len(calls)}
+                    return {**rubric_judge_output(kwargs['context']['category']), 'correctness_reason':f'第 {len(calls)} 次假判分'}
             service = AiService(store, None, Provider(), False)
             from app.rubric_judge import RUBRIC_VERSION
             context = {'contract_version':RUBRIC_VERSION, 'category':'positive', 'final_texts':['资料']}
@@ -69,7 +70,9 @@ class JudgeRecoveryTests(unittest.TestCase):
                     with patch('app.rubric_judge.RUBRIC_PROMPT_SHA256', '新版判分提示词哈希'):
                         changed = service.judge('题','参考','回答','positive',context=context)
                         repeated = service.judge('题','参考','回答','positive',context=context)
-            self.assertEqual([first['attempt'], same['attempt'], low['attempt'], changed['attempt'], repeated['attempt']], [1,1,2,3,3])
+            self.assertEqual([[sample['correctness_reason'] for sample in result['samples']] for result in (first, same, low, changed, repeated)],
+                             [[f'第 {n} 次假判分' for n in numbers] for numbers in ([1,2,3], [1,2,3], [4,5,6], [7,8,9], [7,8,9])])
+            self.assertEqual(len(calls), 9)
             self.assertEqual(same['reused_from']['run_id'], 'BASE')
             self.assertNotIn('reused_from', low)
             self.assertNotIn('reused_from', changed)

@@ -11,9 +11,9 @@ let root:ReturnType<typeof createRoot>;
 const mount=async(node:React.ReactNode)=>{root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));};
 afterEach(()=>{if(root)act(()=>root.unmount());vi.unstubAllGlobals();document.body.innerHTML='';});
 it('uses real Golden fields and omits unavailable columns without placeholder cells',async()=>{
- await mount(<QuestionTable rows={[{id:'q',slot:'Q07',question:'如何操作',test_category:'negative',negative_subtype:'clarify',source_summary:'不适用（负向题（Negative）无标准证据）',scoring_summary:{required:3,auxiliary:1},probe:{score:100},qc:{score:90},baseline_result:{passed:false,diagnosis_category:'检索层问题'}}]} onDetail={()=>{}}/>);
+ await mount(<QuestionTable rows={[{id:'q',slot:'Q07',question:'如何操作',test_category:'negative',negative_subtype:'clarify',source_summary:'不适用（负向题（Negative）无标准证据）',generation_method:'事实查询',scoring_summary:{required:3,auxiliary:1},probe:{score:100},qc:{score:90},baseline_result:{passed:false,diagnosis_category:'检索层问题'}}]} onDetail={()=>{}}/>);
  expect([...document.querySelectorAll('th')].map(e=>e.textContent)).toEqual(['题号','题型','问题','主题簇','负向子类','考查环节','出处','出题方式','Probei','QCi','']);
- expect(document.querySelector('tbody')?.textContent).toContain('3 条');
+ expect(document.querySelector('tbody')?.textContent).toContain('事实查询');
  expect(document.querySelector('tbody .ui-verdict')).toBeNull();expect(document.querySelector('thead')?.textContent).not.toContain('Baseline');
  expect(document.querySelector('tbody')?.textContent).not.toContain('暂无');
 });
