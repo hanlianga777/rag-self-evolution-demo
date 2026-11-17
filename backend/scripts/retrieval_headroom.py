@@ -1,8 +1,8 @@
 """检索可修空间扫描：开跑前判断"Agent 手里的检索参数，到底能不能把题修好"。只检索、不生成、不判分。
 
 为什么要有它（2026-11-16 复盘）：
-  Agent 能调的几乎全是检索参数。如果 Baseline 配置下标准证据本来就都进了最终资料，Agent 再怎么调检索也修不了题，
-  剩下的成绩差只是回答和判分的随机波动——前面 7 次 Agent 实验就是这样白跑的。
+  如果 Baseline 配置下标准证据本来就都进了最终资料，Agent 调检索参数修不了题，只能靠其他方向；
+  如果连其他方向也没有空间，剩下的成绩差只是回答和判分的随机波动。花钱前先把检索这一层的空间量清楚。
   这一步只调用 embedding、rerank 和（开了改写/多问法/HyDE 时）关闭思考的小模型，几分钱，结果可重复，
   所以必须放在付费 Baseline 和 Agent 之前。
 
@@ -13,9 +13,10 @@
      （Agent 每个方案最多改 2 个参数）。
   3. 汇总：Baseline 没拿到证据的题 = 检索缺口；其中某个配置能补回来的 = 可修空间。
 
-判定（写死，不随结果改）：
-  - 可修空间 ≥ --min-fixable（默认 5）道，且至少有一个 ≤2 参数的配置能补回 ≥3 道、同时弄丢的题 ≤1 道 → GO；
-  - 否则 → NO-GO：不跑 Baseline 和 Agent，先改题卷（多出检索难的消融题），再扫。
+结论只作参考（用户 2026-11-16 21:26 定）：
+  Bad Case 有生成层、检索层、安全边界层、性能层四类，Agent 会按实际情况选方向（例如调思考档位），不只修检索。
+  本扫描只量得出"检索层"的可修空间，所以输出的 GO / NO-GO 只是检索层的参考信号，不作为启动 Baseline 或 Agent 的硬条件。
+  参考口径：可修空间 ≥ --min-fixable（默认 5）道，且至少有一个 ≤2 参数的配置能补回 ≥3 道、同时弄丢的题 ≤1 道 → GO。
 
 PYTHONPATH=backend python3 backend/scripts/retrieval_headroom.py --csv 指挥/报告/049-新题卷定稿.csv --output 指挥/报告/050-检索可修空间.csv
   --smoke：只扫 3 道题 × 2 个配置，先确认能跑通（几乎不花钱）。
@@ -93,7 +94,7 @@ def summarize(results, *, min_fixable=5, min_single=3, max_lost=1):
     fixable = sorted({q for r in rows for q in r['fixed']})
     strong = [r for r in rows if r['n_params'] <= 2 and len(r['fixed']) >= min_single and len(r['lost']) <= max_lost]
     verdict = 'GO' if len(fixable) >= min_fixable and strong else 'NO-GO'
-    return {'verdict': verdict, 'rule': f'可修空间≥{min_fixable} 且存在 ≤2 参数配置补回≥{min_single}、弄丢≤{max_lost}',
+    return {'verdict': verdict, 'note': '仅检索层参考信号，不作为启动条件', 'rule': f'可修空间≥{min_fixable} 且存在 ≤2 参数配置补回≥{min_single}、弄丢≤{max_lost}',
             'baseline_gap': gap, 'fixable': fixable, 'unfixable_gap': sorted(set(gap) - set(fixable)),
             'best_configs': rows[:8], 'strong_configs': [r['config'] for r in strong]}
 
