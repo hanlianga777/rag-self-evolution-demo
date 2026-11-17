@@ -2488,6 +2488,11 @@ class GovernanceStore:
         if row is None:
             return None
         result = dict(row)
+        # 指定记录只对它所属的题卷有效：换了新冻结题卷后，旧题卷的指定不能把新 Baseline 挡掉（否则页面整页为空）。
+        current_golden = connection.execute("SELECT id FROM dataset_versions WHERE status='approved' ORDER BY created_at DESC,rowid DESC LIMIT 1").fetchone()
+        pinned_run = connection.execute('SELECT dataset_version_id FROM evaluation_runs WHERE id=?',(result['baseline_run_id'],)).fetchone()
+        if not current_golden or not pinned_run or pinned_run['dataset_version_id'] != current_golden['id']:
+            return None
         if not connection.execute('SELECT 1 FROM evaluation_runs WHERE id=?',(result['comparison_run_id'],)).fetchone():
             result.update(comparison_run_id=None, comparison_label=None, comparison_unavailable_reason='对照记录已删除')
         return result
