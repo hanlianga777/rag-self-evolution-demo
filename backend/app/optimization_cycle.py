@@ -388,6 +388,10 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
             state['staged_decision'] = {'round': number, 'qualified': [c['id'] for c in qualified], 'used': used, 'decision': decision}
             if decision != 'next_round':
                 return finish(experiment, qualified, decision)
+            max_rounds = experiment['result'].get('round_policy', {}).get('max_rounds')
+            if isinstance(max_rounds, int) and number >= max_rounds:
+                # 用户可指定本次只跑到第 N 轮（2026-11-17：只跑第 2、3 轮）；到点停下汇报，不自动开下一轮。
+                return save('round_limit', 'review', f'已跑满 {max_rounds} 轮且未达到转入 D 的条件，按用户要求停下汇报')
             if state.get('current_round_only'):
                 return save('round_completed','review')
             save('running', 'analysis')

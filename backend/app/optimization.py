@@ -349,7 +349,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
               '先读程序生成的基线诊断摘要、速度事实、逐题变化及已被证明有害的改动清单gate_harming_changes。每轮恰好ABC三套，direction由你根据事实自行确定，不预设方向。同轮修改参数互斥。不得照搬gate_harming_changes。'
               '回答策略固定为Strict（分级回答），不是可调参数。generation_thinking可选off/low/high/max，Baseline是max；把Thinking从max降档并配合至少一个检索参数补强，用来验证较低档位能否同样修好Bad Case，是重要方向。每个方案相对其底座最多改两个参数。'
               'prior_sandbox_results里带no_effect的方案：50题回答与已跑结果完全相同，说明它改的参数在当前条件下没有改变交给模型的资料，不要再提出同类无效改动。'
-              '每道错题的diagnostic_view.issue_tags列出它同时存在的全部问题（检索层/生成层/安全边界/性能，可多个），diagnosis_category只是排优先级用的主原因；设计方案时要兼顾同一题的全部标签，不要只看主原因。'
+              '每道错题的bad_cases[].issue_tags列出它同时存在的全部问题（检索层/生成层/安全边界/性能，可多个），diagnosis_category只是排优先级用的主原因；设计方案时要兼顾同一题的全部标签，不要只看主原因。'
               'enhancement_telemetry是增强生效遥测：每个增强手段（query_rewrite/multi_query/hyde/query_decompose）在几道题上开启、在几道题上带来了原问题查不到的新资料（effective_questions、new_final_hits）；生效为0说明这个手段在当前题上没起作用。'
               '有害改动仅禁止完整配置差异原样重复；叠加其他参数的组合只提示风险，不能推断单参数有害。'
               '先写前几轮复盘prior_round_review：summary首轮写无；plans逐一覆盖所有已完成历史方案，每条含candidate_id、changes、fixed_question_ids、new_failure_question_ids（均用保存的正式question_id）、evidence_reason（证据位置、速度、单/多参数归因）、conclusion（有效/有害/待验证及依据）；多参数必须说明无法单独确定并给most_likely_parameter和attribution_reason；baseline_remaining_assessment总结Baseline剩余错题；conclusions为[{id,conclusion}]。首轮plans为空，conclusions从Baseline事实归纳。每套方案必须用review_conclusion_ids引用其中结论。'
@@ -378,6 +378,9 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
                      'reason':view['analysis_reason'], 'subfeature':view.get('subfeature'), 'severity_label':view.get('severity_label'),
                      'priority':priority_by_category.get(view.get('diagnosis_category'),{}).get('priority',view.get('priority')),
                      'priority_note':priority_by_category.get(view.get('diagnosis_category'),{}).get('priority_note',''),
+                     # 一题多问题：issue_tags 列出检索/生成/安全/性能全部标签；judge_failure 给未达标维度的分数与 Judge 理由（054 发现此前只在审计里、没进提示词）。
+                     'issue_tags':[f"{tag['layer']}·{tag['label']}" for tag in view.get('issue_tags') or []],
+                     'judge_failure':(row['result'].get('evaluation_outcome') or {}).get('reason'),
                      'retrieval_facts':row.get('retrieval_facts') or retrieval_facts(row['result'])})
     budget = {**{'used': 0, 'max': MAX_EVALS, 'reserved_for_d': 0}, **(evaluation_budget or {})}
     budget.update(remaining=max(0, budget['max'] - budget['used']), remaining_for_abc=max(0, budget['max'] - budget['used'] - budget['reserved_for_d']))

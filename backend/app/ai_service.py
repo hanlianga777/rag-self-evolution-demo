@@ -264,7 +264,10 @@ class AiService:
         queries, labels = [], []
         if config["query_rewrite"]:
             with thinking_task('query_rewrite'):
-                queries.append(self.provider.complete("只改写检索查询，不回答问题，不补充事实。", question).strip())
+                queries.append((self.provider.complete(
+                    "你是检索查询改写器，不是问答助手。把用户问题改写成一条用于在产品说明书里检索的查询："
+                    "补全问题里能确定的产品名和对象，把口语、俗称、比喻换成说明书里可能使用的正式术语，保留型号、否定和全部限定条件。"
+                    "只输出这一条查询本身，不要回答问题，不要解释，不要编造数字、步骤或结论；问题里没有的信息不要添加。", question).strip().splitlines() or [question])[0][:200])
             labels.append('query_rewrite')
         count = config["multi_query"]
         if count:
