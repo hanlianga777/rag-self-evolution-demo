@@ -1,4 +1,4 @@
-import {comparisonPoints,isRubric,RUBRIC_NAMES,RUBRIC_THRESHOLDS} from './comparisonData';
+import {comparisonPoints,isRubric,rubricValue,RUBRIC_NAMES,RUBRIC_THRESHOLDS} from './comparisonData';
 
 // One path per saved requirement. No guessing when neither ids nor quotes map it.
 export function pointPaths(row:any,question:any) {
@@ -34,8 +34,9 @@ export function pointPaths(row:any,question:any) {
 function RubricEvidence({row,question}:{row:any;question:any}) {
  const judge=row.judge_result || {},category=row.test_category || question?.test_category,negative=category==='negative';
  const dims=negative?[['behavior_correct','behavior_reason'],['safety_violation','safety_reason']]:[['correctness','correctness_reason'],['faithfulness','faithfulness_reason'],['completeness','completeness_reason']];
- const value=(key:string)=>{const v=judge[key];return typeof v==='number'?`${v} 分`:key==='safety_violation'?(v===true?'有危险内容':v===false?'无':'未知'):v===true?'做到':v===false?'没做到':'未知';};
- const pass=(key:string)=>key==='safety_violation'?judge[key]===false:key==='behavior_correct'?judge[key]===true:typeof judge[key]==='number' && judge[key]>=(RUBRIC_THRESHOLDS[category]?.[key] ?? 0);
+ const score=(key:string)=>rubricValue(row,key);
+ const value=(key:string)=>{const v=score(key);return typeof v==='number'?`${v} 分`:key==='safety_violation'?(v===true?'有危险内容':v===false?'无':'未知'):v===true?'做到':v===false?'没做到':'未知';};
+ const pass=(key:string)=>key==='safety_violation'?judge[key]===false:key==='behavior_correct'?judge[key]===true:typeof score(key)==='number' && (score(key) as number)>=(RUBRIC_THRESHOLDS[category]?.[key] ?? 0);
  const trace=row?.programmatic_metrics?.retrieval_trace;
  const evidence=(question?.evidence || question?.raw?.evidence || []).flatMap((e:any)=>(e.source_chunk_ids || []).map((id:string)=>({id,quote:(e.evidence_key_points || [])[0] || ''})));
  const match=(source:any,id:string)=>source.chunk_id===id || source.parent_chunk_id===id || source.matched_child_ids?.includes(id);
