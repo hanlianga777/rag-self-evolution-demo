@@ -22,7 +22,7 @@ const costText = (value: any) => yuanText(value?.amount, value?.currency) ? `${y
 const gateLabels: Record<string, string> = { positive_correctness:'正向题（Positive）正确性', positive_faithfulness:'正向题（Positive）忠实性', positive_completeness:'正向题（Positive）完整性', ablation_correctness:'消融题（Ablation）正确性', ablation_faithfulness:'消融题（Ablation）忠实性', ablation_completeness:'消融题（Ablation）完整性', safe_rejection_rate:'安全拒答率', safety_critical_accuracy:'安全关键准确率', prompt_injection_resistance:'提示注入抵抗', latency_p50_seconds:'回答耗时中位数', latency_p99_seconds:'回答耗时（最慢 1%）' };
 export const productQuestionLabel = (row: Row) => caseData(row).diagnostic_view?.display_question_id || row.display_question_id || questionLabel(caseId(row));
 
-export function BadCaseOverview({rows,categories=[],priorities=[],latencyGates=[],showJudgeReason=false,questions=[],onSelect}: {rows:Row[];categories?:Row[];priorities?:Row[];latencyGates?:Row[];showJudgeReason?:boolean;questions?:Row[];onSelect:(row:Row)=>void}) {
+export function BadCaseOverview({rows,allRows=[],categories=[],priorities=[],latencyGates=[],showJudgeReason=false,questions=[],onSelect}: {rows:Row[];allRows?:Row[];categories?:Row[];priorities?:Row[];latencyGates?:Row[];showJudgeReason?:boolean;questions?:Row[];onSelect:(row:Row)=>void}) {
  const [selected,setSelected]=useState('all');
  useEffect(()=>{setSelected('all');},[rows]);
  const cases=businessDiagnosisRows(rows).filter(row=>caseData(row).diagnostic_view?.diagnosis_category!=='延迟' && caseData(row).diagnostic_view?.diagnosis_category!=='性能问题');
@@ -33,7 +33,11 @@ export function BadCaseOverview({rows,categories=[],priorities=[],latencyGates=[
   {key:'performance',name:'性能',labels:[],icon:'time' as const},
  ];
  const layerKey=(row:Row)=>layerDefinitions.find(layer=>layer.labels.includes(caseData(row).diagnostic_view?.diagnosis_category))?.key;
- const visible=selected==='all'?cases:cases.filter(row=>layerKey(row)===selected);
+ // 性能：按"单题回答耗时超过 P99 门槛（秒）"逐题统计，答对的慢题也算——性能不看对错。不计入 Bad Case 总数。
+ const p99Limit=latencyGates.find(gate=>gate.metric==='latency_p99_seconds')?.threshold;
+ const latencySeconds=(row:Row)=>{const value=(caseData(row).programmatic_metrics || row.programmatic_metrics || {}).latency_ms;return typeof value==='number' && Number.isFinite(value)?value/1000:null;};
+ const slowRows=typeof p99Limit==='number'?allRows.filter(row=>{const seconds=latencySeconds(row);return seconds!==null && seconds>p99Limit;}):[];
+ const visible=selected==='all'?cases:selected==='performance'?slowRows:cases.filter(row=>layerKey(row)===selected);
  const incomplete=cases.filter(row=>!layerKey(row));
  const ranked=categories.map(category=>({...category,...priorities.find(item=>item.label===category.label)}));
  const severityOrder=['致命','严重','中等','轻微'];
@@ -44,9 +48,9 @@ export function BadCaseOverview({rows,categories=[],priorities=[],latencyGates=[
    retrieval:'关键证据没有被找到，或者找到了却排得太靠后，没能交给模型。',
    generation:'证据已经交给模型，但回答漏了要点，或者该追问的时候没有追问。',
    safety:'该拒绝、该提醒风险的题，回答没有守住安全底线。',
-   performance:'单题回答时间超出了 Hard Gate 规定的上限。',
+   performance:typeof p99Limit==='number'?`单题回答耗时超过 ${p99Limit} 秒（P99 门槛）的题，答对的也算；不计入 Bad Case 总数。`:'单题回答时间超出了 Hard Gate 规定的上限。',
   };
-  return {...layer,count:cases.filter(row=>layerKey(row)===layer.key).length,severity,note:notes[layer.key]};
+  return {...layer,count:layer.key==='performance'?slowRows.length:cases.filter(row=>layerKey(row)===layer.key).length,severity,note:notes[layer.key]};
  });
  return <div className="bad-case-overview">
   <div role="group" aria-label="Bad Case 分类"><BadCaseLayers total={cases.length} layers={layers} active={selected} onSelect={setSelected}/></div>

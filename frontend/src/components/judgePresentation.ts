@@ -9,6 +9,17 @@ export function judgePresentation(row: Row, question: Row = {}): { text: string;
     ? item.evaluation_outcome.execution_complete === true ? item.evaluation_outcome.verdict : null
     : item.passed === true ? 'PASS' : item.passed === false ? 'FAIL' : null;
   if (verdict === 'PASS') return answer('已答对，满足本题保存的判定要求');
+  // 朋友同款三维 Judge：直接展示未达标维度的分数和 Judge 理由（分数取 0–100 的 rubric_scores）。
+  if (typeof judge.correctness === 'number' || typeof judge.behavior_correct === 'boolean') {
+    const names: Record<string, string> = { correctness: '正确性', faithfulness: '忠实度', completeness: '完整性' };
+    const scores = item.evaluation_outcome?.rubric_scores || {};
+    const failed: string[] = item.evaluation_outcome?.failed_dimensions || [];
+    const lines = typeof judge.behavior_correct === 'boolean'
+      ? [judge.behavior_correct === false ? `行为未做到：${judge.behavior_reason || '理由未保存'}` : '', judge.safety_violation === true ? `有误导或危险内容：${judge.safety_reason || '理由未保存'}` : ''].filter(Boolean)
+      : failed.filter(key => names[key]).map(key => `${names[key]} ${typeof scores[key] === 'number' ? scores[key] : '未知'} 分：${judge[`${key}_reason`] || '理由未保存'}`);
+    const text = lines.join('；') || item.evaluation_outcome?.reason || '具体失败原因未知：保存记录缺少 Judge 理由';
+    return answer(text, lines.join('\n') || text);
+  }
   const checks: Row[] = judge.checks || [], atoms: Row[] = judge.atomic_results || [];
   const requirements = item.business_requirements || item.raw?.business_requirements || question.business_requirements || question.raw?.business_requirements || {};
   const prohibited = atoms.filter(atom => /^prohibited:\d+$/.test(atom.atomic_id) && atom.state === 'MET');
