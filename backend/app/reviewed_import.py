@@ -10,6 +10,52 @@ from .corpus import CorpusStore, current_manifest, manifest_identity
 
 
 CONTRACT = 'human-reviewed-csv-v1'
+# 规则总表一（2026-11-16 晚）：朋友同款题卷——问题、参考答案、证据原文、题型/子类型、考查节点/参数、难度、出题方式、关键词、备注；
+# 不写 business_requirements（必答 / 加分 / 禁止），判分、质检、页面都不用。
+FRIEND_CONTRACT = 'friend-golden-v1'
+FRIEND_METADATA = ('test_node', 'config_param', 'difficulty', 'generation_method', 'keywords', 'note', 'paired_question', 'criticality')
+CROSS_CHUNK_METHODS = {'跨段综合', '桥接'}
+NEGATIVE_BEHAVIORS = {'safety_critical':'safe_rejection', 'prompt_injection':'prompt_injection_resistance',
+                      'insufficient_evidence':'insufficient_evidence', 'clarify':'clarify'}
+
+
+def validate_friend_content(candidate, chunks):
+    """朋友同款硬校验的来源部分：证据必须能在所标切块原文里逐字找到（空白与全半角归一后比较）。"""
+    import unicodedata
+    strict = lambda value: re.sub(r'\s+', '', unicodedata.normalize('NFKC', value or ''))
+    if candidate.get('business_requirements') is not None:
+        raise ValueError('朋友同款题卷不写 business_requirements（必答 / 加分 / 禁止）')
+    if not isinstance(candidate.get('question'), str) or not candidate['question'].strip():
+        raise ValueError('问题不能为空')
+    group = candidate.get('test_category')
+    known = {c['chunk_id']: c for c in chunks}
+    if group in {'positive', 'ablation'}:
+        if not (candidate.get('reference_answer') or '').strip() or not candidate.get('evidence'):
+            raise ValueError('正向题（Positive）和消融题（Ablation）须有参考答案和证据原文')
+        for source in candidate['evidence']:
+            ids, quotes = source.get('source_chunk_ids') or [], source.get('evidence_key_points') or []
+            if not ids or not quotes or any(i not in known for i in ids):
+                raise ValueError('证据切块不在当前知识库：' + ','.join(ids))
+            body = ''.join(strict(known[i].get('chunk_text', known[i].get('text', ''))) for i in ids)
+            for quote in quotes:
+                if strict(quote) not in body:
+                    raise ValueError('证据原文在所标切块里找不到：' + quote[:40])
+        # 朋友硬校验第 8 条"跨块校验：去掉任一段就答不出"：跨段题的证据必须分散在至少两块，且没有任何一块单独包含全部证据。
+        if candidate.get('generation_method') in CROSS_CHUNK_METHODS or candidate.get('ablation_attribute') == 'cross_chunk':
+            quotes = [q for source in candidate['evidence'] for q in source.get('evidence_key_points') or []]
+            ids = list(dict.fromkeys(i for source in candidate['evidence'] for i in source.get('source_chunk_ids') or []))
+            texts = {i: strict(known[i].get('chunk_text', known[i].get('text', ''))) for i in ids}
+            if len(ids) < 2 or any(all(strict(q) in body for q in quotes) for body in texts.values()):
+                raise ValueError('跨段题的证据必须来自至少两块，且任何一块都不能单独答全')
+    elif group == 'negative':
+        if candidate.get('evidence'):
+            raise ValueError('负向题不填证据')
+        if NEGATIVE_BEHAVIORS.get(candidate.get('negative_subtype')) != candidate.get('expected_behavior'):
+            raise ValueError('负向题（Negative）子类与预期行为不匹配')
+        if not (candidate.get('reference_answer') or candidate.get('expected_response') or '').strip():
+            raise ValueError('负向题需要一段参考回答（行为样例）')
+    else:
+        raise ValueError('题型必须是 positive / ablation / negative')
 
 
 def receipt_key(source_sha256, *, machine_checks=False):
@@ -38,7 +84,7 @@ def validate_content(candidate, chunks):
             raise ValueError('负向题（Negative）子类与预期行为不匹配')
 
 
-def import_batch(store, candidates, source_sha256, source, review_note, *, machine_checks=False):
+def import_batch(store, candidates, source_sha256, source, review_note, *, machine_checks=False, contract=None):
     from .governance import _json, _now, _normalized, GENERATION_PROFILES
     from datetime import datetime, timezone
     from .full_text import CORPUS_LOCK
@@ -51,6 +97,11 @@ def import_batch(store, candidates, source_sha256, source, review_note, *, machi
     with CORPUS_LOCK, store.connection() as connection:
         connection.execute('BEGIN IMMEDIATE')
         chunks = CorpusStore().chunks()
+        friend = contract == FRIEND_CONTRACT
+        if friend:
+            machine_checks = True
+            for candidate in candidates:
+                validate_friend_content(candidate, chunks)
         if machine_checks:
             from .golden_v2 import validate_golden_candidate
             prepared = []
@@ -67,8 +118,9 @@ def import_batch(store, candidates, source_sha256, source, review_note, *, machi
                 prepared.append(candidate)
             candidates = prepared
         for candidate in candidates:
-            validate_content(candidate, chunks)
-        key = receipt_key(source_sha256, machine_checks=machine_checks)
+            if not friend:
+                validate_content(candidate, chunks)
+        key = receipt_key(source_sha256 + (':' + FRIEND_CONTRACT if friend else ''), machine_checks=machine_checks)
         previous = store.business_import_receipt(key)
         if previous:
             raise ValueError('该人工审定文件已导入，请使用已有Generation Run')
@@ -78,10 +130,10 @@ def import_batch(store, candidates, source_sha256, source, review_note, *, machi
         ids, hashes = [], {}
         provenance = 'reviewed_csv_machine_checks' if machine_checks else 'reviewed_csv'
         legacy_type = 'v1_mini' if machine_checks else 'reviewed_csv'
-        contract = 'reviewed-csv-machine-checks-v1' if machine_checks else CONTRACT
+        contract = FRIEND_CONTRACT if friend else 'reviewed-csv-machine-checks-v1' if machine_checks else CONTRACT
         for index, candidate in enumerate(sorted(candidates, key=lambda c: c['coverage_slot']), 1):
             question_id = f'CSV-{serial}-{index:02d}'
-            raw = {**candidate, 'id': question_id, 'source': provenance, 'generation_run_id': run_id,
+            raw = {**candidate, **({'golden_contract': FRIEND_CONTRACT} if friend else {}), 'id': question_id, 'source': provenance, 'generation_run_id': run_id,
                    'display_id': candidate['coverage_slot'], 'evaluation_group': candidate['test_category'],
                    'import_audit': {'source_sha256': source_sha256, 'source': source, 'review_note': review_note, 'imported_at': now}}
             item = {'id': question_id, 'question': raw['question'], 'reference_answer': raw.get('reference_answer'),

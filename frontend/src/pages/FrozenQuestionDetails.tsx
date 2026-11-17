@@ -51,8 +51,17 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true,
   const validityReason = readable(probe.question_validity_reason || (probePassed ? "题目与证据校验通过。" : displayText(probe.reason || "保存记录未提供题目有效性说明。")));
   const probeClass = probe.probe_details?.classification || probe.classification;
   const retrievalReason = readable(probe.retrieval_observation || (retrievalObservation ? "最终检索上下文证据未齐（P1 召回观察）。" : probeClass === "SUPPORTED" ? "标准证据已被检索召回。" : row.test_category === "negative" ? "负向题按资料边界核对，不做召回观察。" : "保存记录未提供召回观察。"));
-  const requirements = row.raw?.business_requirements || {};
-  const groups: [string, any[]][] = [["必答", [...(requirements.required_checks || []), ...(requirements.conditional_checks || [])]], ["加分", requirements.auxiliary_information || []], ["禁止", requirements.prohibited || []]];
+  // 规则总表一（2026-11-16 晚）：不再展示"必答 / 加分 / 禁止"；改为朋友同款题目信息。
+  const raw = row.raw || {};
+  const ablationNames: Record<string, string> = { colloquial: "口语化问法", alias_entity: "别名 / 缩写", weak_keywords: "弱关键词", cross_chunk: "跨段" };
+  const facts: [string, string][] = ([
+    ["出题方式", raw.generation_method],
+    ["消融类型", raw.ablation_attribute && (ablationNames[raw.ablation_attribute] || raw.ablation_attribute)],
+    ["配对正向题", raw.paired_question],
+    ["考查环节", [raw.test_node, raw.config_param].filter(Boolean).join(" · ")],
+    ["难度", raw.difficulty],
+    ["关键词", Array.isArray(raw.keywords) ? raw.keywords.join("、") : raw.keywords],
+  ] as [string, any][]).filter(([, value]) => typeof value === "string" && value.trim()) as [string, string][];
   return <>
   <ConfirmDialog open={!!qualityConfirm} onOpenChange={open => !open && setQualityConfirm(null)} title={qualityConfirm?.name === "probe" ? "确认运行 Probe" : "确认运行 QC"} busy={busy} onConfirm={() => { const next = qualityConfirm; setQualityConfirm(null); if (next) onRun?.(next.id, next.name); }}><p>将重新校验当前题目，会调用模型并产生费用。</p><p>不会影响当前线上版本。</p></ConfirmDialog>
   <div className="drawer-body frozen-question-details">
@@ -61,7 +70,7 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true,
     <DrawerSection title="问题"><p>{presentationText(row.question || "")}</p><p className="muted">出处：{questionSources(row)}</p></DrawerSection>
     <DrawerSection title="参考答案"><ol className="golden-answer-list candidate-answer">{answers.map((line, index) => <li key={index}>{line}</li>)}</ol>{row.test_category === "negative" && <small className="muted">按预期行为检查回答边界</small>}</DrawerSection>
     {uniqueEvidence.length > 0 && <DrawerSection title="核心证据"><div className="golden-evidence-scroll">{uniqueEvidence.map(({ chunk, count }, index: number) => <div className="golden-evidence" key={index}><strong>{sourceLabel(chunk)}{count > 1 && ` · 命中 ${count} 处`}</strong><div className="muted-prose"><TruncatedText lines={3}>{chunk.chunk_text || "暂无"}</TruncatedText></div></div>)}</div></DrawerSection>}
-    {groups.some(([, points]) => points.length) && <DrawerSection title="评分要点"><div className="golden-scoring-points">{groups.filter(([, points]) => points.length).map(([label, points]) => <section key={label}><h4>{label}</h4>{points.length ? <ul>{points.map((point, index) => <li key={index}>{readable(typeof point === "string" ? point : point.requirement || point.description || "暂无")}{point.trigger && <small>适用条件：{readable(String(point.trigger))}</small>}</li>)}</ul> : <p>暂无</p>}</section>)}</div></DrawerSection>}
+    {facts.length > 0 && <DrawerSection title="题目信息"><ul className="golden-question-facts">{facts.map(([label, value]) => <li key={label}><span className="muted">{label}：</span>{value}</li>)}</ul></DrawerSection>}
     <DrawerSection title="质检结果"><div className="golden-quality-results quality-grid"><div className="golden-probe-result"><strong>Probe · {goldenQuality(row, "probe")}</strong><Badge tone={probePassed ? "good" : "warning"}>{probeExecutionFailed ? "未完成" : probePassed ? "通过" : row.probe_status === "needs_revision" ? "未通过" : "未运行"}</Badge><div className="muted-prose"><TruncatedText lines={3}>{probeExecutionFailed ? "执行情况" : "题目有效"}：{validityReason}</TruncatedText></div><div className="muted-prose"><TruncatedText lines={3}>召回观察：{retrievalReason}</TruncatedText></div><button className="primary" disabled={busy || !onRun} aria-description={!onRun ? "即将支持" : undefined} onClick={() => setQualityConfirm({ id: row.id, name: "probe" })}>运行 Probe</button></div><div><strong>QC · {typeof qc.score === "number" ? goldenScore(qc.score) : goldenQuality(row, "qc")}</strong><Badge tone={qcPassed ? "good" : "warning"}>{qcPassed ? "通过" : row.qc_status === "qc_failed" ? "未通过" : "未运行"}</Badge><div className="muted-prose"><TruncatedText lines={3}>{readable(qc.reason || (qcPassed ? "整卷质检通过，未发现需修改的问题。" : "保存记录未提供质检说明。"))}</TruncatedText></div><button className="primary" disabled={busy || !onRun || !probePassed} aria-description={!onRun ? "即将支持" : !probePassed ? "Probe 通过后可运行 QC" : undefined} onClick={() => setQualityConfirm({ id: row.id, name: "qc" })}>运行 QC</button></div></div></DrawerSection>
 
   </div>

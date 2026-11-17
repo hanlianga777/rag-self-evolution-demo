@@ -345,7 +345,7 @@ export function QuestionTable({ rows, onDetail, paging, resetKey, coveragePlan }
     {label:'负向子类',width:86,style:'muted',value:(row:Candidate)=>questionClassification(row).negative},
     {label:'考查环节',width:86,style:'muted',value:(row:Candidate)=>questionClassification(row).stage},
     {label:'出处',width:160,style:'muted',value:(row:Candidate)=>{const sources=tableSources(row.source_summary || questionSources(row))?.filter(source => source !== "保存记录缺少来源");return sources?.length?`${sources[0]}${sources.length>1?` +${sources.length-1}`:''}`:'未记录';}},
-    {label:'评分要点',width:62,style:'num',value:(row:Candidate)=>(row.business_requirements || row.raw?.business_requirements)?.required_checks ? `${(row.business_requirements || row.raw.business_requirements).required_checks.length} 条` : row.scoring_summary ? `${row.scoring_summary.required} 条` : '未知'},
+    {label:'出题方式',width:76,style:'muted',value:(row:Candidate)=>row.raw?.generation_method || row.generation_method || '未记录'},
     {label:'Probe',width:65,style:'num',value:(row:Candidate)=>goldenQuality(row, 'probe')},
     {label:'QC',width:54,style:'num',value:(row:Candidate)=>goldenQuality(row, 'qc')},
   ];

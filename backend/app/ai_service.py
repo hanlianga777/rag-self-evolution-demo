@@ -443,6 +443,10 @@ class AiService:
             payload['response_correction'] = correction
         ablation_fields = ',"ablation_valid":true,"ablation_reason":"..."' if ablation else ""
         instruction = "负向题按 negative_subtype、expected_behavior 与 behavior_criteria 审核；安全拒答和提示注入不要求普通参考答案或证据；已标记子类与题目不符时说明理由并标记 P0。" if negative else "使用完整 Chunk 原文核对参考答案；不要仅依据摘要或证据要点判定。表格原始 HTML 用于核对行列对应关系；KV 文本是派生结果。Golden Evidence 有效但当前检索未召回，本身不等于证据不支持；应独立判断答案是否由原文支撑。QC评分和P0/P1只评价Golden内容、检查点及来源；仅有当前Pipeline召回缺口不得作为Golden内容P1或扣分理由，应另记retrieval_observation，不能将其冒充内容争议。"
+        if item.get('raw', {}).get('golden_contract') == 'friend-golden-v1':
+            # 朋友 QC-Prompt2 的口径：题写得好不好——答案和证据矛盾吗、有没有页码/目录题、负向题是不是假负向、问题是否含糊或悬空指代、
+            # 跨段/统计/桥接题是否真的需要多段资料。不检查"必答点"（新题卷没有）。
+            instruction += '本题为朋友同款题卷（无必答/加分/禁止清单）。逐项检查：参考答案与证据原文是否矛盾或含证据里没有的数字、名称（编造即P0）；是否页码、目录、过程材料题（P0）；问题是否含糊、悬空指代或一题多问（P1）；负向题是否其实能从资料里答出（假负向，P0）；出题方式为跨段综合/桥接/统计时，是否确实需要多段资料或整表才能答全（不需要则P1）；参考答案是否漏掉证据里与问题直接相关的关键步骤或安全前提（P1）。'
         content_fields = ',"content_review":{"checks":[{"id":"检查点ID","applicable":true,"met":true,"reason":"判断依据","support":[{"chunk_id":"实际来源ID","quote":"连续原文"}]}],"scope_valid":true,"safety_valid":true,"prohibited_clear":true,"disputes":[]}' if requirements else ''
         if requirements:
             instruction += 'content_review.checks是封闭的父检查点列表：只允许required_checks与conditional_checks的父ID，必须与输入qc_check_ids完全一致，每个ID恰好一次。禁止将auxiliary_information、prohibited、acceptable_equivalents的条目放入checks，即使条目带有id、requirement、source_chunk_ids或保留R前缀也不改变所属角色；相关内容仍须审查并在reason/issues/disputes说明，不得扩展checks集合。不要将Judge子原子ID额外加入QC父检查点列表。'

@@ -6,7 +6,20 @@ export const parameterNames:Record<string,string> = {"candidate_k": "候选数",
 export const parameterValue = (value:any):string => ({max:'最高',high:'高',medium:'中',low:'低',off:'关闭',Grounded:'有据生成',Tiered:'分级回答',Strict:'Strict（分级回答）',Completeness:'完整性优先',true:'开启',false:'关闭'}[String(value)] || (value == null ? '未知' : typeof value==='object' ? JSON.stringify(value) : String(value)));
 export function configChanges(before:any,after:any){return [...new Set([...Object.keys(before || {}),...Object.keys(after || {})])].filter(key=>key in parameterNames && JSON.stringify(before?.[key])!==JSON.stringify(after?.[key])).map(key=>({key,label:parameterNames[key] || '其他配置',before:parameterValue(before?.[key]),after:parameterValue(after?.[key])}));}
 
+// 规则总表二（2026-11-16）：新 Judge 按朋友三维打分，没有"必答要点"。逐维度对比：达到本题型门槛线算达标。
+export const RUBRIC_THRESHOLDS:Record<string,Record<string,number>>={positive:{correctness:80,faithfulness:80,completeness:75},ablation:{correctness:70,faithfulness:75,completeness:65}};
+export const RUBRIC_NAMES:Record<string,string>={correctness:'答案正确性',faithfulness:'忠实度',completeness:'完整性',behavior_correct:'行为正确',safety_violation:'无危险内容'};
+export const isRubric=(row:any)=>typeof row?.judge_result?.correctness==='number' || typeof row?.judge_result?.behavior_correct==='boolean';
+export function rubricPoints(before:any,after:any):Point[] {
+  const category=before?.test_category || after?.test_category;
+  const keys=category==='negative'?['behavior_correct','safety_violation']:['correctness','faithfulness','completeness'];
+  const ok=(row:any,key:string)=>{const j=row?.judge_result;if(!j)return false;if(key==='behavior_correct')return j.behavior_correct===true;if(key==='safety_violation')return j.safety_violation===false;return typeof j[key]==='number' && j[key]>=(RUBRIC_THRESHOLDS[category]?.[key] ?? 0);};
+  const score=(row:any,key:string)=>{const v=row?.judge_result?.[key];return typeof v==='number'?`${v} 分`:typeof v==='boolean'?(key==='safety_violation'?(v?'有':'无'):(v?'是':'否')):'未知';};
+  return keys.map((key,index)=>({number:index+1,text:`${RUBRIC_NAMES[key]}（${score(before,key)} → ${score(after,key)}）`,before:ok(before,key),after:ok(after,key),fresh:!ok(before,key)&&ok(after,key),beforeQuotes:[],afterQuotes:[]}));
+}
+
 export function comparisonPoints(before:any,after:any,question:any={}):Point[] {
+  if((isRubric(before) || isRubric(after)) && !(before?.judge_result?.atomic_results || after?.judge_result?.atomic_results))return rubricPoints(before,after);
   const left=before?.judge_result?.atomic_results || [],right=after?.judge_result?.atomic_results || [];
   const numbers=[...new Set<number>([...left,...right].flatMap((item:any)=>{const match=item.atomic_id?.match(/^Q\d+-R(\d+)(?:-\d+)?$/);return match ? [Number(match[1])] : [];}))].sort((a,b)=>a-b);
   const reference=(before?.reference_answer || after?.reference_answer || question.reference_answer || '').split('\n');
@@ -47,9 +60,9 @@ export function explanation(before:any,after:any,beforeConfig:any,afterConfig:an
     steps.push({label:'关键证据位置',text:`“${excerpt}”：${movement}`});
   }
   if(before?.test_category==='negative' && typeof before.passed==='boolean' && typeof after.passed==='boolean')steps.push({label:'回答结果',text:`Before${before.passed?'正确拒答':'拒答判定未通过'}，After${after.passed?'正确拒答':'拒答判定未通过'}`});
-  else if(points.some(point=>point.fresh))steps.push({label:'回答结果',text:`补上了必答要点 ${points.filter(point=>point.fresh).map(point=>`${String.fromCodePoint(0x2460+point.number-1)} ${point.text}`).join('；')}`});
+  else if(points.some(point=>point.fresh))steps.push({label:'回答结果',text:`达标的维度 ${points.filter(point=>point.fresh).map(point=>`${String.fromCodePoint(0x2460+point.number-1)} ${point.text}`).join('；')}`});
   const added = points.filter(point => point.fresh).map(point => String.fromCodePoint(0x2460 + point.number - 1)).join('、');
-  const outcome = added ? `补上要点 ${added}` : '满足本题保存的判定要求';
+  const outcome = added ? `补上达标维度 ${added}` : '满足本题保存的判定要求';
   const headline = before?.passed === false && after?.passed === true
     ? change && expanded ? `关键证据被截掉 → 放宽 保留条数 后进入上下文 → ${outcome}`
       : change && recalled ? `关键证据未召回 → 扩大 候选数 后进入上下文 → ${outcome}`
@@ -64,10 +77,10 @@ export function metricRows(before:any,after:any,points:Point[]):MetricRow[] {
   const stage=(row:any,key:string)=>{const value=row?.programmatic_metrics?.stages?.find((stage:any)=>stage.stage_name===key)?.duration_ms;return typeof value==='number'?value:null;};
   const totalScale=Math.max(metric(before,'latency_ms') || 0,metric(after,'latency_ms') || 0);
   const count=(row:any)=>Array.isArray(finalEvidence(row))?finalEvidence(row)!.length:null;
-  const definitions:[string,number|null,number|null,string,boolean][]=[['必答要点',points.length?points.filter(p=>p.before).length:null,points.length?points.filter(p=>p.after).length:null,'条',false],['本题回答耗时',metric(before,'latency_ms'),metric(after,'latency_ms'),'秒',true],['TTFT',metric(before,'ttft_ms'),metric(after,'ttft_ms'),'秒',true],['其中：检索',stage(before,'retrieval'),stage(after,'retrieval'),'秒',true],['其中：生成',stage(before,'generation'),stage(after,'generation'),'秒',true],['进入回答的证据',count(before),count(after),'段',false]];
+  const definitions:[string,number|null,number|null,string,boolean][]=[['达标维度',points.length?points.filter(p=>p.before).length:null,points.length?points.filter(p=>p.after).length:null,'项',false],['本题回答耗时',metric(before,'latency_ms'),metric(after,'latency_ms'),'秒',true],['TTFT',metric(before,'ttft_ms'),metric(after,'ttft_ms'),'秒',true],['其中：检索',stage(before,'retrieval'),stage(after,'retrieval'),'秒',true],['其中：生成',stage(before,'generation'),stage(after,'generation'),'秒',true],['进入回答的证据',count(before),count(after),'段',false]];
   const number=(n:number)=>Number(n.toFixed(Math.abs(n)<1?2:1)).toString();
   return definitions.map(([label,a,b,unit,time])=>{
-    const format=(n:number|null)=>n==null?'未知':label==='必答要点'?`${n} / ${points.length}`:`${number(time?n/1000:n)} ${unit}`;
+    const format=(n:number|null)=>n==null?'未知':label==='达标维度'?`${n} / ${points.length}`:`${number(time?n/1000:n)} ${unit}`;
     const delta=a==null || b==null?'未知':`${b>a?'+':b<a?'−':''}${number(Math.abs(b-a)/(time?1000:1))} ${unit}`;
     return {label,before:a,after:b,beforeText:format(a),afterText:format(b),delta,scale:time?totalScale:Math.max(a || 0,b || 0),better:a==null || b==null || a===b?null:(time?a<b:a>b)?'before':'after'};
   });

@@ -5,14 +5,14 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { FrozenQuestionDetails } from './pages/FrozenQuestionDetails';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => { document.body.innerHTML = ''; });
-it('groups saved scoring points, resolves QC citations and hides original IDs from the retired technical details', async () => {
- const row={id:'internal-question',question:'如何维护？',test_category:'positive',reference_answer:'先断电',probe_status:'probe_passed',qc_status:'qc_passed',raw:{business_scenario:'现场维护',business_requirements:{required_checks:[{requirement:'断开电源'}],auxiliary_information:['擦干表面'],prohibited:['带电清洗']}},evidence_details:[{chunks:[{chunk_id:'DOC-001-C-00180',document_name:'维护手册.pdf',page_start:12,chunk_text:'先断开电源。'}]}],qc:{score:90,reason:'DOC-001-C-00180 支持答案；DOC-999-C-00000 未提供来源信息'},probe:{score:95}};
+it('hides retired scoring points (no 必答/加分/禁止), shows friend question facts, resolves QC citations and hides original IDs from the retired technical details', async () => {
+ const row={id:'internal-question',question:'如何维护？',test_category:'positive',reference_answer:'先断电',probe_status:'probe_passed',qc_status:'qc_passed',raw:{business_scenario:'现场维护',generation_method:'跨段综合',test_node:'retrieval',config_param:'top_k',difficulty:'medium',business_requirements:{required_checks:[{requirement:'断开电源'}],auxiliary_information:['擦干表面'],prohibited:['带电清洗']}},evidence_details:[{chunks:[{chunk_id:'DOC-001-C-00180',document_name:'维护手册.pdf',page_start:12,chunk_text:'先断开电源。'}]}],qc:{score:90,reason:'DOC-001-C-00180 支持答案；DOC-999-C-00000 未提供来源信息'},probe:{score:95}};
  const root=createRoot(document.body.appendChild(document.createElement('div')));
  await act(async()=>root.render(<FrozenQuestionDetails row={row}/>));
- expect([...document.querySelectorAll('.drawer-section h3')].map(e=>e.textContent)).toEqual(['业务场景','问题','参考答案','核心证据','评分要点','质检结果']);
- expect(document.querySelector('.golden-scoring-points')?.textContent).toContain('必答断开电源');
- expect(document.querySelector('.golden-scoring-points')?.textContent).toContain('加分擦干表面');
- expect(document.querySelector('.golden-scoring-points')?.textContent).toContain('禁止带电清洗');
+ expect([...document.querySelectorAll('.drawer-section h3')].map(e=>e.textContent)).toEqual(['业务场景','问题','参考答案','核心证据','题目信息','质检结果']);
+ expect(document.querySelector('.golden-question-facts')?.textContent).toContain('跨段综合');
+ expect(document.querySelector('.golden-question-facts')?.textContent).toContain('retrieval · top_k');
+ expect(document.body.textContent).not.toContain('必答');expect(document.body.textContent).not.toContain('加分');
  expect(document.querySelector('.golden-quality-results')?.textContent).toContain('维护手册 · p12 支持答案');
  expect(document.querySelector('.golden-quality-results')?.textContent).not.toContain('DOC-001');
  expect(document.querySelector('.golden-quality-results')?.textContent).not.toContain('暂无');

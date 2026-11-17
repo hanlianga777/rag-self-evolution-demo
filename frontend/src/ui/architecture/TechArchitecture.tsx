@@ -33,7 +33,7 @@ const MODEL_GROUPS: { name: string; items: M[] }[] = [
     { title: "DeepSeek", vendor: "深度求索", icon: "model", line: "改写、假设答案检索、回答", tip: "深度求索（DeepSeek）的对话模型，负责查询改写、假设答案检索、多路查询和最终回答。中文表达好，可以调节思考档位，价格低，适合需要反复评测的场景。" },
   ] },
   { name: "评测模型", items: [
-    { title: "DeepSeek", vendor: "深度求索", icon: "correct", line: "LLM-as-Judge 判分", tip: "LLM-as-Judge：拿每道题的必答要点和证据原文，对照回答打分（答对程度、要点覆盖、是否忠于证据、有无安全问题）。演示阶段和生成模型同一家族；生产环境建议换成独立模型，并加人工抽检。" },
+    { title: "DeepSeek", vendor: "深度求索", icon: "correct", line: "LLM-as-Judge 判分", tip: "LLM-as-Judge：拿每道题的参考答案和检索到的证据原文，对照回答打分（答案正确性、忠实度、完整性；负向题看行为和安全），每题判 3 次取中间值。演示阶段和生成模型同一家族；生产环境建议换成独立模型，并加人工抽检。" },
   ] },
   { name: "存储", items: [
     { title: "FAISS", vendor: "Meta 开源", icon: "data", line: "向量索引", tip: "Meta 开源的向量检索库，用内积做精确检索；数据量不大时速度快，不需要单独部署服务。" },
