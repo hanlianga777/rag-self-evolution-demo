@@ -62,7 +62,10 @@ class StrategyTests(unittest.TestCase):
         review={'plans':[{'candidate_id':'D','fixed_question_ids':['Q17','Q26'],'new_failure_question_ids':['Q13'],'matched_question_ids':['Q26'],'prediction_match_count':1,
                           'unmatched_reason':'Q30未修好','parameter_assessment':{'多问法检索':'不确定'},'evidence_reason':'保存位置','conclusion':'不确定'}],'lessons':['盯Q13']}
         validate_round_conclusion(review,[d])
-        self.assertEqual(review['plans'][0]['parameter_assessment'],'多问法检索：不确定')
+        self.assertEqual(review['plans'][0]['parameter_assessment'],'不确定')
+        mixed=deepcopy(review);mixed['plans'][0]['parameter_assessment']={'多问法检索':'有效','候选数':'不确定'}
+        validate_round_conclusion(mixed,[d])
+        self.assertEqual(mixed['plans'][0]['parameter_assessment'],'多问法检索：有效；候选数：不确定')
         review['plans'][0].update(matched_question_ids=[],prediction_match_count=0)
         with self.assertRaises(ValueError):validate_round_conclusion(review,[d])
 

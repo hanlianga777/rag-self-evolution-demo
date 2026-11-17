@@ -92,7 +92,9 @@ def validate_round_conclusion(review, candidates):
             plan['unmatched_reason'] = '预测与结果一致，无不符'
         if isinstance(plan.get('parameter_assessment'), dict) and plan['parameter_assessment'] and all(
                 isinstance(k, str) and isinstance(v, str) and v.strip() for k, v in plan['parameter_assessment'].items()):
-            plan['parameter_assessment'] = '；'.join(f'{k}：{v}' for k, v in plan['parameter_assessment'].items())
+            values = {v.strip() for v in plan['parameter_assessment'].values()}
+            # 逐题复盘只接受"有效/无效/不确定"；各参数判断一致时直接取这个值，不一致才拼成文字（会按原规则退回）。
+            plan['parameter_assessment'] = values.pop() if len(values) == 1 else '；'.join(f'{k}：{v}' for k, v in plan['parameter_assessment'].items())
         names = {'unmatched_reason': '预测不符原因', 'parameter_assessment': '参数有效/有害判断', 'evidence_reason': '检索证据', 'conclusion': '结论'}
         missing = [names[k] for k in names if not isinstance(plan.get(k), str) or not plan[k].strip()]
         if missing:
