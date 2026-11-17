@@ -37,7 +37,8 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true,
   const probeExecutionFailed = probe.probe_details?.probe_execution_status === "failed";
   const probePassed = row.probe_status === "probe_passed", qcPassed = row.qc_status === "qc_passed";
   const behavior = row.expected_behavior || row.raw?.expected_behavior || row.negative_subtype;
-  const answer = row.test_category === "negative" ? qc.behavior_criteria || behaviorText[behavior] || displayText(behavior || "暂无") : row.reference_answer || "暂无";
+  // 负向题优先展示冻结的参考回答；旧题卷没有参考回答时才退回到预期行为口径。
+  const answer = row.test_category === "negative" ? row.reference_answer || row.raw?.expected_response || qc.behavior_criteria || behaviorText[behavior] || displayText(behavior || "暂无") : row.reference_answer || "暂无";
   const evidence = (row.evidence_details || []).flatMap((source: Candidate) => source.chunks || []);
   const uniqueEvidence: { chunk: Candidate; count: number }[] = [];
   for (const chunk of evidence) {

@@ -161,6 +161,14 @@ def snapshot_manifest(snapshot):
             'sha256':hashlib.sha256(json.dumps(rows,sort_keys=True,ensure_ascii=False).encode()).hexdigest()}
 
 
+def is_friend_snapshot(snapshot):
+    """朋友同款题卷（friend-golden-v1）没有必答/加分/禁止原子合同，按三维 Rubric 判分，不需要原子合同清单。"""
+    questions = snapshot.get('questions') or []
+    return bool(questions) and all(q.get('golden_contract') == 'friend-golden-v1' and q.get('business_requirements') is None for q in questions)
+
+
 def validate_snapshot_manifest(snapshot):
+    if is_friend_snapshot(snapshot):
+        return
     if snapshot.get('scoring_contract_manifest') != snapshot_manifest(snapshot):
         raise ValueError('Golden缺少当前已冻结原子合同或内容已变化；请完成Revision、审核和新Snapshot，不能自动升级旧Snapshot')

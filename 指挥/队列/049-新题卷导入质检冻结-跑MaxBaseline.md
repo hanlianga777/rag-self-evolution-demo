@@ -135,3 +135,19 @@ Q14 题面已改为「B2 四足机器人开机和 B2 遥控器开机，长按电
 - Probe 的"通过"看的是：说明书里确实有这段证据，并且证据能支持参考答案。
 - "当前系统有没有召回"只作为 Probe 里的"召回观察"（P1）显示，不影响"通过"。
 - 冻结后用只读浏览器打开 Golden 全部 50 题，核对 Probe、QC 两个卡片都显示"通过"，并在报告里列出每题的 Probe 分、QC 分和召回观察。有任何一题不是"通过"就不冻结，停下写清原因。
+
+## 补充 5（总指挥 21:55）
+
+上次停在第 9–10 步：Baseline 预检报 `Frozen business_requirements required`。原因是正式评测入口还要求每题带旧的"必答/加分/禁止"原子合同，而朋友同款题卷本来就没有这个，判分改用三维 Rubric。已修好：`scoring_contract.validate_snapshot_manifest` 遇到朋友同款题卷（全部题 `golden_contract=friend-golden-v1`，且没有 `business_requirements`）时跳过原子合同检查；旧题卷仍按原规则检查。新增测试在 `tests/test_task050_answer_layout.py`。
+
+前端顺手修了上次报告里的两处显示问题：
+- 参考答案的编号不显示：列表样式被全局清掉了，已在 Golden 详情里恢复 1. 2. 3.；
+- 负向题详情显示的是通用行为口径：现在优先显示冻结的参考回答。
+
+### 本次要做（不重做已完成的，快照 `GD-20261117022226` 不变）
+
+1. 跑 `tests/test_task050_answer_layout.py`。前端跑 `npm run build` 和 `npm test`，只列新增失败。
+2. 重启 8010 后端；确认 `baseline_preflight().can_start=true`，贴出 `baseline_inputs()` 的完整 config（应为 Strict + max）。
+3. 接着做第 10 步（10 题小样）、第 11 步（Max Baseline）、第 12 步（导出），一直做到 Baseline 跑完。
+4. 如果小样或 Baseline 又碰到旧合同字段（必答、business_requirements 等）报错，把报错原文和代码位置写清楚再停。
+5. 前端构建后，只读浏览器再看 Q02、Q15、Q40 的参考答案：编号可见，Q40 显示参考回答。

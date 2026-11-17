@@ -25,3 +25,13 @@ class AnswerLayoutTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class FriendSnapshotManifestTests(unittest.TestCase):
+    def test_friend_snapshot_needs_no_atomic_manifest_but_legacy_still_does(self):
+        from app.scoring_contract import validate_snapshot_manifest
+        friend = {'question_ids': ['A'], 'questions': [{'id': 'A', 'golden_contract': 'friend-golden-v1', 'test_category': 'positive'}]}
+        validate_snapshot_manifest(friend)
+        legacy = {'question_ids': ['A'], 'questions': [{'id': 'A', 'test_category': 'positive'}]}
+        with self.assertRaises(ValueError):
+            validate_snapshot_manifest(legacy)
