@@ -118,8 +118,18 @@ class AgentFormatRepairTests(unittest.TestCase):
         self.assertIn("round_limit", inspect.getsource(optimization_cycle._run_staged))
 
     def test_adjustments_and_strategy_name_are_repaired_not_rejected(self):
-        import inspect
-        from app import optimization
-        source = inspect.getsource(optimization)
-        self.assertIn("normalized_fields", source)
-        self.assertIn("'baseline_value': effective_base.get(key)", source)
+        from copy import deepcopy
+        from test_task031f import InheritanceTests
+        fixture = InheritanceTests(); fixture.setUp()
+        candidate = fixture.response['candidates'][0]
+        candidate['strategy_name'] = '格式不规范'
+        candidate['adjustments'][0]['baseline_value'] = 99
+        original = deepcopy(candidate['adjustments'])
+        _, batch = fixture.prepare()
+        reasoning = batch[0][2]
+        self.assertRegex(reasoning['strategy_name'], r'^「.+」（.+优先）$')
+        self.assertEqual(reasoning['adjustments'], [{**item, 'baseline_value':fixture.base[item['parameter']]}
+                                                   for item in original])
+        repairs = {item['field']:item['from'] for item in fixture.audit['normalized_fields'] if item['candidate']==0}
+        self.assertEqual(repairs['strategy_name'], '格式不规范')
+        self.assertEqual(repairs['adjustments'], original)

@@ -695,17 +695,12 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
             if not isinstance(candidate['core_idea'],str) or not candidate['core_idea'].strip():
                 raise ValueError('缺少核心思路')
             adjustments = candidate['adjustments']
-            given = {item.get('parameter'): item for item in adjustments if isinstance(item, dict)} if isinstance(adjustments, list) else {}
-            rebuilt = []
-            for key, value in diff.items():
-                impact = given.get(key, {}).get('expected_impact')
-                impact = impact if isinstance(impact, str) and impact.strip() else candidate['expected_improvement']
-                if not any(q in impact for q in target_mentions):
-                    impact = impact + '；目标题号：' + '、'.join(target_ids)
-                rebuilt.append({**given.get(key, {}), 'parameter': key, 'baseline_value': effective_base.get(key), 'candidate_value': value, 'expected_impact': impact})
-            if rebuilt != adjustments:
-                normalized.append({'candidate': index, 'field': 'adjustments', 'from': adjustments})
-            candidate['adjustments'] = adjustments = rebuilt
+            if isinstance(adjustments, list):
+                rebuilt = [{**item, 'baseline_value': effective_base.get(item.get('parameter'))}
+                           if isinstance(item, dict) else item for item in adjustments]
+                if rebuilt != adjustments:
+                    normalized.append({'candidate': index, 'field': 'adjustments', 'from': adjustments})
+                candidate['adjustments'] = adjustments = rebuilt
             if (not isinstance(adjustments,list) or len(adjustments)!=len(diff)
                     or {item.get('parameter') for item in adjustments if isinstance(item,dict)}!=set(diff)
                     or any(not isinstance(item,dict) or item.get('baseline_value')!=effective_base.get(item.get('parameter'))
