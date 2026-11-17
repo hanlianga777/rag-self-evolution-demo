@@ -58,6 +58,12 @@ it('keeps internal IDs, conclusion labels, English states and forbidden narrativ
  expect(storyText('EXP-20261105143048349606-R3-C L4 CSV-20261101100758945425-24 generation_thinking=high completed')).not.toMatch(/EXP-|CSV-|L4|completed|generation_thinking/);
  expect(storyText('大模型随机波动需要复跑')).not.toMatch(/随机|波动|复跑/);
 });
+it('drops only the clause about fluctuation, not the whole saved idea (060 R4-B)',()=>{
+ const text=storyText('生成降本 · 「思考降一档并扩大候选池」（速度优先） · 思考从最高档降一档，压掉长尾时间；同时把候选加倍，用召回广度弥补降档带来的表达波动。');
+ expect(text).not.toMatch(/波动|未保存说明|说明未保存/);
+ expect(text).toContain('思考降一档并扩大候选池');
+ expect(text).toContain('同时把候选加倍。');
+});
 it('shows generated D provenance, historical repairs, side effects and its saved final outcome',async()=>{
  const winner=candidate(2,'B',true),d={...candidate(3,'D',true),reasoning:{candidate_label:'D',winner_id:winner.id,changes:[{parameter:'top_k',source_type:'verified',source_candidates:[winner.id],reason:'多保留一段说明',side_effect_check:{historical_effects:'曾伴随安全拒答下降',protected_overlap:['q2'],winner_fixed_risk:'保留已修好的清洁题',gate_risk:'核对最慢回答时间',mitigation:'完整题卷验证'}}]}};
  await mount(<DStory evaluation={baseline} badCases={[{question_id:'q1',result:{question:'怎样清洁？'}}]} experiment={{candidates:[winner,d],result:{d_facts:{winner_id:winner.id,remaining_failures:[{question_id:'q1',evidence_positions:[{candidates:10,final:'未进入'}],historical_fixes:[{candidate_id:winner.id}]}]}},recommendation:{recommended_candidate:d.id}}}/>);

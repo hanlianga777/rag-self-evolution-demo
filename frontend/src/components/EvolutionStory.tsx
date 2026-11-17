@@ -32,7 +32,9 @@ export const shortQuestionId=(id:string):string => {
 export function storyText(value:unknown):string {
   if(Array.isArray(value))value=value.filter(item=>typeof item==='string').join('；');
   if(typeof value!=='string' || !value.trim())return '未保存说明';
-  let text=value.replace(/试跑/g,'评测').split(/(?<=[。！？\n])/).filter(sentence=>!/(?:大模型不稳定|随机|幻觉|波动|复跑|复赛)/.test(sentence)).join('');
+  // 按分句过滤（逗号、分号、· 也算分隔），只去掉讲模型不稳定的那一小句，不把整段说明一起删空。
+  let text=value.replace(/试跑/g,'评测').split(/(?<=[。！？；，·\n])/).filter(sentence=>!/(?:大模型不稳定|随机|幻觉|波动|复跑|复赛)/.test(sentence)).join('')
+    .replace(/[，；·]\s*(?=[。！？\n])/g,'').replace(/\s*·\s*$/,'').replace(/[，；]\s*$/,'。').replace(/^\s*·\s*/,'');
   text=text.replace(/\{[^{}]*\}/g,object=>{try{const fields=JSON.parse(object);if(Object.keys(fields).every(key=>key in storyParameterNames))return Object.entries(fields).map(([key,value])=>`${storyParameterNames[key]}：${storyValue(value)}`).join("、");}catch{/* Retain saved prose. */}return object;});
   text=text.replace(/(?:EXP|EVAL)-[\w-]+/g,id=>schemeName(null,id))
     .replace(/(?:CSV|V1G)-[\dA-Za-z-]*\d[\dA-Za-z-]*|\bQ\d+\b/gi,shortQuestionId)
