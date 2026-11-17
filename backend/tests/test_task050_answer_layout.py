@@ -35,3 +35,15 @@ class FriendSnapshotManifestTests(unittest.TestCase):
         legacy = {'question_ids': ['A'], 'questions': [{'id': 'A', 'test_category': 'positive'}]}
         with self.assertRaises(ValueError):
             validate_snapshot_manifest(legacy)
+
+
+class JudgeSourceLabelTests(unittest.TestCase):
+    def test_judge_sees_document_and_section_but_no_ids(self):
+        from app.rubric_judge import final_texts, rubric_input
+        entries = [{'chunk_id': 'DOC-003-V2-C-00016', 'document': '宇树_B2遥控器使用说明_中文版.pdf',
+                    'section_path': 'R1遥控器 / 技术规格', 'content': '参数=锂电池容量；规格=2500mAh'}]
+        texts = final_texts(entries)
+        self.assertEqual(texts, ['（出处：宇树_B2遥控器使用说明_中文版 · R1遥控器 / 技术规格）参数=锂电池容量；规格=2500mAh'])
+        payload = rubric_input('问', '参考', '答', 'positive', None, texts)
+        self.assertNotIn('DOC-', payload)
+        self.assertIn('R1遥控器', payload)
