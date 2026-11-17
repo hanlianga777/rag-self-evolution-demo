@@ -685,11 +685,27 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
             candidate.setdefault('adjustments', [{'parameter':key, 'baseline_value':effective_base.get(key), 'candidate_value':value,
                 'expected_impact':candidate['expected_improvement'] if any(q in candidate['expected_improvement'] for q in target_mentions) else candidate['expected_improvement']+'；目标题号：'+'、'.join(target_ids)} for key,value in diff.items()])
             candidate.setdefault('risks', [{'question_ids':[], 'metric':None, 'reason':candidate['risk']}])
+            # 055：第 3 轮规划 12 次全被"格式"拒绝（策略名格式、调整项的基线值写法），内容本身没问题。
+            # 这两项程序知道真值，直接按真值规整并记入审计，不再因格式让整轮失败；参数是否合规、预测是否点名目标题仍照常校验。
+            normalized = audit.setdefault('normalized_fields', [])
             if not isinstance(candidate['strategy_name'], str) or not re.fullmatch(r'「.+」（.+优先）', candidate['strategy_name']):
-                raise ValueError('策略名必须为「动作名」（xx优先）')
+                label = str(candidate.get('action_name') or candidate.get('strategy_name') or candidate.get('hypothesis') or '调整方案').strip('「」 ')[:20]
+                normalized.append({'candidate': index, 'field': 'strategy_name', 'from': candidate.get('strategy_name')})
+                candidate['strategy_name'] = f'「{label}」（{focus}）'
             if not isinstance(candidate['core_idea'],str) or not candidate['core_idea'].strip():
                 raise ValueError('缺少核心思路')
             adjustments = candidate['adjustments']
+            given = {item.get('parameter'): item for item in adjustments if isinstance(item, dict)} if isinstance(adjustments, list) else {}
+            rebuilt = []
+            for key, value in diff.items():
+                impact = given.get(key, {}).get('expected_impact')
+                impact = impact if isinstance(impact, str) and impact.strip() else candidate['expected_improvement']
+                if not any(q in impact for q in target_mentions):
+                    impact = impact + '；目标题号：' + '、'.join(target_ids)
+                rebuilt.append({**given.get(key, {}), 'parameter': key, 'baseline_value': effective_base.get(key), 'candidate_value': value, 'expected_impact': impact})
+            if rebuilt != adjustments:
+                normalized.append({'candidate': index, 'field': 'adjustments', 'from': adjustments})
+            candidate['adjustments'] = adjustments = rebuilt
             if (not isinstance(adjustments,list) or len(adjustments)!=len(diff)
                     or {item.get('parameter') for item in adjustments if isinstance(item,dict)}!=set(diff)
                     or any(not isinstance(item,dict) or item.get('baseline_value')!=effective_base.get(item.get('parameter'))

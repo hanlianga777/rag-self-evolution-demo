@@ -71,7 +71,7 @@ class InheritanceTests(unittest.TestCase):
         self.assertEqual(batch[0][2]['changed_parameters_vs_baseline']['retrieval_max_tokens'],4096)
 
     def test_reject_repeated_config_overlap_new_changes_and_wrong_adjustment(self):
-        for kind in ('duplicate','overlap','adjustment','range','missing_prediction'):
+        for kind in ('duplicate','overlap','range','missing_prediction'):
             with self.subTest(kind=kind):
                 test=InheritanceTests();test.setUp()
                 if kind=='duplicate':test.prior.append({'id':'R1-B','status':'evaluated','config':{**test.base,**test.inherited,'top_k':6},'reasoning':{},'result':{}});test.response['prior_round_review']['plans'].append({**test.response['prior_round_review']['plans'][0],'candidate_id':'R1-B','changes':{'top_k':6}})
@@ -80,6 +80,12 @@ class InheritanceTests(unittest.TestCase):
                 elif kind=='range':test.response['candidates'][0]['changed_parameters']={'top_k':999}
                 else:test.response['candidates'][0].pop('predicted_fixed_question_ids')
                 with test.assertRaises(ValueError):test.prepare()
+
+    def test_wrong_adjustment_baseline_value_is_repaired_to_truth(self):
+        # 055 起：调整项里写错的基线值按程序真值规整（记入 normalized_fields），不再让整轮规划失败。
+        self.response['candidates'][0]['adjustments'][0]['baseline_value']=99
+        _, batch=self.prepare()
+        self.assertNotEqual(batch[0][2]['adjustments'][0]['baseline_value'],99)
 
     def test_missing_closing_brackets_only_repaired_with_audit(self):
         raw=json.dumps(self.response)

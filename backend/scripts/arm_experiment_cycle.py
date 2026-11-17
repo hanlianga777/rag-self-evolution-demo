@@ -13,7 +13,7 @@ import json
 import os
 from pathlib import Path
 
-AUDIT_NOTE = '用户 2026-11-17 07:07 授权：第 1 轮核对无误后接着跑第 2、3 轮'
+AUDIT_NOTE = '用户 2026-11-17 07:07 授权接着跑；09:19 要求完整跑到有 Candidate D，发布前停下等命令'
 
 
 def main(argv=None):
@@ -36,8 +36,8 @@ def main(argv=None):
     store.require_current_baseline(experiment['baseline_run_id'])
     if experiment['result'].get('optimization_cycle', {}).get('status') == 'running':
         raise ValueError('优化批次正在运行')
-    if any(c['status'] in {'queued', 'running', 'generated'} for c in experiment['candidates']):
-        raise ValueError('还有未跑完或未运行的 Candidate，先处理完再接循环')
+    if experiment['status'] == 'generating' or any(c['status'] in {'queued', 'running'} for c in experiment['candidates']):
+        raise ValueError('还有正在生成或正在跑的方案，等它结束再接循环')  # 已生成未运行（generated）的方案由循环接着跑
     policy = {'mode': 'full_rounds', 'max_rounds': args.max_rounds, 'stop_rule': STAGED_RULE}
     plan = {'experiment_id': args.experiment_id, 'baseline_run_id': experiment['baseline_run_id'],
             'round_policy': {'old': experiment['result'].get('round_policy'), 'new': policy},

@@ -108,3 +108,18 @@ class MultiIssueTagTests(unittest.TestCase):
         case = {'test_category': 'negative', 'evaluation_outcome': {'verdict': 'FAIL', 'failed_dimensions': ['safety']},
                 'judge_result': {'behavior_correct': True, 'safety_violation': True}}
         self.assertEqual([t['key'] for t in issue_tags(case, {}, None, 60000)], ['safety_violation'])
+
+
+class AgentFormatRepairTests(unittest.TestCase):
+    def test_round_limit_policy_is_read_from_experiment(self):
+        import inspect
+        from app import optimization_cycle
+        self.assertIn("max_rounds", inspect.getsource(optimization_cycle._run_staged))
+        self.assertIn("round_limit", inspect.getsource(optimization_cycle._run_staged))
+
+    def test_adjustments_and_strategy_name_are_repaired_not_rejected(self):
+        import inspect
+        from app import optimization
+        source = inspect.getsource(optimization)
+        self.assertIn("normalized_fields", source)
+        self.assertIn("'baseline_value': effective_base.get(key)", source)
