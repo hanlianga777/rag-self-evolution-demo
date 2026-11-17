@@ -47,3 +47,39 @@ class JudgeSourceLabelTests(unittest.TestCase):
         payload = rubric_input('问', '参考', '答', 'positive', None, texts)
         self.assertNotIn('DOC-', payload)
         self.assertIn('R1遥控器', payload)
+
+
+class ReplayWithReplacedQuestionsTests(unittest.TestCase):
+    """用户 2026-11-16 23:13：换掉 2 道题后，未换的题沿用旧回答和耗时，只给新题生成，全部用新判分重新打分。"""
+    def setUp(self):
+        import json
+        from tests.test_judge_replay_v5 import JudgeReplayTests
+        source, cases, snapshot, config, judge, chunks = JudgeReplayTests().example()
+        old_q = snapshot['questions'][0]
+        new_q = {'id': 'q-replaced', 'question': '新换的题？', 'reference_answer': '新答案。', 'test_category': 'positive', 'evidence': []}
+        kept = {**old_q, 'id': 'q-kept-new-id'}  # 重新导入后题目 ID 会变，题面和参考答案不变
+        self.snapshot = {**snapshot, 'id': 'gd-2', 'question_ids': [kept['id'], new_q['id']], 'questions': [kept, new_q]}
+        source_snapshot = {**snapshot, 'question_ids': ['q-new', 'q-gone'],
+                           'questions': [old_q, {'id': 'q-gone', 'question': '换下来的题？', 'reference_answer': '旧答案。', 'test_category': 'positive', 'evidence': []}]}
+        self.source = {**source, 'dataset_snapshot_json': json.dumps(source_snapshot)}
+        self.cases, self.config, self.judge, self.chunks = cases, config, judge, chunks
+
+    def run_check(self, allow):
+        from app.judge_replay import replay_eligibility
+        from app.evaluation_contract import evaluation_identity
+        judge = {**self.judge, 'evaluation_identity': evaluation_identity(self.snapshot, self.judge)}
+        return replay_eligibility(self.source, self.cases, self.snapshot, self.config, judge, self.chunks, 'fp', allow_new_questions=allow)
+
+    def test_kept_question_reuses_answer_and_new_question_generates(self):
+        result = self.run_check(True)
+        self.assertTrue(result['can_replay'], result['eligibility'])
+        self.assertEqual(result['new_question_ids'], ['q-replaced'])
+        self.assertEqual(result['generation_calls'], 1)
+        self.assertEqual(set(result['executions']), {'q-kept-new-id'})
+
+    def test_without_permission_changed_snapshot_is_blocked(self):
+        self.assertFalse(self.run_check(False)['can_replay'])
+
+    def test_profile_change_is_blocked(self):
+        self.snapshot['questions'][1] = {**self.snapshot['questions'][1], 'test_category': 'negative', 'negative_subtype': 'clarify'}
+        self.assertFalse(self.run_check(True)['can_replay'])

@@ -2089,23 +2089,25 @@ def stop_evaluation(run_id: str):
 
 
 @app.get('/api/evaluations/{source_id}/judge-replay/preflight')
-def judge_replay_preflight(source_id: str, judge_thinking: Literal['off','low','high','max'] | None = None):
-    try:return EvaluationRunner(store,ai_service).judge_replay_preflight(source_id,judge_thinking=judge_thinking)
+def judge_replay_preflight(source_id: str, judge_thinking: Literal['off','low','high','max'] | None = None, allow_new_questions: bool = False):
+    try:return EvaluationRunner(store,ai_service).judge_replay_preflight(source_id,judge_thinking=judge_thinking,allow_new_questions=allow_new_questions)
     except (ValueError,KeyError) as error:raise HTTPException(409,str(error)) from error
 
 
 class JudgeReplayRequest(BaseModel):
     judge_thinking: Literal['off','low','high','max'] | None = None
+    allow_new_questions: bool = False
 
 
 @app.post('/api/evaluations/{source_id}/judge-replay',status_code=201,dependencies=[Depends(require_trusted_origin)])
 def judge_replay(source_id: str,payload: JudgeReplayRequest | None = None):
     try:
         runner=EvaluationRunner(store,ai_service)
-        run_id,items,config=runner.start_judge_replay(source_id,judge_thinking=payload.judge_thinking if payload else None)
+        run_id,items,config=runner.start_judge_replay(source_id,judge_thinking=payload.judge_thinking if payload else None,allow_new_questions=bool(payload and payload.allow_new_questions))
     except (ValueError,KeyError) as error:raise HTTPException(409,str(error)) from error
     threading.Thread(target=contextvars.copy_context().run,args=(runner.execute_baseline,run_id,items,config),daemon=True).start()
-    return {'id':run_id,'status':'running','execution_kind':'judge_only_baseline','generation_calls':0}
+    replay=(store.evaluation_run(run_id,light=True) or {}).get('result',{}).get('judge_replay',{})
+    return {'id':run_id,'status':'running','execution_kind':'judge_only_baseline','generation_calls':len(replay.get('new_question_ids') or []),'new_question_ids':replay.get('new_question_ids') or []}
 
 
 class DiagnosticBatchRequest(BaseModel):

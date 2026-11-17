@@ -61,7 +61,12 @@ def saved_selection_error(trace,chunks):
     return None
 
 
-def replay_eligibility(source,cases,snapshot,config,judge,chunks,fingerprint):
+MAX_NEW_QUESTIONS = 5
+
+
+def replay_eligibility(source,cases,snapshot,config,judge,chunks,fingerprint,*,allow_new_questions=False):
+    """allow_new_questions（用户 2026-11-16 23:13 批准）：新冻结题卷只换了少数题时，未换的题按题面原样沿用旧回答和耗时，
+    换上的新题（至多 MAX_NEW_QUESTIONS 道）现场生成；全部题用新判分重新打分。题数、题型配比必须与原题卷一致。"""
     from .diagnostics import _canonical_final
     from .canonical_evidence import full_norms
     from .ai_service import generation_contract
@@ -69,7 +74,12 @@ def replay_eligibility(source,cases,snapshot,config,judge,chunks,fingerprint):
     shared=[]
     if source.get('run_mode')!='real' or source.get('data_source')!='real' or source.get('status') not in {'partial','failed','completed'}:shared.append('source_not_inactive_real_execution')
     revision = frozen != snapshot
-    if revision:
+    def profile(questions):
+        return sorted((q.get('test_category'), q.get('negative_subtype')) for q in questions)
+    if revision and allow_new_questions:
+        if len(frozen.get('questions') or []) != len(snapshot['questions']) or profile(frozen.get('questions') or []) != profile(snapshot['questions']):
+            shared.append('replaced_questions_changed_profile')
+    elif revision:
         from .scoring_revision import revision_changes
         try:revision_changes(frozen,snapshot)
         except ValueError:shared.append('frozen_snapshot_changed')
@@ -88,10 +98,21 @@ def replay_eligibility(source,cases,snapshot,config,judge,chunks,fingerprint):
     if original.get('baseline_version')!=judge.get('baseline_version') or any(original.get('execution_snapshot',{}).get(k)!=judge.get('execution_snapshot',{}).get(k) for k in ('embedding_model','vector_index','generation_model','temperature')):shared.append('generation_model_embedding_or_configuration_changed')
     if original.get('evaluation_identity')==evaluation_identity(snapshot,judge):shared.append('new_evaluation_identity_required; use_same_identity_resume_instead')
     if original.get('model')!=judge.get('execution_snapshot',{}).get('generation_model'):shared.append('generation_model_not_verified')
-    if len(rows)!=len(cases) or not set(rows)<=set(snapshot['question_ids']):shared.append('source_case_ids_invalid')
+    if len(rows)!=len(cases) or (not allow_new_questions and not set(rows)<=set(snapshot['question_ids'])):shared.append('source_case_ids_invalid')
+    def reference_of(question):
+        return question.get('reference_answer') or question.get('expected_behavior','拒答或澄清')
+    by_text={(c.get('question'),c.get('test_category'),c.get('negative_subtype'),c.get('reference_answer')):c for c in cases}
+    new_ids=[]
     by_id={c['chunk_id']:c for c in chunks}
     for question in snapshot['questions']:
-        key=question['id'];reasons=list(shared);case=rows.get(key);cp=source['result'].get('checkpoints',{}).get(key,{})
+        key=question['id'];reasons=list(shared);case=rows.get(key)
+        if case is None and allow_new_questions:
+            case=by_text.get((question.get('question'),question.get('test_category'),question.get('negative_subtype'),reference_of(question)))
+            if case is None:
+                new_ids.append(key)
+                checks.append({'question_id':key,'eligible':not reasons,'blockers':reasons,'origin':'new_question_generation'})
+                continue
+        cp=source['result'].get('checkpoints',{}).get(case['question_id'] if case else key,{})
         if case:
             execution=saved_case_execution(case)
             if any(case.get(k)!=question.get(k) for k in ('question','test_category','negative_subtype')) or case.get('reference_answer')!=(question.get('reference_answer') or question.get('expected_behavior','拒答或澄清')):reasons.append('saved_question_or_reference_changed')
@@ -124,10 +145,12 @@ def replay_eligibility(source,cases,snapshot,config,judge,chunks,fingerprint):
         checks.append(check)
         if not reasons:executions[key]=execution
     ids=snapshot['question_ids']
+    if len(new_ids)>MAX_NEW_QUESTIONS:
+        for row in checks:row['eligible']=False;row['blockers']=row['blockers']+['too_many_new_questions']
     complete=len(checks)==len(ids) and {r['question_id'] for r in checks}==set(ids) and all(r['eligible'] for r in checks)
     return {'can_replay':complete,'source_run_id':source['id'],'source_sha256':source_digest(source,cases),
         'source_evaluation_identity':original.get('evaluation_identity'),'new_evaluation_identity':evaluation_identity(snapshot,judge),
         'new_versions':{k:judge[k] for k in VERSIONS},
         'total':len(ids),'reusable':len(executions),'eligibility':checks,'executions':executions,
-        'generation_calls':0,'judge_calls':len(ids),'max_attempts_per_question':8,'max_responses_per_pass':4,'max_judge_calls':len(ids)*8,
+        'generation_calls':len(new_ids),'new_question_ids':new_ids,'judge_calls':len(ids),'max_attempts_per_question':8,'max_responses_per_pass':4,'max_judge_calls':len(ids)*8,
         'request_output_limit':32768,'timing_provenance':'historical_generation_not_current_latency','new_judge':judge}

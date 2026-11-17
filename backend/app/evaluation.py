@@ -680,7 +680,7 @@ class EvaluationRunner:
             root_cause={'primary': analysis['primary_root_cause'], 'secondary': [], 'diagnostic_basis': analysis['analysis_reason']})
         return case
 
-    def judge_replay_preflight(self,source_id,*,include_executions=False,judge_thinking=None):
+    def judge_replay_preflight(self,source_id,*,include_executions=False,judge_thinking=None,allow_new_questions=False):
         from .judge_replay import replay_eligibility
         from .diagnostics import _current_corpus
         source=self.store.evaluation_run(source_id)
@@ -695,7 +695,7 @@ class EvaluationRunner:
             judge['judge_thinking']=thinking_config('judge')
         judge['evaluation_identity']=evaluation_identity(snapshot,judge)
         chunks,fingerprint=_current_corpus({'corpus_fingerprint':snapshot['corpus_fingerprint']})
-        result=replay_eligibility(source,self.store.evaluation_case_results(source_id),snapshot,config,judge,chunks,fingerprint)
+        result=replay_eligibility(source,self.store.evaluation_case_results(source_id),snapshot,config,judge,chunks,fingerprint,allow_new_questions=allow_new_questions)
         with self.store.connection() as connection:
             try:self.store.validate_evaluation_start(connection,snapshot,judge)
             except ValueError as error:result.update(can_replay=False,start_blocker=str(error))
@@ -703,10 +703,10 @@ class EvaluationRunner:
         if not include_executions:result.pop('executions')
         return result
 
-    def start_judge_replay(self,source_id,*,automatic=True,judge_thinking=None):
+    def start_judge_replay(self,source_id,*,automatic=True,judge_thinking=None,allow_new_questions=False):
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK:
-            plan=self.judge_replay_preflight(source_id,include_executions=True,judge_thinking=judge_thinking)
+            plan=self.judge_replay_preflight(source_id,include_executions=True,judge_thinking=judge_thinking,allow_new_questions=allow_new_questions)
             if not plan['can_replay']:raise ValueError('Replay eligibility blocked: '+json.dumps({k:v for k,v in plan.items() if k not in {'executions','new_judge'}},ensure_ascii=False))
             source=self.store.evaluation_run(source_id)
             snapshot=self.store.dataset_snapshots()[0]['snapshot']
@@ -927,12 +927,13 @@ class EvaluationRunner:
                             checkpoint['execution'] = {'answer':source['model_answer'], 'retrieval_trace':source['programmatic_metrics'].get('retrieval_trace', {}),
                                                        'reused_from':checkpoint['scored_result']['reused_from']}
                         phase='generation'
-                        if 'execution' not in checkpoint and lineage.get('judge_replay'):
+                        replay_new = item['id'] in ((lineage.get('judge_replay') or {}).get('new_question_ids') or [])
+                        if 'execution' not in checkpoint and lineage.get('judge_replay') and not replay_new:
                             raise ValueError('Judge-only Replay execution missing; generation is forbidden')
                         if 'execution' not in checkpoint:
                             checkpoint['execution']=perform(phase,lambda:self.runtime.answer(item['question'],config))
                             persist()
-                        if lineage.get('judge_replay'):
+                        if lineage.get('judge_replay') and not replay_new:
                             from .diagnostic_evidence import digest
                             expected_execution=lineage['judge_replay']['execution_sha256'].get(item['id'])
                             if digest(checkpoint['execution'])!=expected_execution:raise ValueError('Replay saved execution identity changed')
