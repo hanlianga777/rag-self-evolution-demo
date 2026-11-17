@@ -53,6 +53,30 @@ class StrategyTests(unittest.TestCase):
         with self.assertRaises(ValueError):validate_round_conclusion(review,[c])
 
 
+    def test_d_review_uses_change_targets_as_predictions_and_accepts_assessment_map(self):
+        # 058：D 的预测写在 changes[].target_question_ids，复盘曾误读为"预测为空"；parameter_assessment 写成对象曾被整份退回。
+        from app.agent_strategy import validate_round_conclusion, predicted_ids
+        d={'id':'D','status':'evaluated','reasoning':{'candidate_label':'D','changes':[{'parameter':'multi_query','target_question_ids':['Q26','Q30']}]},
+           'result':{'all_fixed_question_ids':['Q17','Q26'],'new_regression_question_ids':['Q13']}}
+        self.assertEqual(predicted_ids(d),['Q26','Q30'])
+        review={'plans':[{'candidate_id':'D','fixed_question_ids':['Q17','Q26'],'new_failure_question_ids':['Q13'],'matched_question_ids':['Q26'],'prediction_match_count':1,
+                          'unmatched_reason':'Q30未修好','parameter_assessment':{'多问法检索':'不确定'},'evidence_reason':'保存位置','conclusion':'不确定'}],'lessons':['盯Q13']}
+        validate_round_conclusion(review,[d])
+        self.assertEqual(review['plans'][0]['parameter_assessment'],'多问法检索：不确定')
+        review['plans'][0].update(matched_question_ids=[],prediction_match_count=0)
+        with self.assertRaises(ValueError):validate_round_conclusion(review,[d])
+
+    def test_winner_comparison_lists_only_d_own_changes(self):
+        from types import SimpleNamespace
+        from app.agent_strategy import winner_comparison
+        cases={'r-d':[{'question_id':'Q13','passed':False},{'question_id':'Q17','passed':True},{'question_id':'Q27','passed':False}],
+               'r-w':[{'question_id':'Q13','passed':True},{'question_id':'Q17','passed':False},{'question_id':'Q27','passed':False}]}
+        store=SimpleNamespace(evaluation_case_results=lambda run:cases[run])
+        d={'id':'D','reasoning':{'winner_config_diff':{'multi_query':2}},'result':{'evaluation_run_id':'r-d'}}
+        w={'id':'W','reasoning':{},'result':{'evaluation_run_id':'r-w'}}
+        self.assertEqual(winner_comparison(store,d,w),{'winner_id':'W','changed_parameters_vs_winner':{'multi_query':2},
+                                                       'fixed_vs_winner':['Q17'],'new_failures_vs_winner':['Q13']})
+
 class ChainTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)

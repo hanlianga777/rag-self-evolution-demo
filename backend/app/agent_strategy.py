@@ -51,6 +51,26 @@ def validate_strategy(response, prior, audit, targets):
             raise ValueError('每个Candidate必须写预计修好题号predicted_fixed_question_ids，引用当前保存题号')
 
 
+def predicted_ids(candidate):
+    """A/B/C 的预测写在 predicted_fixed_question_ids；D 的预测写在每个改动的 target_question_ids。"""
+    reasoning = candidate.get('reasoning', {})
+    if reasoning.get('candidate_label') == 'D' and not reasoning.get('predicted_fixed_question_ids'):
+        return sorted({q for row in reasoning.get('changes') or [] if isinstance(row, dict) for q in row.get('target_question_ids') or []})
+    return list(reasoning.get('predicted_fixed_question_ids', []))
+
+
+def winner_comparison(store, d, winner):
+    """D 相对 Winner 的程序事实：只改了哪些参数、相对 Winner 修好/新错哪些题。"""
+    def outcomes(candidate):
+        run = candidate['result'].get('evaluation_run_id')
+        return {c['question_id']: c.get('passed') for c in (store.evaluation_case_results(run) if run else [])}
+    mine, theirs = outcomes(d), outcomes(winner)
+    return {'winner_id': winner['id'],
+            'changed_parameters_vs_winner': d['reasoning'].get('winner_config_diff', {}),
+            'fixed_vs_winner': sorted(q for q, ok in mine.items() if ok is True and theirs.get(q) is False),
+            'new_failures_vs_winner': sorted(q for q, ok in mine.items() if ok is False and theirs.get(q) is True)}
+
+
 def validate_round_conclusion(review, candidates):
     if not isinstance(review, dict) or not isinstance(review.get('plans'), list):
         raise ValueError('本轮结论必须包含plans')
@@ -62,7 +82,7 @@ def validate_round_conclusion(review, candidates):
         result = candidate['result']
         fixed = set(result.get('all_fixed_question_ids', []))
         broken = set(new_failure_ids(result))
-        predicted = set(candidate['reasoning'].get('predicted_fixed_question_ids', []))
+        predicted = set(predicted_ids(candidate))
         if (set(plan.get('fixed_question_ids', [])) != fixed or set(plan.get('new_failure_question_ids', [])) != broken
                 or set(plan.get('matched_question_ids', [])) != fixed & predicted
                 or type(plan.get('prediction_match_count')) is not int or plan['prediction_match_count'] != len(fixed & predicted)):
@@ -70,6 +90,9 @@ def validate_round_conclusion(review, candidates):
         # 预测与结果完全吻合、也没有弄坏题时，"预测不符原因"本来就无话可说，允许留空并记为吻合。
         if fixed == predicted and not broken and not (isinstance(plan.get('unmatched_reason'), str) and plan['unmatched_reason'].strip()):
             plan['unmatched_reason'] = '预测与结果一致，无不符'
+        if isinstance(plan.get('parameter_assessment'), dict) and plan['parameter_assessment'] and all(
+                isinstance(k, str) and isinstance(v, str) and v.strip() for k, v in plan['parameter_assessment'].items()):
+            plan['parameter_assessment'] = '；'.join(f'{k}：{v}' for k, v in plan['parameter_assessment'].items())
         names = {'unmatched_reason': '预测不符原因', 'parameter_assessment': '参数有效/有害判断', 'evidence_reason': '检索证据', 'conclusion': '结论'}
         missing = [names[k] for k in names if not isinstance(plan.get(k), str) or not plan[k].strip()]
         if missing:
@@ -113,7 +136,7 @@ def conclude_round(store, runtime, experiment_id, *, final_d=False):
         candidate_cases={c['id']:store.evaluation_case_results(c['result'].get('evaluation_run_id')) if c['result'].get('evaluation_run_id') else [] for c in evaluated},
         golden_questions=json.loads(baseline['dataset_snapshot_json']).get('questions', []), causal_evidence=experiment['result'].get('causal_evidence') is True)
     prompt = {'round':number, 'prior_sandbox_results':facts['prior_sandbox_results'],
-              'predictions':{c['id']:c['reasoning'].get('predicted_fixed_question_ids', []) for c in evaluated},
+              'predictions':{c['id']:predicted_ids(c) for c in evaluated},
               'skipped_candidates':[c['id'] for c in current if c['status']=='skipped'],
               'previous_round_conclusions':experiment['result'].get('round_conclusions', {})}
     system = ('你是RAG优化Agent。只读本实验保存事实，撰写本轮结论，输出JSON。不得编造检索证据或单参数因果关系，记录缺失写未知。'
@@ -121,6 +144,13 @@ def conclude_round(store, runtime, experiment_id, *, final_d=False):
               'matched_question_ids是实际修好与predictions交集，prediction_match_count为交集数量；unmatched_reason解释预测不符原因；'
               'parameter_assessment写哪些参数有效/有害/待验证；evidence_reason说明检索位置或耗时依据，多参数写无法单独确定及最可能参数和理由；'
               'conclusion总结有效/有害/待验证；lessons为非空字符串数组，写带入下一轮的经验。格式{"plans":[],"lessons":[]}。')
+    if final_d:
+        winner = next((c for c in experiment['candidates'] if c['id'] == (evaluated[0]['reasoning'].get('winner_id') if evaluated else None)), None)
+        if winner:
+            prompt['winner_comparison'] = {d['id']: winner_comparison(store, d, winner) for d in evaluated}
+            system += ('D是在已确认Winner上精修：winner_comparison是程序事实，列出D相对Winner只改了哪些参数，以及相对Winner修好/新错的题。'
+                       '相对Baseline的多项差异里，除这几项外都是Winner原有的改动，不是D新改的；分析D时不要写成多参数混改。'
+                       '相对Winner只改1个参数时，相对Winner的修好/新错可以说与该参数伴随出现，仍不能写成已证明的因果。predictions里的D预测来自改动的目标题。')
     if experiment['result'].get('causal_evidence'):
         prompt['case_comparisons'] = facts['case_comparisons']
         system += ('逐题对比case_comparisons是程序事实。每个plans新增case_reviews数组，逐一覆盖修好、新错、仍错题，每项含question（Q29形式）、state（修好、新错、仍错）、reason（一句中文原因）、attributed_parameter（中文参数名或未知）、assessment（有效、无效、不确定）。'
