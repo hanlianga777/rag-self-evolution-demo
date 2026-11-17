@@ -137,9 +137,12 @@ NEW = {
  'Q19': "清水箱/污水箱容量各为 55 l。",
  'Q20': "额定电压：DC 50.4V。",
 }
+NEW_Q21 = "1. 在“设置”菜单中按下“一般设置”按钮。\n2. 在一般设置页面的“设定时区”下设置相应时区。"
 for src, dst in (('Q01','Q21'),('Q04','Q22'),('Q07','Q23'),('Q08','Q24'),('Q19','Q25'),('Q20','Q26'),('Q17','Q27'),('Q15','Q28'),('Q11','Q29'),('Q12','Q30')):
     NEW[dst] = NEW[src]
+NEW['Q21'] = NEW_Q21  # 2026-11-16 23:55：按 052 QC 建议定向修订一次（朋友规则：只修坏题、最多 1 轮）
 P = [p[:8] + (NEW[p[0]],) + p[9:] for p in P]
+P = [p[:9] + ((p[9] + [(K(55),'2. 按下“一般设置”按钮\n显示当前的一般设置。')]),) + p[10:] if p[0]=='Q21' else p for p in P]
 old = list(csv.DictReader(open(REPO + '046-当前题卷字段.csv', encoding='utf-8-sig')))
 chunk_list = [{'chunk_id': k, 'chunk_text': v} for k, v in chunks.items()]
 strict = lambda v: re.sub(r'\s+', '', unicodedata.normalize('NFKC', v))
