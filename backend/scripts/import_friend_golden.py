@@ -14,6 +14,7 @@ PYTHONPATH=backend python3 backend/scripts/import_friend_golden.py --csv 指挥/
 import argparse
 import csv
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -43,7 +44,8 @@ def to_candidate(row):
                  'test_node': row.get('考查节点', '').strip() or None, 'config_param': row.get('考查参数', '').strip() or None,
                  'difficulty': row.get('难度', '').strip() or None, 'note': row.get('备注', '').strip() or None,
                  'keywords': [k.strip() for k in (row.get('关键词') or '').replace('，', ',').split(',') if k.strip()],
-                 'paired_question': row.get('配对题号', '').strip() or None}
+                 'paired_question': row.get('配对题号', '').strip() or None,
+                 'golden_contract': 'friend-golden-v1'}
     if method == '统计':
         candidate['aggregation_items'] = [item.strip() for item in (row.get('统计条目') or '').split('｜') if item.strip()]
     if group == 'ablation':
@@ -73,7 +75,8 @@ def main(argv=None):
     from app.golden_v2 import validate_golden_candidate
     from app.reviewed_import import FRIEND_CONTRACT, import_batch, validate_friend_content
     data = args.csv.read_bytes()
-    rows = list(csv.DictReader(data.decode('utf-8-sig').splitlines()))
+    # 单元格内有换行（多段证据、分行答案），不能先 splitlines 再交给 csv。
+    rows = list(csv.DictReader(io.StringIO(data.decode('utf-8-sig'), newline='')))
     chunks = CorpusStore().chunks()
     report, candidates = [], []
     for row in rows:

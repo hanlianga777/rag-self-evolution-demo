@@ -3,6 +3,7 @@ import { ConfirmDialog } from "../components/Dialog";
 import { readableSourceName } from "../components/ComparisonAnswer";
 import { Badge, DrawerSection, TruncatedText } from "../components/Primitives";
 import { displayText, presentationText } from "../display";
+import { answerMarkup } from "../components/CaseAnswer";
 
 type Candidate = Record<string, any>;
 const behaviorText: Record<string, string> = {
@@ -37,7 +38,6 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true,
   const probePassed = row.probe_status === "probe_passed", qcPassed = row.qc_status === "qc_passed";
   const behavior = row.expected_behavior || row.raw?.expected_behavior || row.negative_subtype;
   const answer = row.test_category === "negative" ? qc.behavior_criteria || behaviorText[behavior] || displayText(behavior || "暂无") : row.reference_answer || "暂无";
-  const answers = String(answer).split(/\n+/).map(line => line.trim().replace(/^\d+[.、)）]\s*/, "")).filter(Boolean);
   const evidence = (row.evidence_details || []).flatMap((source: Candidate) => source.chunks || []);
   const uniqueEvidence: { chunk: Candidate; count: number }[] = [];
   for (const chunk of evidence) {
@@ -68,7 +68,7 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true,
     {showSource && row.raw?.source === "reviewed_csv_machine_checks" && <p className="muted">来源：人工审核</p>}
     {scenario && scenario !== "暂无" && <DrawerSection title="业务场景"><div className="muted-prose"><TruncatedText lines={3}>{scenario}</TruncatedText></div></DrawerSection>}
     <DrawerSection title="问题"><p>{presentationText(row.question || "")}</p><p className="muted">出处：{questionSources(row)}</p></DrawerSection>
-    <DrawerSection title="参考答案"><ol className="golden-answer-list candidate-answer">{answers.map((line, index) => <li key={index}>{line}</li>)}</ol>{row.test_category === "negative" && <small className="muted">按预期行为检查回答边界</small>}</DrawerSection>
+    <DrawerSection title="参考答案"><div className="golden-answer-list candidate-answer">{answerMarkup(String(answer))}</div>{row.test_category === "negative" && <small className="muted">按预期行为检查回答边界</small>}</DrawerSection>
     {uniqueEvidence.length > 0 && <DrawerSection title="核心证据"><div className="golden-evidence-scroll">{uniqueEvidence.map(({ chunk, count }, index: number) => <div className="golden-evidence" key={index}><strong>{sourceLabel(chunk)}{count > 1 && ` · 命中 ${count} 处`}</strong><div className="muted-prose"><TruncatedText lines={3}>{chunk.chunk_text || "暂无"}</TruncatedText></div></div>)}</div></DrawerSection>}
     {facts.length > 0 && <DrawerSection title="题目信息"><ul className="golden-question-facts">{facts.map(([label, value]) => <li key={label}><span className="muted">{label}：</span>{value}</li>)}</ul></DrawerSection>}
     <DrawerSection title="质检结果"><div className="golden-quality-results quality-grid"><div className="golden-probe-result"><strong>Probe · {goldenQuality(row, "probe")}</strong><Badge tone={probePassed ? "good" : "warning"}>{probeExecutionFailed ? "未完成" : probePassed ? "通过" : row.probe_status === "needs_revision" ? "未通过" : "未运行"}</Badge><div className="muted-prose"><TruncatedText lines={3}>{probeExecutionFailed ? "执行情况" : "题目有效"}：{validityReason}</TruncatedText></div><div className="muted-prose"><TruncatedText lines={3}>召回观察：{retrievalReason}</TruncatedText></div><button className="primary" disabled={busy || !onRun} aria-description={!onRun ? "即将支持" : undefined} onClick={() => setQualityConfirm({ id: row.id, name: "probe" })}>运行 Probe</button></div><div><strong>QC · {typeof qc.score === "number" ? goldenScore(qc.score) : goldenQuality(row, "qc")}</strong><Badge tone={qcPassed ? "good" : "warning"}>{qcPassed ? "通过" : row.qc_status === "qc_failed" ? "未通过" : "未运行"}</Badge><div className="muted-prose"><TruncatedText lines={3}>{readable(qc.reason || (qcPassed ? "整卷质检通过，未发现需修改的问题。" : "保存记录未提供质检说明。"))}</TruncatedText></div><button className="primary" disabled={busy || !onRun || !probePassed} aria-description={!onRun ? "即将支持" : !probePassed ? "Probe 通过后可运行 QC" : undefined} onClick={() => setQualityConfirm({ id: row.id, name: "qc" })}>运行 QC</button></div></div></DrawerSection>

@@ -208,6 +208,40 @@ def build_plan(chunks, embeddings, profile, corpus_fingerprint=None, embedding_i
     return plan
 
 
+FRIEND_CONTRACT = 'friend-golden-v1'
+_STRICT_TOKEN = re.compile(r'[A-Za-z0-9]+(?:[./,-][A-Za-z0-9]+)*')
+
+
+def friend_answer_supported(answer, sources):
+    """朋友同款题卷的参考答案锚点（用户 2026-11-16 19:45：答案要结构化、通顺，可适度润色）。
+    硬要求：数字、型号、单位等字母数字串全部出现在证据里；引号里的按钮名/提示文字逐字出现在证据里；
+    每个分句的中文内容与证据的二字词重合率 ≥ 0.5（不超过 6 个汉字的短句只查字母数字串）。语义是否走样由整卷 QC 判 P0。"""
+    from .governance import _COUNT_LINE, _strip_answer_layout
+    evidence = '\n'.join(text(c) for c in sources)
+    flat = unicodedata.normalize('NFKC', evidence)
+    tokens = {normalize(t) for t in _STRICT_TOKEN.findall(flat)}
+    body = _strip_answer_layout(unicodedata.normalize('NFKC', answer or ''))
+    if not body.strip():
+        return False
+    if any(_COUNT_LINE.match(line.strip()) for line in body.splitlines()):
+        return False  # “共 N 条”与实际列出的条数不符
+    if any(normalize(t) not in tokens and normalize(t) not in normalize(flat) for t in _STRICT_TOKEN.findall(body)):
+        return False
+    joined = normalize(flat)
+    if any(normalize(quoted) and normalize(quoted) not in joined for quoted in re.findall(r'[“"「]([^”"」]{2,40})[”"」]', body)):
+        return False
+    source_cn = ''.join(ch for ch in flat if '\u4e00' <= ch <= '\u9fff')
+    source_pairs = {source_cn[i:i + 2] for i in range(len(source_cn) - 1)}
+    for part in re.split(r'[。；;，,、\n（）()！!？?]+', body):
+        cn = ''.join(ch for ch in part if '\u4e00' <= ch <= '\u9fff')
+        if len(cn) <= 6:
+            continue
+        pairs = [cn[i:i + 2] for i in range(len(cn) - 1)]
+        if sum(pair in source_pairs for pair in pairs) / len(pairs) < .5:
+            return False
+    return True
+
+
 def answer_supported(answer, sources):
     from .governance import _answer_anchor_supported
     if _answer_anchor_supported(answer, [text(c) for c in sources]):
@@ -357,7 +391,8 @@ def validate_answer_content(candidate, sources, review=None):
     """Review is backend-trusted context, never candidate-supplied self-approval."""
     requirements = candidate.get('business_requirements')
     if requirements is None:
-        supported = candidate.get('test_category') == 'negative' or answer_supported(candidate.get('reference_answer') or '', sources)
+        check = friend_answer_supported if candidate.get('golden_contract') == FRIEND_CONTRACT or (candidate.get('raw') or {}).get('golden_contract') == FRIEND_CONTRACT else answer_supported
+        supported = candidate.get('test_category') == 'negative' or check(candidate.get('reference_answer') or '', sources)
         return {'status': 'supported_anchor' if supported else 'unsupported_anchor'}
     binding = content_review_identity(candidate, sources)
     checks = []

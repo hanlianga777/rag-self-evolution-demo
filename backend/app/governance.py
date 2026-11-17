@@ -52,7 +52,42 @@ def _normalized(value: str) -> str:
     return "".join(character.lower() for character in value if character.isalnum())
 
 
+_LIST_MARKER = re.compile(r"^[ \t]*(?:\d{1,2}[.、．)）](?!\d)|[-•·])[ \t]*")
+_FRAMING_LINE = re.compile(r"^[^\dA-Za-z\n]{0,14}(?:以下|如下|下面|分别|步骤|几点|操作)[^\dA-Za-z\n]{0,8}[：:]$")
+_COUNT_LINE = re.compile(r"^(?:[^\dA-Za-z\n]{0,10}?)共\s*([0-9]{1,2}|[一二两三四五六七八九十]{1,2})\s*[条项个种点类步][^\dA-Za-z\n]{0,6}[：:]$")
+_CN_NUMBERS = {'一': 1, '二': 2, '两': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10}
+_LINE_LABEL = re.compile(r"^[\u4e00-\u9fff]{2,8}[：:]")
+
+
+def _cn_count(value: str) -> int:
+    if value.isdigit():
+        return int(value)
+    if value.startswith('十'):
+        return 10 + _CN_NUMBERS.get(value[1:], 0)
+    if len(value) == 2 and value[1] == '十':
+        return _CN_NUMBERS[value[0]] * 10
+    return _CN_NUMBERS.get(value, -1)
+
+
+def _strip_answer_layout(answer: str) -> str:
+    """结构化排版不算事实：去掉行首序号/项目符号、"按以下步骤操作："这类引导行、行首短中文小标签（如"存放地点："），
+    以及与列表条数一致的"共 N 条："计数行；计数与实际条数不符时保留该行，让锚点校验拦下。"""
+    raw = [line.strip() for line in answer.splitlines()]
+    items = sum(bool(_LIST_MARKER.match(line)) for line in raw if line)
+    kept = []
+    for line in raw:
+        line = _LIST_MARKER.sub("", line).strip()
+        if not line or _FRAMING_LINE.match(line):
+            continue
+        count = _COUNT_LINE.match(line)
+        if count and _cn_count(count.group(1)) == items:
+            continue
+        kept.append(_LINE_LABEL.sub("", line).strip() if not count else line)
+    return "\n".join(line for line in kept if line)
+
+
 def _answer_anchor_supported(answer: str, evidence_texts: list[str]) -> bool:
+    answer = _strip_answer_layout(answer)
     texts = [_normalized(text) for text in evidence_texts]
     whole = _normalized(answer)
     if not whole or not texts:

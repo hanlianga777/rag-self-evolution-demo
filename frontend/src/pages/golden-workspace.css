@@ -20,8 +20,9 @@
 .frozen-question-details .drawer-section h3 { margin: 0 0 16px;  }
 .frozen-question-details .drawer-section p, .frozen-question-details li, .frozen-question-details blockquote {  line-height: 1.7; }
 .frozen-question-details .drawer-section p:last-child { margin-bottom: 0; }
-.frozen-question-details .golden-answer-list { margin: 0; padding-left: 24px; list-style: decimal; }
-.frozen-question-details .golden-answer-list li + li { margin-top: 12px; }
+.frozen-question-details .golden-answer-list p { margin: 0 0 8px; }
+.frozen-question-details .golden-answer-list ol, .frozen-question-details .golden-answer-list ul { margin: 0; padding-left: 24px; }
+.frozen-question-details .golden-answer-list li + li { margin-top: 8px; }
 .frozen-question-details .golden-evidence + .golden-evidence { margin-top: 20px; }
 .frozen-question-details .golden-evidence strong {  overflow-wrap: anywhere; }
 .frozen-question-details blockquote { margin: 12px 0 0; padding-left: 16px; border-left: 2px solid var(--line); white-space: pre-line; }
