@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // 047 报告的 Q21：judge_result 存的是旧统计量纲（3.2 / 1 / 0.6），百分制在 evaluation_outcome.rubric_scores（80 / 100 / 60）。
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
