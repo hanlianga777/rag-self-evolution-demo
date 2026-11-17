@@ -565,7 +565,9 @@ class GovernanceStore:
             if item['classification']=='RETRIEVAL_INCOHERENT' and qc_state['passed'] and item['probe_hash']==content_hash and item['qc_hash']==content_hash:
                 from .golden_v2 import golden_fact_coverage
                 fact_coverage = {**golden_fact_coverage(item, _load(item['retrieval_probe_json'],{}), _load(item['retrieval_qc_json'],{}), chunks), 'content_hash':content_hash, 'probe_id':item['probe_id'], 'qc_id':item['qc_id']}
-            if item['classification'] not in {None, 'EVIDENCE_VALID','NEGATIVE_VALID'} and (fact_coverage or {}).get('status')!='necessary_facts_located':
+            # 朋友同款题卷：标准证据当前没召回（检索不连贯）是留给 Agent 优化的信号，不阻断 Gate 1（规则总表：未召回不算阻断）。
+            retrieval_gap_allowed = item['raw'].get('golden_contract') == 'friend-golden-v1' and item['classification'] == 'RETRIEVAL_INCOHERENT'
+            if item['classification'] not in {None, 'EVIDENCE_VALID','NEGATIVE_VALID'} and (fact_coverage or {}).get('status')!='necessary_facts_located' and not retrieval_gap_allowed:
                 reasons.append({'RETRIEVAL_INCOHERENT':'检索不连贯','FAKE_NEGATIVE_RISK':'负向证据需复核'}.get(item['classification'], '证据需复核'))
             if item['execution_status'] in {'failed','uncertain'}:
                 reasons.append('检索执行失败或无法判定')
@@ -2078,7 +2080,10 @@ class GovernanceStore:
         tables = corpus.original_tables(sources) if positive and isinstance(corpus, CorpusStore) else {}
         governed = bool(item['raw'].get('business_requirements'))
         validation = validate_golden_candidate({**item['raw'],**item},chunks,validation_context={'original_tables':tables}) if governed else None
-        programmatic['answer_anchor'] = validation['valid'] if governed else answer_supported(item['reference_answer'] or '', [{**chunk,'original_tables':tables.get(chunk['chunk_id'], [])} for chunk in sources]) if positive else True
+        # 朋友同款题卷（friend-golden-v1）的答案锚点与导入硬校验保持一致：允许结构化排版和适度润色，数字/名称/计数仍须在证据里。
+        from .golden_v2 import FRIEND_CONTRACT, friend_answer_supported
+        anchor = friend_answer_supported if item['raw'].get('golden_contract') == FRIEND_CONTRACT else answer_supported
+        programmatic['answer_anchor'] = validation['valid'] if governed else anchor(item['reference_answer'] or '', [{**chunk,'original_tables':tables.get(chunk['chunk_id'], [])} for chunk in sources]) if positive else True
         if positive and (item.get('planner_version') or item['raw'].get('construction_type')):
             programmatic['candidate_legality'] = validate_golden_candidate({**item['raw'],**item}, chunks, validation_context={'original_tables':tables})['valid']
         haystack = " ".join(source_texts.values())
