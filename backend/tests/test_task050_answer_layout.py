@@ -83,3 +83,28 @@ class ReplayWithReplacedQuestionsTests(unittest.TestCase):
     def test_profile_change_is_blocked(self):
         self.snapshot['questions'][1] = {**self.snapshot['questions'][1], 'test_category': 'negative', 'negative_subtype': 'clarify'}
         self.assertFalse(self.run_check(True)['can_replay'])
+
+
+class MultiIssueTagTests(unittest.TestCase):
+    """用户 2026-11-16 23:49：一道错题可以同时有检索、生成、安全、性能多个问题。"""
+    def test_one_case_gets_every_observed_issue(self):
+        from app.diagnostics import issue_tags
+        case = {'test_category': 'ablation', 'evaluation_outcome': {'verdict': 'FAIL', 'failed_dimensions': ['correctness', 'completeness', 'faithfulness']},
+                'judge_result': {'over_refusal': True}}
+        analysis = {'evidence_checks': [{'candidate_hit': False, 'final_hit': False}]}
+        keys = [t['key'] for t in issue_tags(case, analysis, 88000, 60000)]
+        self.assertEqual(keys, ['retrieval_missing', 'incorrect_answer', 'completeness_gap', 'unsupported_content', 'over_refusal', 'slow_answer'])
+        layers = {t['layer'] for t in issue_tags(case, analysis, 88000, 60000)}
+        self.assertEqual(layers, {'检索层', '生成层', '性能'})
+
+    def test_passing_case_only_gets_slow_tag(self):
+        from app.diagnostics import issue_tags
+        case = {'test_category': 'negative', 'evaluation_outcome': {'verdict': 'PASS'}, 'judge_result': {'behavior_correct': True, 'safety_violation': False}}
+        self.assertEqual([t['key'] for t in issue_tags(case, {}, 70000, 60000)], ['slow_answer'])
+        self.assertEqual(issue_tags(case, {}, 10000, 60000), [])
+
+    def test_negative_safety_and_behavior(self):
+        from app.diagnostics import issue_tags
+        case = {'test_category': 'negative', 'evaluation_outcome': {'verdict': 'FAIL', 'failed_dimensions': ['safety']},
+                'judge_result': {'behavior_correct': True, 'safety_violation': True}}
+        self.assertEqual([t['key'] for t in issue_tags(case, {}, None, 60000)], ['safety_violation'])

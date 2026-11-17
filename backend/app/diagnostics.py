@@ -301,6 +301,47 @@ def display_diagnosis(case, analysis, golden):
     return {'display_layer':layer, 'display_subtype':detail, 'display_severity':'严重' if severe else '一般'}
 
 
+ISSUE_LAYERS = {'retrieval_missing': ('检索层', '标准证据没检索到'), 'ranking_omission': ('检索层', '检索到但没进最终资料'),
+                'incorrect_answer': ('生成层', '答案不正确'), 'completeness_gap': ('生成层', '漏要点'),
+                'unsupported_content': ('生成层', '有资料里没有的说法'), 'over_refusal': ('生成层', '资料里有却说没有'),
+                'behavior_miss': ('安全边界', '没做到预期行为（拒答/追问/资料不足）'), 'safety_violation': ('安全边界', '有危险或误导内容'),
+                'slow_answer': ('性能', '单题回答超过 P99 门槛')}
+
+
+def issue_tags(case, analysis, latency_ms=None, latency_limit_ms=None):
+    """一题可以同时有多个问题（用户 2026-11-16 23:49）：主原因 primary_root_cause 只用于排优先级，
+    这里按已保存的事实逐项打标签——检索排名、三维分数（0–100 的 rubric_scores）、负向两项、单题耗时。不调用模型。"""
+    tags = []
+    verdict = _saved_verdict(case)
+    category = case.get('test_category')
+    if verdict == 'FAIL':
+        checks = analysis.get('evidence_checks') or []
+        if category in {'positive', 'ablation'}:
+            if any(c.get('candidate_hit') is False for c in checks):
+                tags.append('retrieval_missing')
+            elif any(c.get('final_hit') is False for c in checks):
+                tags.append('ranking_omission')
+        outcome = case.get('evaluation_outcome') or {}
+        judge = case.get('judge_result') or {}
+        failed = set(outcome.get('failed_dimensions') or [])
+        if 'correctness' in failed:
+            tags.append('incorrect_answer')
+        if 'completeness' in failed:
+            tags.append('completeness_gap')
+        if 'faithfulness' in failed:
+            tags.append('unsupported_content')
+        if judge.get('over_refusal') is True:
+            tags.append('over_refusal')
+        if category == 'negative':
+            if judge.get('behavior_correct') is False or 'behavior' in failed:
+                tags.append('behavior_miss')
+            if judge.get('safety_violation') is True or 'safety' in failed:
+                tags.append('safety_violation')
+    if type(latency_ms) in (int, float) and type(latency_limit_ms) in (int, float) and latency_ms > latency_limit_ms:
+        tags.append('slow_answer')
+    return [{'key': key, 'layer': ISSUE_LAYERS[key][0], 'label': ISSUE_LAYERS[key][1]} for key in dict.fromkeys(tags)]
+
+
 @memoized_view
 def diagnostic_view(case, *, golden_item=None, corpus_chunks=None, corpus_fingerprint=None):
     """Expose one conclusion and keep the minimal shape consumed by existing pages."""
@@ -345,11 +386,14 @@ def diagnostic_view(case, *, golden_item=None, corpus_chunks=None, corpus_finger
     if type(latency['question_ms']) in (int, float) and latency['question_ms'] > latency_limit_ms:
         phenomena.append({'name': 'Latency 过高', 'status': 'observed',
                           'basis': [f"已保存单题耗时 {latency['question_ms']} ms，超过现有 P99 Hard Gate 对照 {latency_limit_ms} ms；不改变业务判分"]})
-    return {**analysis, **display_diagnosis(case, analysis, golden), 'view_version': 'diagnosis-view-v7',
+    tags = issue_tags(case, analysis, latency['question_ms'], latency_limit_ms)
+    primary_layer = {'检索层问题': '检索层', '生成层问题': '生成层', '安全边界问题': '安全边界'}.get(category)
+    return {**analysis, **display_diagnosis(case, analysis, golden), 'view_version': 'diagnosis-view-v8',
+            'issue_tags': tags, 'issue_layers': list(dict.fromkeys(tag['layer'] for tag in tags)),
             'display_question_id':display_id,'subfeature':subfeature,'subfeatures':[subfeature] if subfeature else [],
             'retrieval_positions':positions,'retrieval_position_label':position_label,'missing_points':missing_points,
             'phenomena': phenomena,
-            'secondary_root_causes': [], 'is_technical_bad_case': bool(directions),
+            'secondary_root_causes': [tag for tag in tags if tag['layer'] != primary_layer], 'is_technical_bad_case': bool(directions),
             'optimization_directions': directions, 'trace_observations': observations,
             'diagnosis_complete': category != '记录缺失',
             'root_cause_evidence': {'reason': analysis['analysis_reason'], 'findings': analysis['evidence_checks']},
