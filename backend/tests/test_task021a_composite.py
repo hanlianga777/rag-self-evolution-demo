@@ -187,6 +187,23 @@ class RefinementTests(unittest.TestCase):
                 db.execute('update candidate_configs set config_json=? where id=?',(json.dumps({**candidate['config'],'top_k':4}),candidate['id']))
             with self.assertRaisesRegex(ValueError,'已审查'):runner.candidate_inputs(candidate['id'])
 
+    def test_sandbox_entry_accepts_d_whose_overlap_was_normalized(self):
+        # 057：首次规划规整了保护题重叠并附审计；开跑前复验不再产生审计，不能因此判为"与已审查建议不一致"。
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        from app.evaluation import EvaluationRunner
+        value=self.suggestion();value['changes'][0]['side_effect_check']['protected_overlap']=['q2']
+        p=Mock(complete=Mock(return_value=json.dumps(value)),settings=context.Settings('fixture','https://example.invalid','fixture'))
+        candidate=self.store.create_composite(self.experiment,p)
+        self.assertEqual(candidate['reasoning']['changes'][0]['normalized_fields'][0]['to'],['q3'])
+        self.assertEqual(self.store.experiment(self.experiment)['result']['composite']['attempts'][0]['normalized_fields'][0]['from'],['q2'])
+        runner=EvaluationRunner(self.store,SimpleNamespace(model='fixture'))
+        with patch.object(runner,'_require_generation_contract'),patch.object(runner,'snapshot_items',return_value=[]):
+            self.assertEqual(runner.candidate_inputs(candidate['id'])[2]['id'],candidate['id'])
+            with self.store.connection() as db:
+                db.execute('update candidate_configs set config_json=? where id=?',(json.dumps({**candidate['config'],'top_k':4}),candidate['id']))
+            with self.assertRaisesRegex(ValueError,'已审查'):runner.candidate_inputs(candidate['id'])
+
     def test_new_round_review_does_not_overwrite_previous_round(self):
         exp=self.store.create_experiment(self.baseline,'generating')
         for number in (1,2):

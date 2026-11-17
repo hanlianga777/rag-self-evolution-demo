@@ -1059,7 +1059,10 @@ class EvaluationRunner:
             facts = build_d_facts(self.store,baseline,winner,history)
             if facts != decision.get('facts'):raise ValueError('D事实表对应的保存结果已变化')
             config, changes = validate_d_refinement(decision['suggestion'],winner,history,baseline['config'],facts)
-            if (config != candidate['config'] or changes != candidate['reasoning'].get('changes')
+            # normalized_fields 只是首次规划时的规整审计；保存的建议已经规整好，复验不会再产生，比较时不计。
+            def _audit_free(rows):
+                return [{k:v for k,v in row.items() if k!='normalized_fields'} if isinstance(row,dict) else row for row in rows or []]
+            if (config != candidate['config'] or _audit_free(changes) != _audit_free(candidate['reasoning'].get('changes'))
                     or parameter_diff(config,pipeline_config(baseline['config'])) != candidate['reasoning'].get('changed_parameters')):
                 raise ValueError('D配置与已审查建议不一致')
         if candidate['reasoning'].get('intervention_contract_version') in {'agent-closure-3', 'agent-closure-4'}:
