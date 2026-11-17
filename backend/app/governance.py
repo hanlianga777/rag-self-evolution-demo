@@ -3292,6 +3292,9 @@ class GovernanceStore:
                     validate_d_mode(suggestion, winner, eligible, facts)
                 if suggestion['should_generate_d']:
                     config, source_records = validate_d_refinement(suggestion, winner, eligible, base_config, facts)
+                    if any(row.get('normalized_fields') for row in source_records):
+                        audit['normalized_fields'] = [item for row in source_records for item in row.get('normalized_fields', [])]
+                        persist_attempts()
                     references = sorted({q for row in source_records for q in row['target_question_ids']})
                     full_diff = parameter_diff(config, base_config)
                     for field in ('hypothesis','root_cause','intervention_direction','evidence_assertions'):

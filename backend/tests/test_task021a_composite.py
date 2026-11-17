@@ -66,6 +66,15 @@ class RefinementTests(unittest.TestCase):
         v=self.suggestion();v['proposed_config_diff']={'hyde':True};v['changes'][0].update(parameter='hyde',source_type='new_attempt',source_candidates=[],why_not_verified='top_k=6伴随q3翻错，保护题重叠')
         self.assertTrue(self.validate(v)[0]['hyde'])
 
+    def test_wrong_protected_overlap_is_normalized_to_fact_table(self):
+        # 056：D 三次规划都因模型抄错保护题重叠（多列已错题、漏列翻错的保护题）被拒；改为按事实表规整并留审计。
+        v=self.suggestion();v['changes'][0]['side_effect_check']['protected_overlap']=['q2']
+        _,records=self.validate(v)
+        self.assertEqual(v['changes'][0]['side_effect_check']['protected_overlap'],['q3'])
+        self.assertEqual(records[0]['normalized_fields'],[{'field':'side_effect_check.protected_overlap','parameter':'top_k','from':['q2'],'to':['q3']}])
+        _,records=self.validate(self.suggestion())
+        self.assertNotIn('normalized_fields',records[0])
+
     def test_partial_records_contrast_but_does_not_require_it(self):
         with self.store.connection() as db:
             db.execute('insert into candidate_configs values (?,?,?,?,?,?,?)',(self.experiment+'-C',self.experiment,'generated',json.dumps({**DEFAULT_PIPELINE_CONFIG,'top_k':6,'multi_query':2}),json.dumps({'candidate_label':'C','round':1}),'{}','now'))

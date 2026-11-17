@@ -195,7 +195,14 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
         if any(type(row.get(k)) is not int or row[k]<0 for k in ('expected_fixed_count','possible_broken_count')):raise ValueError('预期修好/可能弄坏几道须为非负整数')
         profile=next(p for p in facts['parameter_profiles'][key] if type(p['value']) is type(value) and p['value']==value)
         overlap={q for p in profile['observations'] for q in p['new_failure_question_ids']} & protected
-        if not overlap<=set(side['protected_overlap']) or not set(side['protected_overlap'])<=protected:raise ValueError('副作用检查须覆盖事实表中与受保护题的重叠')
+        # 保护题重叠是代码从事实表算出的集合（规则总表五.8：数字、题号由程序填写或校验，Agent 不能自己编）。
+        # 模型抄错时按事实表规整：补上漏列的重叠题、去掉不在保护集合里的题（保留模型额外点名的保护题），并留审计。
+        given=side['protected_overlap']
+        normalized=[]
+        if not overlap<=set(given) or not set(given)<=protected:
+            truth=sorted((set(given)&protected)|overlap)
+            normalized.append({'field':'side_effect_check.protected_overlap','parameter':key,'from':list(given),'to':truth})
+            side['protected_overlap']=truth
         selected=row.get('source_candidates',[])
         if not isinstance(selected,list):raise ValueError('来源须为列表')
         if kind=='new_attempt':
@@ -214,5 +221,6 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
                 bundle=parameter_diff(source_config,base)
                 whole=all(config[k]==v and type(config[k]) is type(v) for k,v in bundle.items())
                 if not whole and kind!='partial':raise ValueError('多参数来源只取一部分时，source_type须写partial（部分取用）')
-        records.append({**row,'source_type':kind, **({'partial_contrast_verified':bool(valid_contrasts)} if kind=='partial' else {})})
+        records.append({**row,'source_type':kind, **({'partial_contrast_verified':bool(valid_contrasts)} if kind=='partial' else {}),
+                        **({'normalized_fields':normalized} if normalized else {})})
     return effective_config,records
