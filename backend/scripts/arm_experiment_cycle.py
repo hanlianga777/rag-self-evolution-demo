@@ -42,6 +42,7 @@ def main(argv=None):
     plan = {'experiment_id': args.experiment_id, 'baseline_run_id': experiment['baseline_run_id'],
             'round_policy': {'old': experiment['result'].get('round_policy'), 'new': policy},
             'causal_evidence': {'old': experiment['result'].get('causal_evidence'), 'new': True},
+            'strategy_contract': {'old': experiment['result'].get('strategy_contract'), 'new': experiment['result'].get('strategy_contract') or 'agent-strategy-4'},
             'unattended_authorization': unattended_authorization(store),
             'candidates': [{'id': c['id'], 'status': c['status'], 'qualified': c['result'].get('qualification', {}).get('qualified')} for c in experiment['candidates']],
             'budget': experiment.get('evaluation_budget')}
@@ -51,13 +52,15 @@ def main(argv=None):
         connection.execute('BEGIN IMMEDIATE')
         row = connection.execute('SELECT result_json FROM experiments WHERE id=?', (args.experiment_id,)).fetchone()
         result = json.loads(row['result_json'])
+        # 2026-11-18：手动 POST /api/experiments/run 生成的实验没有 strategy_contract，本轮复盘与 D 的组合规则都会被跳过；分轮循环一律补上
+        result.setdefault('strategy_contract', 'agent-strategy-4')
         result.update(round_policy=policy, causal_evidence=True,
                       cycle_arming={'audit_note': AUDIT_NOTE, 'max_rounds': args.max_rounds})
         connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (json.dumps(result, ensure_ascii=False), args.experiment_id))
     if not unattended_authorization(store).get('enabled'):
         set_unattended_authorization(store, True, '用户', audit_note=AUDIT_NOTE)
     after = store.experiment(args.experiment_id, light=True)['result']
-    return {'armed': {'round_policy': after.get('round_policy'), 'causal_evidence': after.get('causal_evidence')},
+    return {'armed': {'round_policy': after.get('round_policy'), 'causal_evidence': after.get('causal_evidence'), 'strategy_contract': after.get('strategy_contract')},
             'unattended_authorization': unattended_authorization(store)}
 
 
