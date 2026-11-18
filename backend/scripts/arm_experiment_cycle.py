@@ -13,7 +13,7 @@ import json
 import os
 from pathlib import Path
 
-AUDIT_NOTE = '用户 2026-11-17 07:07 授权接着跑；09:19 要求完整跑到有 Candidate D，发布前停下等命令'
+AUDIT_NOTE = '用户 2026-11-18 10:40 授权：知识库 v3 上跑 Baseline 后跑第 1 轮 A/B/C 三个 Sandbox，跑完即停，不发布'
 
 
 def main(argv=None):
