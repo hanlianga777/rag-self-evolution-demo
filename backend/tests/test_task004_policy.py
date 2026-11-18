@@ -109,7 +109,8 @@ class Task004CandidateIntegrationTests(unittest.TestCase):
         self.runtime.judges.clear()
         result = self.runner.execute_candidate(*self.runner.start_candidate(exp + '-R1-A'))
         self.assertEqual(result['status'], 'evaluated')
-        self.assertFalse(result['result']['qualification']['qualified'])
+        # 2026-11-18 朋友口径：普通题新增只记录、不设上限，门槛全过即合格。
+        self.assertTrue(result['result']['qualification']['qualified'])
         self.assertEqual(result['result']['bad_case_count'], 1)
         self.assertEqual(result['result']['initial_bad_case_count'], 1)
         self.assertEqual(result['result']['new_regressions'], 1)

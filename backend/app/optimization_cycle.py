@@ -215,6 +215,9 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
             experiment = store.experiment(experiment_id, light=True)
             qualified = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}
                          and c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True]
+            if state.get('current_round_only'):
+                # 只跑本轮：本轮跑完、复盘写完就停，不因出现合格方案而自动确认报告或进 D。
+                return save('round_completed','review')
             if full_rounds:
                 if experiment['result'].get('report_confirmation'):
                     continue
