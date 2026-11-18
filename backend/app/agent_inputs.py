@@ -1,7 +1,7 @@
 """Objective Agent inputs from saved Baseline records; no service calls or writes."""
 import json
 
-from .diagnostics import diagnostic_view, standard_evidence, unmet_required_points
+from .diagnostics import _text, diagnostic_view, standard_evidence, unmet_required_points
 
 MISSING = '记录缺失'
 
@@ -40,12 +40,16 @@ def evidence_positions(question, trace):
     evidence = (question.get('evidence') or raw.get('evidence')
                 or question.get('evidence_locations') or raw.get('evidence_locations')
                 or (question.get('business_requirements') or raw.get('business_requirements') or {}).get('sources') or [])
-    ids = []
+    ids, quotes = [], {}
     for entry in evidence:
         keys = (entry.get('source_chunk_ids') or [entry.get('chunk_id') or entry.get('source_id')]) if isinstance(entry, dict) else [None]
+        points = []
+        if isinstance(entry, dict):
+            points = [entry['quote']] if entry.get('quote') else [p for p in (entry.get('evidence_key_points') or []) if isinstance(p, str)]
         for key in keys:
             if key not in ids:
                 ids.append(key)
+            quotes.setdefault(key, []).extend(_text(p) for p in points if _text(p))
     if not ids:
         return MISSING
 
@@ -56,6 +60,14 @@ def evidence_positions(question, trace):
         for index, entry in enumerate(entries, 1):
             if isinstance(entry, dict) and (entry.get('chunk_id') == chunk_id or chunk_id in (entry.get('matched_child_ids') or [])):
                 return index
+        # 2026-11-18（068 复盘疑点）：父子切块交付的是父块全文，matched_child_ids 只记"被检索命中的子块"。
+        # 命中兄弟子块时，标准子块的原文其实已在父块里交给模型；按原文是否在条目全文中补判，并标明口径。
+        wanted = quotes.get(chunk_id) or []
+        if wanted:
+            for index, entry in enumerate(entries, 1):
+                body = _text(entry.get('content') or entry.get('chunk_text') or entry.get('text') or '') if isinstance(entry, dict) else ''
+                if body and all(q in body for q in wanted):
+                    return f'{index}（原文在同一父块内，按原文判定）'
         if any(not isinstance(entry, dict) or not (entry.get('chunk_id') or entry.get('matched_child_ids')) for entry in entries):
             return MISSING
         return '未进入'
