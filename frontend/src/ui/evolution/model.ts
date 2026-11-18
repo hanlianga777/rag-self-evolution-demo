@@ -12,7 +12,7 @@ export type CandidateView = {
   qualified: boolean | null; winner: boolean; correct: number | null; total: number | null;
   p50: number | null; p99: number | null; complete: boolean;
   gates?: { passed: number; total: number }; newFailures?: number;
-  regression?: { new_critical_failures: number; new_ordinary_failures: number; limits?: { critical: number; ordinary: number } };
+  regression?: { new_critical_failures: number; new_ordinary_failures: number; limits?: { critical: number; ordinary: number | null } };
 };
 export type RoundView = { round: number; candidates: CandidateView[]; summary: string; fastestId: string | null; thought?: string; lesson?: { text: string; source: string } };
 export type EvolutionModel = { rounds: RoundView[]; winnerId: string | null; d: CandidateView | null; budget: { used: number; max: number } | null };

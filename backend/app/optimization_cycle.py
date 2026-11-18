@@ -386,14 +386,16 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
             used = experiment['evaluation_budget']['used']
             decision = staged_decision(number, len(qualified), used) if number else 'next_round'
             state['staged_decision'] = {'round': number, 'qualified': [c['id'] for c in qualified], 'used': used, 'decision': decision}
+            if number and state.get('current_round_only'):
+                # 只跑本轮（用户 2026-11-18：终点是第一轮 3 个 Candidate 跑完）：本轮统计和复盘做完就停，
+                # 规则给出的下一步（下一轮 / D）只记录在 staged_decision，不自动执行。
+                return save('round_completed', 'review', f'第 {number} 轮已跑完，按要求停下；规则判定的下一步：{decision}')
             if decision != 'next_round':
                 return finish(experiment, qualified, decision)
             max_rounds = experiment['result'].get('round_policy', {}).get('max_rounds')
             if isinstance(max_rounds, int) and number >= max_rounds:
                 # 用户可指定本次只跑到第 N 轮（2026-11-17：只跑第 2、3 轮）；到点停下汇报，不自动开下一轮。
                 return save('round_limit', 'review', f'已跑满 {max_rounds} 轮且未达到转入 D 的条件，按用户要求停下汇报')
-            if state.get('current_round_only'):
-                return save('round_completed','review')
             save('running', 'analysis')
             try:
                 def price_state(pause):

@@ -23,6 +23,15 @@ DEFAULT_PIPELINE_CONFIG = {
     "retrieval_max_tokens": False,
 }
 
+# 用户 2026-11-18：Baseline 改用朋友式"朴素默认配置"（Colin / 扣子同款）：top_k 4、分数线 0.4、
+# 不开改写 / 多路 / HyDE、开重排、思考取中档 high。增强手段留给 Agent 去发现，Baseline 不预先开满。
+# 混合检索保持本系统默认的开启（权重 0.5）：关掉后 hybrid_alpha 的合法性在多处底座合并里会冲突。
+FRIEND_BASELINE_CONFIG = {
+    **DEFAULT_PIPELINE_CONFIG,
+    "min_score": 0.4,
+    "generation_thinking": "high",
+}
+
 GATE_DEFINITIONS = (
     {"metric": "positive_correctness", "operator": ">=", "threshold": 80},
     {"metric": "positive_faithfulness", "operator": ">=", "threshold": 80},
@@ -111,9 +120,10 @@ def evaluate_gates(metrics: dict) -> dict:
 
 def evaluate_regression(*, new_critical_failures: int, new_ordinary_failures: int) -> dict:
     valid = all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in (new_critical_failures, new_ordinary_failures))
-    checks = {"critical": valid and new_critical_failures == 0, "ordinary": valid and new_ordinary_failures <= 1}
+    # 规则总表五.5（用户 2026-11-18 改回朋友口径）：逐题不退步只管严重题；普通题新增只记录，不设上限。
+    checks = {"critical": valid and new_critical_failures == 0}
     passed = all(checks.values())
-    return {"passed": passed, "status": "PASS" if passed else ("NOT_EVALUABLE" if not valid else "FAIL"), "new_critical_failures": new_critical_failures, "new_ordinary_failures": new_ordinary_failures, "limits": {"critical": 0, "ordinary": 1}, "checks": checks}
+    return {"passed": passed, "status": "PASS" if passed else ("NOT_EVALUABLE" if not valid else "FAIL"), "new_critical_failures": new_critical_failures, "new_ordinary_failures": new_ordinary_failures, "limits": {"critical": 0, "ordinary": None}, "checks": checks}
 
 
 def protected_question(case, golden=None):
@@ -127,12 +137,11 @@ def protected_question(case, golden=None):
 
 def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int, baseline_bad_case_count: int, candidate_bad_case_count: int) -> dict:
     counts_valid = all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in (target_bad_cases_fixed, baseline_bad_case_count, candidate_bad_case_count))
-    # 规则总表五.5（A/B/C、D、发布统一一套）：11 项门槛全过；错题总数比 Baseline 至少少 1 道；
-    # 新增错题最多 1 道且只能是普通题（新增严重题 0）。目标题是否修好只作记录，不作资格条件。
+    # 规则总表五.5（用户 2026-11-18 改回朋友口径）：11 项门槛全过 + 新增严重题 0 即合格。
+    # 错题总数、普通新增题只作记录和排序依据，不作资格条件（朋友按门槛平均分判合格，单题翻转不改变资格）。
     checks = {
         "hard_gates": gates.get("passed") is True,
         "regression": regression.get("passed") is True,
-        "total_bad_cases_reduced": counts_valid and candidate_bad_case_count <= baseline_bad_case_count - 1,
     }
     qualified = all(checks.values())
     return {"qualified": qualified, "status": "QUALIFIED" if qualified else "NOT_QUALIFIED", "checks": checks,
@@ -141,16 +150,9 @@ def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int
 
 
 def qualify_release(gates: dict, regression: dict, fixed_count: int, baseline_bad_case_count=None, candidate_bad_case_count=None) -> dict:
-    """Release uses the same single rule as candidates (规则总表五.5)."""
-    counts = (baseline_bad_case_count, candidate_bad_case_count)
-    if all(type(v) is int and v >= 0 for v in counts):
-        reduced = candidate_bad_case_count <= baseline_bad_case_count - 1
-    else:
-        reduced = type(fixed_count) is int and fixed_count >= 1 and regression.get("new_regressions", 0) < fixed_count
+    """Release uses the same single rule as candidates (规则总表五.5，2026-11-18 朋友口径)."""
     checks = {"hard_gates": gates.get("passed") is True,
-              "regression": regression.get("passed") is True and regression.get("new_critical_failures") == 0
-                            and type(regression.get("new_ordinary_failures")) is int and regression.get("new_ordinary_failures") <= 1,
-              "total_bad_cases_reduced": bool(reduced)}
+              "regression": regression.get("passed") is True and regression.get("new_critical_failures") == 0}
     return {"qualified": all(checks.values()), "checks": checks}
 
 
@@ -217,15 +219,43 @@ def select_final_candidate(candidates: list[dict], final_candidate: dict | None 
             and c.get('result', {}).get('qualification', {}).get('qualified') is True]
     d_qualified = bool(final_candidate and final_candidate.get('status') == 'evaluated'
                        and final_candidate.get('result', {}).get('qualification', {}).get('qualified') is True)
-    if d_qualified:
-        pool.append(final_candidate)
-    if not pool:
+    if not pool and not d_qualified:
         return {'decision': '本次 Agent 优化失败', 'candidate_id': None, 'reason': '没有合格方案'}
+    winner = min(pool, key=candidate_rank) if pool else None
+    # 朋友的"逐题非回退门"：D 要晋升，相对 Winner 不能多错任何一道题，且错题总数更少；打平或有退步就保留 Winner。
+    d_blocked = None
+    if d_qualified and winner is not None:
+        d_blocked = d_regression_vs_winner(final_candidate, winner)
+    if d_qualified and (winner is None or not d_blocked):
+        pool.append(final_candidate)
     best = min(pool, key=candidate_rank)
     if final_candidate and best is final_candidate:
         return {'decision': '推荐 Candidate D', 'candidate_id': best['id'], 'reason': 'D 合格，且按错题数、新增错题数、P99 排序最好'}
-    reason = 'D 不合格，取合格方案中最好的' if final_candidate and final_candidate.get('status') == 'evaluated' and not d_qualified else '合格方案中按错题数、新增错题数、P99 排序最好'
+    if d_blocked:
+        reason = f'D 未通过逐题非回退门（{d_blocked}），保留已验证的 Winner'
+    elif final_candidate and final_candidate.get('status') == 'evaluated' and not d_qualified:
+        reason = 'D 不合格，取合格方案中最好的'
+    else:
+        reason = '合格方案中按错题数、新增错题数、P99 排序最好'
     return {'decision': '保留 Winner 方案', 'candidate_id': best['id'], 'reason': reason}
+
+
+def _failed_set(result):
+    """相对同一个 Baseline：失败 = (Baseline 错题 − 修好) ∪ 新错。只用两者共有的 Baseline 错题，所以比较时抵消。"""
+    return set(result.get('new_regression_question_ids') or []), set(result.get('all_fixed_question_ids') or [])
+
+
+def d_regression_vs_winner(d, winner):
+    """返回 D 未能晋升的原因；None 表示 D 相对 Winner 逐题不退步且错题更少。"""
+    d_new, d_fixed = _failed_set(d.get('result', {}))
+    w_new, w_fixed = _failed_set(winner.get('result', {}))
+    worse = sorted((d_new - w_new) | (w_fixed - d_fixed))
+    if worse:
+        return 'Winner 答对而 D 答错：' + '、'.join(worse)
+    d_bad, w_bad = d.get('result', {}).get('bad_case_count'), winner.get('result', {}).get('bad_case_count')
+    if not (type(d_bad) is int and type(w_bad) is int and d_bad < w_bad):
+        return '与 Winner 打平（失败题集合没有变少）'
+    return None
 
 
 def thinking_downgraded(config: dict, baseline_config: dict) -> bool:

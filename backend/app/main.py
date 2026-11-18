@@ -394,6 +394,10 @@ def knowledge_slot(slot_id: str):
 
 def start_knowledge_golden():
     """Continue real Full construction only; the existing workflow ends at Human Gate 1."""
+    # 2026-11-18：题卷由总指挥亲自出（规则总表一.4a），换知识库后不自动付费生成题目；.env 设 RAG_SKIP_AUTO_GOLDEN=1 时跳过。
+    from .config import load_values
+    if (os.getenv('RAG_SKIP_AUTO_GOLDEN') or load_values().get('RAG_SKIP_AUTO_GOLDEN')) == '1':
+        return None
     if not ai_service.live_enabled: raise ProviderUnavailable('DeepSeek missing; Corpus preserved, Golden not run')
     with CORPUS_LOCK:
         state = knowledge()

@@ -10,11 +10,12 @@ from app.followups import FollowupJobs
 
 class Task004PolicyTests(unittest.TestCase):
     def test_abc_blocks_ordinary_over_limit_despite_net_target_improvement(self):
+        # 2026-11-18 朋友口径：门槛全过 + 严重题不新增即合格；普通新增、错题数只用于排序。
         regression = policy.evaluate_regression(new_critical_failures=0, new_ordinary_failures=3)
-        self.assertFalse(regression['passed'])
-        self.assertFalse(policy.qualify_candidate({'passed': True}, regression, 4, 6, 5)['qualified'])
-        self.assertFalse(policy.qualify_candidate({'passed': True}, regression, 0, 6, 5)['qualified'])
-        self.assertFalse(policy.qualify_candidate({'passed': True}, regression, 4, 6, 6)['qualified'])
+        self.assertTrue(regression['passed'])
+        self.assertTrue(policy.qualify_candidate({'passed': True}, regression, 4, 6, 5)['qualified'])
+        self.assertTrue(policy.qualify_candidate({'passed': True}, regression, 0, 6, 6)['qualified'])
+        self.assertFalse(policy.qualify_candidate({'passed': False}, regression, 4, 6, 1)['qualified'])
         self.assertFalse(policy.evaluate_regression(new_critical_failures=1, new_ordinary_failures=0)['passed'])
 
     def test_final_allows_one_ordinary_regression_and_selects_best_qualified(self):

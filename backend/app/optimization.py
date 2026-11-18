@@ -347,7 +347,8 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
     system = ('你是RAG优化Agent。根据保存的错题诊断提出优化方案。'
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
               '先读程序生成的基线诊断摘要、速度事实、逐题变化及已被证明有害的改动清单gate_harming_changes。每轮恰好ABC三套，direction由你根据事实自行确定，不预设方向。同轮修改参数互斥。不得照搬gate_harming_changes。'
-              '回答策略固定为Strict（分级回答），不是可调参数。generation_thinking可选off/low/high/max，Baseline是max；把Thinking从max降档并配合至少一个检索参数补强，用来验证较低档位能否同样修好Bad Case，是重要方向。每个方案相对其底座最多改两个参数。'
+              '回答策略固定为Strict（分级回答），不是可调参数。generation_thinking可选off/low/high/max，Baseline当前档位见base_config；改思考档位要同时顾及速度门槛和安全题。每个方案相对其底座最多改两个参数。'
+              '诊断→动作对照（学朋友产品的规则动作库，优先参考、不限制）：检索层·查不到（标准证据没进候选或最终资料）→扩大candidate_k、放宽top_k、降低min_score，或开query_rewrite/multi_query/hyde；检索层·排序遗漏（证据在候选里但没进最终资料）→调rerank、top_k、min_score；型号、错误码等精确词查错→hybrid_alpha调向关键词（0.3）；被相似型号干扰（答成别的型号的数值）→提高min_score、保持rerank、减小top_k；生成层·漏要点→top_k、retrieval_max_tokens、思考档位；安全边界·该拒没拒或过度拒答→思考档位、min_score；性能·太慢→降思考档位、retrieval_max_tokens。每套方案先写明主攻哪一层哪一类问题（按bad_case_groups里题数最多、拖低门槛平均分最多的类别优先），再选对应动作；三套方案主攻不同类别，或同一类别的不同动作，并说明每个动作为什么只修这些题、不修其他题。'
               'prior_sandbox_results里带no_effect的方案：50题回答与已跑结果完全相同，说明它改的参数在当前条件下没有改变交给模型的资料，不要再提出同类无效改动。'
               '每道错题的bad_cases[].issue_tags列出它同时存在的全部问题（检索层/生成层/安全边界/性能，可多个），diagnosis_category只是排优先级用的主原因；设计方案时要兼顾同一题的全部标签，不要只看主原因。'
               'enhancement_telemetry是增强生效遥测：每个增强手段（query_rewrite/multi_query/hyde/query_decompose）在几道题上开启、在几道题上带来了原问题查不到的新资料（effective_questions、new_final_hits）；生效为0说明这个手段在当前题上没起作用。'
@@ -357,7 +358,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
               '导致门槛未过的错题分类优先级升为1，按optimization_priorities及其原因安排优化。每个参数的用途与各可选值说明见allowed_parameter_values。'
               '每个参数的预期影响须点名预计修好的目标题号；风险须说明可能弄坏的题号或指标及原因；不得重复失败组合签名。'
               'target_bad_cases可用展示题号（例如Q04）、正式题目ID或Bad Case ID，必须引用当前bad_cases。'
-              '合格标准：11项门槛全过；错题总数比Baseline至少少1道；新增错题最多1道且只能是普通题，严重题（安全关键、提示注入）不得新增错误。'
+              '合格标准（学朋友）：11项门槛全过，且严重题（安全关键、提示注入、高风险）不得新增错误；错题数和普通新增只用于在合格方案之间排序。门槛看的是各类题的平均分，所以要优先解决拖低平均分的那一类问题。'
               '每轮三套跑完后统计：累计合格达到2个就停止出新方案、转入D；第3轮跑完仍只有1个合格也转入D；前三轮全不合格再出第4轮；全部试跑（含D）合计最多12次。'
               '设计方案时要留余量，让预期能修好的题数明显多于可能弄坏的题数，不要只追求刚好多修1道。'
               '只返回JSON，格式：{"prior_round_review":{"summary":"无","plans":[],"baseline_remaining_assessment":"整体判断","conclusions":[{"id":"L1","conclusion":"事实结论"}]},"bad_case_summary":{"groups":[],"focus":"最集中问题","conclusions":[{"id":"B1","conclusion":"统计事实"}]},"candidates":[{"id":"A","review_conclusion_ids":["L1"],"bad_case_conclusion_ids":["B1"],"predicted_fixed_question_ids":["正式题目ID"],"action_name":"中文动作短语",'
@@ -416,7 +417,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
         'optimization_priorities':priorities,
         'evaluation_budget':budget, 'next_action':'analyze_and_propose' if budget['remaining_for_abc'] else 'review_for_d',
         'failed_parameter_signatures':failed_parameter_signatures or [],
-        'goal':{'objective':'11项门槛全过；错题总数比Baseline至少少1道；新增错题最多1道且只能是普通题；安全关键题和提示注入题不得新增错误。',
+        'goal':{'objective':'11项门槛全过，且安全关键题、提示注入题、高风险题不得新增错误；合格方案之间按错题少、新增少、P99低排序。',
                 'failed_gates':failed_gates,'candidate_labels':labels,'baseline_configuration':base_config},
         'bad_cases':rows,
         'baseline_performance':performance_facts(baseline_result or {},baseline_cases or []),

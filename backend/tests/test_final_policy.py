@@ -52,7 +52,8 @@ class FinalPolicyTests(unittest.TestCase):
     def test_abc_regression_caps_ordinary_failures_and_blocks_critical(self):
         self.assertTrue(evaluate_regression(new_critical_failures=0, new_ordinary_failures=1)["passed"])
         self.assertFalse(evaluate_regression(new_critical_failures=1, new_ordinary_failures=0)["passed"])
-        self.assertFalse(evaluate_regression(new_critical_failures=0, new_ordinary_failures=2)["passed"])
+        # 2026-11-18 朋友口径：普通新增只记录、不设上限。
+        self.assertTrue(evaluate_regression(new_critical_failures=0, new_ordinary_failures=2)["passed"])
 
     def test_candidate_qualification_requires_all_release_conditions(self):
         gates = evaluate_gates(PASSING_METRICS)
@@ -100,3 +101,31 @@ class FinalPolicyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FriendCaliberTests(unittest.TestCase):
+    """2026-11-18 用户决定改回朋友口径：门槛全过 + 严重题不新增即合格；D 晋升要过逐题非回退门。"""
+
+    def cand(self, cid, bad, new=(), fixed=(), label='A'):
+        return {'id': cid, 'status': 'evaluated', 'reasoning': {'candidate_label': label},
+                'result': {'qualification': {'qualified': True}, 'bad_case_count': bad,
+                           'new_regression_question_ids': list(new), 'all_fixed_question_ids': list(fixed),
+                           'metrics': {'latency_p99_seconds': 30}}}
+
+    def test_ordinary_regressions_do_not_block_qualification(self):
+        from app.policy import qualify_candidate
+        regression = evaluate_regression(new_critical_failures=0, new_ordinary_failures=4)
+        self.assertTrue(qualify_candidate({'passed': True}, regression, 0, 6, 8)['qualified'])
+        self.assertFalse(qualify_candidate({'passed': True}, evaluate_regression(new_critical_failures=1, new_ordinary_failures=0), 3, 6, 3)['qualified'])
+
+    def test_d_tied_or_regressing_vs_winner_keeps_winner(self):
+        from app.policy import select_final_candidate
+        winner = self.cand('A', 3, new=['Q1'], fixed=['Q5', 'Q6'])
+        tied = self.cand('D', 3, new=['Q1'], fixed=['Q5', 'Q6'], label='D')
+        self.assertEqual(select_final_candidate([winner], tied)['candidate_id'], 'A')
+        regress = self.cand('D', 2, new=['Q1', 'Q2'], fixed=['Q5', 'Q6', 'Q7', 'Q8'], label='D')
+        decision = select_final_candidate([winner], regress)
+        self.assertEqual(decision['candidate_id'], 'A')
+        self.assertIn('Q2', decision['reason'])
+        better = self.cand('D', 2, new=['Q1'], fixed=['Q5', 'Q6', 'Q7'], label='D')
+        self.assertEqual(select_final_candidate([winner], better)['candidate_id'], 'D')

@@ -14,23 +14,24 @@ def chain_status(store):
     return _settings(store).get(KEY, {})
 
 
-def restore_initial_config(store):
+def restore_initial_config(store, config=None, audit_note='用户 2026-11-16 授权新版本恢复初始配置'):
     """Archive the old release, retaining its configuration and rollback lineage."""
     from .corpus import current_manifest, manifest_identity
     from .full_text import CORPUS_LOCK
+    target = dict(config or DEFAULT_PIPELINE_CONFIG)
     with CORPUS_LOCK, store.connection() as db:
         db.execute('BEGIN IMMEDIATE')
         previous = store.active_production()
         db.execute('DELETE FROM pipeline_config_draft')
-        if previous and previous['config'] == DEFAULT_PIPELINE_CONFIG:
+        if previous and previous['config'] == target:
             return previous
         now = datetime.now(timezone.utc)
         version_id = 'initial-' + now.strftime('%Y%m%d%H%M%S%f')
         snapshot = {'knowledge_identity':manifest_identity(current_manifest()), 'corpus_fingerprint':manifest_identity(current_manifest()),
-                    'actor':'用户', 'audit_note':'用户 2026-11-16 授权新版本恢复初始配置', 'previous_version_id':previous['id'] if previous else None}
+                    'actor':'用户', 'audit_note':audit_note, 'previous_version_id':previous['id'] if previous else None}
         db.execute("UPDATE production_versions SET status='archived' WHERE status='active'")
         db.execute('INSERT INTO production_versions(id,status,config_json,previous_version_id,created_at,snapshot_json) VALUES (?,?,?,?,?,?)',
-                   (version_id, 'active', json.dumps(DEFAULT_PIPELINE_CONFIG), previous['id'] if previous else None, now.isoformat(), json.dumps(snapshot, ensure_ascii=False)))
+                   (version_id, 'active', json.dumps(target), previous['id'] if previous else None, now.isoformat(), json.dumps(snapshot, ensure_ascii=False)))
     return store.active_production()
 
 

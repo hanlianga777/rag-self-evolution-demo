@@ -62,7 +62,7 @@ function rejectionReason(item: CandidateView): string {
   if (!item.complete) return '评测尚未完成，不能据此确定资格。';
   if (item.qualified===true) return '本次保存的最终推荐未选择该方案，具体取舍见完整报告。';
   const review=item.regression;
-  const failures=review?.limits ? (['critical','ordinary'] as const).filter(key=>review[`new_${key}_failures`]>review.limits![key]) : [];
+  const failures=review?.limits ? (['critical','ordinary'] as const).filter(key=>typeof review.limits![key]==='number' && review[`new_${key}_failures`]>(review.limits![key] as number)) : [];
   const regression=failures.length===1 ? `新增 ${item.broken.length} 个 Bad Case，超过${failures[0]==='critical' ? '严重' : '普通'}新增最多 ${review!.limits![failures[0]]} 个的上限。` : failures.length ? `新增 ${item.broken.length} 个 Bad Case；${failures.map(key=>`${key==='critical' ? '严重' : '普通'}新增 ${review![`new_${key}_failures`]} 个，超过最多 ${review!.limits![key]} 个的上限`).join('；')}。` : '';
   const gates=item.gateFailures.length ? `${item.gateFailures.join('；')}，未通过 Hard Gate。` : '';
   return [regression,gates].filter(Boolean).join(' ') || (item.broken.length ? `新增 ${item.broken.length} 个 Bad Case，保存记录未提供超限明细，具体落选原因见完整报告。` : '保存记录未提供具体落选原因，见完整报告。');

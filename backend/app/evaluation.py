@@ -90,7 +90,7 @@ def candidate_comparison(baseline, candidate, targets, golden_questions=None):
             'net_improvement': len(fixed) - len(new), 'formal_blocking_question_ids': critical,
             'bad_case_count': sum(c.get('passed') is False for q, c in candidate.items() if q not in fluctuations),
             'initial_bad_case_count': sum(c.get('passed') is False for c in candidate.values()),
-            'regression_interpretation': '按单遍结果计新增 Bad Case；严重新增上限0、普通新增上限1；修好不能抵消新增退化'}
+            'regression_interpretation': '按单遍结果计新增 Bad Case；严重题不得新增；普通新增只记录不设上限（2026-11-18 朋友口径）'}
 
 
 def enhancement_summary(cases):

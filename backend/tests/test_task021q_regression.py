@@ -9,11 +9,12 @@ from app.policy import evaluate_regression, qualify_candidate
 
 class RegressionLimitTests(unittest.TestCase):
     def test_ordinary_over_limit_fails_even_when_more_cases_are_fixed(self):
+        # 2026-11-18 朋友口径：普通新增不设上限。
         regression = evaluate_regression(new_critical_failures=0, new_ordinary_failures=3)
-        self.assertFalse(regression['passed'])
-        self.assertEqual(regression['limits'], {'critical': 0, 'ordinary': 1})
-        self.assertEqual(regression['checks'], {'critical': True, 'ordinary': False})
-        self.assertFalse(qualify_candidate({'passed': True}, regression, 4, 6, 5)['qualified'])
+        self.assertTrue(regression['passed'])
+        self.assertEqual(regression['limits'], {'critical': 0, 'ordinary': None})
+        self.assertEqual(regression['checks'], {'critical': True})
+        self.assertTrue(qualify_candidate({'passed': True}, regression, 4, 6, 5)['qualified'])
         self.assertTrue(evaluate_regression(new_critical_failures=0, new_ordinary_failures=1)['passed'])
         self.assertFalse(evaluate_regression(new_critical_failures=1, new_ordinary_failures=0)['passed'])
         self.assertEqual(evaluate_regression(new_critical_failures=0, new_ordinary_failures=None)['status'], 'NOT_EVALUABLE')
@@ -39,7 +40,7 @@ class RegressionLimitTests(unittest.TestCase):
                 before = c.execute('SELECT result_json FROM candidate_configs').fetchone()[0]
             for result in [store.candidate('exp-R3-A')['result'], store.candidates('exp', light=True)[0]['result'], store.experiment('exp', light=True)['candidates'][0]['result']]:
                 review = result['regression_review']
-                self.assertEqual(review['status'], 'FAIL')
+                self.assertEqual(review['status'], 'PASS')
                 self.assertEqual(review['new_ordinary_failures'], 3)
                 self.assertEqual(review['new_critical_failures'], 0)
                 self.assertEqual(review['case_severities'], {'Q13': 'ordinary', 'Q30': 'ordinary', 'Q37': 'ordinary'})
