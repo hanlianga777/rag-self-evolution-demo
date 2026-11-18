@@ -13,7 +13,7 @@ import json
 import os
 from pathlib import Path
 
-AUDIT_NOTE = '用户 2026-11-18 10:40 授权：知识库 v3 上跑 Baseline 后跑第 1 轮 A/B/C 三个 Sandbox，跑完即停，不发布'
+AUDIT_NOTE = '用户 2026-11-18 17:52 授权：先查清证据疑点，再跑第 2 轮 A/B/C，跑完即停；不做 D，不发布'
 
 
 def main(argv=None):
@@ -21,6 +21,7 @@ def main(argv=None):
     parser.add_argument('--database', type=Path)
     parser.add_argument('--experiment-id', required=True)
     parser.add_argument('--max-rounds', type=int, default=3)
+    parser.add_argument('--run-to-round', type=int, help='用户指定先跑到第 N 轮：之前各轮不转入 D，跑完第 N 轮停下')
     parser.add_argument('--apply', action='store_true')
     args = parser.parse_args(argv)
     from app.config import load_values
@@ -39,6 +40,8 @@ def main(argv=None):
     if experiment['status'] == 'generating' or any(c['status'] in {'queued', 'running'} for c in experiment['candidates']):
         raise ValueError('还有正在生成或正在跑的方案，等它结束再接循环')  # 已生成未运行（generated）的方案由循环接着跑
     policy = {'mode': 'full_rounds', 'max_rounds': args.max_rounds, 'stop_rule': STAGED_RULE}
+    if args.run_to_round:
+        policy.update(max_rounds=max(args.max_rounds, args.run_to_round), user_run_to_round=args.run_to_round)
     plan = {'experiment_id': args.experiment_id, 'baseline_run_id': experiment['baseline_run_id'],
             'round_policy': {'old': experiment['result'].get('round_policy'), 'new': policy},
             'causal_evidence': {'old': experiment['result'].get('causal_evidence'), 'new': True},

@@ -389,6 +389,15 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
             used = experiment['evaluation_budget']['used']
             decision = staged_decision(number, len(qualified), used) if number else 'next_round'
             state['staged_decision'] = {'round': number, 'qualified': [c['id'] for c in qualified], 'used': used, 'decision': decision}
+            # 用户指定"先跑到第 N 轮"（2026-11-18 17:52：先跑第二轮，不做 D）：N 轮之前一律进下一轮，跑完第 N 轮就停。
+            run_to = experiment['result'].get('round_policy', {}).get('user_run_to_round')
+            if isinstance(run_to, int) and number:
+                if number < run_to and used < MAX_EVALS and decision != 'next_round':
+                    state['staged_decision']['rule_decision'] = decision
+                    state['staged_decision']['user_override'] = f'用户要求先跑到第 {run_to} 轮，本轮不按规则转入 {decision}'
+                    decision = state['staged_decision']['decision'] = 'next_round'
+                elif number >= run_to:
+                    return save('round_completed', 'review', f'已跑到用户指定的第 {run_to} 轮，按要求停下；规则判定的下一步：{decision}')
             if number and state.get('current_round_only'):
                 # 只跑本轮（用户 2026-11-18：终点是第一轮 3 个 Candidate 跑完）：本轮统计和复盘做完就停，
                 # 规则给出的下一步（下一轮 / D）只记录在 staged_decision，不自动执行。
