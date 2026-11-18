@@ -325,7 +325,7 @@ class AiService:
             from .rubric_judge import aggregate_samples
             from .config import load_settings
             count = load_settings().judge_samples
-            samples, usage, recovery, costs, reused = [], [], [], [], []
+            samples, usage, recovery, reused = [], [], [], []
             for sample in range(1, count + 1):
                 parts = reuse_parts(question, expected, answer, category, context.get('negative_subtype'), context.get('final_texts', []), thinking_config('judge'), sample)
                 one = reuse_result('judge', parts, lambda:self._judge_uncached(question,expected,answer,category,context=context))
@@ -333,10 +333,11 @@ class AiService:
                     reused.append(one['reused_from'])
                 else:
                     usage.extend(one.get('token_usage') or []); recovery.extend(one.get('response_recovery') or [])
-                    costs.append(one.get('estimated_cost') or 0)
                 samples.append(one)
+            # 2026-11-18：单次 Judge 的 estimated_cost 是费用报告字典，不能直接 sum；按三次的真实用量合并重算一次
             result = {**aggregate_samples(category, samples), 'stages': [s for one in samples for s in (one.get('stages') or [])],
-                      'token_usage': usage, 'response_recovery': recovery, 'estimated_cost': sum(costs)}
+                      'token_usage': usage, 'response_recovery': recovery,
+                      **(cost_fields(self.model, usage) if usage else {'estimated_cost': 0})}
             if len(reused) == count:
                 result['reused_from'] = reused[0]
             return result

@@ -61,13 +61,17 @@ def test_ai_service_judges_three_times(monkeypatch):
     calls = []
     outputs = iter([pos(100, 100, 60), pos(100, 100, 80), pos(100, 100, 80)])
     service = ai_service.AiService.__new__(ai_service.AiService)
-    monkeypatch.setattr(ai_service.AiService, '_judge_uncached', lambda self, *a, **k: calls.append(1) or {**next(outputs), 'token_usage': [{'n': 1}], 'estimated_cost': 0.001})
+    # 真实的单次 estimated_cost 是费用报告字典（2026-11-18 小样就因 sum(字典) 报错），这里按真实形状模拟
+    monkeypatch.setattr(ai_service.AiService, '_judge_uncached', lambda self, *a, **k: calls.append(1) or {**next(outputs), 'token_usage': [{'n': 1}], 'estimated_cost': {'status': 'estimated', 'amount': 0.001, 'currency': 'USD'}})
+    monkeypatch.setattr(ai_service, 'cost_fields', lambda model, usage: {'cost_estimation': {'status': 'estimated', 'amount': 0.001 * len(usage), 'currency': 'USD'}, 'estimated_cost': {'status': 'estimated', 'amount': 0.001 * len(usage), 'currency': 'USD'}})
+    monkeypatch.setattr(ai_service.AiService, 'model', property(lambda self: 'deepseek-chat'))
     monkeypatch.setenv('JUDGE_SAMPLES', '3')
     result = ai_service.AiService.judge.__wrapped__(service, '问', '参考', '答', 'positive', context={'contract_version': RUBRIC_VERSION, 'final_texts': ['资料']}) \
         if hasattr(ai_service.AiService.judge, '__wrapped__') else service.judge('问', '参考', '答', 'positive', context={'contract_version': RUBRIC_VERSION, 'final_texts': ['资料']})
     assert len(calls) == 3
     assert result['completeness'] == 80 and result['aggregation']['count'] == 3
-    assert len(result['token_usage']) == 3 and result['estimated_cost'] == pytest.approx(0.003)
+    assert len(result['token_usage']) == 3 and result['estimated_cost']['amount'] == pytest.approx(0.003)
+    assert result['cost_estimation']['amount'] == pytest.approx(0.003)
 
 
 def test_enhancement_effect_counts_only_new_hits():
