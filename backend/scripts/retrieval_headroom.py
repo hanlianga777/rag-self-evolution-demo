@@ -130,14 +130,19 @@ def main(argv=None):
     if not ai_service.live_enabled:
         raise SystemExit('需要真实的 embedding / rerank / DeepSeek 配置；当前是 Mock，扫描结果没有意义')
     baseline = dict(FRIEND_BASELINE_CONFIG)  # 2026-11-18：Baseline 用朋友式朴素默认配置
+    # 与正式 Baseline（evaluation._baseline_inputs）一致：绑定当前活动索引的知识身份，否则会退回旧版 legacy 索引
+    index_info = ai_service.corpus.index_info() or {}
+    identity = index_info.get('knowledge_identity')
+    if not identity:
+        raise SystemExit('当前活动索引没有知识身份，扫描会落到旧版索引；请先确认 062 的 v3 索引已生效')
     items = golden_questions(args.csv.read_bytes())
 
     def retrieve(question, config):
-        return ai_service.retrieve_context(question, config)[0]
+        return ai_service.retrieve_context(question, {**config, 'knowledge_identity': identity})[0]
 
     if args.smoke:
         items, variants = items[:3], [{'candidate_k': 24}]
-        return {'smoke': True, 'baseline_config': baseline, 'results': scan(items, baseline, variants, retrieve)}
+        return {'smoke': True, 'knowledge_identity': identity, 'index_chunks': len(ai_service.corpus.chunks()), 'baseline_config': baseline, 'results': scan(items, baseline, variants, retrieve)}
     singles = single_variants(baseline, ALLOWED_SEARCH_SPACE)
     results = scan(items, baseline, singles, retrieve)
     best = [r for r in summarize(results)['best_configs'] if r['net'] > 0][:args.pairs]
@@ -151,7 +156,7 @@ def main(argv=None):
     summary = summarize(results, min_fixable=args.min_fixable)
     if args.output:
         write_table(args.output, items, results)
-    return {'baseline_config': {k: baseline[k] for k in RETRIEVAL_KEYS}, 'questions': len(items), 'configs': len(results), **summary}
+    return {'knowledge_identity': identity, 'baseline_config': {k: baseline[k] for k in RETRIEVAL_KEYS}, 'questions': len(items), 'configs': len(results), **summary}
 
 
 if __name__ == '__main__':
