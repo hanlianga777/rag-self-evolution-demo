@@ -195,6 +195,15 @@ class AiService:
     def answer(self, question: str, config: dict | None = None, *, on_token=None) -> dict:
         config = {**DEFAULT_PIPELINE_CONFIG, **(config or {})}
         started_at = time.perf_counter()
+        evidence, context_budget, stages, trace, auxiliary_usage = self.retrieve_context(question, config)
+        return self._generate(question, config, started_at, evidence, context_budget, stages, trace, auxiliary_usage, on_token)
+
+    @provider_task('answer')
+    def retrieve_context(self, question: str, config: dict | None = None):
+        """回答前的全部检索步骤（改写/多问法/HyDE → 检索 → 资料长度预算），不生成回答。
+        answer() 和检索可修空间扫描（scripts/retrieval_headroom.py）共用这一条路径，保证扫描结果就是正式回答会拿到的资料。
+        与 answer() 同属 'answer' 任务，辅助查询的复用键一致：扫描时生成的改写结果，正式跑时会被原样复用。"""
+        config = {**DEFAULT_PIPELINE_CONFIG, **(config or {})}
         stages, trace = [], {}
         with measure(stages, "query_processing"), collect_usage() as auxiliary_usage:
             queries = self._retrieval_queries(question, config, trace=trace, stages=stages)
@@ -217,6 +226,9 @@ class AiService:
             evidence, context_budget = budget_context(evidence, config.get('retrieval_max_tokens', False), numbered=self.generation_prompt_version in NUMBERED_PROMPT_VERSIONS)
         trace['context_budget'] = context_budget
         if 'final' in trace: trace['final'] = evidence
+        return evidence, context_budget, stages, trace, auxiliary_usage
+
+    def _generate(self, question, config, started_at, evidence, context_budget, stages, trace, auxiliary_usage, on_token):
         generation_task = 'baseline' if config.get('run_target') == 'baseline' else 'candidate' if config.get('run_target') == 'sandbox_candidate' else 'generation'
         # 规则总表三.3：配置写的档位就是实际请求的档位。
         effort = config.get('generation_thinking') or 'max'
