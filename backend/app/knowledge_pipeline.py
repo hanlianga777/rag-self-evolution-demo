@@ -144,7 +144,7 @@ V2_CONFIG = {**CONFIG, 'chunk_strategy': 'parent-child-v2', 'parent_min_tokens':
              'child_tail_min_tokens': 80, 'child_target_min_tokens': 200, 'overlap_tokens': 50,
              'table_intro_max_tokens': 200, 'toc_min_entries': 3, 'toc_min_fraction': 0.5,
              'repeat_page_fraction': 0.30, 'repeat_short_line_chars': 40, 'repeat_min_pages': 2,
-             'table_normalize': 'table-kv-v3', 'denoise_version': 'mineru-noise-v4', 'heading_context': 'child-section-v2',
+             'table_normalize': 'table-kv-v3', 'denoise_version': 'mineru-noise-v5', 'heading_context': 'child-section-v2',
              'header_footer_identity_max_chars': 12,
              'list_layout': 'numbered-steps-image-labels-v1',
              'heading_hierarchy': 'manual-chapters-v1'}
@@ -206,11 +206,17 @@ def _v2_block_text(block):
             if not lines: lines = [' | '.join(headers)]
         else:
             lines = [' | '.join(row) for row in rows]
-        return '\n'.join([*captions, *lines, *footnotes])
+        return _strip_page_flow('\n'.join([*captions, *lines, *footnotes]))
     text = (block.get('text') or '\n'.join(block.get('list_items', []) + block.get('image_caption', []) +
             block.get('image_footnote', [])) or block.get('code_body') or block.get('latex') or '').strip()
-    # 2026-11-19（078 审核）：ABB 手册把翻页标记粘在标题后面（"1.1 关于 IRB 1200续前页"），整行去重规则抓不到；只去行尾的翻页标记。
-    return re.sub(r'\s*(?:续前页|下一页继续)\s*$', '', text, flags=re.M).strip()
+    return _strip_page_flow(text)
+
+
+def _strip_page_flow(text):
+    """2026-11-19（078/079 审核）：ABB 手册把翻页标记粘在标题后（"1.1 关于 IRB 1200续前页"），表格标题、脚注里也有独立的"下一页继续"。
+    普通文本和表格都只去行尾的翻页标记（整行只有标记时整行去掉），正文中间出现的同样字样不动。"""
+    cleaned = re.sub(r'[ \t]*(?:续前页|下一页继续)[ \t]*$', '', text, flags=re.M)
+    return '\n'.join(line for line in cleaned.split('\n') if line.strip() or not cleaned.strip()).strip()
 
 
 def _v2_noise(text):

@@ -48,3 +48,10 @@ def test_v2_strips_page_flow_markers_glued_to_headings():
     from app.knowledge_pipeline import _v2_block_text
     assert _v2_block_text({'type': 'text', 'text': '1.1 关于 IRB 1200续前页'}) == '1.1 关于 IRB 1200'
     assert _v2_block_text({'type': 'text', 'text': '正文说明续前页内容不变'}) == '正文说明续前页内容不变'
+
+
+def test_v2_strips_page_flow_markers_in_table_captions_and_footnotes():
+    from app.knowledge_pipeline import _v2_block_text
+    block = {'type': 'table', 'table_caption': ['4.2.2 维护计划续前页'], 'table_footnote': ['i 说明文字', '下一页继续'],
+             'table_body': _html([['维护活动', '每12个月'], ['检查信息标签', 'x']])}
+    assert _v2_block_text(block) == '4.2.2 维护计划\n维护活动=检查信息标签；每12个月=x\ni 说明文字'
