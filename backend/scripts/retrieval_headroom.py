@@ -88,7 +88,8 @@ def hit_of(evidence, golden, quotes=None):
                     rank = index; break
         if rank is not None:
             ranks.append(rank)
-    return {'all_hit': len(ranks) == len(golden), 'rank': min(ranks) if ranks else None, 'n_context': len(evidence)}
+    final_ids = ['/'.join([e.get('chunk_id') or '?', *(e.get('matched_child_ids') or [])]) for e in evidence]
+    return {'all_hit': len(ranks) == len(golden), 'rank': min(ranks) if ranks else None, 'n_context': len(evidence), 'final_ids': final_ids}
 
 
 def scan(items, baseline, variants, retrieve):
@@ -126,13 +127,13 @@ def write_table(path, items, results):
     names = list(results)
     with open(path, 'w', newline='', encoding='utf-8-sig') as f:
         w = csv.writer(f)
-        w.writerow(['题号', '题型', '出题方式', '标准证据', *names])
+        w.writerow(['题号', '题型', '出题方式', '标准证据', *names, 'Baseline最终资料（父块/命中子块）'])
         for item in items:
             cells = []
             for n in names:
                 h = results[n]['hits'][item['qid']]
                 cells.append(('✓' if h['all_hit'] else '✗') + (f" #{h['rank']}" if h['rank'] else ''))
-            w.writerow([item['qid'], item['group'], item['method'], ' '.join(item['golden']), *cells])
+            w.writerow([item['qid'], item['group'], item['method'], ' '.join(item['golden']), *cells, ' | '.join(results['baseline']['hits'][item['qid']].get('final_ids') or [])])
 
 
 def build_preview(baseline_run_id, items, results):
