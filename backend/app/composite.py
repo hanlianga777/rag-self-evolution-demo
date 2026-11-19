@@ -3,7 +3,7 @@ import json
 from itertools import combinations
 
 from .agent_inputs import evidence_positions, new_failure_ids
-from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, GATE_DEFINITIONS, PARAMETER_EXPLANATIONS, validate_candidate_config
+from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, FIXED_PIPELINE_PARAMETERS, GATE_DEFINITIONS, PARAMETER_EXPLANATIONS, validate_candidate_config
 
 D_FACTS_VERSION = 'winner-refinement-2'
 
@@ -18,7 +18,9 @@ def pipeline_config(config):
     result = {k:config.get(k, DEFAULT_PIPELINE_CONFIG[k]) for k in ALLOWED_SEARCH_SPACE}
     for key,value in result.items():
         result[key] = next((v for v in ALLOWED_SEARCH_SPACE[key] if v==value and (type(v) is type(value) or type(v) in (int,float) and type(value) in (int,float))),value)
-    return result  # 2026-11-19：prompt_strategy 已进入 Search Space，按方案实际取值
+    # 2026-11-19：prompt_strategy 已进入 Search Space，按方案实际取值；固定参数（temperature）原样保留，不算改动
+    result.update({k: config[k] for k in FIXED_PIPELINE_PARAMETERS if k in config})
+    return result
 
 
 def parameter_diff(config, base):

@@ -126,14 +126,15 @@ export function questionSource(row: any): string {
   return row?.raw?.generation_run_id ? "AI 生成" : "来源未知";
 }
 
-export const parameterNames:Record<string,string> = {"candidate_k": "候选数", "top_k": "保留条数", "min_score": "最低相关分", "hybrid_search": "混合检索", "hybrid_alpha": "语义检索权重", "generation_thinking": "思考档位", "query_decompose": "问题拆解", "retrieval_max_tokens": "资料总长度上限", "rerank": "重排序", "query_rewrite": "问题改写", "multi_query": "多路查询", "hyde": "假设答案检索", "metadata_filter": "元数据筛选", "alias_mapping": "别名映射", "prompt_strategy": "回答策略"};
+// 2026-11-19 用户要求：Pipeline 参数统一用英文名（对齐 Colin / 扣子）
+export const parameterNames:Record<string,string> = {"candidate_k": "Candidate K", "top_k": "Top-K", "min_score": "Min Score", "hybrid_search": "Hybrid Search", "hybrid_alpha": "Hybrid Alpha", "generation_thinking": "Thinking", "query_decompose": "Query Decompose", "retrieval_max_tokens": "Max Context Tokens", "rerank": "Rerank", "query_rewrite": "Query Rewrite", "multi_query": "Multi-Query", "hyde": "HyDE", "metadata_filter": "Metadata Filter", "alias_mapping": "Alias Mapping", "prompt_strategy": "Prompt Strategy", "temperature": "Temperature"};
 
 export const descriptions: Record<string, string> = {
   generation_thinking: "可选择 OFF / Low / High / Max", query_decompose: "拆解独立意图并分别检索；默认关闭", retrieval_max_tokens: "不限 / 8192 / 4096；缺少 tokenizer 时按字符数估算 token",
   candidate_k: "初始候选召回数量", top_k: "进入回答上下文的证据数量", min_score: "进入上下文前的最低相关分",
   hybrid_search: "组合向量与BM25", hybrid_alpha: "Embedding Retrieval 在 Hybrid Search 中的权重", rerank: "模型 Rerank、原排序或仅原问题的 BM25 排序",
   query_rewrite: "生成标准化检索问法", multi_query: "生成互补检索问法", hyde: "先写一段假设答案，再拿去检索",
-  metadata_filter: "按可靠元数据筛选", alias_mapping: "使用已审核别名映射", prompt_strategy: "分级回答：能确定的先回答，条件缺失时追问，资料无关时转人工，并保留安全警告",
+  metadata_filter: "按可靠元数据筛选", alias_mapping: "使用已审核别名映射", prompt_strategy: "Strict：分级回答（Baseline）；Looser：有据直接答、答全要点；Safe：安全结论在前、拒绝绕过与注入", temperature: "固定为 0：关闭 Thinking 时请求温度为 0，同一请求结果一致；不作为 Agent 可调参数",
 };
 
 export function localShortTime(value?: string): string {

@@ -24,17 +24,17 @@ EXAMPLES = {
     'conclusion': {'verdicts':[{'candidate':'A','label':'合格/不合格/有害','one_line':'≤30字'}], 'fixed':[{'q':'Q41','why':'≤25字'}], 'broken':[{'q':'Q15','why':'≤25字'}], 'unresolved':[{'q':'Q29','why':'≤25字'}], 'param_judgement':['≤40字，最多2条'], 'lessons':['≤40字，最多3条']},
     'd': dict.fromkeys(['merged','predicted','actual','decision'],'≤40字'),
 }
-PARAMETER_NAMES = {
-    'candidate_k':'候选召回数', 'top_k':'上下文条数', 'min_score':'最低相关度',
-    'hybrid_search':'混合检索', 'hybrid_alpha':'向量权重', 'generation_thinking':'思考档位',
-    'query_decompose':'问题拆解', 'retrieval_max_tokens':'上下文容量', 'rerank':'重排方式',
-    'query_rewrite':'问题改写', 'multi_query':'多路查询', 'hyde':'假设答案检索',
-    'metadata_filter':'元数据筛选', 'alias_mapping':'别名映射', 'prompt_strategy':'回答策略',
+PARAMETER_NAMES = {  # 2026-11-19 用户要求：Pipeline 参数统一用英文名（对齐 Colin / 扣子）
+    'candidate_k':'Candidate K', 'top_k':'Top-K', 'min_score':'Min Score',
+    'hybrid_search':'Hybrid Search', 'hybrid_alpha':'Hybrid Alpha', 'generation_thinking':'Thinking',
+    'query_decompose':'Query Decompose', 'retrieval_max_tokens':'Max Context Tokens', 'rerank':'Rerank',
+    'query_rewrite':'Query Rewrite', 'multi_query':'Multi-Query', 'hyde':'HyDE',
+    'metadata_filter':'Metadata Filter', 'alias_mapping':'Alias Mapping', 'prompt_strategy':'Prompt Strategy', 'temperature':'Temperature',
 }
 SYSTEM = '''你只负责把已保存的 Agent 分析提炼成简短中文 JSON，不重新评测、不提出新建议。
 只用对应原文里有的事实，不补充、不推测。原文写无法确定的，保留不确定性；预测只能说预计，不能当作实际效果。观测关联不写成参数因果。缺失信息写未知，没有修好或弄坏题写空数组。
-题号统一 Q29 形式（小于10可写Q04），只能使用原文中的题号。候选用A/B/C/D，历史轮次用第几轮的中文说法。参数只能用所给中文映射；值Tiered写分级回答，Grounded写有据生成，max/high/low写Max/High/Low，true/false写开启/关闭，query_only写仅按问题排序。配置前后来自原文配置，不猜旧值。
-输出文案不出现任何内部编号、英文 snake_case、等号、英文括注。P99/P50可写最慢回答/中位耗时；HyDE写假设答案检索。口吻是业务人员能听懂的短句，可以保留不宜采纳、应回退等业务判断。
+题号统一 Q29 形式（小于10可写Q04），只能使用原文中的题号。候选用A/B/C/D，历史轮次用第几轮的中文说法。参数名只能用所给英文映射（如Top-K、Candidate K、Prompt Strategy）；值Strict/Looser/Safe原样写，max/high/low/off写Max/High/Low/Off，true/false写ON/OFF，query_only写Query Only。配置前后来自原文配置，不猜旧值。
+输出文案不出现任何内部编号、英文 snake_case、等号。P99/P50原样写。口吻是业务人员能听懂的短句，可以保留不宜采纳、应回退等业务判断。
 数字只能保留原文同值，允许四舍五入到1位小数，不计算新的差值、比例或百分数。不把编号里的数字当统计值。避免不必要的数字。
 严格按给定 JSON 结构，仅返回 JSON。禁止添加type、note、parameters等模板没有的字段。每个字段的字数限制含所有标点、数字与英文字母；宁可短写，不能超限。模板中的targets与q字段只允许Q题号。
 '''

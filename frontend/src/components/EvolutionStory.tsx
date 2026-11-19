@@ -46,7 +46,7 @@ export function storyText(value:unknown):string {
     text=text.replace(new RegExp(`\\b${key}\\s*=\\s*`,'g'),`${name} `).replaceAll(key,name);
   }
   text=text.replace(/thinking/gi,'Thinking').replace(/topk/gi,'Top-K').replace(/Top-K\s*=\s*/g,'Top-K ').replace(/([\u4e00-\u9fff])(Thinking|Max|High|\d+)/g,'$1 $2').replace(/(Thinking|Max|High|\d+)([\u4e00-\u9fff])/g,'$1 $2');
-  return narrativeText(text).replace(/\b(?:Required|Forbidden|FAIL|PASS)\b/g,word=>({Required:'必答',Forbidden:'禁止',FAIL:'未通过',PASS:'通过'}[word]!)).replace(/\s*=\s*/g,'：').replace(/\bp99\b/g,'最慢回答 P99').replace(/\bTop(\d+)\b/gi,'回答证据前 $1 条').replace(/\bquery_only\b/g,'只按问题').replace(/\bcompleted\b/g,'已完成').replace(/\brunning\b/g,'运行中').replace(/\bqueued\b/g,'排队中').replace(/Golden Chunk/g,'标准说明').replace(/\b(?:candidates|reranked|final)\b/g,word=>({candidates:'候选列表',reranked:'Rerank 列表',final:'回答证据'}[word]!)).replace(/\b(?:Grounded|Tiered|Completeness|Max|High|Low|OFF|Off|Thinking|Rerank|Top-K|Candidate K|Query Rewrite|Multi-Query|HyDE|Hybrid Search)\b/g,word=>({Grounded:'有据生成',Tiered:'分级回答',Completeness:'完整性优先',Max:'最高',High:'高',Low:'低',OFF:'关闭',Off:'关闭',Thinking:'思考档位',Rerank:'重排序','Top-K':'保留条数','Candidate K':'候选数','Query Rewrite':'问题改写','Multi-Query':'多路查询',HyDE:'假设答案检索','Hybrid Search':'混合检索'}[word]!)).replace(/思考档位\s*档位/g,'思考档位').replace(/\bcandidate_missing\b/g,'候选方案缺失').trim() || '说明未保存';
+  return narrativeText(text).replace(/\b(?:Required|Forbidden|FAIL|PASS)\b/g,word=>({Required:'必答',Forbidden:'禁止',FAIL:'未通过',PASS:'通过'}[word]!)).replace(/\s*=\s*/g,'：').replace(/\bp99\b/g,'最慢回答 P99').replace(/\bquery_only\b/g,'只按问题').replace(/\bcompleted\b/g,'已完成').replace(/\brunning\b/g,'运行中').replace(/\bqueued\b/g,'排队中').replace(/Golden Chunk/g,'标准说明').replace(/\b(?:candidates|reranked|final)\b/g,word=>({candidates:'候选列表',reranked:'Rerank 列表',final:'回答证据'}[word]!)).replace(/\bcandidate_missing\b/g,'候选方案缺失').trim() || '说明未保存';
 }
 
 export function StoryText({value,evaluation,badCases=[]}:{value:unknown;evaluation?:any;badCases?:any[]}) {
@@ -167,7 +167,7 @@ function DResultStory({experiment,evaluation,badCases,footer}:{experiment:any;ev
   const remaining=(facts.remaining_failures || []).filter((row:any)=>rowFor(row.question_id)?.passed===false || rowFor(row.question_id)?.passed!==true && (fixed===null || !fixed.includes(row.question_id)));
   const missedReason=(row:any)=>{
     const rank=missedEvidenceRank(d,row);
-    return rank!==undefined ? `关键说明在 Winner 的${d.config?.rerank===false ? '候选' : '重排'}结果里排第 ${rank} 位，即使把 保留条数 放宽到 ${d.config.top_k} 也拿不到；这个位置提示下一轮应先检查${d.config?.rerank===false ? '召回顺序' : '重排顺序'}，而不是继续增加条数。` : '保存的证据位置不足，原因未知。';
+    return rank!==undefined ? `关键说明在 Winner 的${d.config?.rerank===false ? '候选' : '重排'}结果里排第 ${rank} 位，即使把 Top-K 放宽到 ${d.config.top_k} 也拿不到；这个位置提示下一轮应先检查${d.config?.rerank===false ? '召回顺序' : '重排顺序'}，而不是继续增加条数。` : '保存的证据位置不足，原因未知。';
   };
   const issueReason=(id:string)=>judgePresentation(rowFor(id) || {}, savedSnapshot(evaluation).questions?.find((question:any)=>question.id===id)).text;
 
@@ -229,7 +229,7 @@ export function DSideEffects({changes,summary,candidates=[]}:{changes:any[];summ
       const p99=gates.find((gate:any)=>gate.metric==='latency_p99_seconds' && gate.passed===false);
       return `${schemeName(source)} 新增了 ${questionList(result.new_regression_question_ids)}，安全拒答${!p99 && safetyGate?.passed===false ? '降到 ' : ' '}${typeof safety==='number' ? `${safety}%` : '未知'}${typeof p99?.actual==='number' ? `、P99 ${p99.actual.toFixed(1)} 秒` : ''}`;
     }).join('；') : '';
-    return <article className="d-side-effects" key={index}><h4>{storyParameterNames[change.parameter] || '参数调整'} · 副作用检查</h4>{history ? <p>前几轮里，保留条数 {topK} 出现时伴随过副作用：{history}。这些只是同时出现，不能证明是 保留条数 造成的，所以 D 把这些题列为重点盯防。</p> : (summary ? fields.slice(0,1) : fields).map(([label,value])=>Array.isArray(value) ? <div key={label}><span className="ui-body-muted">{label}：</span><ul style={{listStyleType:'disc',paddingLeft:'1.5em'}}>{value.map((item:string,index:number)=><li key={index}><StoryText value={item}/></li>)}</ul></div> : <p key={label}><span className="ui-body-muted">{label}：</span><StoryText value={value}/></p>)}{summary && <p>实际结果：{summary}</p>}</article>;
+    return <article className="d-side-effects" key={index}><h4>{storyParameterNames[change.parameter] || '参数调整'} · 副作用检查</h4>{history ? <p>前几轮里，Top-K {topK} 出现时伴随过副作用：{history}。这些只是同时出现，不能证明是 保留条数 造成的，所以 D 把这些题列为重点盯防。</p> : (summary ? fields.slice(0,1) : fields).map(([label,value])=>Array.isArray(value) ? <div key={label}><span className="ui-body-muted">{label}：</span><ul style={{listStyleType:'disc',paddingLeft:'1.5em'}}>{value.map((item:string,index:number)=><li key={index}><StoryText value={item}/></li>)}</ul></div> : <p key={label}><span className="ui-body-muted">{label}：</span><StoryText value={value}/></p>)}{summary && <p>实际结果：{summary}</p>}</article>;
   })}</>;
 }
 
@@ -335,7 +335,7 @@ export function recommendationTradeoff(experiment:any):string {
     const value=change.reason || change.rationale;
     if(typeof value!=='string' || !value.trim())return '';
     const saved=value.match(/^剩余(.+?)属于已进入候选\/重排但被Top(\d+)截断的context_selection问题；历史保存结果中top_k=(\d+)伴随修好(.+?)，且该值在search_space允许范围内，不撤销Winner的/);
-    if(saved && changes.length===1 && change.parameter==='top_k')return `${saved[1]} 的关键证据已经进入候选，却被“只取 ${saved[2]} 条”的上限截掉；前几轮的结果显示 保留条数 ${saved[3]} 能修好${saved[1].split('、').length===2 ? '这两题' : '这些题'}，所以 D 只在 Winner 上加了这一项。`;
+    if(saved && changes.length===1 && change.parameter==='top_k')return `${saved[1]} 的关键证据已经进入候选，却被“只取 ${saved[2]} 条”的上限截掉；前几轮的结果显示 Top-K ${saved[3]} 能修好${saved[1].split('、').length===2 ? '这两题' : '这些题'}，所以 D 只在 Winner 上加了这一项。`;
     return storyText(value).replaceAll('context_selection','上下文选择').replaceAll('search_space','允许调整范围');
   }).filter(Boolean).join('；');
   const tradeoff=fixed?.length && broken && typeof actual==='number' && typeof before==='number' && typeof gate?.threshold==='number' && gate.passed===true ? `Candidate D 在 ${schemeName(winner)} 的基础上多修好了 ${questionList(fixed)}，新增 Bad Case ${broken.length ? `为 ${broken.length}` : '仍为 0'}；它的 P99 是 ${actual.toFixed(1)} 秒，${actual>before ? `比 ${schemeName(winner)} 慢一些，但仍在` : '仍在'} ${gate.threshold} 秒门槛以内，按质量优先的规则推荐 D。` : base;

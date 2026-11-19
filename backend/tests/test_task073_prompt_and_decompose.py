@@ -4,12 +4,12 @@ from app.ai_service import PROMPT_STRATEGIES, STRICT_STRATEGY
 
 
 def test_prompt_variants_extend_strict():
-    assert set(ALLOWED_SEARCH_SPACE['prompt_strategy']) == set(PROMPT_STRATEGIES) == {'Strict', 'StrictComplete', 'StrictSafe'}
+    assert set(ALLOWED_SEARCH_SPACE['prompt_strategy']) == set(PROMPT_STRATEGIES) == {'Strict', 'Looser', 'Safe'}
     assert all(text.startswith(STRICT_STRATEGY) for text in PROMPT_STRATEGIES.values())
 
 
 def test_candidate_may_change_prompt_and_decompose():
-    for change in ({'prompt_strategy': 'StrictSafe'}, {'prompt_strategy': 'StrictComplete'}, {'query_decompose': True}):
+    for change in ({'prompt_strategy': 'Safe'}, {'prompt_strategy': 'Looser'}, {'query_decompose': True}):
         assert validate_candidate_config({**FRIEND_BASELINE_CONFIG, **change})['valid'], change
     assert not validate_candidate_config({**FRIEND_BASELINE_CONFIG, 'prompt_strategy': 'Loose'})['valid']
 

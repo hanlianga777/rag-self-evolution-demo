@@ -10,23 +10,23 @@ export const draftDefaults: Record<string, unknown> = { generation_thinking: "hi
 export function thinkingLabel(value: unknown): string {
   if (value && typeof value === "object") {
     const saved = value as { thinking?: { type?: string }; reasoning_effort?: string };
-    if (saved.thinking?.type === "disabled") return "关闭";
+    if (saved.thinking?.type === "disabled") return "Off";
     return saved.thinking?.type === "enabled" ? thinkingLabel(saved.reasoning_effort) : "历史未知";
   }
-  const labels: Record<string, string> = { off: "关闭", low: "低", high: "高", max: "最高" };
+  const labels: Record<string, string> = { off: "Off", low: "Low", high: "High", max: "Max" };
   return typeof value === "string" && labels[value] || "历史未知";
 }
 
 export function formatValue(value: unknown): string {
   if (typeof value === "string" && ["off", "low", "high", "max"].includes(value)) return thinkingLabel(value);
-  return value == null ? "未采集" : typeof value === "boolean" ? value ? "开启" : "关闭" : displayText(String(value));
+  return value == null ? "未采集" : typeof value === "boolean" ? value ? "ON" : "OFF" : displayText(String(value));
 }
 
 export function SearchSpaceTable({ contract, baseline }: { contract: Record<string, { type: string; allowed: unknown[] }>; baseline: Record<string, unknown> }) {
   return <div className="table-scroll"><DataTable className="search-space-table"><thead><tr><th>参数</th>{Object.keys(baseline).length > 0 && <th className="parameter-value">当前 Baseline</th>}<th className="parameter-value">允许范围</th><th>依赖关系</th><th>说明</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td className="muted"><TruncatedText lines={2}>{parameterNames[key] || key}</TruncatedText></td>{Object.keys(baseline).length > 0 && <td className="parameter-value muted"><TruncatedText lines={2}>{key === "generation_thinking" ? thinkingLabel(baseline[key]) : formatValue(baseline[key])}</TruncatedText></td>}<td className="parameter-value muted"><TruncatedText lines={2}>{rule.allowed.map(formatValue).join(" / ")}</TruncatedText></td><td className="muted"><TruncatedText lines={2}>{key === "top_k" ? "候选数不能少于保留条数" : key === "hybrid_alpha" ? "Hybrid Search 已开启" : "—"}</TruncatedText></td><td className="muted"><TruncatedText lines={2}>{descriptions[key] || "—"}</TruncatedText></td></tr>)}</tbody></DataTable></div>;
 }
 
-export const parameterGroups: Record<string, string[]> = { Query: ["query_rewrite", "multi_query", "hyde", "query_decompose", "alias_mapping"], Retrieval: ["candidate_k", "top_k", "min_score", "hybrid_search", "hybrid_alpha", "metadata_filter", "retrieval_max_tokens"], Rerank: ["rerank"], Generation: ["prompt_strategy", "generation_thinking"] };
+export const parameterGroups: Record<string, string[]> = { Query: ["query_rewrite", "multi_query", "hyde", "query_decompose", "alias_mapping"], Retrieval: ["candidate_k", "top_k", "min_score", "hybrid_search", "hybrid_alpha", "metadata_filter", "retrieval_max_tokens"], Rerank: ["rerank"], Generation: ["prompt_strategy", "generation_thinking", "temperature"] };
 export function ParameterDiff({ before = {}, after = {} }: { before?: Record<string, unknown>; after?: Record<string, unknown> }) {
   const [open, setOpen] = useState(false);
   const keys = Object.values(parameterGroups).flat().filter(key => key in before || key in after);
