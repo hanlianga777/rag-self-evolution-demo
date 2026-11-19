@@ -28,7 +28,7 @@ it('retains incomplete-workflow primary actions and unknown metrics',async()=>{
 });
 it('connects all round cards to the existing drawer and migrates diagnosis to Baseline',async()=>{
  const d=data();await mount(<EvolutionPage data={d}/>);
- expect(document.querySelectorAll('.page-shell-header .tabs button')).toHaveLength(3);
+ expect(document.querySelectorAll('.page-shell-header .tabs button')).toHaveLength(4);
  expect(document.querySelector('.agent-overview')).not.toBeNull();
  expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('10');
  await click('进化路线');expect(document.querySelectorAll('.ui-evo-card')).toHaveLength(3);await act(async()=>document.querySelector<HTMLElement>('.ui-evo-card')!.click());expect(document.querySelector('[role=dialog]')?.textContent).toContain('Candidate 详情');

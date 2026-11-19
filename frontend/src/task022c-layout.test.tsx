@@ -25,17 +25,18 @@ it('puts the saved decision once above equal comparison cards and keeps unresolv
  expect(document.querySelectorAll('.d-result-conclusion')).toHaveLength(1);
  expect(document.querySelector('.d-result-conclusion .ui-q')).toBeNull();
 });
-it('keeps candidate fields uniform and exposes complete risk prose without the question-count prefix',async()=>{
+it('keeps candidate summaries uniform and saves full risk prose for the disclosure',async()=>{
  const risks=[{question_ids:['Q04'],reason:'安全风险'},{question_ids:['Q06'],reason:'延迟风险'},{question_ids:['Q08'],reason:'受保护题风险'}];
  const candidates=['A','B','C'].map(label=>({...winner,id:`exp-R3-${label}`,reasoning:{round:3,candidate_label:label,risks,core_idea:'保存的思路'},result}));
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({}))));
  await mount(<EvolutionPage data={{evaluation:{id:'base',config:{top_k:4}},optimization:{id:'exp',candidates}}}/>);
  await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='进化路线')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
  for(const card of document.querySelectorAll('.candidate-card')){
-  expect(card.querySelectorAll('.ui-field.lines-2')).toHaveLength(6);
-  const risk=[...card.querySelectorAll('.ui-field')].find(f=>f.querySelector('.ui-kicker')?.textContent==='风险')!;
-  expect(risk.textContent).not.toContain('完整内容见');expect(risk.textContent).toContain('安全风险');expect(risk.textContent).toContain('延迟风险');expect(risk.querySelectorAll('.ui-clamp')).toHaveLength(1);expect(risk.textContent).toContain('受保护题风险');
-  expect(card.querySelector('.candidate-result + .ui-clamp')).toBeNull();expect(card.querySelectorAll('.candidate-result > div')).toHaveLength(3);
-  expect(card.querySelector('.ui-q.is-fixed')?.textContent).toBe('Q04');
+  expect(card.querySelectorAll('.candidate-summary-row')).toHaveLength(4);
+  const details=card.querySelector<HTMLDetailsElement>('details')!;
+  expect(details.open).toBe(false);
+  const risk=[...details.querySelectorAll('p')].find(p=>p.textContent?.startsWith('风险 ·'))!;
+  expect(risk.textContent).not.toContain('完整内容见');expect(risk.textContent).toContain('安全风险');expect(risk.textContent).toContain('延迟风险');expect(risk.textContent).toContain('受保护题风险');
+  expect(card.querySelector('.candidate-result-line')?.textContent).toContain('修好 Q04');
  }
 });

@@ -15,14 +15,14 @@ async function click(label: string) { await act(async () => [...document.querySe
 
 it("restores stages and complete generated plans without inventing evaluated results", async () => {
   const frozen = JSON.stringify(data); await mount();
-  expect(document.querySelectorAll(".tabs button")).toHaveLength(3); expect(document.querySelectorAll(".ui-agent-stats > div")).toHaveLength(4);
+  expect(document.querySelectorAll(".tabs button")).toHaveLength(4); expect(document.querySelectorAll(".ui-agent-stats > div")).toHaveLength(4);
   expect(document.querySelector('.agent-case-destinations')).toBeNull();
   await click("进化路线");
   expect(document.querySelectorAll(".candidate-card-body")).toHaveLength(3);
   expect(document.querySelectorAll(".ui-evo-card")).toHaveLength(3);
   expect(document.body.textContent).not.toMatch(/null|undefined|\[object Object\]/);
   await click("进化路线");
-  expect([...document.querySelectorAll(".candidate-card:first-of-type .field-label")].map(e => e.textContent)).toEqual(["思路","改动参数","针对的题","预期效果","风险","结果"]);
+  expect([...document.querySelectorAll(".candidate-card:first-of-type .candidate-summary-row dt")].map(e => e.textContent)).toEqual(["改了什么","针对","依据"]);
   expect(document.querySelector(".candidate-card")?.textContent).toContain("Sandbox 尚未运行");
   await click("查看目标 1 题");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(bad.result.question);

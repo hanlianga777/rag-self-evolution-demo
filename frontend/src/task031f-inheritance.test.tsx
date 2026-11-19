@@ -6,7 +6,7 @@ import {EvolutionPage} from './pages/EvolutionPage';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
 let root:ReturnType<typeof createRoot>;
 afterEach(()=>{if(root)act(()=>root.unmount());document.body.innerHTML='';vi.unstubAllGlobals();sessionStorage.clear();});
-it('shows inherited parameters in muted text and keeps only new changes in the changes field',async()=>{
+it('shows the full Baseline diff and keeps the inherited configuration provenance',async()=>{
  history.replaceState(null,'','#evolution?tab=comparison');
  const base={top_k:4,generation_thinking:'max',prompt_strategy:'Grounded'};
  const candidate={id:'EXP-R2-B',status:'generated',config:{...base,top_k:6,generation_thinking:'high',prompt_strategy:'Tiered'},reasoning:{candidate_label:'B',round:2,inherited_from:'EXP-R1-A',inherited_parameters:{generation_thinking:'high',prompt_strategy:'Tiered'},changed_parameters:{top_k:6},changed_parameters_vs_baseline:{generation_thinking:'high',prompt_strategy:'Tiered',top_k:6}},result:{}};
@@ -17,9 +17,9 @@ it('shows inherited parameters in muted text and keeps only new changes in the c
  const card=document.querySelector('.candidate-card')!;
  const inherited=[...card.querySelectorAll('p.muted')].find(p=>p.textContent?.includes('在 Candidate A 的基础上'))!;
  expect(inherited).toBeTruthy();expect(inherited.textContent).toContain('Tiered');
- const change=[...card.querySelectorAll('section')].find(p=>p.querySelector('h4')?.textContent==='改动参数')!;
- expect(change.textContent).toContain('4 → 6');expect(change.textContent).not.toContain('Tiered');
- expect(change.textContent).not.toContain('max');
+ const change=[...card.querySelectorAll('.candidate-summary-row')].find(p=>p.querySelector('dt')?.textContent==='改了什么')!;
+ expect(change.textContent).toContain('4 → 6');expect(change.textContent).toContain('Grounded → Tiered');
+ expect(change.textContent).toContain('Max → High');
 });
 it('uses the complete Baseline diff in timeline parameters and avoids single-parameter attribution for inherited bundles',async()=>{
  const {candidateView,topKLessonEvidence}=await import('./ui/evolution/model');

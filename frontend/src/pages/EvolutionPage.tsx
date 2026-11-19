@@ -1,5 +1,6 @@
 import { pagePurpose } from "../helpText";
-import { RoundStrategy, RoundConclusion } from '../components/RoundStrategy';
+import { RoundConclusion } from '../components/RoundStrategy';
+import { CandidateOverviewTable, CandidateResultSummary, SummaryText, candidateStrategyName, candidateSummary, evaluatedCandidate } from '../components/AgentStrategySummary';
 import { yuanText } from "../components/PipelineFields";
 import { judgePresentation } from "../components/judgePresentation";
 import { agentDisplayText } from "../display";
@@ -11,7 +12,6 @@ import { AgentOverview } from "../ui/evolution/AgentOverview";
 import { FinalRecommendation } from "../ui/evolution/FinalRecommendation";
 import { EvolutionTimeline } from "../ui/evolution/EvolutionTimeline";
 import { QuestionBadge, QuestionList } from "../ui/Primitives";
-import { ClampText } from "../ui/ClampText";
 import { buildEvolutionModel } from "../ui/evolution/model";
 import { usePageTab } from "../usePageTab";
 import { savedSnapshot } from "../evaluationProgress";
@@ -42,7 +42,7 @@ const rootCause = currentRoot;
 export function EvolutionPage({ data }: { data: any }) {
   const operation = useOperation();
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [savedStage, setStage] = usePageTab("evolution", ["overview", "route", "comparison", "review", "candidates", "sandbox", "regression", "recommendation"] as const, "overview");
+  const [savedStage, setStage] = usePageTab("evolution", ["overview", "route", "candidate-comparison", "comparison", "review", "candidates", "sandbox", "regression", "recommendation"] as const, "overview");
   const stage = ["candidates","sandbox","comparison"].includes(savedStage) ? "route" : savedStage === "regression" || savedStage === "recommendation" ? "review" : savedStage;
   useEffect(() => { if (savedStage !== stage) setStage(stage); }, [savedStage, stage]);
   const openDiagnosis = () => { location.hash = "evaluation?tab=cases"; };
@@ -265,7 +265,7 @@ export function EvolutionPage({ data }: { data: any }) {
 
 
     </Section>;
-  return <PageShell className="page evolution-page" header={<><div className="page-title"><div><h1><IconTile name="agent" />Agent 工作台</h1><p className="ui-kicker page-purpose">{pagePurpose.evolution}</p></div><div className="header-actions">{hasRunning && <button className="secondary" onClick={() => setStage("route")}>查看 Sandbox 进度</button>}</div></div></>} tabs={<div className="tabs"><button data-label="概览" aria-pressed={stage === "overview"} className={stage === "overview" ? "active" : ""} onClick={() => setStage("overview")}>概览</button><button data-label="进化路线" aria-pressed={stage === "route"} className={stage === "route" ? "active" : ""} onClick={() => setStage("route")}>进化路线</button><button data-label="回归与推荐" aria-pressed={stage === "review"} className={stage === "review" ? "active" : ""} onClick={() => setStage("review")}>回归与推荐</button></div>} resetKey={stage}>
+  return <PageShell className="page evolution-page" header={<><div className="page-title"><div><h1><IconTile name="agent" />Agent 工作台</h1><p className="ui-kicker page-purpose">{pagePurpose.evolution}</p></div><div className="header-actions">{hasRunning && <button className="secondary" onClick={() => setStage("route")}>查看 Sandbox 进度</button>}</div></div></>} tabs={<div className="tabs"><button data-label="概览" aria-pressed={stage === "overview"} className={stage === "overview" ? "active" : ""} onClick={() => setStage("overview")}>概览</button><button data-label="进化路线" aria-pressed={stage === "route"} className={stage === "route" ? "active" : ""} onClick={() => setStage("route")}>进化路线</button><button data-label="Candidates 对比" aria-pressed={stage === "candidate-comparison"} className={stage === "candidate-comparison" ? "active" : ""} onClick={() => setStage("candidate-comparison")}>Candidates 对比</button><button data-label="回归与推荐" aria-pressed={stage === "review"} className={stage === "review" ? "active" : ""} onClick={() => setStage("review")}>回归与推荐</button></div>} resetKey={stage}>
 
 
     <ConfirmDialog open={!!confirmationAction} onOpenChange={open => !open && setConfirmationAction(null)} title={confirmationAction?.title || "确认操作"} onConfirm={() => { const next = confirmationAction; setConfirmationAction(null); next?.execute(); }}><div className="muted-prose"><TruncatedText lines={3}>{confirmationAction?.description}</TruncatedText></div></ConfirmDialog>
@@ -275,7 +275,7 @@ export function EvolutionPage({ data }: { data: any }) {
     {cycle?.status === "budget_exhausted" && <p className="workbench-status" role="status">优化循环已停止：已评测 {budget.used} / {budget.max} 次，剩余 {Math.max(0, budget.max - budget.used)} 次（其中 1 次留给 D）。剩余次数不足以运行完整 A/B/C；只有合格 Winner 经人工确认后才能进入 D。</p>}
     {policyBlocked && <p className="error-notice">当前 Baseline 评测版本身份与运行代码不兼容，真实 Agent 启动已阻断，旧实验只读。全部 Bad Case 保留在优化规划中；请先到 Baseline 查看身份预检，核对历史评测与当前规则的兼容性；需要新版评分时使用保存回答判分，不自动重新生成。</p>}
 <div className="header-actions agent-secondary-actions">{triedSandbox ? null : planningBlocked && !published ? <button className={stage === "review" ? "secondary" : "primary"} disabled={busy || policyBlocked || hasRunning || !!confirmation} onClick={completePlan}>补齐本轮规划（不收费）</button> : pending.length ? <button className={stage === "review" ? "secondary" : "primary"} disabled={busy || !canBatch} onClick={() => void runBatch()}><Play size={15} />{batchRunning ? "本轮 Sandbox 运行中" : "运行本轮 A/B/C Sandbox"}</button> : <button className={stage === "review" ? "secondary" : "primary"} disabled={policyBlocked || busy || hasRunning || evaluation.status !== "completed" || (!!abc.length && !canContinue) || (!badCases.length && !experiment?.result?.monitoring_context)} onClick={() => void (canContinue ? continueRound() : generate())}><Play size={15} />{busy ? "处理中…" : canContinue ? "继续优化下一轮" : abc.length ? "本轮 Candidate 已生成" : "生成 A / B / C"}</button>}{!published && planningIncomplete && triedSandbox && <button className="secondary" disabled={busy || policyBlocked || hasRunning || !!confirmation} onClick={completePlan}>补齐本轮规划（不收费）</button>}{canBatch && triedSandbox && <button className="secondary" disabled={busy} onClick={() => void runBatch()}>运行本轮 A/B/C Sandbox</button>}{triedSandbox && canContinue && !pending.length && <button className="primary" disabled={policyBlocked || busy || hasRunning || evaluation.status !== "completed"} onClick={() => continueRound()}><Play size={15} />{busy ? "处理中…" : "继续优化下一轮"}</button>}</div>
-    <Drawer className="workbench-drawer" open={historyOpen} onOpenChange={setHistoryOpen} title="历史实验 · 原 Candidate 与结果只读"><div className="drawer-body"><div className="candidate-cards">{abc.filter(item => (item.reasoning?.round || 1) < roundNumber).map(candidate => <CandidateCard key={candidate.id} candidate={candidate} includeRound baseline={evaluation.config || {}} busy={true} onDetail={()=>{setHistoryOpen(false);setSelectedCandidate(candidate);}} targets={targetRows(candidate,badCases)} onTargets={()=>{setHistoryOpen(false);setTargetCandidate(candidate);}} onRun={()=>void run(candidate)} />)}</div></div></Drawer>
+    <Drawer className="workbench-drawer" open={historyOpen} onOpenChange={setHistoryOpen} title="历史实验 · 原 Candidate 与结果只读"><div className="drawer-body"><div className="candidate-cards">{abc.filter(item => (item.reasoning?.round || 1) < roundNumber).map(candidate => <CandidateCard key={candidate.id} experiment={experiment} candidate={candidate} includeRound baseline={evaluation.config || {}} busy={true} onDetail={()=>{setHistoryOpen(false);setSelectedCandidate(candidate);}} targets={targetRows(candidate,badCases)} onTargets={()=>{setHistoryOpen(false);setTargetCandidate(candidate);}} onRun={()=>void run(candidate)} />)}</div></div></Drawer>
     {error && <p ref={errorRef} tabIndex={-1} className="error-notice" role="alert">{error}</p>}
 
     {experiment?.result?.generation_status==='no_candidates' && <p className="workbench-status" role="status">本轮没有合法 Candidate，不能运行 Sandbox；未生成不代表优化成功。</p>}
@@ -285,10 +285,12 @@ export function EvolutionPage({ data }: { data: any }) {
     <p className="agent-identity sr-only">{evaluation.id ? `当前 Baseline：${baselineName(evaluation)}` : "当前有效 Baseline 尚未就绪。"}</p>
 
     {stage === "overview" && <AgentOverview experiment={experiment || data.optimization} model={{...evolutionModel, budget: budgetKnown ? budget : null}} evaluation={evaluation} chosenId={savedRecommended?.id} released={productionReleased} status={agentStatus} cases={processingCases} onCase={setSelectedBadCase}/>}
-    {stage === "route" && <div className="route-timeline"><EvolutionTimeline key={experiment?.id} model={evolutionModel} experiment={experiment} onRoundChange={setRoundSelection} renderCandidate={id=>{const candidate=candidates.find(c=>c.id===id);return <CandidateCard key={id} route routeWinner={id===evolutionModel.winnerId} candidate={candidate} primaryRun={id===displayedCandidates.find(item=>['generated','failed'].includes(item.status))?.id} baseline={evaluation.config || {}} onDetail={()=>setSelectedCandidate(candidate)} onSkip={()=>void action('跳过未运行 Candidate',()=>postJson(`/api/candidates/${id}/skip`,{actor:'当前用户'}))} running={activeOperation(id)} busy={busy || planningBlocked || policyBlocked || hasRunning || !!confirmation} targets={targetRows(candidate,badCases)} onTargets={()=>setTargetCandidate(candidate)} onRun={()=>void run(candidate)}/>;}} sandbox={()=>sandboxTable}
+    {stage === "route" && <div className="route-timeline"><EvolutionTimeline key={experiment?.id} model={evolutionModel} experiment={experiment} onRoundChange={setRoundSelection} renderCandidate={id=>{const candidate=candidates.find(c=>c.id===id);return <CandidateCard key={id} experiment={experiment} route routeWinner={id===evolutionModel.winnerId} candidate={candidate} primaryRun={id===displayedCandidates.find(item=>['generated','failed'].includes(item.status))?.id} baseline={evaluation.config || {}} onDetail={()=>setSelectedCandidate(candidate)} onSkip={()=>void action('跳过未运行 Candidate',()=>postJson(`/api/candidates/${id}/skip`,{actor:'当前用户'}))} running={activeOperation(id)} busy={busy || planningBlocked || policyBlocked || hasRunning || !!confirmation} targets={targetRows(candidate,badCases)} onTargets={()=>setTargetCandidate(candidate)} onRun={()=>void run(candidate)}/>;}} sandbox={()=>sandboxTable}
       questionText={id => questionText(id, evaluation, badCases)} onOpen={id => setSelectedCandidate(candidates.find(candidate => candidate.id === id))} >
       <section className="d-timeline" aria-label="Candidate D 决策"><DStory experiment={experiment} evaluation={evaluation} badCases={badCases} onReport={d ? ()=>setSelectedCandidate(d) : undefined} onRecommendation={()=>setStage("review")}/>{d?.status === "evaluated" && experiment?.result?.round_conclusions?.D && <RoundConclusion experiment={experiment} round="D"/>}{d && d.status !== "evaluated" && <CandidateAction primary candidate={d} running={activeOperation(d.id)} busy={busy || policyBlocked || hasRunning} onRun={()=>void run(d)}/>}</section>
     </EvolutionTimeline></div>}
+
+    {stage === "candidate-comparison" && <CandidateOverviewTable evaluation={evaluation} candidates={reviewCandidates} rounds={experiment?.rounds || []}/>}
 
     {stage === "review" && <>
       {chosenView ? <><FinalRecommendation chosen={chosenView} runnerUp={runnerUpView}
@@ -362,31 +364,59 @@ function candidateProgress(candidate:any, running?:{current?:number;total?:numbe
   return candidateState(candidate).label;
 }
 
-function CandidateCard({ candidate, baseline, onDetail, targets, onTargets, running, busy, onRun, onSkip, includeRound = false, primaryRun = false, route=false,routeWinner=false }: {route?:boolean;routeWinner?:boolean; primaryRun?: boolean; includeRound?: boolean; candidate: any; baseline: Record<string, any>; onDetail: () => void; targets: any[]; onTargets: () => void; running?: { current?: number; total?: number; stage?: string }; busy: boolean; onRun: () => void; onSkip?: () => void }) {
+function CandidateCard({ candidate, experiment, baseline, onDetail, targets, onTargets, running, busy, onRun, onSkip, includeRound = false, primaryRun = false, route = false, routeWinner = false }: {
+  candidate: any; experiment: any; baseline: Record<string, unknown>; onDetail: () => void; targets: any[];
+  onTargets: () => void; running?: { current?: number; total?: number; stage?: string }; busy: boolean;
+  onRun: () => void; onSkip?: () => void; includeRound?: boolean; primaryRun?: boolean; route?: boolean; routeWinner?: boolean;
+}) {
   const reasoning = candidate.reasoning || {}, result = candidate.result;
-  const evaluated = candidate.status === "evaluated" && result?.evaluation_complete !== false;
+  const evaluated = evaluatedCandidate(candidate);
   const interrupted = candidate.status === "failed" && candidate.product_interruption === true;
   const state = candidateState(candidate, !!running);
-  const inherited=reasoning.inherited_parameters || {};
-  const changeBase={...baseline,...inherited};
-  const after=candidate.config || (reasoning.changed_parameters ? {...changeBase,...reasoning.changed_parameters} : null);
-  const changes=after ? Object.keys(storyParameterNames).filter(key=>key in changeBase && key in after && JSON.stringify(changeBase[key])!==JSON.stringify(after[key])).map(key=>`${storyParameterNames[key]} ${storyValue(changeBase[key])} → ${storyValue(after[key])}`).join('；') || '已保存参数没有变化。' : '配置快照未保存，变化未知。';
-  const risks:string[]=Array.isArray(reasoning.risks) && reasoning.risks.length ? reasoning.risks.map((risk:any)=>risk.reason || '暂无') : [reasoning.risk || '暂无'];
-  const questionBadges=(ids:any,tone:'fixed'|'broken')=>Array.isArray(ids) ? ids.length ? ids.map((id:string)=><QuestionBadge key={id} id={shortQuestionId(id)} tone={tone} question={targets.find(row=>row.question_id===id) ? caseData(targets.find(row=>row.question_id===id)).question : undefined}/>) : '无' : '暂无';
-  return <article className={`candidate-card drawer-section${route?" ui-evo-card":""}${routeWinner?" winner":""}`} onClick={event=>{if(route && !(event.target as HTMLElement).closest("button"))onDetail();}}><div className="candidate-card-header"><div><h3>{schemeName(candidate, undefined, includeRound)}</h3></div><Badge tone={candidate.result?.price_pause?.paused ? "warning" : state.tone}>{candidate.result?.price_pause?.paused ? "已暂停" : state.label}</Badge></div><div className="candidate-card-body" tabIndex={0} role="region" aria-label={`Candidate ${reasoning.candidate_label} 正文`}>
-    <CandidateField label="思路"><ClampText lines={2} text={storyText([reasoning.direction || (reasoning.intervention_direction ? optimizationDirection(reasoning.intervention_direction) : ''),reasoning.strategy_name,reasoning.core_idea || reasoning.hypothesis || '暂无'].filter(Boolean).join(' · '))}/></CandidateField>
-    {reasoning.inherited_from && <p className="muted" style={{fontSize:12}}>在 Candidate {String(reasoning.inherited_from).match(/(?:^|-)([ABC])$/)?.[1] || reasoning.inherited_from} 的基础上 · {Object.entries(inherited).map(([key,value])=>`${storyParameterNames[key] || key} ${storyValue(value)}`).join("；")}</p>}
-    <CandidateField label="改动参数"><ClampText lines={2} text={changes}/></CandidateField>
-    <CandidateField label="针对的题">{targets.length ? targets.map(row=><QuestionBadge key={row.question_id} id={shortQuestionId(row.question_id)} question={caseData(row).question}/>) : '暂无可匹配的题目'}</CandidateField>
-    {reasoning.predicted_fixed_question_ids && <CandidateField label="预计修好">{reasoning.predicted_fixed_question_ids.map(shortQuestionId).join("、")}</CandidateField>}
-    <CandidateField label="预期效果"><ClampText lines={2} text={storyText(reasoning.expected_improvement || reasoning.expected || '暂无')}/></CandidateField>
-    <CandidateField label="风险"><ClampText lines={2} text={storyText(risks.join("；"))}/></CandidateField>
-    <CandidateField label="结果">{evaluated ? <dl className="candidate-result"><div><dt>答对</dt><dd>{typeof result.total === "number" && typeof result.bad_case_count === "number" ? result.total - result.bad_case_count : "未知"} / {result.total ?? "未知"}</dd></div><div><dt>修好</dt><dd>{questionBadges(result?.all_fixed_question_ids,"fixed")}</dd></div><div><dt>新增 Bad Case</dt><dd>{questionBadges(result?.new_regression_question_ids,"broken")}</dd></div></dl> : <><p>{candidateProgress(candidate,running)}</p>{result?.evaluation_complete === false && <div className="muted-prose"><TruncatedText lines={3}>已完成 {result.completed ?? "暂无"}/{result.total ?? "暂无"}{candidate.resume_plan?.can_resume === false ? ` · ${businessSummary(candidate.resume_plan.reason)}` : " · 已保存进度"}</TruncatedText></div>}<p className={interrupted ? "candidate-interruption-note" : "muted"}>{interrupted ? "产品故障，会自动续跑；已完成的题不重复调用。" : candidate.status === "failed" ? "Sandbox 运行停止，原因见详情。" : running || ["running","queued"].includes(candidate.status) ? "等待完整资格结论。" : "Sandbox 尚未运行"}</p></>}</CandidateField>
-  </div><div className="candidate-card-footer">{targets.length>0 && <button className="secondary small" onClick={onTargets}><Icon name="target" size={14}/>查看目标 {targets.length} 题</button>}<button className="secondary small" onClick={event => { event.currentTarget.focus(); onDetail(); }}><Icon name="report" size={14}/>查看 Candidate 与完整报告</button>{candidate.status === "generated" && onSkip && <button className="text-button" disabled={busy || !!running} onClick={onSkip}>跳过此 Candidate</button>}{candidate.status !== "evaluated" && <CandidateAction primary={primaryRun} candidate={candidate} running={running} busy={busy} onRun={onRun} />}</div></article>;
-}
-
-function CandidateField({label,children}:{label:string;children:React.ReactNode}) {
-  return <section className="candidate-story-block ui-field lines-2"><h4 className="field-label ui-kicker" style={{margin:0}}>{label}</h4><div className="candidate-field-content" style={label==="结果" ? undefined : {height:"calc(1.6em * 2)",overflow:"hidden"}}>{children}</div></section>;
+  const inherited = reasoning.inherited_parameters || {};
+  const risks = Array.isArray(reasoning.risks) && reasoning.risks.length
+    ? reasoning.risks.map((risk: any) => risk.reason || '暂无') : [reasoning.risk || '暂无'];
+  const thought = storyText([
+    reasoning.direction || (reasoning.intervention_direction ? optimizationDirection(reasoning.intervention_direction) : ''),
+    reasoning.strategy_name, reasoning.core_idea || reasoning.hypothesis || '暂无',
+  ].filter(Boolean).join(' · '));
+  return <article className={`candidate-card candidate-summary-card drawer-section${route ? " ui-evo-card" : ""}${routeWinner ? " winner" : ""}`}
+    onClick={event => { if (route && !(event.target as HTMLElement).closest("button,details")) onDetail(); }}>
+    <div className="candidate-card-summary">
+      <div className="candidate-card-header">
+        <h3><SummaryText text={`${schemeName(candidate, undefined, includeRound)} · ${candidateStrategyName(candidate)}`}/></h3>
+        <Badge tone={result?.price_pause?.paused ? "warning" : state.tone}>{result?.price_pause?.paused ? "已暂停" : state.label}</Badge>
+      </div>
+      <dl>
+        {candidateSummary(candidate, baseline, experiment, targets).map(([label, value]) => <div key={label} className="candidate-summary-row">
+          <dt>{label}</dt><dd><SummaryText text={value}/></dd>
+        </div>)}
+        {evaluated && <div className="candidate-summary-row"><dt>结果</dt><dd><CandidateResultSummary result={result}/></dd></div>}
+      </dl>
+    </div>
+    <div className="candidate-card-body" role="region" aria-label={`Candidate ${reasoning.candidate_label} 正文`}>
+      {!evaluated && <div className="candidate-run-note">
+        <p>{candidate.status === "generated" ? "Sandbox 尚未运行" : candidateProgress(candidate, running)}</p>
+        {result?.evaluation_complete === false && <p>已完成 {result.completed ?? "暂无"}/{result.total ?? "暂无"}
+          {candidate.resume_plan?.can_resume === false ? ` · ${businessSummary(candidate.resume_plan.reason)}` : " · 已保存进度"}</p>}
+        {interrupted && <p className="candidate-interruption-note">产品故障，会自动续跑；已完成的题不重复调用。</p>}
+      </div>}
+      <details className="agent-strategy-details">
+        <summary>展开 Agent 完整思考</summary>
+        <p>{thought}</p>
+        {reasoning.inherited_from && <p className="muted">在 Candidate {String(reasoning.inherited_from).match(/(?:^|-)([ABC])$/)?.[1] || reasoning.inherited_from} 的基础上 · {Object.entries(inherited).map(([key,value])=>`${storyParameterNames[key] || key} ${storyValue(value,key)}`).join("；")}</p>}
+        {targets.length > 0 && <p>目标题 {targets.map(row => <QuestionBadge key={row.question_id} id={shortQuestionId(row.question_id)} question={caseData(row).question}/>)}</p>}
+        <p>预期效果 · {storyText(reasoning.expected_improvement || reasoning.expected || '暂无')}</p>
+        <p>风险 · {storyText(risks.join("；"))}</p>
+      </details>
+    </div>
+    <div className="candidate-card-footer">
+      {targets.length > 0 && <button className="secondary small" onClick={onTargets}><Icon name="target" size={14}/>查看目标 {targets.length} 题</button>}
+      <button className="secondary small" onClick={event => { event.currentTarget.focus(); onDetail(); }}><Icon name="report" size={14}/>查看 Candidate 与完整报告</button>
+      {candidate.status === "generated" && onSkip && <button className="text-button" disabled={busy || !!running} onClick={onSkip}>跳过此 Candidate</button>}
+      {candidate.status !== "evaluated" && <CandidateAction primary={primaryRun} candidate={candidate} running={running} busy={busy} onRun={onRun}/>}
+    </div>
+  </article>;
 }
 
 function ConfigDiff({ base, candidate }: { base: Record<string, any>; candidate: any }) {

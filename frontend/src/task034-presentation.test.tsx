@@ -17,10 +17,13 @@ it('uses source footnotes without raw audit copies and keeps model wording',asyn
  expect(document.querySelector('.comparison-sources button')?.textContent).toContain('第 3 页');
  expect(document.querySelector('.technical-record')).toBeNull();
 });
-it('presents saved new-experiment strategy and review in order without disclosure or internal ids',async()=>{
+it('summarizes saved strategy and review above collapsed evidence without internal ids',async()=>{
  const experiment={result:{agent_strategies:{1:{prior_round_review:{summary:'首轮从体检出发',plans:[{candidate_id:'EXP-123-R1-A',conclusion:'待验证',evidence_reason:'证据未齐'}]},bad_case_summary:{groups:[{layer:'检索层',subtype:'关键证据没找回来',count:2}],focus:'先补齐证据'}}},round_conclusions:{1:{status:'saved',review:{plans:[{candidate_id:'EXP-123-R1-A',conclusion:'仍需验证',fixed_question_ids:[],new_failure_question_ids:[],prediction_match_count:0,case_reviews:[{question:'Q01',state:'仍错',reason:'关键证据缺失',assessment:'不确定'}],parameter_assessment:'无法单独归因',evidence_reason:'保存的检索记录',unmatched_reason:'尚未补齐'}],lessons:['下一轮先检查证据']}}}},candidates:[{id:'EXP-123-R1-A',reasoning:{round:1,candidate_label:'A',hypothesis:'扩大查找范围',risk:'可能更慢',predicted_fixed_question_ids:['Q01']}}]};
  await render(<><RoundStrategy experiment={experiment} round={1}/><RoundConclusion experiment={experiment} round={1}/></>);
- expect(document.querySelector('details,summary')).toBeNull();
+ expect(document.querySelectorAll('.agent-strategy-details')).toHaveLength(2);
+ expect(document.querySelectorAll('.agent-strategy-details[open]')).toHaveLength(0);
+ expect(document.querySelector('.round-strategy-line')?.textContent).toContain('检索层 2 题');
+ expect(document.querySelector('.round-conclusion-summary')?.textContent).toContain('预测中 0/1');
  expect(document.body.textContent).not.toContain('EXP-');
  expect(document.body.textContent).toContain('扩大查找范围');
  expect(document.body.textContent).toContain('关键证据缺失');

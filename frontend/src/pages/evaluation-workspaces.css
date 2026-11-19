@@ -277,6 +277,38 @@
 .evolution-page.page-shell .candidate-card-body { display:block; flex:1; min-height:0; margin:0; overflow:auto; scrollbar-width:thin; }
 .evolution-page.page-shell .candidate-card-footer { flex:none; display:flex; flex-direction:row; align-items:center; gap:8px; min-height:64px; padding-top:8px; }
 .evolution-page.page-shell .candidate-card-footer .candidate-card-action { margin:0; padding:0; }
+.summary-text { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.route-timeline .candidate-summary-card { grid-row:auto; }
+:is(.evolution-page.page-shell, .workbench-drawer) .candidate-summary-card .candidate-card-header {
+  align-items:center; height:auto; min-height:0; margin-bottom:8px; gap:8px;
+}
+.candidate-summary-card .candidate-card-header h3 { min-width:0; font-size:15px; }
+.candidate-summary-card .candidate-card-header .badge { flex-shrink:0; }
+.candidate-card-summary dl, .candidate-summary-row dd { margin:0; }
+.candidate-summary-row { display:flex; gap:8px; align-items:baseline; margin-bottom:5px; font-size:12px; }
+.candidate-summary-row dt { flex:none; color:var(--muted); font-weight:600; }
+.candidate-summary-row dd { min-width:0; flex:1; }
+.candidate-result-line { display:flex; }
+.candidate-result-line > span { flex:none; }
+.candidate-result-line > :is(.result-fixed,.result-broken) { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.candidate-result-line > .result-fixed { flex-shrink:1; }
+.candidate-result-line > .result-broken { max-width:30%; }
+.candidate-result-line > span:nth-child(even) { white-space:pre; }
+.candidate-summary-card .candidate-card-footer { flex-wrap:wrap; }
+.agent-strategy-details { margin-top:10px; }
+.agent-strategy-details > summary { cursor:pointer; color:var(--muted); font-size:13px; width:fit-content; }
+.agent-strategy-details > p, .candidate-run-note { font-size:13px; }
+.agent-round-strategy .round-strategy-line { display:flex; align-items:baseline; gap:8px; min-width:0; }
+.round-strategy-line strong { flex:none; }
+.round-conclusion-summary { margin-bottom:8px; }
+.round-conclusion-summary p { margin:2px 0; }
+.evolution-page .page-content .candidate-overview-scroll { height:auto; }
+.evolution-page .page-content .candidate-overview-scroll .candidate-overview-table {
+  table-layout:auto; width:max-content; min-width:100% !important;
+}
+.candidate-overview-table th[scope="row"] { white-space:nowrap; }
+.candidate-overview-table td { min-width:85px; }
+.candidate-overview-table td .summary-text { max-width:18rem; }
 .evolution-page.page-shell .candidate-field-content { overflow:visible; }
 .evolution-page.page-shell .candidate-story-block { padding:8px 0; }
 .evolution-page .compact-config-diff { display:block; }

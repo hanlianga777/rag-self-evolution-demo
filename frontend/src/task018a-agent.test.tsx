@@ -18,7 +18,7 @@ it.each([false,true])("keeps compact progress on overview and saved Sandbox and 
   expect(document.querySelector('details > summary')?.textContent).not.toBe("实验进度");
   for(const button of [...document.querySelectorAll<HTMLButtonElement>(".tabs button")]) {
     await act(async()=>button.click());
-    expect(document.querySelectorAll(".page-shell-header .tabs button")).toHaveLength(3);
+    expect(document.querySelectorAll(".page-shell-header .tabs button")).toHaveLength(4);
     if(button.textContent === "概览")expect(document.querySelector(".ui-agent-stats")?.textContent).toContain("7/50");else expect(document.querySelector(".page-shell-header .ui-agent-stats")).toBeNull();
   }
   const sandbox=[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(button => button.textContent === "进化路线")!;
@@ -32,7 +32,9 @@ it("removes repeated strategy fields and keeps one before/after parameter list",
   await act(async()=>[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(b=>b.textContent==="进化路线")!.click());
   const card=document.querySelector(".candidate-card")!;
   expect(card.textContent).toContain("扩大候选范围");
-  expect(card.querySelector(".candidate-field-content")?.textContent).toContain("检索召回增强");
-  expect([...card.querySelectorAll(".ui-field")].find(field=>field.querySelector(".ui-kicker")?.textContent==="改动参数")?.textContent).toContain("Top-K 4 → 8");
-  expect([...card.querySelectorAll(".field-label")].map(e=>e.textContent)).toEqual(["思路","改动参数","针对的题","预期效果","风险","结果"]);
+  const thought = card.querySelector<HTMLDetailsElement>("details")!;
+  expect(thought.open).toBe(false);
+  expect(thought.textContent).toContain("检索召回增强");
+  expect(card.querySelector(".candidate-summary-row")?.textContent).toContain("Top-K 4 → 8");
+  expect([...card.querySelectorAll(".candidate-summary-row dt")].map(e=>e.textContent)).toEqual(["改了什么","针对","依据"]);
 });

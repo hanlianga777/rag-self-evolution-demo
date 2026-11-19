@@ -26,10 +26,10 @@ it('keeps complete fixed IDs on cards and moves target counts to the target draw
  await mount();await click('进化路线');await click('Round 3');
  const cards=[...document.querySelectorAll('.candidate-cards .candidate-card')];const c=cards[2];
  expect(c.querySelector('small')).toBeNull();expect(cards.map(c=>c.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['未通过','未通过','合格']);
- const result=c.querySelector('.candidate-story-block:last-child')!;
- expect(result.textContent).toContain('答对47 / 50');expect(result.textContent).toContain('修好Q24Q29Q38');expect(result.textContent).toContain('新增 Bad Case无');
+ const result=c.querySelector('.candidate-summary-row:last-child')!;
+ expect(result.textContent).toContain('47/50');expect(result.textContent).toContain('修好 Q24、Q29、Q38');expect(result.textContent).toContain('新错 无');
  for(const label of ['修复原问题','Regression Check','Hard Gate','P50','P99','可发布'])expect(result.textContent).not.toContain(label);
- expect(c.querySelectorAll('.candidate-story-block')[2].textContent).toBe('针对的题Q29');
+ expect(c.querySelectorAll('.candidate-summary-row')[1].textContent).toContain('1 题：Q29');
  expect([...c.querySelectorAll('button')].map(b=>b.textContent)).toEqual(['查看目标 1 题','查看 Candidate 与完整报告']);
  await act(async()=>c.querySelector<HTMLButtonElement>('.candidate-card-footer button')!.click());
  expect(document.querySelector('[role=dialog]')?.textContent).toContain('指定目标修好 1 / 1');

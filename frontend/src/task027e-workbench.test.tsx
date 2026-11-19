@@ -19,7 +19,7 @@ async function mount(){root=createRoot(document.body.appendChild(document.create
 async function click(text:string){await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===text)!.click());}
 it('defaults to overview and computes published result, parameter lineage and all six case outcomes',async()=>{
  data.badCases.reverse();const before=JSON.stringify(data);await mount();
- expect([...document.querySelectorAll('.tabs button')].map(b=>b.textContent)).toEqual(['概览','进化路线','回归与推荐']);
+ expect([...document.querySelectorAll('.tabs button')].map(b=>b.textContent)).toEqual(['概览','进化路线','Candidates 对比','回归与推荐']);
  expect(document.querySelector('.tabs .active')?.textContent).toBe('概览');expect(document.querySelector('.page-title + .ui-agent-stats')).toBeNull();
  const overview=document.querySelector('.agent-overview')!;expect(overview.textContent).toContain('推荐并已发布 Candidate D');expect(overview.textContent).toContain('44 → 48');expect(overview.textContent).toContain('10 / 12');
  expect(document.querySelectorAll('.agent-overview-params .plain-parameter-diff > div')).toHaveLength(3);

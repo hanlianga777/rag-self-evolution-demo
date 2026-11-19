@@ -31,7 +31,7 @@ it("keeps only the selected governance workspace visible", async () => {
 it("shows one Evolution stage instead of four stacked cards", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ evaluation: {}, badCases: [] }} />));
-  expect(document.querySelector(".agent-overview")).not.toBeNull(); expect(document.querySelectorAll(".tabs button")).toHaveLength(3);
+  expect(document.querySelector(".agent-overview")).not.toBeNull(); expect(document.querySelectorAll(".tabs button")).toHaveLength(4);
   expect(document.body.textContent).not.toContain("Sandbox 对比");
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "进化路线")!.click());
   expect(document.body.textContent).toContain("Sandbox 对比");
