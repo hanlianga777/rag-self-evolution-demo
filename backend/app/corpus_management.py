@@ -131,9 +131,13 @@ class CorpusManager:
             self._update(operation_id, stage=stage)
             new_pipeline = self.knowledge_pipeline or kind == 'rebuild'
             if new_pipeline:
-                from .knowledge_pipeline import KnowledgePipeline
+                from .knowledge_pipeline import ACTIVE_CHUNK_VERSION, CachedMinerUParser, KnowledgePipeline, MinerUProvider, settings as pipeline_settings
                 pipeline = KnowledgePipeline(self.index_dir, self.retriever)
-                staging, bundle_id = pipeline.build(sources, progress=lambda step, completed, total: self._update(operation_id, stage=step, completed=completed, total=total))
+                # 2026-11-19：重建固定用 parent-child-v2，并复用已保存的 MinerU 结果（见 knowledge_pipeline.ACTIVE_CHUNK_VERSION 注释）
+                parser = CachedMinerUParser(self.index_dir, lambda: MinerUProvider(pipeline_settings()))
+                staging, bundle_id = pipeline.build(sources, progress=lambda step, completed, total: self._update(operation_id, stage=step, completed=completed, total=total),
+                                                    chunk_version=ACTIVE_CHUNK_VERSION, parser=parser)
+                self._update(operation_id, mineru_cache={'reused': parser.hits, 'parsed': parser.misses}, chunk_version=ACTIVE_CHUNK_VERSION)
             else:
                 result = build_index(force=True, catalog=sources, index_dir=staging, strict=True, on_progress=lambda step, completed, total: self._update(operation_id, stage=step, completed=completed, total=total))
                 if result:

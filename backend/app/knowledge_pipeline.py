@@ -673,6 +673,37 @@ class MinerUProvider:
         raise ProviderUnavailable('MinerU parsing timed out; task retained remotely')
 
 
+# 2026-11-19（总指挥复盘）：062、072 走 /api/knowledge/rebuild 时默认用了 v1 分块（按标题切 Parent，父子比约 1.2:1），
+# 违背 11-14 用户定的 parent-child-v2（验收：平均每个 Parent ≥3 个 Child、单 Child 的 Parent ≤15%、碎块为 0）。
+# 重建接口从此固定用 v2；离线测试仍可显式传 chunk_version。
+ACTIVE_CHUNK_VERSION = 'parent-child-v2'
+
+
+class CachedMinerUParser:
+    """重建时优先复用旧索引里保存的 MinerU 原始结果（<文档ID>-mineru.zip），只改切块规则不重新解析、不花 MinerU 额度；
+    找不到缓存才调用真实 MinerU。文档 ID 由源文件指纹决定，同一份 PDF 的缓存一定对得上。"""
+    def __init__(self, cache_root, fallback_factory):
+        self.cache_root = Path(cache_root); self.fallback_factory = fallback_factory; self._fallback = None
+        self.hits, self.misses = [], []
+
+    def parse(self, path, document_id):
+        found = sorted(self.cache_root.glob(f'**/{document_id}-mineru.zip'), key=lambda p: p.stat().st_mtime, reverse=True) if self.cache_root.exists() else []
+        for candidate in found:
+            archive = candidate.read_bytes()
+            try:
+                with zipfile.ZipFile(BytesIO(archive)) as bundle:
+                    names = [n for n in bundle.namelist() if n.endswith('_content_list.json') or n.endswith('/content_list.json') or n == 'content_list.json']
+                    if len(names) != 1: continue
+                    blocks = json.loads(bundle.read(names[0]))
+                if isinstance(blocks, list):
+                    self.hits.append(document_id); return blocks, archive
+            except (zipfile.BadZipFile, ValueError, KeyError):
+                continue
+        self.misses.append(document_id)
+        if self._fallback is None: self._fallback = self.fallback_factory()
+        return self._fallback.parse(path, document_id)
+
+
 class KnowledgePipeline:
     def __init__(self, index_dir, retriever):
         self.index_dir = Path(index_dir); self.retriever = retriever
