@@ -144,7 +144,7 @@ V2_CONFIG = {**CONFIG, 'chunk_strategy': 'parent-child-v2', 'parent_min_tokens':
              'child_tail_min_tokens': 80, 'child_target_min_tokens': 200, 'overlap_tokens': 50,
              'table_intro_max_tokens': 200, 'toc_min_entries': 3, 'toc_min_fraction': 0.5,
              'repeat_page_fraction': 0.30, 'repeat_short_line_chars': 40, 'repeat_min_pages': 2,
-             'table_normalize': 'table-kv-v2', 'denoise_version': 'mineru-noise-v3', 'heading_context': 'child-section-v2',
+             'table_normalize': 'table-kv-v3', 'denoise_version': 'mineru-noise-v4', 'heading_context': 'child-section-v2',
              'header_footer_identity_max_chars': 12,
              'list_layout': 'numbered-steps-image-labels-v1',
              'heading_hierarchy': 'manual-chapters-v1'}
@@ -192,7 +192,12 @@ def _v2_block_text(block):
         labels = {'参数', '规格', '备注', '类型', '要点', '适用范围', 'LED1', '日期', '版本', '修订内容'}
         header_index = 1 if len(rows) > 1 and len(rows[0]) == 1 else 0
         headers = rows[header_index]
-        has_header = any(cell in labels for cell in headers) or '<th' in block.get('table_body', '')
+        # 2026-11-19（079 审核）：原规则只认旧手册的固定表头词或 <th>，ABB 手册的表头（维护活动、机器人类型…）全被当成数据行，
+        # 每行丢了列名，比 v1 还差。补上 v1 的通用判断：表头每格非空、不是数值单位格，且至少还有一行数据，就按表头处理。
+        value_like = re.compile(r'^\s*[-+±]?\d[\d.,/]*\s*(%|°|°/秒|kg|g|mm|m|kW|W|V|A|Nm|Hz|MPa|ml|s|ms|小时)?\s*$')
+        generic_header = (len(rows) > header_index + 1 and len(headers) >= 2 and not reader.complex and all(cell.strip() for cell in headers)
+                          and not any(value_like.match(cell) for cell in headers))
+        has_header = any(cell in labels for cell in headers) or '<th' in block.get('table_body', '') or generic_header
         if has_header:
             lines = [' | '.join(rows[0])] if header_index else []
             for row in rows[header_index + 1:]:
@@ -202,8 +207,10 @@ def _v2_block_text(block):
         else:
             lines = [' | '.join(row) for row in rows]
         return '\n'.join([*captions, *lines, *footnotes])
-    return (block.get('text') or '\n'.join(block.get('list_items', []) + block.get('image_caption', []) +
+    text = (block.get('text') or '\n'.join(block.get('list_items', []) + block.get('image_caption', []) +
             block.get('image_footnote', [])) or block.get('code_body') or block.get('latex') or '').strip()
+    # 2026-11-19（078 审核）：ABB 手册把翻页标记粘在标题后面（"1.1 关于 IRB 1200续前页"），整行去重规则抓不到；只去行尾的翻页标记。
+    return re.sub(r'\s*(?:续前页|下一页继续)\s*$', '', text, flags=re.M).strip()
 
 
 def _v2_noise(text):
