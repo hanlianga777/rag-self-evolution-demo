@@ -29,7 +29,8 @@ DEFAULT_PIPELINE_CONFIG = {
 FRIEND_BASELINE_CONFIG = {
     **DEFAULT_PIPELINE_CONFIG,
     "min_score": 0.4,
-    "generation_thinking": "high",
+    # 2026-11-19 噪声根治（用户 11-18 21:01 同意）：开思考时 DeepSeek 不接收温度参数，回答随机；Baseline 关闭思考、温度 0
+    "generation_thinking": "off",
 }
 
 GATE_DEFINITIONS = (

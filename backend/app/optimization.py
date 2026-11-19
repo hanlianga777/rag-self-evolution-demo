@@ -24,7 +24,7 @@ INTERVENTIONS = {
     'query_expansion': ({'query_rewrite','multi_query','hyde'}, {'recall_missing'}),
     'candidate_recall': ({'candidate_k','hybrid_search','hybrid_alpha'}, {'recall_missing'}),
     'context_selection': ({'top_k','rerank','min_score','retrieval_max_tokens'}, {'ranking_omission','retrieval_noise'}),
-    'grounded_generation': ({'generation_thinking'}, {'final_sufficient','confirmed_claim','safety_failure'}),
+    'grounded_generation': ({'generation_thinking','top_k','retrieval_max_tokens'}, {'final_sufficient','confirmed_claim','safety_failure'}),  # 2026-11-19 思考档位锁定时只剩交付资料可调
     'stage_performance': (set(search_space_contract()), {'measured_latency'}),
 }
 
@@ -154,6 +154,10 @@ def validate_round_contract(candidates, baseline, prior_candidates, baseline_gat
         if len(diff) > 2:raise ValueError('每个方案相对底座最多改两个参数（规则总表五.1）')
         if used & set(diff):raise ValueError('同轮方案不得共用参数：'+','.join(sorted(used & set(diff))))
         used.update(diff)
+        # 2026-11-19 噪声根治（用户 11-18 21:01 同意）：开思考时 DeepSeek 不收温度参数，回答随机；思考档位暂时锁定，不给 Agent 调
+        # 只在新口径（Baseline 关闭思考）下锁定；旧实验（Baseline 开思考）沿用原降档规则
+        if baseline.get('generation_thinking') == 'off' and ('generation_thinking' in diff or 'generation_thinking' in (candidate.get('inherited_parameters') or {})):
+            raise ValueError('思考档位已锁定为 Baseline 档位（噪声根治，规则总表三.3），方案不得改 generation_thinking')
         current=baseline.get('generation_thinking','max')
         proposed=diff.get('generation_thinking',current)
         if current not in THINKING_LEVELS or proposed not in THINKING_LEVELS:raise ValueError('未知Thinking档位')
@@ -347,7 +351,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
     system = ('你是RAG优化Agent。根据保存的错题诊断提出优化方案。'
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
               '先读程序生成的基线诊断摘要、速度事实、逐题变化及已被证明有害的改动清单gate_harming_changes。每轮恰好ABC三套，direction由你根据事实自行确定，不预设方向。同轮修改参数互斥。不得照搬gate_harming_changes。'
-              '回答策略固定为Strict（分级回答），不是可调参数。generation_thinking可选off/low/high/max，Baseline当前档位见base_config；改思考档位要同时顾及速度门槛和安全题。每个方案相对其底座最多改两个参数。'
+              '回答策略固定为Strict（分级回答），不是可调参数。若base_config的generation_thinking为off，则思考档位已锁定（关闭思考、温度0，保证同一请求结果一致），任何方案都不得改它；否则generation_thinking可选off/low/high/max，改档要同时顾及速度门槛和安全题。锁定时，生成层和安全题的问题只能通过检索与上下文参数（top_k、retrieval_max_tokens、min_score、rerank等）改善交给模型的资料。每个方案相对其底座最多改两个参数。'
               '诊断→动作对照（学朋友产品的规则动作库，优先参考、不限制）：检索层·查不到（标准证据没进候选或最终资料）→扩大candidate_k、放宽top_k、降低min_score，或开query_rewrite/multi_query/hyde；检索层·排序遗漏（证据在候选里但没进最终资料）→调rerank、top_k、min_score；型号、错误码等精确词查错→hybrid_alpha调向关键词（0.3）；被相似型号干扰（答成别的型号的数值）→提高min_score、保持rerank、减小top_k；生成层·漏要点→top_k、retrieval_max_tokens、思考档位；安全边界·该拒没拒或过度拒答→思考档位、min_score；性能·太慢→降思考档位、retrieval_max_tokens。每套方案先写明主攻哪一层哪一类问题（按bad_case_groups里题数最多、拖低门槛平均分最多的类别优先），再选对应动作；三套方案主攻不同类别，或同一类别的不同动作，并说明每个动作为什么只修这些题、不修其他题。'
               'prior_sandbox_results里带no_effect的方案：50题回答与已跑结果完全相同，说明它改的参数在当前条件下没有改变交给模型的资料，不要再提出同类无效改动。'
               '每道错题的bad_cases[].issue_tags列出它同时存在的全部问题（检索层/生成层/安全边界/性能，可多个），diagnosis_category只是排优先级用的主原因；设计方案时要兼顾同一题的全部标签，不要只看主原因。'
