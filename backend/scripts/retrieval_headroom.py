@@ -55,6 +55,9 @@ def golden_questions(csv_bytes):
     return items
 
 
+RECALL_PAIR_PARTNERS = [('candidate_k', 24), ('multi_query', 4), ('query_decompose', True), ('hyde', True), ('query_rewrite', True), ('min_score', 0.2)]
+
+
 def single_variants(baseline, space):
     """每个检索参数的每个可选值各改一次（相对 Baseline 只改 1 个参数）。"""
     variants = []
@@ -195,6 +198,16 @@ def main(argv=None):
         change = {**results[a['config']]['change'], **results[b['config']]['change']}
         if len(change) == 2:
             pairs.append(change)
+    # 2026-11-19（081 审核）：父子切块下 Top-K 数的是父块，Top-K=4 会把"候选召回变多"的收益全部挡住，
+    # 所以 candidate_k / multi_query / 问题拆解 / HyDE 单独看永远是 0，不会进入上面的两两组合。
+    # 固定补扫"Top-K 放到最大 + 一个召回类参数"（Colin A 轮就是 candidate_k 24 + top_k 6），让扫描和给 Agent 的预演都看得到。
+    widest = max(ALLOWED_SEARCH_SPACE.get('top_k', (baseline.get('top_k'),)))
+    if widest != baseline.get('top_k'):
+        for key, value in RECALL_PAIR_PARTNERS:
+            if value in ALLOWED_SEARCH_SPACE.get(key, ()) and value != baseline.get(key):
+                change = {'top_k': widest, key: value}
+                if change not in pairs:
+                    pairs.append(change)
     if pairs:
         results.update({k: v for k, v in scan(items, baseline, pairs, retrieve).items() if k != 'baseline'})
     summary = summarize(results, min_fixable=args.min_fixable)
