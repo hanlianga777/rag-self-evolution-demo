@@ -18,7 +18,7 @@ async function mount(node:React.ReactNode){root=createRoot(document.body.appendC
 async function click(label:string){await act(async()=>[...document.querySelectorAll('button')].find(b=>(b.getAttribute('aria-label') || b.textContent)===label)!.click());}
 it('uses saved Baseline shares and gates and shows additional metrics directly',async()=>{
  await mount(<EvaluationPage data={{evaluation:baseline}}/>);
- const hero=document.querySelector('[aria-label="Baseline 报告摘要"]');expect(hero).not.toBeNull();expect(document.querySelector('.ui-bl-turn')).toBeNull();expect(hero?.textContent).toContain('44 / 50');expect(hero?.textContent).toContain('最高');expect(hero?.textContent).toContain('P50 16.7 秒 · P99 42.2 秒');expect(hero?.textContent).toContain('生成层问题 1');
+ const hero=document.querySelector('[aria-label="Baseline 报告摘要"]');expect(hero).not.toBeNull();expect(document.querySelector('.ui-bl-turn')).toBeNull();expect(hero?.textContent).toContain('44 / 50');expect(hero?.textContent).toContain('Max');expect(hero?.textContent).toContain('P50 16.7 秒 · P99 42.2 秒');expect(hero?.textContent).toContain('生成层问题 1');
  expect(document.querySelector('.ui-bl-bar')?.getAttribute('aria-label')).toContain('回答生成 95.8%');
  const more=document.querySelector('.baseline-more');expect(more).not.toBeNull();expect(more?.tagName).not.toBe('DETAILS');expect(more?.textContent).not.toContain('耗时拆解');expect(more?.textContent).toContain('Recall@K');expect(more?.textContent).not.toContain('综合分');
  expect(more?.querySelector('[aria-label="MRR说明"]')).not.toBeNull();

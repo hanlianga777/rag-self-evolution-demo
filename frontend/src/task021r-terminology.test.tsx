@@ -11,11 +11,11 @@ it('uses the requested industry labels and real thinking values',()=>{
  expect(displayText('Candidate')).toBe('Candidate');
  expect(displayText('Regression')).toBe('Regression Check');
  expect(displayText('Positive')).toBe('正向（Positive）');
- expect(parameterNames.candidate_k).toBe('候选数');
- expect(parameterNames.top_k).toBe('保留条数');
- expect(storyValue('max')).toBe('最高');
- expect(storyValue('off')).toBe('关闭');
- expect(baselineName({config:{generation_thinking:'high'}})).toContain('高');
+ expect(parameterNames.candidate_k).toBe('Candidate K');
+ expect(parameterNames.top_k).toBe('Top-K');
+ expect(storyValue('max')).toBe('Max');
+ expect(storyValue('off')).toBe('Off');
+ expect(baselineName({config:{generation_thinking:'high'}})).toContain('High');
  expect(schemeName({reasoning:{round:3,candidate_label:'D'}})).toBe('Candidate D');
 });
 it('removes technical entry sections from every source page',()=>{
@@ -34,7 +34,7 @@ it('normalizes displayed parameter notation and keeps saved Agent evidence uncha
  const reasoning={candidate_label:'D',explanation:original,core_idea:original};
  const data={candidates:[{id:'d',status:'evaluated',reasoning,result:{evaluation_complete:true}}]};
  const before=JSON.stringify(data);
- expect(renderToStaticMarkup(createElement(DStory,{experiment:data}))).toContain(original.replace("方案 D", "Candidate D").replace("rerank=query_only", "重排序 方式：只按问题"));
- expect(renderToStaticMarkup(createElement(StrategyPresentation,{reasoning}))).toContain(original.replace("方案 D", "Candidate D").replace("rerank=query_only", "重排序 方式：只按问题"));
+ expect(renderToStaticMarkup(createElement(DStory,{experiment:data}))).toContain(original.replace("方案 D", "Candidate D").replace("rerank=query_only", "Rerank：Query Only"));
+ expect(renderToStaticMarkup(createElement(StrategyPresentation,{reasoning}))).toContain(original.replace("方案 D", "Candidate D").replace("rerank=query_only", "Rerank：Query Only"));
  expect(JSON.stringify(data)).toBe(before);
 });

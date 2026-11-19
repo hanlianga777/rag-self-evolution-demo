@@ -18,15 +18,15 @@ const experiment=(extra:any={})=>({id:'experiment',candidates:[{...winner,id:'EX
 it('keeps question labels distinct, hides technical IDs and translates parameters and metrics',()=>{
  const text=storyText(`${questionId}/Q29，DOC-001-C-00096，top_k=6，rerank=query_only，hybrid_alpha=0.6，hyde，safe_rejection，safe_rejection_rate，latency_p99_seconds`);
  expect(text).toContain('Q24/Q29');expect(text).toContain('相关说明段落');
- for(const name of ['保留条数 6','重排序 方式：只按问题','语义检索权重','假设答案检索','安全拒答率','回答耗时 P99'])expect(text).toContain(name);
+ for(const name of ['Top-K 6','Rerank：Query Only','Hybrid Alpha','HyDE','安全拒答率','回答耗时 P99'])expect(text).toContain(name);
  expect(text).not.toMatch(/CSV-|DOC-|top_k|rerank|query_only|safe_rejection|hybrid_alpha|hyde|latency_p99_seconds/);
  expect(storyText('safe_rejection')).toBe('安全拒答率');
- expect(storyText('p99=65.614秒，Top4截断')).toBe('P99 65.614 秒，回答证据前 4 条 截断');
+ expect(storyText('p99=65.614秒，Top4截断')).toBe('P99 65.614 秒，Top-K 4 截断');
 });
 it('normalizes displayed Agent reviews and predictions while preserving saved evidence',async()=>{
  const exp=experiment(),original=JSON.stringify(exp);
  await mount(<EvolutionRoute evaluation={evaluation} experiment={exp} badCases={[]}/>);
- expect(document.querySelector('.route-review')?.textContent).toContain(`${questionId}/Q29并附带修Q38；保留条数 6，重排序 query_only，DOC-001-C-00096。`);
+ expect(document.querySelector('.route-review')?.textContent).toContain(`${questionId}/Q29并附带修Q38；Top-K 6，Rerank Query Only，DOC-001-C-00096。`);
  expect(document.querySelector('.d-story')?.textContent).toContain(storyText(declinedReason));expect(document.querySelector('.d-story')?.textContent).not.toContain('CSV-');
  expect(JSON.stringify(exp)).toBe(original);
 });

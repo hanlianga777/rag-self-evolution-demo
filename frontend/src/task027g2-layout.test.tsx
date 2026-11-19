@@ -22,8 +22,8 @@ it('separates saved version identity, provenance, retrieval parameters and answe
  const cells=document.querySelectorAll('.release-history-table tbody tr:first-child td');
  expect(cells[0].querySelector('button')?.textContent).toBe('Candidate D');
  expect(cells[0].querySelector('.release-history-meta')?.textContent).toMatch(/^推荐发布 · /);
- expect(cells[2].querySelector('.release-history-main')?.textContent).toBe('候选数 24 · 保留条数 6 · 思考档位 高');
- expect(cells[2].querySelector('.release-history-meta')?.textContent).toBe('回答策略 有据生成');
+ expect(cells[2].querySelector('.release-history-main')?.textContent).toBe('Candidate K 24 · Top-K 6 · Thinking High');
+ expect(cells[2].querySelector('.release-history-meta')?.textContent).toBe('Prompt Strategy Grounded');
  expect(document.querySelector('.release-history-table tbody tr:nth-child(2) td:first-child')?.textContent).toBe('Baseline初始配置');
 });
 it('shows only saved remaining failures and online Bad Cases inside the next-input card without writes',async()=>{
@@ -33,8 +33,8 @@ it('shows only saved remaining failures and online Bad Cases inside the next-inp
  const card=document.querySelector('.monitoring-next-inputs');
  expect(document.querySelectorAll('.monitoring-layout > .panel')).toHaveLength(2);
  expect(card?.textContent).toContain('问题怎样回流');
- expect(card?.textContent).toContain('关键证据重排后排第 7 位，保留条数 6 拿不到');
- expect(card?.textContent).toContain('关键证据重排后排第 24 位，保留条数 6 拿不到');
+ expect(card?.textContent).toContain('关键证据重排后排第 7 位，Top-K 6 拿不到');
+ expect(card?.textContent).toContain('关键证据重排后排第 24 位，Top-K 6 拿不到');
  expect([...card!.querySelectorAll('.ui-q')].map(n=>n.textContent)).toEqual(['Q06','Q27']);
  expect(card?.querySelector('.monitoring-online-bad-cases')?.textContent).toContain('暂无');
  expect(document.querySelectorAll('.feedback-next-inputs')).toHaveLength(1);

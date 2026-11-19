@@ -27,8 +27,8 @@ it("shows saved parameter diff before any provider call and restores question", 
   const data = { evaluation: { id: "eval", config: { prompt_strategy: "Grounded" } }, versions: [{ id: "p1", status: "active", provenance: "published", previous_version_id: "baseline-v1", config: { prompt_strategy: "Abstention" } }, { id: "baseline-v1", provenance: "bootstrap", config: { prompt_strategy: "Grounded" } }] };
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<ExperimentPage data={data} onOpenCitation={() => {}} />));
-  expect(document.body.textContent).toContain("有据生成");
-  expect(document.body.textContent).toContain("谨慎拒答");
+  expect(document.body.textContent).toContain("Grounded");
+  expect(document.body.textContent).toContain("Abstention");
   expect(document.body.textContent).not.toContain("上一 线上版本");
   const textarea = document.querySelector("textarea")!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "保留的问题"); textarea.dispatchEvent(new Event("input", { bubbles: true })); });

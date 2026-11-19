@@ -35,8 +35,8 @@ it('renders real strategy fields and explicitly leaves absent data empty',async(
  expect(document.body.textContent).toContain('预计改善 Q04');expect(document.body.textContent).toContain('保留更多内容可能更慢');
  await act(async()=>root.render(<StrategyPresentation reasoning={{hypothesis:'历史字段'}}/>));expect(document.body.textContent).toContain('尚未保存策略名');expect(document.body.textContent).toContain('历史字段');
 });
-it('keeps legacy prompt labels and promotes gate-blocking categories with saved latency',async()=>{
- expect(formatValue('Abstention')).toBe('谨慎拒答');expect(formatValue('Tiered')).toBe('分级回答');
+it('keeps legacy prompt identifiers and promotes gate-blocking categories with saved latency',async()=>{
+ expect(formatValue('Abstention')).toBe('Abstention');expect(formatValue('Tiered')).toBe('Tiered');
  const rows=[{question_id:'Q37',passed:false,diagnostic_view:{diagnosis_category:'回答问题',subfeature:'澄清不足'}}];
  await mount(<BadCaseOverview rows={rows} categories={categories} priorities={[{label:'回答问题',priority:1,priority_note:'导致门槛未过：安全拒答率'}]} latencyGates={[{metric:'latency_p50_seconds',actual:8.4,threshold:26,status:'PASS'},{metric:'latency_p99_seconds',actual:23.7,threshold:61,status:'PASS'}]} onSelect={()=>{}}/>);
  expect(document.querySelector('.ui-bcl')?.textContent).toContain('证据已经交给模型');
@@ -50,7 +50,7 @@ it('sorts stages, folds tiny shares and uses seconds and plain comparison labels
  expect(timing.tiny.map(stage=>stage.stage)).toEqual(['tiny2','tiny1']);
  expect(document.querySelector('[aria-label="耗时拆解"]')).toBeNull();
  await click('查看对照');const dialog=document.querySelector('[role="dialog"]')!;
- expect(dialog.textContent).toContain('最高');expect(dialog.textContent).toContain('高 · 当前回答档位');
+ expect(dialog.textContent).toContain('Max');expect(dialog.textContent).toContain('High · 当前回答档位');
  expect(dialog.textContent).toContain('4.7 秒');expect(dialog.textContent).not.toContain('毫秒');
  expect(dialog.textContent).toContain('回答耗时 P99');expect(dialog.textContent).toContain('每题回答费用');
  expect(dialog.textContent).toContain('回答问题 · 澄清不足');

@@ -34,7 +34,7 @@ it('builds story from saved rounds, original question and the same critical para
  expect(document.querySelector('.ui-ovs-turns')?.textContent).toContain('Round 1');
  expect(document.querySelector('.ui-ovs-turns')?.textContent).toContain('多修好 Q04');
  expect(document.querySelector('.ui-ovs-fixed')?.textContent).toContain('保存的原题');
- expect(document.querySelector('.ui-ovs-fixed-c')?.textContent).toBe('保留条数 4 → 6');
+ expect(document.querySelector('.ui-ovs-fixed-c')?.textContent).toBe('Top-K 4 → 6');
  await act(async()=>document.querySelector<HTMLButtonElement>('.ui-ovs-turns button')!.click());expect(location.hash).toBe('#evolution?tab=route');
  await act(async()=>document.querySelector<HTMLButtonElement>('.ui-ovs-fixed button')!.click());expect(location.hash).toBe('#verification?tab=compare&q=Q04');
 });

@@ -6,17 +6,17 @@ import { errorMessage, postJson } from "../api";
 import { LoadingSkeleton, Badge, Section } from "../components/Primitives";
 import { pipelineCached, pipelineFetch, pipelineIdentity, invalidatePipeline } from "../pipelineCache";
 import { Drawer } from "../components/Dialog";
-import { draftDefaults, formatValue, parameterNames, SearchSpaceTable } from "../components/PipelineFields";
+import { descriptions, draftDefaults, formatValue, parameterNames, SearchSpaceTable } from "../components/PipelineFields";
 
 import { ParamGrid, type ParamGroup } from "../ui/settings/ParamGrid";
 import { ParamChip } from "../ui/Primitives";
 import { HoverCard } from "../ui/HoverCard";
 
 const settingsGroups: Record<string, string[]> = {
-  "查询理解": ["query_rewrite", "multi_query", "hyde"],
+  Query: ["query_rewrite", "multi_query", "hyde", "query_decompose"],
   "检索召回": ["candidate_k", "hybrid_search", "hybrid_alpha"],
   "筛选排序": ["rerank", "top_k", "min_score", "retrieval_max_tokens"],
-  "回答生成": ["prompt_strategy", "generation_thinking"],
+  Generation: ["prompt_strategy", "generation_thinking", "temperature"],
 };
 
 
@@ -40,7 +40,7 @@ export function SettingsPage({ data }: { data: any }) {
     ["分块", knowledge.chunk_strategy ? `Parent-Child 分块 · Parent ${knowledge.parent_tokens} / Child ${knowledge.child_tokens} / 重叠 ${knowledge.overlap_tokens}` : data.documents?.[0]?.chunk_strategy],
     ["Embedding 模型", knowledge.embedding_model || index.embedding_model], ["实际维度", index.dimension != null ? `${index.dimension} 维` : null],
     ["索引", index.vector_index], ["Rerank 模型", knowledge.rerank_model],
-    ["回答生成模型", pipeline?.frozen_models?.generation], ["回答策略", "Strict（分级回答）"], ["Judge 模型", pipeline?.frozen_models?.judge],
+    ["回答生成模型", pipeline?.frozen_models?.generation], ["Judge 模型", pipeline?.frozen_models?.judge],
   ];
   const change = (key: string, value: any) => setDraft(previous => {
     const next = { ...previous, [key]: value };
@@ -62,17 +62,21 @@ export function SettingsPage({ data }: { data: any }) {
       {pipeline?.draft_stale && <p className="error-notice">已保存草稿的基准已变化，请重新核对并保存。</p>}
       <ParamGrid groups={Object.entries(settingsGroups).map(([name, keys], index) => ({
         name, icon: (["target", "data", "layers", "thinking"] as const)[index],
-        items: keys.filter(key => contract[key]).map(key => ({
+        items: keys.filter(key => key === "temperature" || contract[key]).map(key => key === "temperature" ? {
+          key, label: parameterNames[key], note: descriptions[key], options: [],
+          value: pipeline?.fixed_parameters?.temperature ?? 0,
+          fixedValue: formatValue(pipeline?.fixed_parameters?.temperature ?? 0),
+        } : ({
           key, label: parameterNames[key],
           note: parameterHelp[key as keyof typeof parameterHelp],
-          options: contract[key].allowed.filter((value: any) => key !== "top_k" || value <= draft.candidate_k).map((value: any) => ({ value, label: key === "retrieval_max_tokens" && value === false ? "不限" : key === "generation_thinking" && value === "off" ? "Off" : formatValue(value) })),
+          options: contract[key].allowed.filter((value: any) => key !== "top_k" || value <= draft.candidate_k).map((value: any) => ({ value, label: formatValue(value, key) })),
           value: draft[key], baseline: baseline[key], online: published ? onlineConfig?.[key] : undefined,
           disabled: busy || key === "hybrid_alpha" && !draft.hybrid_search, changed: changed.includes(key),
         })),
       })) as ParamGroup[]} onChange={change} legend={{baseline: pipeline?.baseline_config ? changed.length ? "白底：当前草稿；灰点：Baseline 起点" : "白底：Baseline 起点" : undefined, online: published ? "蓝点：当前线上" : undefined}} />
       {(changed.length > 0 || pipeline?.config_draft) && <div className="pipeline-draft-actions">
         <span role="status">{changed.length} 项已修改{pipeline?.config_draft && !pipeline.draft_stale ? " · 配置草稿已保存" : ""}</span>
-        <div className="pipeline-draft-chips">{changed.map(key => <ParamChip key={key} label={parameterNames[key] || key} from={formatValue(base[key])} to={formatValue(draft[key])} />)}</div>
+        <div className="pipeline-draft-chips">{changed.map(key => <ParamChip key={key} label={parameterNames[key] || key} from={formatValue(base[key], key)} to={formatValue(draft[key], key)} />)}</div>
         <HoverCard content="保存后需运行新的 Baseline 才会成为评测基线。Candidate 使用独立实验配置。"><span tabIndex={0} aria-label="草稿生效说明">ⓘ</span></HoverCard>
         <button className="secondary ui-btn-danger" disabled={busy} onClick={() => void save(true)}>放弃修改</button><button className="primary" disabled={busy || !changed.length} onClick={() => void save()}>保存草稿</button>
       </div>}

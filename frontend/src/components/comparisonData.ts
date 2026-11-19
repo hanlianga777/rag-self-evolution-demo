@@ -1,11 +1,13 @@
+import { parameterNames, pipelineValue } from "../display";
 export type Point = {number:number; text:string; before:boolean; after:boolean; fresh:boolean; beforeQuotes:string[]; afterQuotes:string[]};
 export const categoryName = (value:string) => ({positive:'正向题（Positive）',ablation:'消融题（Ablation）',negative:'负向题（Negative）'}[value] || '题型未知');
 export const verdict = (row:any) => row?.passed===true ? '答对' : row?.passed===false ? '答错' : '未知';
 export const finalEvidence = (row:any):any[] | undefined => row?.programmatic_metrics?.retrieval_trace?.final;
 // 2026-11-19 用户要求：Pipeline 参数统一用英文名（对齐 Colin / 扣子）
-export const parameterNames:Record<string,string> = {"candidate_k": "Candidate K", "top_k": "Top-K", "min_score": "Min Score", "hybrid_search": "Hybrid Search", "hybrid_alpha": "Hybrid Alpha", "generation_thinking": "Thinking", "query_decompose": "Query Decompose", "retrieval_max_tokens": "Max Context Tokens", "rerank": "Rerank", "query_rewrite": "Query Rewrite", "multi_query": "Multi-Query", "hyde": "HyDE", "metadata_filter": "Metadata Filter", "alias_mapping": "Alias Mapping", "prompt_strategy": "Prompt Strategy", "temperature": "Temperature"};
-export const parameterValue = (value:any):string => ({max:'Max',high:'High',medium:'Medium',low:'Low',off:'Off',Grounded:'Grounded',Tiered:'Tiered',Strict:'Strict',Looser:'Looser',Safe:'Safe',Completeness:'Completeness',query_only:'Query Only',true:'ON',false:'OFF'}[String(value)] || (value == null ? '未知' : typeof value==='object' ? JSON.stringify(value) : String(value)));
-export function configChanges(before:any,after:any){return [...new Set([...Object.keys(before || {}),...Object.keys(after || {})])].filter(key=>key in parameterNames && JSON.stringify(before?.[key])!==JSON.stringify(after?.[key])).map(key=>({key,label:parameterNames[key] || '其他配置',before:parameterValue(before?.[key]),after:parameterValue(after?.[key])}));}
+export { parameterNames } from "../display";
+export const parameterValue = (value: unknown, key?: string): string =>
+  value && typeof value === "object" ? JSON.stringify(value) : pipelineValue(value, key) ?? "未知";
+export function configChanges(before:any,after:any){return [...new Set([...Object.keys(before || {}),...Object.keys(after || {})])].filter(key=>key in parameterNames && JSON.stringify(before?.[key])!==JSON.stringify(after?.[key])).map(key=>({key,label:parameterNames[key] || '其他配置',before:parameterValue(before?.[key], key),after:parameterValue(after?.[key], key)}));}
 
 // 规则总表二（2026-11-16）：新 Judge 按朋友三维打分，没有"必答要点"。逐维度对比：达到本题型门槛线算达标。
 export const RUBRIC_THRESHOLDS:Record<string,Record<string,number>>={positive:{correctness:80,faithfulness:80,completeness:75},ablation:{correctness:70,faithfulness:75,completeness:65}};
@@ -52,8 +54,8 @@ export function explanation(before:any,after:any,beforeConfig:any,afterConfig:an
     const characters=Array.from(cleaned),excerpt=/[\u4e00-\u9fff]{4}/.test(cleaned) && !/[={}\[\]]/.test(cleaned)?(characters.length>24?characters.slice(0,23).join('')+'…':cleaned):'关键说明';
     const {a,b}=pair;
     let movement:string;
-    if(expanded)movement=`Before 重排 第 ${a.rerank_rank} 位，被 保留条数 截掉；After 重排 ${b.rerank_rank != null ? `第 ${b.rerank_rank} 位` : '位置未知'}，进入 保留条数 第 ${b.final_rank} 位`;
-    else if(recalled)movement=`Before没进候选，After${b.final_rank!=null?`进入 保留条数 第 ${b.final_rank} 位`:'进入候选'}`;
+    if(expanded)movement=`Before 重排 第 ${a.rerank_rank} 位，被 Top-K 截掉；After 重排 ${b.rerank_rank != null ? `第 ${b.rerank_rank} 位` : '位置未知'}，进入 Top-K 第 ${b.final_rank} 位`;
+    else if(recalled)movement=`Before没进候选，After${b.final_rank!=null?`进入 Top-K 第 ${b.final_rank} 位`:'进入候选'}`;
     else {
       const stage=a.final_rank!==b.final_rank?'final_rank':a.rerank_rank!==b.rerank_rank?'rerank_rank':'candidate_rank';
       const label={final_rank:'进入回答的位置',rerank_rank:'重排 位置',candidate_rank:'候选位置'}[stage];
@@ -67,8 +69,8 @@ export function explanation(before:any,after:any,beforeConfig:any,afterConfig:an
   const added = points.filter(point => point.fresh).map(point => String.fromCodePoint(0x2460 + point.number - 1)).join('、');
   const outcome = added ? `补上达标维度 ${added}` : '满足本题保存的判定要求';
   const headline = before?.passed === false && after?.passed === true
-    ? change && expanded ? `关键证据被截掉 → 放宽 保留条数 后进入上下文 → ${outcome}`
-      : change && recalled ? `关键证据未召回 → 扩大 候选数 后进入上下文 → ${outcome}`
+    ? change && expanded ? `关键证据被截掉 → 放宽 Top-K 后进入上下文 → ${outcome}`
+      : change && recalled ? `关键证据未召回 → 提高 Candidate K 后进入上下文 → ${outcome}`
       : `判定未通过 → ${outcome}`
     : steps.map(step => step.text.replace(/^“.*?”：/, '')).join('；') || '保存记录未提供变化依据。';
   return {key:change ? key : undefined,steps,headline};

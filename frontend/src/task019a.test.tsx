@@ -19,7 +19,7 @@ it('uses real Golden fields and omits unavailable columns without placeholder ce
 });
 it('shows saved changes, repaired and harmed questions with the corresponding retrospective',async()=>{
  await mount(<EvolutionRoute evaluation={{config:{hyde:false}}} badCases={[{question_id:'Q15',question:'修好的原问题'},{question_id:'Q07',question:'弄坏的原问题'}]} experiment={{candidates:[{id:'R1-A',status:'evaluated',config:{hyde:true},reasoning:{candidate_label:'A',round:1},result:{all_fixed_question_ids:['Q15'],new_regression_question_ids:['Q07']}}],result:{prior_round_reviews:{'2':{status:'saved',review:{conclusions:[{id:'L1',conclusion:'检索改动有速度成本'}]}}}}}}/>);
- expect(document.body.textContent).toContain('Agent 本轮复盘');expect(document.body.textContent).toContain('修好：修好的原问题');expect(document.body.textContent).toContain('弄坏：弄坏的原问题');expect(document.body.textContent).toContain('假设答案检索');expect(document.body.textContent).toContain('检索改动有速度成本');
+ expect(document.body.textContent).toContain('Agent 本轮复盘');expect(document.body.textContent).toContain('修好：修好的原问题');expect(document.body.textContent).toContain('弄坏：弄坏的原问题');expect(document.body.textContent).toContain('HyDE');expect(document.body.textContent).toContain('检索改动有速度成本');
 });
 it('persists visible unattended authorization with actor and never offers automatic publish',async()=>{
  const fetcher=vi.fn(async(_url:string,init?:RequestInit)=>new Response(JSON.stringify(init?.method==='POST'?{enabled:true,actor:'当前用户',authorized_at:'2026-11-05T12:00:00Z'}:{off_peak_only:true,unattended_authorization:{enabled:false,actor:null,authorized_at:null}})));

@@ -18,7 +18,7 @@ const response = (value: any) => new Response(JSON.stringify(value));
 it('uses the shared vocabulary while preserving common RAG terms', () => {
  for (const [key, value] of Object.entries({ 'Hard Gate': 'Hard Gate', Overall: '综合分', Candidate: 'Candidate', Regression: 'Regression Check', Recommendation: '推荐 Candidate', Release: '发布', Production: '线上版本', Monitoring: '监控', Snapshot: '冻结版本', Slot: '题位', Coverage: '覆盖规划', 'Human Gate': '人工确认', positive: '正向（Positive）' })) expect(displayText(key)).toBe(value);
  for (const key of ['Pipeline', 'Agent', 'Sandbox', 'HyDE', 'Rerank']) expect(displayText(key)).toBe(key);
- expect(parameterNames.hyde).toBe('假设答案检索'); expect(parameterNames.top_k).toBe('保留条数');
+ expect(parameterNames.hyde).toBe('HyDE'); expect(parameterNames.top_k).toBe('Top-K');
  expect(gateNames.safe_rejection_rate).toBe('安全拒答率');
 });
 it('reads overview metrics from the selected saved evaluation, and never fabricates pending results', async () => {
@@ -63,7 +63,7 @@ it('reads Agent progress from the saved budget and keeps the internal Baseline I
  vi.stubGlobal('fetch', vi.fn(async () => response({ search_space: {} })));
  await mount(<EvolutionPage data={{ evaluation: { id: 'internal-agent-baseline', status: 'completed', created_at: '2026-11-01T02:00:00Z', config: { generation_thinking: 'high' } }, optimization: { id: 'exp', evaluation_budget: { used: 4, max: 17, reserved_for_d: 2 }, candidates: [] } }} />);
  expect(document.querySelector('.ui-agent-stats > div:nth-child(3)')?.textContent).toContain('4 / 17');
- expect(document.querySelector('.agent-identity')?.textContent).toContain('Baseline · 高 · 11-01');
+ expect(document.querySelector('.agent-identity')?.textContent).toContain('Baseline · High · 11-01');
  expect(document.querySelector('.agent-identity')?.textContent).not.toContain('internal-agent-baseline');
 });
 it('names a runtime version from its saved date and hides its internal ID', async () => {

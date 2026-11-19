@@ -85,7 +85,8 @@ class FinalPolicyTests(unittest.TestCase):
         hybrid_off["hybrid_search"] = False
         self.assertTrue(validate_candidate_config(hybrid_off)["valid"])
         self.assertFalse(validate_candidate_config({**config, "rerank_top_n": 10})["valid"])
-        for parameter,value in (("metadata_filter","FALLBACK"),("alias_mapping",True),("query_decompose",True)):
+        self.assertTrue(validate_candidate_config({**config, "query_decompose": True})["valid"])
+        for parameter,value in (("metadata_filter","FALLBACK"),("alias_mapping",True)):
             with self.subTest(parameter=parameter):
                 self.assertFalse(validate_candidate_config({**config,parameter:value})["valid"])
         self.assertFalse(validate_candidate_config(config, prior_configs=[config])["valid"])

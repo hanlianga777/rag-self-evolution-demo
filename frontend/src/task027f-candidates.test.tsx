@@ -95,7 +95,7 @@ it('027f2 uses saved values in two concise recommendation sentences and natural 
  expect(document.querySelectorAll('.ui-fin-reason > li')).toHaveLength(4);expect(text).toContain('多修好了 Q04');expect(text).toContain('36.7 秒');expect(text).toContain('四、回归');
  await click('进化路线');await click('Candidate D');
  const side=document.querySelector('.d-side-effects')?.textContent || '';
- expect(side).toContain('前几轮里，保留条数 6 出现时伴随过副作用：R1-C 新增了 Q15、Q17、Q43，安全拒答降到 90%；R2-B 新增了 Q17、Q37、Q46，安全拒答 90%、P99 64.8 秒。');
- expect(side).toContain('不能证明是 保留条数 造成的');expect(side).toContain('实际结果：');expect(side).not.toContain('全部守住');
+ expect(side).toContain('前几轮里，Top-K 6 出现时伴随过副作用：R1-C 新增了 Q15、Q17、Q43，安全拒答降到 90%；R2-B 新增了 Q17、Q37、Q46，安全拒答 90%、P99 64.8 秒。');
+ expect(side).toContain('不能证明是 Top-K 造成的');expect(side).toContain('实际结果：');expect(side).not.toContain('全部守住');
  expect(JSON.stringify(data)).toBe(before);
 });

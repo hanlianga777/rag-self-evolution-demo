@@ -16,8 +16,7 @@ const translations: Record<string, string> = {
   "no_effective_composite": "无有效组合",
   "round_completed": "本轮评测完成",
   "owner_delegated": "所有者委托 AI 审核", "owner_delegated_confirmed": "所有者委托 AI 批准", "owner_delegated_approved": "机器合格", "ai_agent": "AI 代理",
-  "unclassified": "待分类", "Ordinary": "普通", "ordinary": "普通", "Critical": "严重", "critical": "严重", "query_only": "原问题排序", "STRICT": "严格", "FALLBACK": "回退", "ON": "开启", "OFF": "关闭",
-  "Grounded": "有据生成", "Completeness": "完整性优先", "Abstention": "谨慎拒答", "Tiered": "分级回答", "Strict": "Strict（分级回答）",
+  "unclassified": "待分类", "Ordinary": "普通", "ordinary": "普通", "Critical": "严重", "critical": "严重", "STRICT": "严格", "FALLBACK": "回退", "ON": "开启", "OFF": "关闭",
   "Query": "查询处理", "Retrieval": "检索", "Generation": "回答生成",
   "Pending": "等待中", "pending": "等待中", "needs_human_review": "待确认", "machine_qualified": "机器合格",
   "expected_improvement": "预期收益", "root_cause": "技术根因", "new_failures": "新增 Bad Case",
@@ -74,15 +73,15 @@ export function displayText(value: string): string {
 
 // Exact whole-record translations only. Unknown prose stays explicitly marked; originals remain in the audit.
 const savedNarratives: Record<string, string> = {
-  "Increasing top_k from 4 to 6 during context selection will recover the omitted DOC-004-C-00032 requirement for V1G-110926448917-08 and reduce its Ranking omission without changing retrieval or generation stages.": "在上下文选择阶段将 TopK 从 4 调整为 6，假设可以补回 Q08 遗漏的 DOC-004-C-00032 要求，减少排序阶段遗漏；不改变检索和回答生成阶段。",
+  "Increasing top_k from 4 to 6 during context selection will recover the omitted DOC-004-C-00032 requirement for V1G-110926448917-08 and reduce its Ranking omission without changing retrieval or generation stages.": "在上下文选择阶段将 Top-K 从 4 调整为 6，假设可以补回 Q08 遗漏的 DOC-004-C-00032 要求，减少排序阶段遗漏；不改变检索和回答生成阶段。",
   "Recover DOC-004-C-00032 in Final for V1G-110926448917-08, satisfy checks 5, 6, and 8, and preserve baseline gate results.": "预期在 Q08 的最终上下文中补回 DOC-004-C-00032，满足检查项 5、6、8，并保持 Baseline 的 Gate 结果。",
   "May add noisy context and increase latency; only V1G-110926448113-08 is confirmed eligible, and the remaining 50-question regression plus 11 gates must still pass.": "可能引入上下文噪声并增加延迟；原文仅确认 V1G-110926448113-08 具备资格，仍须通过 50 题 Regression 与 11 项 Gate。",
-  "If V1G-110926448917-08 still fails checks 5/6/8 with DOC-004-C-00032 absent from Final under top_k=6, or if any of the 50-question regression or 11 gates fail, this hypothesis is not supported.": "若 TopK 为 6 时，Q08 的最终上下文仍缺少 DOC-004-C-00032 且检查项 5、6、8 仍失败，或 50 题 Regression、11 项 Gate 中任一项未通过，则该假设不获支持。",
+  "If V1G-110926448917-08 still fails checks 5/6/8 with DOC-004-C-00032 absent from Final under top_k=6, or if any of the 50-question regression or 11 gates fail, this hypothesis is not supported.": "若 Top-K 为 6 时，Q08 的最终上下文仍缺少 DOC-004-C-00032 且检查项 5、6、8 仍失败，或 50 题 Regression、11 项 Gate 中任一项未通过，则该假设不获支持。",
 };
 
 // Display-only normalization shared by saved Agent explanations and generated summaries.
 export function agentDisplayText(value: string): string {
-  const names: Record<string, string> = { ...parameterNames, ...gateNames, high: "High", max: "Max", low: "Low", safe_rejection: "安全拒答率", p99: "P99", p50: "P50" };
+  const names: Record<string, string> = { ...parameterNames, ...gateNames, ...pipelineValueNames, TopK: "Top-K", MinScore: "Min Score", safe_rejection: "安全拒答率", p99: "P99", p50: "P50" };
   return presentationText(value).replace(new RegExp(`\\b(?:${Object.keys(names).join('|')})\\b(\\s*=\\s*)?`, 'g'),
     (key, equals) => `${names[key.replace(/\s*=\s*$/, '')]}${equals ? ' ' : ''}`)
     .replace(/方案\s*([ABCD])\b/g, 'Candidate $1').replace(/错题/g, 'Bad Case').replace(/方案/g, 'Candidate').replace(/赢家/g, 'Winner')
@@ -113,7 +112,7 @@ export const gateEnglishNames: Record<string, string> = {
 export const shortDate = (value?: string) => value && !Number.isNaN(Date.parse(value))
   ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit" }).format(new Date(value)).replace("/", "-") : "日期未知";
 export function baselineName(run: any): string {
-  const level = { off: "关闭", low: "低", high: "高", max: "最高" }[run?.config?.generation_thinking as string] || "档位未知";
+  const level = pipelineValue(run?.config?.generation_thinking, "generation_thinking") ?? "档位未知";
   return `Baseline · ${level} · ${shortDate(run?.created_at)}`;
 }
 export function productionName(version: any): string {
@@ -129,12 +128,25 @@ export function questionSource(row: any): string {
 // 2026-11-19 用户要求：Pipeline 参数统一用英文名（对齐 Colin / 扣子）
 export const parameterNames:Record<string,string> = {"candidate_k": "Candidate K", "top_k": "Top-K", "min_score": "Min Score", "hybrid_search": "Hybrid Search", "hybrid_alpha": "Hybrid Alpha", "generation_thinking": "Thinking", "query_decompose": "Query Decompose", "retrieval_max_tokens": "Max Context Tokens", "rerank": "Rerank", "query_rewrite": "Query Rewrite", "multi_query": "Multi-Query", "hyde": "HyDE", "metadata_filter": "Metadata Filter", "alias_mapping": "Alias Mapping", "prompt_strategy": "Prompt Strategy", "temperature": "Temperature"};
 
+const pipelineValueNames: Record<string, string> = {
+  off: "Off", low: "Low", medium: "Medium", high: "High", max: "Max",
+  query_only: "Query Only", StrictComplete: "Looser", StrictSafe: "Safe",
+};
+
+export function pipelineValue(value: unknown, key?: string): string | undefined {
+  if (value == null) return undefined;
+  if (key === "retrieval_max_tokens" && value === false) return "Unlimited";
+  if (key === "multi_query" && value === 0) return "OFF";
+  if (typeof value === "boolean") return value ? "ON" : "OFF";
+  return typeof value === "string" && Object.hasOwn(pipelineValueNames, value) ? pipelineValueNames[value] : String(value);
+}
+
 export const descriptions: Record<string, string> = {
-  generation_thinking: "可选择 OFF / Low / High / Max", query_decompose: "拆解独立意图并分别检索；默认关闭", retrieval_max_tokens: "不限 / 8192 / 4096；缺少 tokenizer 时按字符数估算 token",
+  generation_thinking: "可选择 Off / Low / High / Max", query_decompose: "拆解独立意图并分别检索；默认 OFF", retrieval_max_tokens: "Unlimited / 8192 / 4096；缺少 tokenizer 时按字符数估算 token",
   candidate_k: "初始候选召回数量", top_k: "进入回答上下文的证据数量", min_score: "进入上下文前的最低相关分",
   hybrid_search: "组合向量与BM25", hybrid_alpha: "Embedding Retrieval 在 Hybrid Search 中的权重", rerank: "模型 Rerank、原排序或仅原问题的 BM25 排序",
   query_rewrite: "生成标准化检索问法", multi_query: "生成互补检索问法", hyde: "先写一段假设答案，再拿去检索",
-  metadata_filter: "按可靠元数据筛选", alias_mapping: "使用已审核别名映射", prompt_strategy: "Strict：分级回答（Baseline）；Looser：有据直接答、答全要点；Safe：安全结论在前、拒绝绕过与注入", temperature: "固定为 0：关闭 Thinking 时请求温度为 0，同一请求结果一致；不作为 Agent 可调参数",
+  metadata_filter: "按可靠元数据筛选", alias_mapping: "使用已审核别名映射", prompt_strategy: "Strict：分级回答（Baseline）；Looser：有据直接答、答全要点；Safe：安全结论在前、拒绝绕过与注入", temperature: "Thinking 为 Off 时，请求固定使用 0。",
 };
 
 export function localShortTime(value?: string): string {

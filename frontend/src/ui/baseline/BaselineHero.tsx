@@ -22,7 +22,7 @@ export function BaselineHero({ gates, correct, total, badCount, layers, thinking
       <div className="ui-bl-cell"><span><IconLabel name="gate">Hard Gate</IconLabel></span><strong className="ui-num">{gates.passed} / {gates.total}</strong><StatusBadge kind={allPassed ? "qualified" : "failed"} label={allPassed ? "全部通过" : "未全部通过"} /></div>
       <div className="ui-bl-cell"><span><IconLabel name="correct">答对</IconLabel></span><strong className="ui-num">{correct} / {total}</strong><small>{badCount} 个 Bad Case</small></div>
       <div className="ui-bl-cell"><span><IconLabel name="layers">Bad Case 分层</IconLabel></span><div className="ui-bl-layers">{layers.map(item => <span key={item.label}>{item.label} <b className="ui-num">{item.count}</b></span>)}</div></div>
-      <div className="ui-bl-cell"><span><IconLabel name="thinking">Thinking 档位</IconLabel></span><strong>{thinking ?? "未知"}</strong><small className="ui-num">P50 {p50 != null ? `${p50.toFixed(1)} 秒` : "未知"} · P99 {p99 != null ? `${p99.toFixed(1)} 秒` : "未知"}</small></div>
+      <div className="ui-bl-cell"><span><IconLabel name="thinking">Thinking</IconLabel></span><strong>{thinking ?? "未知"}</strong><small className="ui-num">P50 {p50 != null ? `${p50.toFixed(1)} 秒` : "未知"} · P99 {p99 != null ? `${p99.toFixed(1)} 秒` : "未知"}</small></div>
     </div>
     {stages.length > 0 && <div className="ui-bl-time">
       <div className="ui-bl-time-head"><span><IconLabel name="time">耗时构成</IconLabel></span></div>

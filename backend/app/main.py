@@ -36,7 +36,7 @@ from .optimization import OptimizationAgent
 from .diagnostics import diagnostic_view
 from .diagnostic_categories import DIAGNOSTIC_CATEGORIES
 from .product_diagnostics import product_diagnostics
-from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, search_space_contract, validate_candidate_config
+from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, FIXED_PIPELINE_PARAMETERS, search_space_contract, validate_candidate_config
 from .telemetry import price_config
 from .providers import DeepSeekProvider, ProviderTimeout, ProviderUnavailable
 from .retrieval import RetrievalUnavailable
@@ -1680,6 +1680,7 @@ def pipeline():
         "baseline_id": baseline["id"] if baseline else None,
         "baseline_config": baseline["config"] if baseline else None,
         "search_space": search_space_contract(),
+        "fixed_parameters": FIXED_PIPELINE_PARAMETERS,
         "locked_parameters": sorted(EXCLUDED_AUTOMATIC_PARAMETERS),
         "index": knowledge_state["index"],
         "knowledge": knowledge_state,

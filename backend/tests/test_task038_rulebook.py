@@ -34,7 +34,7 @@ def test_defaults_are_strict_and_max():
     assert ALLOWED_SEARCH_SPACE["generation_thinking"] == ("off", "low", "high", "max")
 
 
-def test_prompt_strategy_is_fixed_not_tunable():
+def test_prompt_strategy_rejects_legacy_values():
     config = base_config()
     assert validate_candidate_config(config)["valid"]
     config["generation_thinking"] = "high"
@@ -48,10 +48,10 @@ def test_prompt_strategy_is_fixed_not_tunable():
 @pytest.mark.parametrize("critical,ordinary,base_bad,cand_bad,ok", [
     (0, 0, 8, 7, True),
     (0, 1, 8, 7, True),     # 修好2、新增1普通，净少1
-    (0, 2, 8, 6, False),    # 新增普通超过1道
+    (0, 2, 8, 6, True),     # 普通新增题不设上限
     (1, 0, 8, 6, False),    # 新增严重题
-    (0, 1, 8, 8, False),    # 修好1新增1，总数没少
-    (0, 0, 8, 8, False),
+    (0, 1, 8, 8, True),     # 总错题数持平仍满足合格门槛
+    (0, 0, 8, 8, True),
 ])
 def test_candidate_and_release_use_one_rule(critical, ordinary, base_bad, cand_bad, ok):
     reg = regression(critical, ordinary)

@@ -16,9 +16,9 @@ it('shows inherited parameters in muted text and keeps only new changes in the c
  await act(async()=>root.render(<EvolutionPage data={{evaluation:{id:'BASE',config:base},optimization:experiment}}/>));
  const card=document.querySelector('.candidate-card')!;
  const inherited=[...card.querySelectorAll('p.muted')].find(p=>p.textContent?.includes('在 Candidate A 的基础上'))!;
- expect(inherited).toBeTruthy();expect(inherited.textContent).toContain('分级回答');
+ expect(inherited).toBeTruthy();expect(inherited.textContent).toContain('Tiered');
  const change=[...card.querySelectorAll('section')].find(p=>p.querySelector('h4')?.textContent==='改动参数')!;
- expect(change.textContent).toContain('4 → 6');expect(change.textContent).not.toContain('分级回答');
+ expect(change.textContent).toContain('4 → 6');expect(change.textContent).not.toContain('Tiered');
  expect(change.textContent).not.toContain('max');
 });
 it('uses the complete Baseline diff in timeline parameters and avoids single-parameter attribution for inherited bundles',async()=>{

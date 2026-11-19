@@ -30,12 +30,12 @@ it("centres the actual published snapshot while a newer recommendation remains u
 
 it("shows only changed parameters on the release main screen and opens full configuration in a Drawer", async () => {
   await render(<VersionsPage data={{ versions: [production, { id: "baseline-v1", status: "archived", config: { prompt_strategy: "Grounded", rerank: false } }] }} />);
-  expect(document.querySelector(".release-diff")?.textContent).toContain("有据生成");
-  expect(document.querySelector(".release-diff")?.textContent).toContain("谨慎拒答");
-  expect(document.querySelector(".page-content")?.textContent).not.toContain("重排序");
+  expect(document.querySelector(".release-diff")?.textContent).toContain("Grounded");
+  expect(document.querySelector(".release-diff")?.textContent).toContain("Abstention");
+  expect(document.querySelector(".page-content")?.textContent).not.toContain("Rerank");
   expect(document.querySelector(".release-panel-layout details")).toBeNull();
   await click("查看发布快照");
-  expect(document.querySelector(".drawer")?.textContent).toContain("重排序");
+  expect(document.querySelector(".drawer")?.textContent).toContain("Rerank");
   expect(document.querySelector(".drawer pre")).toBeNull();
 });
 

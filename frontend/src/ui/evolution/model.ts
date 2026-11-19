@@ -4,6 +4,8 @@
  * 输出：页面直接渲染用的轮次 / Candidate 模型。所有文字都由保存数据生成，不编。
  */
 
+import { parameterNames, pipelineValue } from "../../display";
+
 export type ParamChange = { key: string; label: string; from?: string; to: string };
 export type CandidateView = {
   id: string; label: string; round: number; name: string; direction: string; efficiency: boolean;
@@ -17,18 +19,10 @@ export type CandidateView = {
 export type RoundView = { round: number; candidates: CandidateView[]; summary: string; fastestId: string | null; thought?: string; lesson?: { text: string; source: string } };
 export type EvolutionModel = { rounds: RoundView[]; winnerId: string | null; d: CandidateView | null; budget: { used: number; max: number } | null };
 
-export const PARAM_LABELS:Record<string,string> = {"candidate_k": "候选数", "top_k": "保留条数", "min_score": "最低相关分", "hybrid_search": "混合检索", "hybrid_alpha": "语义检索权重", "generation_thinking": "思考档位", "query_decompose": "问题拆解", "retrieval_max_tokens": "资料总长度上限", "rerank": "重排序", "query_rewrite": "问题改写", "multi_query": "多路查询", "hyde": "假设答案检索", "metadata_filter": "元数据筛选", "alias_mapping": "别名映射", "prompt_strategy": "回答策略"};
-
-const THINKING: Record<string, string> = { off: "关闭", low: "低", medium: "中", high: "高", max: "最高" };
-const STRATEGY: Record<string, string> = { Grounded: "有据生成", Tiered: "分级回答", Strict: "Strict（分级回答）" };
+export const PARAM_LABELS = parameterNames;
 
 export function paramValue(key: string, value: unknown): string {
-  if (value === undefined || value === null) return "未知";
-  if (key === "generation_thinking" && typeof value === "string") return THINKING[value] ?? value;
-  if (key === "prompt_strategy" && typeof value === "string") return STRATEGY[value] ?? value;
-  if (key === "multi_query" && (value === false || value === 0)) return "关闭";
-  if (typeof value === "boolean") return value ? "开启" : "关闭";
-  return String(value);
+  return pipelineValue(value, key) ?? "未知";
 }
 
 export const shortId = (id: string): string => {
@@ -124,12 +118,12 @@ function roundLesson(round: number, candidates: any[], winnerId: string | null):
   const [a, b, c] = saved;
   let text: string | undefined;
   if (round === 1 && changedOnly(a, { candidate_k: 24, multi_query: 2 }) && fixes(a, ['Q24', 'Q29', 'Q38']) && a.result.all_fixed_question_ids.length === 3 && gate(a, 'latency_p99_seconds')?.passed === false && changedOnly(c, { generation_thinking: 'high', top_k: 6 }) && fixes(c, ['Q04', 'Q06']) && failedSafety(c))
-    text = '扩候选+多路查询修好 3 题，但 P99 超标；降档+Top-K 6 修好 Q04、Q06，却拉低了安全拒答。';
+    text = '扩候选＋Multi-Query 修3题，P99超标。降档＋Top-K 6修Q04/Q06，安全拒答下降。';
   if (round === 2 && saved.every(item => list(item.result.new_regression_question_ids).includes('Q17')) && topKLessonEvidence(candidates) && failedSafety(b))
     text = '三个 Candidate 新增 Q17；Top-K 6 修好 Q04、Q06，但安全拒答下降。';
   const previous = candidates.filter(item => ['A', 'B', 'C'].includes(item.reasoning?.candidate_label) && item.reasoning.round < round);
   if (round === 3 && previous.length === 6 && previous.every(item => savedFacts(item) && item.result.new_regression_question_ids.length > 0) && changedOnly(c, { generation_thinking: 'high', candidate_k: 24 }) && fixes(c, ['Q24', 'Q29', 'Q38']) && !c.result.new_regression_question_ids.length && a.result.new_regression_question_ids.length && b.result.new_regression_question_ids.length && c.result.gates.passed && c.id === winnerId)
-    text = '降低思考档、同时把候选扩到 24，首次做到零新增 Bad Case，成为 Winner。';
+    text = '降档并把 Candidate K 提至 24，首次做到零新增 Bad Case，成为 Winner。';
   if (!text) return;
   const source = saved.map(item => {
     const r = item.result, p99 = gate(item, 'latency_p99_seconds'), safety = gate(item, 'safe_rejection_rate');

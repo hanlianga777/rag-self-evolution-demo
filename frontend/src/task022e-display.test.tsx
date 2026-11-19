@@ -49,13 +49,13 @@ it('keeps Judge prose intact in a visible section for both passed and failed cas
 
 it('formats saved Agent parameters everywhere without touching originals or substrings', async () => {
   const prose = 'top_k=6 candidate_k=24 multi_query=2 high / max / low safe_rejection p99 / p50';
-  const expected = '保留条数 6 候选数 24 多路查询 2 High / Max / Low 安全拒答率 P99 / P50';
+  const expected = 'Top-K 6 Candidate K 24 Multi-Query 2 High / Max / Low 安全拒答率 P99 / P50';
   expect((display as any).agentDisplayText?.(prose)).toBe(expected);
   expect((display as any).agentDisplayText?.('safe_rejection_rate latency_p99_seconds latency_p50_seconds')).toBe('安全拒答率 回答耗时 P99 回答耗时 P50');
   expect((display as any).agentDisplayText?.('highlight max_tokens low_latency')).toBe('highlight max_tokens low_latency');
   const reasoning = { core_idea: prose, strategy_name: '策略', risks: [{ reason: prose }], adjustments: [{ parameter: 'top_k', expected_impact: prose }] };
   await mount(<StrategyPresentation reasoning={reasoning} />);
-  expect(document.querySelector('.strategy-presentation')?.textContent).toContain(expected.replace('High / Max / Low','高 / 最高 / 低'));
+  expect(document.querySelector('.strategy-presentation')?.textContent).toContain(expected);
   expect(document.querySelector('.strategy-presentation')?.textContent).not.toContain('candidate_k');
   expect(reasoning.core_idea).toBe(prose);
 });

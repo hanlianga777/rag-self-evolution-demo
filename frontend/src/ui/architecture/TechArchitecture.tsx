@@ -14,10 +14,10 @@ import "./architecture.css";
 
 type P = { title: string; icon: IconName; params: string[]; tip: string };
 const STEPS: P[] = [
-  { title: "查询理解", icon: "search", params: ["问题改写", "多路查询", "假设答案检索"], tip: "把用户的口语问题变成更好检索的说法：改写成规范问法、生成几个互补问法，或先写一段假设答案再拿去检索。" },
-  { title: "检索召回", icon: "network", params: ["候选数", "混合检索", "Embedding 权重"], tip: "先从知识库里多捞一些候选段落：向量检索看语义，BM25 看原词，两者按权重融合。" },
-  { title: "筛选排序", icon: "rerank", params: ["重排序", "保留条数", "最低相关分", "上下文容量"], tip: "用重排模型给候选段落重新打分排序，按最低分过滤，再把命中的小块换成所在的完整段落（Parent），取前 保留条数 段交给模型。" },
-  { title: "回答生成", icon: "cite", params: ["回答策略", "思考档位"], tip: "按回答策略组织答案：先结论、再步骤、安全警告在前，句末用角标标出处；思考档位决定模型想多深。" },
+  { title: "查询理解", icon: "search", params: ["Query Rewrite", "Multi-Query", "HyDE", "Query Decompose"], tip: "把用户的口语问题变成更好检索的说法：改写成规范问法、生成几个互补问法，或先写一段假设答案再拿去检索。" },
+  { title: "检索召回", icon: "network", params: ["Candidate K", "Hybrid Search", "Hybrid Alpha"], tip: "先从知识库里多捞一些候选段落：向量检索看语义，BM25 看原词，两者按权重融合。" },
+  { title: "筛选排序", icon: "rerank", params: ["Rerank", "Top-K", "Min Score", "Max Context Tokens"], tip: "用重排模型给候选段落重新打分排序，按最低分过滤，再把命中的小块换成所在的完整段落（Parent），按 Top-K 取前几段交给模型。" },
+  { title: "回答生成", icon: "cite", params: ["Prompt Strategy", "Thinking", "Temperature"], tip: "按回答策略组织答案：先结论、再步骤、安全警告在前，句末用角标标出处；思考档位决定模型想多深。" },
 ];
 
 type M = { title: string; vendor: string; line: string; tip: string; icon: IconName };

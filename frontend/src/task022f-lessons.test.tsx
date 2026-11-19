@@ -22,7 +22,7 @@ const experiment=(candidates:any[])=>({candidates,result:{report_confirmation:{w
 const build=(cs:any[])=>buildEvolutionModel(experiment(cs),{},x=>x,c=>c.id);
 it('derives cross-candidate lessons from saved results, keeping the combined R1 changes and all source facts',()=>{
  const model=build(savedCandidates());
- expect(model.rounds[0].lesson?.text).toContain('多路查询修好 3 题');
+ expect(model.rounds[0].lesson?.text).toContain('Multi-Query 修3题');
  expect(model.rounds[1].lesson?.text).toContain('三个 Candidate 新增 Q17');
  expect(model.rounds[2].lesson?.text).toContain('首次做到零新增 Bad Case');
  for(const round of model.rounds){expect(('本轮经验：'+round.lesson!.text).length).toBeLessThanOrEqual(60);for(const label of ['A','B','C'])expect(round.lesson?.source).toContain(`Round ${round.round} · Candidate ${label}：修好`);}
@@ -35,7 +35,7 @@ it('omits unsupported lessons when saved parameters, results or the first-zero/W
  const missing=savedCandidates();delete (missing[2].result.gates.gates[0] as any).actual;expect(build(missing).rounds[0].lesson).toBeUndefined();
  const model=buildEvolutionModel({candidates:savedCandidates()}, {},x=>x,c=>c.id);expect(model.rounds[2].lesson).toBeUndefined();
 });
-it('opens evidence in HoverCard through keyboard focus and shows verified 保留条数 evidence on the D chip',async()=>{
+it('opens evidence in HoverCard through keyboard focus and shows verified Top-K evidence on the D chip',async()=>{
  const cs=savedCandidates();cs.push({...candidate(3,'D',{top_k:6},['Q04'],[],11),reasoning:{candidate_label:'D',winner_id:'R3-C',changed_parameters:{top_k:6}}} as any);
  const node=document.body.appendChild(document.createElement('div')),root=createRoot(node);
  try {

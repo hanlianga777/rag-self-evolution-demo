@@ -111,7 +111,7 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
   const state=data.optimization?.result || {},facts=state.d_facts || state.composite?.facts || recommendationOf(data.optimization).composite?.facts || {};
   const remainingReason=(id:string)=>{
     const rank=missedEvidenceRank(d,facts.remaining_failures?.find((row:any)=>row.question_id===id));
-    return rank!==undefined ? `关键证据${d.config?.rerank===false ? '召回后' : '重排后'}排第 ${rank} 位，保留条数 ${d.config.top_k} 拿不到` : '保存的证据位置不足，原因未知。';
+    return rank!==undefined ? `关键证据${d.config?.rerank===false ? '召回后' : '重排后'}排第 ${rank} 位，Top-K ${d.config.top_k} 拿不到` : '保存的证据位置不足，原因未知。';
   };
   const openRemaining=(id:string)=>{setQuestionId(id);setTab("compare");location.hash=`verification?tab=compare&q=${encodeURIComponent(id)}`;};
   return <PageShell className={`page verification-page verification-${tab}`} header={<div className="page-title"><div><h1><IconTile name="verify" />问答验证</h1><p className="ui-kicker page-purpose">{pagePurpose.verification}</p></div></div>} tabs={<div className="tabs"><button data-label="Before/After" aria-pressed={tab === "compare"} className={tab === "compare" ? "selected" : ""} onClick={() => setTab("compare")}>Before/After</button><button data-label="实时问答" aria-pressed={tab === "qa"} className={tab === "qa" ? "selected" : ""} onClick={() => setTab("qa")}>实时问答</button><button data-label="Monitoring" aria-pressed={tab === "monitoring"} className={tab === "monitoring" ? "selected" : ""} onClick={() => setTab("monitoring")}>Monitoring</button></div>} resetKey={tab}>

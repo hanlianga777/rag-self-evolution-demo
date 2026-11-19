@@ -51,7 +51,7 @@ it('separates the short conclusion from before and after evidence ranks',()=>{
  const row=(check:any)=>({passed:false,diagnostic_view:{evidence_checks:[{quote:'只在室内存放设备',...check}]},programmatic_metrics:{retrieval_trace:{final:Array(6).fill({})}}});
  const points=[{number:1,text:'只在室内',before:false,after:true,fresh:true,beforeQuotes:[],afterQuotes:[]}];
  const why=explanation(row({rerank_rank:5,final_rank:null}),{...row({rerank_rank:6,final_rank:6}),passed:true},{top_k:4},{top_k:6},points);
- expect(why).toHaveProperty('headline','关键证据被截掉 → 放宽 保留条数 后进入上下文 → 补上达标维度 ①');
+ expect(why).toHaveProperty('headline','关键证据被截掉 → 放宽 Top-K 后进入上下文 → 补上达标维度 ①');
  expect(why.steps[1].text).toContain('Before 重排 第 5 位');expect(why.steps[1].text).toContain('After 重排 第 6 位');
 });
 it.each([true,false])('shows only knowledge coverage totals without snapshot provenance (%s)',async(matches)=>{

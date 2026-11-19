@@ -13,6 +13,7 @@ export type ParamOption = { value: unknown; label: string };
 export type ParamItem = {
   key: string; label: string; note?: string; options: ParamOption[];
   value: unknown; baseline?: unknown; online?: unknown; disabled?: boolean; changed?: boolean; onlineChanged?: boolean;
+  fixedValue?: string;
 };
 export type ParamGroup = { name: string; icon?: IconName; items: ParamItem[] };
 
@@ -34,7 +35,7 @@ export function ParamGrid({ groups, onChange, legend = { baseline: "Baseline", o
             <span>{item.label}</span>
             {item.note && <HoverCard content={item.note}><span className="ui-pg-info" tabIndex={0} aria-label={`${item.label}说明`}><Icon name="info" size={13} /></span></HoverCard>}
           </div>
-          <div className="ui-pg-seg" role="radiogroup" aria-label={item.label}>
+          {item.fixedValue !== undefined ? <span>{item.fixedValue}（固定）</span> : <div className="ui-pg-seg" role="radiogroup" aria-label={item.label}>
             {item.options.map(option => {
               const selected = same(item.value, option.value);
               const isBase = item.baseline !== undefined && same(item.baseline, option.value);
@@ -47,7 +48,7 @@ export function ParamGrid({ groups, onChange, legend = { baseline: "Baseline", o
                 {(isBase || isOnline) && <span className="ui-pg-marks" aria-hidden="true">{isBase && <i className="dot base" />}{isOnline && <i className="dot online" />}</span>}
               </button>;
             })}
-          </div>
+          </div>}
         </div>)}
       </section>)}
     </div>

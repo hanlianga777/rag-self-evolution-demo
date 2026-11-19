@@ -21,7 +21,7 @@ it('preloads the light list and every case before local filtering/searching',asy
  expect(fetcher.mock.calls).toHaveLength(6);expect(fetcher.mock.calls.every(([p])=>/comparison-cases|\/cases\/Q0[46]/.test(p))).toBe(true);
  expect(document.querySelector('.comparison-rail')?.textContent).toContain('修好的1');
  expect([...document.querySelectorAll('.comparison-step .comparison-t')].map(n=>n.textContent)).toEqual(['配置变化','证据位置变化','结果变化']);
- expect(document.querySelector('.comparison-steps')?.textContent).toContain('保留条数 4 → 6');
+ expect(document.querySelector('.comparison-steps')?.textContent).toContain('Top-K 4 → 6');
  expect(document.querySelector('.comparison-steps')?.textContent).toContain('达标的维度 ①');
  expect(document.querySelectorAll('.comparison-ptable .ui-clamp')).toHaveLength(0);
  expect(document.querySelector('mark')?.textContent).toContain('只在室内');
@@ -62,7 +62,7 @@ it('does not highlight an invented quote or expose configuration identity metada
  await mount(<ComparisonAnswer row={row} points={points} side="after" onOpenCitation={()=>{}}/>);
  expect(document.querySelector('mark')).toBeNull();
  const {configChanges}=await import('./components/comparisonData');
- expect(configChanges({top_k:4,run_target:'baseline'},{top_k:6,run_target:'sandbox_candidate',candidate_id:'EXP-sensitive'})).toEqual([{key:'top_k',label:'保留条数',before:'4',after:'6'}]);
+ expect(configChanges({top_k:4,run_target:'baseline'},{top_k:6,run_target:'sandbox_candidate',candidate_id:'EXP-sensitive'})).toEqual([{key:'top_k',label:'Top-K',before:'4',after:'6'}]);
 });
 it('uses explicit pages after unquoted sections and keeps prose around bare filenames',()=>{
  const evidence=[{...source,document:'宇树_B2四足机器人用户手册_中文版.pdf',page_start:11},{...source,document:'宇树_B2四足机器人用户手册_中文版.pdf',page_start:18}];
