@@ -1,4 +1,4 @@
-"""总指挥出题（2026-11-19，知识库 v4；079 版：证据按 parent-child-v2 新切块重新锚定，题目、答案、证据原文与 074 完全相同：ABB IRB 1300 产品手册 + IRB 1200 产品规格）→ 指挥/报告/079-题卷v4-v2锚定.csv。
+"""总指挥出题（2026-11-19，知识库 v4；080 版：证据按 parent-child-v2（table-kv-v3）新切块重新锚定，题目、答案、证据原文与 074 完全相同：ABB IRB 1300 产品手册 + IRB 1200 产品规格）→ 指挥/报告/080-题卷v4.csv。
 
 设计（用户 2026-11-19 08:02 确认的出题标准）：
 - 题型比例与 063 相同：正向 20（单段 10 / 跨段 4 / 统计 2 / 桥接 2 / 台账 2），消融 10，负向 20。
@@ -16,7 +16,7 @@ from app.golden_v2 import friend_answer_supported
 from app.reviewed_import import validate_friend_content
 
 REPO = '/home/claude/rag-self-evolution-demo/指挥/报告/'
-chunks = {r['chunk_id']: r['切块原文'].replace('\\n', '\n') for r in csv.DictReader(open(REPO + '078-切块全量.csv', encoding='utf-8-sig'))}
+chunks = {r['chunk_id']: r['切块原文'].replace('\\n', '\n') for r in csv.DictReader(open(REPO + '079-切块全量.csv', encoding='utf-8-sig'))}
 mk = lambda doc: (lambda n: f'{doc}-C-{n:05d}')
 S, M1, M5 = mk('DOC-41ed759faa12'), mk('DOC-8c302b249b5b'), mk('DOC-7cf7d0fd4182')
 
@@ -219,5 +219,5 @@ from collections import Counter
 print(Counter(r['题型'] for r in rows), Counter(r['出题方式'] for r in rows if r['题型'] == 'positive'), Counter(r['负向子类型'] for r in rows if r['题型'] == 'negative'))
 print('UNRESOLVED', UNRESOLVED)
 print('\n'.join(problems) or 'ALL OK', len(rows))
-with open(REPO + '074-题卷v4.csv', 'w', encoding='utf-8-sig', newline='') as f:
+with open(REPO + '080-题卷v4.csv', 'w', encoding='utf-8-sig', newline='') as f:
     w = csv.DictWriter(f, fieldnames=FIELDS); w.writeheader(); w.writerows(rows)
