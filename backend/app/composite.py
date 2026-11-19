@@ -18,7 +18,7 @@ def pipeline_config(config):
     result = {k:config.get(k, DEFAULT_PIPELINE_CONFIG[k]) for k in ALLOWED_SEARCH_SPACE}
     for key,value in result.items():
         result[key] = next((v for v in ALLOWED_SEARCH_SPACE[key] if v==value and (type(v) is type(value) or type(v) in (int,float) and type(value) in (int,float))),value)
-    return {**result, 'prompt_strategy':'Strict'}
+    return result  # 2026-11-19：prompt_strategy 已进入 Search Space，按方案实际取值
 
 
 def parameter_diff(config, base):

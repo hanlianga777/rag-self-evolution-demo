@@ -18,6 +18,7 @@ DEFAULT_PIPELINE_CONFIG = {
     "query_rewrite": False,
     "multi_query": False,
     "hyde": False,
+    "query_decompose": False,
     "prompt_strategy": "Strict",
     "generation_thinking": "max",
     "retrieval_max_tokens": False,
@@ -59,12 +60,16 @@ ALLOWED_SEARCH_SPACE = {
     "query_rewrite": (True, False),
     "multi_query": (False, 2, 4, 6),
     "hyde": (True, False),
+    # 2026-11-19 用户确认：学扣子配置表的"问题拆解"，对付一问两件事的桥接题
+    "query_decompose": (False, True),
+    # 2026-11-19 用户确认：放开回答提示词（Colin 用"放松提示词"修过度拒答）；三个版本都以 Strict 为底
+    "prompt_strategy": ("Strict", "StrictComplete", "StrictSafe"),
     "generation_thinking": ("off", "low", "high", "max"),
     "retrieval_max_tokens": (False, 8192, 4096),
 }
 
-# 规则总表三.1：回答策略固定为 Strict（内容为原 Tiered 分级回答），不是 Agent 可调参数。
-FIXED_PIPELINE_PARAMETERS = {"prompt_strategy": "Strict"}
+# 规则总表三.1（2026-11-19 修订）：Baseline 固定 Strict；Agent 可在三个 Strict 系版本中选择。
+FIXED_PIPELINE_PARAMETERS = {}
 THINKING_ORDER = ("off", "low", "high", "max")
 
 EXCLUDED_AUTOMATIC_PARAMETERS = frozenset({
@@ -74,6 +79,8 @@ EXCLUDED_AUTOMATIC_PARAMETERS = frozenset({
 
 # Descriptions follow ALLOWED_SEARCH_SPACE order; values remain validator-owned.
 PARAMETER_EXPLANATIONS = {
+    'query_decompose': ('把一句话里问了两三件事的问题拆成几个子问题，分别去查资料再合起来交给模型。适合答案分散在不同章节的题，但多一次模型调用、稍慢。', ['关闭', '开启（拆成子问题分别检索）']),
+    'prompt_strategy': ('交给模型的回答规则。三个版本都以分级回答为底：标准版即 Baseline 所用；补全要点版要求把子问逐条答全、有据直接答，治漏要点和过度拒答；安全强化版要求安全结论在前、不给绕过方法、型号状态不明先追问，治该拒不拒和被注入带偏。', ['Strict（标准分级回答）', 'StrictComplete（补全要点版）', 'StrictSafe（安全强化版）']),
     'candidate_k': ('第一轮查找时先捞回多少段资料，留给后面排序挑选。捞得多不容易漏掉关键证据，但排序更费时。', ['12（常规范围）', '24（范围加倍，适合证据分散在多处的题）']),
     'top_k': ('排序后真正交给模型写回答的资料段数。给得多要点更全，但模型要读得更多、回答更慢，也更容易被无关内容干扰。', ['4（精简）', '6（更全，稍慢）']),
     'min_score': ('相关分低于这条线的资料直接丢掉，不交给模型。线越高资料越干净，但也可能把有用的证据一起筛掉。', ['0（不筛）', '0.1（只去掉明显无关的）', '0.2（适度筛选）', '0.3（筛得较严）', '0.4（最严）']),
@@ -337,7 +344,7 @@ def validate_candidate_config(config: dict, *, prior_configs=(), completed_evals
     for key, rule in contract.items():
         if key == "hybrid_alpha" and config.get("hybrid_search") is False:
             continue
-        if key not in config and key in {"generation_thinking", "retrieval_max_tokens"}:
+        if key not in config and key in {"generation_thinking", "retrieval_max_tokens", "query_decompose", "prompt_strategy"}:
             continue  # Read historical configs without inventing execution metadata.
         if key not in config:
             errors.append(f"missing required parameter: {key}")

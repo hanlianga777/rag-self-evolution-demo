@@ -17,11 +17,11 @@ class AcceptanceTests(unittest.TestCase):
         self.assertNotIn('采用分级回答', provider.requests[-1][0])
         service.answer('问题', {'prompt_strategy': 'Strict'})
         self.assertIn('采用分级回答', provider.requests[-1][0])
-        self.assertNotIn('prompt_strategy', search_space_contract())
+        self.assertIn('prompt_strategy', search_space_contract())  # 2026-11-19 规则修订：回答提示词与问题拆解进入 Agent 可调范围
 
     def test_all_parameter_choices_explain_their_meaning(self):
         contract = search_space_contract()
-        self.assertEqual(set(contract),set(DEFAULT_PIPELINE_CONFIG)-{'prompt_strategy'})
+        self.assertEqual(set(contract),set(DEFAULT_PIPELINE_CONFIG))  # 2026-11-19 规则修订：回答提示词与问题拆解进入 Agent 可调范围
         for key, rule in contract.items():
             with self.subTest(key=key):
                 self.assertTrue(rule['description'])

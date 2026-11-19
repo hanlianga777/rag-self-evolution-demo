@@ -50,7 +50,7 @@ class StableRequests(unittest.TestCase):
         system, prompt = build_agent_prompt([], DEFAULT_PIPELINE_CONFIG, [], [], list('ABC'), evaluation_budget={'used':6}, round_number=3)
         self.assertTrue(prompt['round_contract']['downgrade_required'])
         self.assertIn('generation_thinking', prompt['allowed_parameter_values'])
-        self.assertNotIn('prompt_strategy', prompt['allowed_parameter_values'])
+        self.assertIn('prompt_strategy', prompt['allowed_parameter_values'])  # 2026-11-19 规则修订：回答提示词与问题拆解进入 Agent 可调范围
         self.assertNotIn('Max降到High', system)
 
     def test_agent_can_tune_all_four_generation_thinking_levels(self):

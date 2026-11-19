@@ -21,7 +21,7 @@ with patch.dict(os.environ, _env):
 class Round0PolicyTests(unittest.TestCase):
     def test_new_defaults_and_historical_absence(self):
         self.assertEqual(DEFAULT_PIPELINE_CONFIG['generation_thinking'], 'max')
-        self.assertNotIn('query_decompose', DEFAULT_PIPELINE_CONFIG)
+        self.assertIs(DEFAULT_PIPELINE_CONFIG['query_decompose'], False)  # 2026-11-19 规则修订：回答提示词与问题拆解进入 Agent 可调范围
         self.assertIs(DEFAULT_PIPELINE_CONFIG['retrieval_max_tokens'], False)
         old = {k: v for k, v in DEFAULT_PIPELINE_CONFIG.items()
                if k not in {'generation_thinking', 'query_decompose', 'retrieval_max_tokens'}}
@@ -37,7 +37,7 @@ class Round0PolicyTests(unittest.TestCase):
                 self.assertFalse(validate_candidate_config({**DEFAULT_PIPELINE_CONFIG, key: value})['valid'])
         for limit in (False, 8192, 4096):
             self.assertTrue(validate_candidate_config({**DEFAULT_PIPELINE_CONFIG, 'retrieval_max_tokens': limit})['valid'])
-        self.assertNotIn('query_decompose', search_space_contract())
+        self.assertIn('query_decompose', search_space_contract())  # 2026-11-19 规则修订：回答提示词与问题拆解进入 Agent 可调范围
 
 
 class Round0DecomposeTests(unittest.TestCase):

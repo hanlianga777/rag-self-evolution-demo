@@ -30,7 +30,7 @@ from itertools import combinations
 from pathlib import Path
 
 RETRIEVAL_KEYS = ('candidate_k', 'top_k', 'min_score', 'hybrid_search', 'hybrid_alpha', 'rerank',
-                  'query_rewrite', 'multi_query', 'hyde', 'retrieval_max_tokens')
+                  'query_rewrite', 'multi_query', 'hyde', 'query_decompose', 'retrieval_max_tokens')
 
 
 def golden_questions(csv_bytes):

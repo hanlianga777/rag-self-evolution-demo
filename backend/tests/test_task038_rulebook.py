@@ -30,7 +30,7 @@ def base_config():
 def test_defaults_are_strict_and_max():
     assert DEFAULT_PIPELINE_CONFIG["prompt_strategy"] == "Strict"
     assert DEFAULT_PIPELINE_CONFIG["generation_thinking"] == "max"
-    assert "prompt_strategy" not in ALLOWED_SEARCH_SPACE
+    assert ALLOWED_SEARCH_SPACE["prompt_strategy"] == ("Strict", "StrictComplete", "StrictSafe")  # 2026-11-19 规则修订：回答提示词与问题拆解进入 Agent 可调范围
     assert ALLOWED_SEARCH_SPACE["generation_thinking"] == ("off", "low", "high", "max")
 
 
