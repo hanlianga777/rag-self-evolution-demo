@@ -40,15 +40,18 @@ def golden_questions(csv_bytes):
     for row in rows:
         if row['题型'].strip() not in {'positive', 'ablation'}:
             continue
-        ids = []
+        ids, quotes = [], {}
         for line in (row.get('证据') or '').splitlines():
-            chunk_id, sep, _ = line.partition('｜')
-            if sep and chunk_id.strip() and chunk_id.strip() not in ids:
-                ids.append(chunk_id.strip())
+            chunk_id, sep, quote = line.partition('｜')
+            if sep and chunk_id.strip():
+                if chunk_id.strip() not in ids:
+                    ids.append(chunk_id.strip())
+                if quote.strip():
+                    quotes.setdefault(chunk_id.strip(), []).append(quote.strip())
         if not ids:
             raise ValueError(f"{row['题号']} 没有标准证据切块，无法扫描")
         items.append({'qid': row['题号'].strip(), 'group': row['题型'].strip(), 'method': row.get('出题方式', '').strip(),
-                      'question': row['问题'].strip(), 'golden': ids})
+                      'question': row['问题'].strip(), 'golden': ids, 'quotes': quotes})
     return items
 
 
@@ -62,10 +65,30 @@ def single_variants(baseline, space):
     return variants
 
 
-def hit_of(evidence, golden):
-    got = [e.get('chunk_id') for e in evidence]
-    ranks = [got.index(g) + 1 for g in golden if g in got]
-    return {'all_hit': len(ranks) == len(golden), 'rank': min(ranks) if ranks else None, 'n_context': len(got)}
+def _norm(text):
+    import re, unicodedata
+    return re.sub(r'\s+', '', unicodedata.normalize('NFKC', str(text or '')))
+
+
+def hit_of(evidence, golden, quotes=None):
+    """标准子块是否进了最终资料。父子切块交付父块全文，matched_child_ids 只记被命中的子块（069 发现）：
+    按 ID 找不到时，标准原文全部出现在某条资料全文里也算进入（与 agent_inputs.evidence_positions 同口径）。"""
+    quotes = quotes or {}
+    ranks = []
+    for g in golden:
+        rank = None
+        for index, entry in enumerate(evidence, 1):
+            if entry.get('chunk_id') == g or g in (entry.get('matched_child_ids') or []):
+                rank = index; break
+        if rank is None and quotes.get(g):
+            wanted = [_norm(q) for q in quotes[g] if _norm(q)]
+            for index, entry in enumerate(evidence, 1):
+                body = _norm(entry.get('content') or entry.get('chunk_text') or entry.get('text') or '')
+                if wanted and body and all(q in body for q in wanted):
+                    rank = index; break
+        if rank is not None:
+            ranks.append(rank)
+    return {'all_hit': len(ranks) == len(golden), 'rank': min(ranks) if ranks else None, 'n_context': len(evidence)}
 
 
 def scan(items, baseline, variants, retrieve):
@@ -75,7 +98,7 @@ def scan(items, baseline, variants, retrieve):
     results = {}
     for change in [{}, *variants]:
         config = {**baseline, **change}
-        results[label(change)] = {'change': change, 'hits': {item['qid']: hit_of(retrieve(item['question'], config), item['golden']) for item in items}}
+        results[label(change)] = {'change': change, 'hits': {item['qid']: hit_of(retrieve(item['question'], config), item['golden'], item.get('quotes')) for item in items}}
     return results
 
 
@@ -112,12 +135,32 @@ def write_table(path, items, results):
             w.writerow([item['qid'], item['group'], item['method'], ' '.join(item['golden']), *cells])
 
 
+def build_preview(baseline_run_id, items, results):
+    """给 Agent 的检索预演表（2026-11-19 用户确认）：每个配置相对 Baseline，哪些题的标准证据会进入 / 掉出最终资料。
+    只检索、不生成、不判分，结果确定；它只说明检索层，生成和判分仍要在 Sandbox 里验证。"""
+    base = results['baseline']['hits']
+    configs = []
+    for name, data in results.items():
+        if name == 'baseline':
+            continue
+        hits = data['hits']
+        enters = sorted(q for q, h in base.items() if not h['all_hit'] and hits[q]['all_hit'])
+        lost = sorted(q for q, h in base.items() if h['all_hit'] and not hits[q]['all_hit'])
+        configs.append({'change': data['change'], 'evidence_enters_final': enters, 'evidence_lost_from_final': lost, 'net': len(enters) - len(lost)})
+    configs.sort(key=lambda c: (-c['net'], len(c['change']), json.dumps(c['change'], sort_keys=True)))
+    return {'baseline_run_id': baseline_run_id, 'kind': 'retrieval_preview',
+            'note': '只检索不生成：说明改某个参数后标准证据进不进最终资料。证据进来不等于一定答对，掉出去大概率答错；生成层和负向题不在预演范围。',
+            'baseline_evidence': {item['qid']: {'group': item['group'], 'method': item['method'], 'all_hit': base[item['qid']]['all_hit'], 'rank': base[item['qid']]['rank']} for item in items},
+            'configs': configs}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--csv', type=Path, required=True)
     parser.add_argument('--output', type=Path)
     parser.add_argument('--database', type=Path)
     parser.add_argument('--smoke', action='store_true')
+    parser.add_argument('--preview-for-baseline', help='把逐配置预演结果存成 Agent 输入：data/retrieval_preview/<Baseline run ID>.json')
     parser.add_argument('--pairs', type=int, default=4, help='单参数收益最大的前 N 个两两组合再扫')
     parser.add_argument('--min-fixable', type=int, default=5)
     args = parser.parse_args(argv)
@@ -156,6 +199,11 @@ def main(argv=None):
     summary = summarize(results, min_fixable=args.min_fixable)
     if args.output:
         write_table(args.output, items, results)
+    if args.preview_for_baseline:
+        target = database.resolve().parent / 'retrieval_preview' / f'{args.preview_for_baseline}.json'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(build_preview(args.preview_for_baseline, items, results), ensure_ascii=False, indent=1), encoding='utf-8')
+        summary['preview_file'] = str(target)
     return {'knowledge_identity': identity, 'baseline_config': {k: baseline[k] for k in RETRIEVAL_KEYS}, 'questions': len(items), 'configs': len(results), **summary}
 
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import json
 import math
 import hashlib
@@ -345,8 +347,19 @@ def enhancement_latency_deltas(baseline_config, baseline_result, candidates):
     return rows
 
 
+def load_retrieval_preview(store, baseline_run_id):
+    """读取 retrieval_headroom.py --preview-for-baseline 生成的预演表；没有就返回 None（旧实验不受影响）。"""
+    try:
+        path = Path(store.database_path).parent / 'retrieval_preview' / f'{baseline_run_id}.json'
+        data = json.loads(path.read_text(encoding='utf-8')) if path.is_file() else None
+    except (OSError, ValueError, AttributeError):
+        return None
+    return data if isinstance(data, dict) and data.get('baseline_run_id') == baseline_run_id else None
+
+
 def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, labels, *, baseline_gates=None, evaluation_budget=None, failed_parameter_signatures=None,
-                       baseline_result=None, baseline_cases=None, candidate_cases=None, golden_questions=None, round_conclusions=None, round_policy=None, causal_evidence=False, round_number=None):
+                       baseline_result=None, baseline_cases=None, candidate_cases=None, golden_questions=None, round_conclusions=None, round_policy=None, causal_evidence=False, round_number=None,
+                       retrieval_preview=None):
     """Build the exact Agent request without a Provider or persistence side effect."""
     system = ('你是RAG优化Agent。根据保存的错题诊断提出优化方案。'
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
@@ -433,6 +446,12 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
         'prior_sandbox_results':prior_results,
         'enhancement_latency_deltas':enhancement_latency_deltas(base_config, baseline_result or {}, prior_candidates),
     }
+    if retrieval_preview:
+        prompt['retrieval_preview'] = retrieval_preview
+        system += ('retrieval_preview是开跑前做的检索预演（只检索不生成，结果确定，题号与display_question_id一致）：configs列出相对Baseline改1到2个参数后，'
+                   '哪些题的标准证据会进入最终资料（evidence_enters_final）、哪些会掉出（evidence_lost_from_final）。'
+                   '检索层错题的方案应优先依据预演选择参数，predicted_fixed_question_ids要与预演中进入的错题一致；预演显示会掉出证据的题要写进risks。'
+                   '预演不覆盖生成层和负向题，这类题的预测要说明依据。')
     from .agent_strategy import bad_case_groups
     latest = next((c for c in reversed(prior_candidates) if c['status']=='evaluated' and (candidate_cases or {}).get(c['id'])), None)
     prompt['bad_case_groups'] = bad_case_groups((candidate_cases or {})[latest['id']] if latest else [row['result'] | {'question_id':row['question_id']} for row in bad_cases])
@@ -880,7 +899,8 @@ class OptimizationAgent:
             baseline_gates=persisted_gates,evaluation_budget=evaluation_budget,failed_parameter_signatures=audit['failed_parameter_signatures'],
             baseline_result=baseline['result'],baseline_cases=saved_cases(baseline_run_id),
             candidate_cases={c['id']:saved_cases(c.get('result',{}).get('evaluation_run_id')) for c in prior_candidates},
-            golden_questions=list(questions.values()),round_conclusions=context.get('round_conclusions'),round_policy=context.get('round_policy'),causal_evidence=context.get('causal_evidence') is True,round_number=round_number)
+            golden_questions=list(questions.values()),round_conclusions=context.get('round_conclusions'),round_policy=context.get('round_policy'),causal_evidence=context.get('causal_evidence') is True,round_number=round_number,
+            retrieval_preview=load_retrieval_preview(self.store, baseline_run_id))
         audit['causal_evidence'] = context.get('causal_evidence') is True
         audit['case_comparisons'] = prompt.get('case_comparisons', {})
         audit['best_case_comparison'] = prompt.get('best_case_comparison', [])
