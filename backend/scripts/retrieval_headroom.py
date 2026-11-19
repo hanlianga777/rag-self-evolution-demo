@@ -58,6 +58,16 @@ def golden_questions(csv_bytes):
 RECALL_PAIR_PARTNERS = [('candidate_k', 24), ('multi_query', 4), ('query_decompose', True), ('hyde', True), ('query_rewrite', True), ('min_score', 0.2)]
 
 
+WIDE_COMBOS = [
+    {'top_k': 6, 'candidate_k': 24, 'min_score': 0.2},
+    {'top_k': 6, 'candidate_k': 24, 'min_score': 0},
+    {'top_k': 6, 'candidate_k': 24, 'min_score': 0.2, 'query_decompose': True},
+    {'top_k': 6, 'candidate_k': 24, 'min_score': 0.2, 'multi_query': 4},
+    {'top_k': 6, 'candidate_k': 24, 'min_score': 0.2, 'hyde': True},
+    {'top_k': 6, 'candidate_k': 24, 'min_score': 0.2, 'query_rewrite': True},
+]
+
+
 def single_variants(baseline, space):
     """每个检索参数的每个可选值各改一次（相对 Baseline 只改 1 个参数）。"""
     variants = []
@@ -208,6 +218,12 @@ def main(argv=None):
                 change = {'top_k': widest, key: value}
                 if change not in pairs:
                     pairs.append(change)
+    # 2026-11-19（085 审核）：Top-K=6 + 单个召回参数仍补不回"一次问全"题——第 5 个父块的子块要么不在 12 个候选里，要么重排分低于 0.4。
+    # 朋友的 A 轮一次改 2～5 个参数（扣子 A/B/C 改 4～5 个），所以再固定补扫几组"整体放宽检索"的三四参数组合。
+    for extra in WIDE_COMBOS:
+        change = {k: v for k, v in extra.items() if v in ALLOWED_SEARCH_SPACE.get(k, ()) and v != baseline.get(k)}
+        if len(change) >= 3 and change not in pairs:
+            pairs.append(change)
     if pairs:
         results.update({k: v for k, v in scan(items, baseline, pairs, retrieve).items() if k != 'baseline'})
     summary = summarize(results, min_fixable=args.min_fixable)
