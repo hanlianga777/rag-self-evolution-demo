@@ -2124,7 +2124,8 @@ class GovernanceStore:
                 if fail_on_judge_error:
                     raise
                 answerability = {"answerable": None, "reason": str(error), "error_type": type(error).__name__}
-        parse_complete = (raw_full_text.get('coverage') or {}).get('status') == 'complete'
+        parse_coverage = raw_full_text.get('coverage') or {}
+        parse_complete = parse_coverage.get('effective_status', parse_coverage.get('status')) == 'complete'
         uncertain = not positive and ((subtype_semantic is not None and subtype_semantic.get('matched') is None) or (ambiguous_negative and answerability.get('answerable') is None) or (subtype in {'insufficient_evidence', 'clarify'} and not parse_complete))
         negative_passed = behavior == expected_behavior and not subtype_mismatch and not uncertain and (not ambiguous_negative or answerability.get("answerable") is False)
         full_text = {"mode": "evidence" if positive else "fake_negative_check", "phrases": phrases, "matched_phrases": matched, "source_checks": source_checks, "normalized_query": normalized_query, "corpus_match_chunk_ids": corpus_matches, "entity_match_chunk_ids": entity_matches, "passed": bool(source_checks) and all(check["text_available"] for check in source_checks) if positive else negative_passed}

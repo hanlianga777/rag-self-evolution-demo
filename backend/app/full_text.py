@@ -108,4 +108,19 @@ def search_full_text(question, full_text):
         matches.append({**{key: page[key] for key in ('document_id', 'page', 'parser', 'text_checksum')},
                         'matched_terms': terms, 'method': 'raw_page_anchor',
                         'content': page['text'], 'content_preview': page['text'][max(0, position - 100):position + 300]})
-    return {'status': 'searched', 'corpus_fingerprint': full_text['corpus_fingerprint'], 'coverage': full_text['coverage'], 'anchors': anchors, 'matches': matches, 'signal_only': True}
+    return {'status': 'searched', 'corpus_fingerprint': full_text['corpus_fingerprint'], 'coverage': effective_coverage(full_text), 'anchors': anchors, 'matches': matches, 'signal_only': True}
+
+
+def effective_coverage(full_text):
+    """2026-11-19（096 审核）：源 PDF 本身有空白页（IRB 1200 规格第 70、71 页，IRB 1300 手册第 5 部分第 182 页，PyMuPDF 无文字、OCR 无结果、
+    渲染纯白），按原规则"每页都要有字"永远是 insufficient，导致所有"资料不足 / 需追问"负向题探针判为不确定。
+    这里不改落盘的 full_text.json（不动知识身份），只在读取时给出 effective_status：所有页都有记录、空白页不超过总页数 1%，视为全文覆盖完整；
+    空白页清单原样列出供审计。"""
+    coverage = dict(full_text.get('coverage') or {})
+    pages = full_text.get('pages') or []
+    blank = [{'document_id': page['document_id'], 'page': page['page'], 'parser': page.get('parser')} for page in pages if not page['text'].strip()]
+    total = coverage.get('total_pages') or 0
+    all_present = total > 0 and len({(page['document_id'], page['page']) for page in pages}) == total
+    coverage['blank_pages'] = blank
+    coverage['effective_status'] = 'complete' if coverage.get('status') == 'complete' or (all_present and len(blank) <= total * 0.01) else coverage.get('status')
+    return coverage
