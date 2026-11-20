@@ -10,7 +10,7 @@
 
 1. 运行规则一致性测试、`rules_e2e_check.py`，贴出规则指纹。
 2. 核对 `baseline_inputs()` 的 config，逐项与规则总表四.1 一致。
-3. 核对 `baseline_preflight().can_start=True`，且冻结快照为 102 报告第一行里的那个，`knowledge_identity` 与 101a 一致。
+3. 核对 `baseline_preflight().can_start=True`，且冻结快照为 102 报告第一行里的那个，`knowledge_identity` 与 101b 一致。
 
 ## 2. Baseline
 
