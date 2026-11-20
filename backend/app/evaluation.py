@@ -489,6 +489,10 @@ class EvaluationRunner:
         trace = execution.get('retrieval_trace') or {}
         final = trace.get('final', [])
         observation = observe_evidence(item, final)
+        if 'evidence_equivalence' in trace:
+            from .retrieval import evidence_coverage
+            required = {key for source in item['evidence'] for key in source.get('source_chunk_ids', [])}
+            observation['standard_evidence'] = evidence_coverage(trace, required)
         from .diagnostics import _current_corpus
         from .canonical_evidence import full_norms
         chunks,fingerprint=_current_corpus(trace)
@@ -515,13 +519,11 @@ class EvaluationRunner:
         if item['test_category'] != 'negative' and not isinstance(trace.get('final'), list):
             sufficiency.update(status='unknown', sufficient=None, reason='最终上下文未采集；不能把未采集当作检索遗漏')
         expected_chunks = {chunk_id for evidence in item["evidence"] for chunk_id in evidence.get("source_chunk_ids", [])}
-        retrieved = [key for entry in execution["retrieval"] for key in entry.get("matched_child_ids", [entry.get("chunk_id")])]
-        matching = [index + 1 for index, chunk_id in enumerate(retrieved) if chunk_id in expected_chunks]
-        from .retrieval import evidence_coverage
+        from .retrieval import evidence_coverage, evidence_retrieval_metrics
         trace = execution.get('retrieval_trace') or {}
         coverage = evidence_coverage({**trace, 'final': trace.get('final', execution['retrieval'])}, expected_chunks)
-        hit = bool(matching) if expected_chunks else None
-        precision = len(matching) / len(retrieved) * 100 if expected_chunks and retrieved else None
+        retrieval_metrics = evidence_retrieval_metrics(trace, execution['retrieval'], expected_chunks)
+        hit = retrieval_metrics['retrieval_hit']
         claims = assess_claims(execution["answer"], judge, final, item=item)
         unsafe_operations=[r for r in claims['confirmed'] if item['test_category']=='negative' and r.get('kind')=='unsupported_instruction' and r.get('changes_operation') is True]
         effective_behavior=judge['behavior_pass'] and not unsafe_operations
@@ -576,14 +578,14 @@ class EvaluationRunner:
                  'pending_findings':claims['pending'], 'unresolved_conflicts':sufficiency.get('unresolved_conflicts',[]),
                  'confirmation_basis':'saved_structural_findings_not_independent_semantic_proof'}
         basis = 'verified_answer_claim' if primary == 'Generation' and located_failure else 'measured_latency' if primary == 'Performance' else 'explicit_safety_failure' if primary == 'Safety' else analysis['retrieval_failure_stage'] if primary == 'Retrieval' else 'unresolved_evaluation_evidence' if primary == 'Unknown' else coverage['diagnostic_basis']
-        case = {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "diagnosis": diagnostic, "evaluation_outcome":outcome, "programmatic_metrics": {"generation_thinking": execution.get("generation_thinking"), "behavior_contract":behavior_contract, "evidence_sufficiency": sufficiency, "claim_assessment": claims, "retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnostic_basis": basis}, "passed": not failure_tags, "redline_pass": not redline}
+        case = {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "diagnosis": diagnostic, "evaluation_outcome":outcome, "programmatic_metrics": {"generation_thinking": execution.get("generation_thinking"), "behavior_contract":behavior_contract, "evidence_sufficiency": sufficiency, "claim_assessment": claims, "retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), **retrieval_metrics, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnostic_basis": basis}, "passed": not failure_tags, "redline_pass": not redline}
 
         return self._finalize_diagnosis(case, item)
 
     def _score_rubric(self, item, execution):
         """规则总表第二节：朋友同款三维 Judge；逐题对错与门槛平均来自同一份分数。不跑本地正则安全守卫。"""
         from .rubric_judge import RUBRIC_VERSION, final_texts, rubric_verdict, legacy_quality, failure_tags, borderline
-        from .retrieval import evidence_coverage
+        from .retrieval import evidence_coverage, evidence_retrieval_metrics
         from .policy import protected_question
         trace = execution.get('retrieval_trace') or {}
         final = trace.get('final', execution.get('retrieval', [])) or []
@@ -591,18 +593,17 @@ class EvaluationRunner:
         expected = item.get('reference_answer') or (item.get('raw') or {}).get('reference_answer') or (item.get('raw') or {}).get('expected_behavior', '拒答或澄清')
         context = {'contract_version': RUBRIC_VERSION, 'category': category, 'negative_subtype': item.get('negative_subtype'),
                    'final_texts': final_texts(final)}
+        required = {c for e in item.get('evidence', []) for c in e.get('source_chunk_ids', [])}
+        coverage = evidence_coverage(trace, required)
+        if 'equivalence_version' in coverage:
+            context['programmatic_evidence_observation'] = coverage
         judge = self.runtime.judge(item['question'], expected, execution['answer'], category, context=context)
         verdict = rubric_verdict(category, judge)
         passed = verdict['passed']
         quality = legacy_quality(category, judge)
-        required = {c for e in item.get('evidence', []) for c in e.get('source_chunk_ids', [])}
-        coverage = evidence_coverage(trace, required)
-        retrieved = [c for e in execution.get('retrieval', []) for c in e.get('matched_child_ids', [e.get('chunk_id')])]
-        matching = [i + 1 for i, c in enumerate(retrieved) if c in required]
         metrics = {k: execution.get(k) for k in ('generation_thinking','latency_ms','ttft_ms','input_tokens','output_tokens','provider_cost','stages','token_usage','estimated_cost','cost_estimation')}
-        metrics.update(retrieval_hit=bool(matching) if required else None,
-                       retrieval_precision=len(matching) / len(retrieved) * 100 if required and retrieved else None,
-                       retrieval_rank=matching[0] if matching else None, retrieval_trace=trace, evidence_coverage=coverage,
+        metrics.update(**evidence_retrieval_metrics(trace, execution.get('retrieval', []), required),
+                       retrieval_trace=trace, evidence_coverage=coverage,
                        behavior_contract={'effective_pass': passed, 'raw_judge_pass': passed, 'violations': []},
                        judge_usage=judge.get('token_usage'), judge_stages=judge.get('stages'), judge_cost=judge.get('estimated_cost'),
                        judge_cost_estimation=judge.get('cost_estimation'))
@@ -625,7 +626,7 @@ class EvaluationRunner:
     def _score_business(self, item, execution, judge, expected, *, canonical_chunks=None):
         from .providers import ProviderInvalidResponse
         from .scoring_contract import compile_contract
-        from .retrieval import evidence_coverage
+        from .retrieval import evidence_coverage, evidence_retrieval_metrics
         trace = execution.get('retrieval_trace') or {}
         try:
             validate_business_judgment(judge, execution['answer'], trace.get('final'), category=item['test_category'], constraints=item.get('raw'), question=item['question'], reference=expected, candidates=trace.get('candidates'),canonical_chunks=canonical_chunks, scoring_contract=compile_contract(item) if item.get('raw',{}).get('business_requirements') is not None else None)
@@ -646,13 +647,11 @@ class EvaluationRunner:
         required={c for e in item.get('evidence',[]) for c in e.get('source_chunk_ids',[])}
         coverage=evidence_coverage(trace,required)
         metrics={k:execution.get(k) for k in ('generation_thinking','latency_ms','ttft_ms','input_tokens','output_tokens','provider_cost','stages','token_usage','estimated_cost','cost_estimation')}
-        retrieved=[c for e in execution.get('retrieval',[]) for c in e.get('matched_child_ids',[e.get('chunk_id')])]
-        matching=[i+1 for i,c in enumerate(retrieved) if c in required]
         roles=business_check_roles(judge,question=item['question'],reference=expected)
         metrics['judge_check_roles']=roles
         metrics['judge_support_locations']=[{'section':section,'index':index,'support':q,'stage':'final' if quote_present(q,trace.get('final'),display=True) else 'candidate_requirement_evidence'} for section in ('checks','issues') for index,finding in enumerate(judge[section]) for q in finding['support']]
         sufficient=None if item['test_category']=='negative' else all(check.get('scope_support') if check.get('check_type')=='scope' else check['support'] for check,role in zip(judge['checks'],roles) if role['role']=='required')
-        metrics.update(retrieval_hit=bool(matching) if required else None,retrieval_precision=len(matching)/len(retrieved)*100 if required and retrieved else None,retrieval_rank=matching[0] if matching else None,retrieval_trace=trace,evidence_coverage=coverage,
+        metrics.update(**evidence_retrieval_metrics(trace, execution.get('retrieval', []), required), retrieval_trace=trace,evidence_coverage=coverage,
             behavior_contract={'effective_pass':passed,'raw_judge_pass':judge['verdict']=='PASS','violations':judge['issues']},
             evidence_sufficiency={'status':'not_applicable' if sufficient is None else 'sufficient' if sufficient else 'insufficient','sufficient':sufficient,'source_constraints':{k:item.get('raw',{}).get(k) for k in ('product','product_scope','entity','version','source_reference','source_document_id','expected_response')},'facts':judge['checks'],'version':VERSIONS['evidence_matcher_version']},
             judge_usage=judge.get('token_usage'),judge_stages=judge.get('stages'),judge_cost=judge.get('estimated_cost'),judge_cost_estimation=judge.get('cost_estimation'))
@@ -669,6 +668,9 @@ class EvaluationRunner:
     def _finalize_diagnosis(self, case, item):
         from .diagnostics import standard_evidence, automatic_analysis
         case['standard_evidence'] = standard_evidence(item)
+        if 'evidence_equivalence' in (case['programmatic_metrics'].get('retrieval_trace') or {}):
+            from .evidence_equivalence import anchored_quotes
+            case['programmatic_metrics']['standard_evidence_bindings'] = anchored_quotes(item)
         analysis = automatic_analysis(case, golden_item=item)
         case['programmatic_metrics']['retrieval_diagnostics'] = analysis['retrieval_metrics']
         case.update(primary_root_cause=analysis['primary_root_cause'], secondary_root_causes=[],
@@ -1047,6 +1049,9 @@ class EvaluationRunner:
             self._require_generation_contract(baseline['judge'])
         if not policy_current(baseline['judge']):
             raise ValueError('评测规则已升级，请建立新Baseline；旧 Candidate 只读')
+        if baseline['config'].get('knowledge_identity'):
+            from .evaluation_snapshot import require_resume_snapshot
+            require_resume_snapshot(baseline['judge'])
         from .policy import validate_candidate_config
         if not validate_candidate_config(candidate["config"])["valid"]:
             raise ValueError("Candidate 参数超出 Search Space")

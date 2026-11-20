@@ -8,7 +8,9 @@ from pathlib import Path
 
 from .telemetry import measure
 from .corpus import EMBEDDING_MODEL, INDEX_DIR, TOP_K, CorpusStore, manifest_identity
+from .evidence_equivalence import bundle_equivalence, group_index, matched_child_ids, stage_matches
 from .full_text import CORPUS_LOCK, validate_bundle, search_full_text
+from .rules import CANDIDATE_DEDUP
 
 
 class RetrievalUnavailable(RuntimeError):
@@ -294,6 +296,9 @@ class VectorRetriever:
             rewritten = rewritten.replace(alias, canonical)
         query_list = [rewritten, *(queries or [])]
         candidate_k = int(config.get("candidate_k", 12))
+        knowledge = (self._bundle or {}).get('manifest', {}).get('knowledge_identity')
+        equivalence = bundle_equivalence(self._bundle) if knowledge and CANDIDATE_DEDUP['enabled'] else None
+        raw_k = candidate_k * CANDIDATE_DEDUP['recall_multiplier'] if equivalence else candidate_k
         with measure(stages, 'metadata_filter', 'retrieval'):
             chunks = self._metadata_candidates(rewritten, config.get("metadata_filter", "OFF"), self._chunks())
         by_id = {chunk["chunk_id"]: chunk for chunk in chunks}
@@ -303,12 +308,12 @@ class VectorRetriever:
             query_started = time.perf_counter()
             query_hits = {"vector": [], "bm25": []}
             with measure(stages, "vector_search", "retrieval"):
-                for hit in self.vector_candidates(query, candidate_k, stages=stages):
+                for hit in self.vector_candidates(query, raw_k, stages=stages):
                     if hit["chunk_id"] in by_id:
                         query_hits["vector"].append(hit["chunk_id"])
                         vector_scores[hit["chunk_id"]] = max(vector_scores.get(hit["chunk_id"], float("-inf")), float(hit["score"]))
             with measure(stages, "bm25", "retrieval"):
-                for chunk_id, score in sorted(self._bm25(query).items(), key=lambda item: (-item[1], item[0]))[:candidate_k]:
+                for chunk_id, score in sorted(self._bm25(query).items(), key=lambda item: (-item[1], item[0]))[:raw_k]:
                     if chunk_id in by_id:
                         query_hits["bm25"].append(chunk_id)
                         bm25_scores[chunk_id] = max(bm25_scores.get(chunk_id, float("-inf")), score)
@@ -319,7 +324,7 @@ class VectorRetriever:
             trace['query_merge'] = {'method': 'max_score_per_chunk_then_shared_fusion_candidate_cap',
                                     'candidate_k': candidate_k, 'rerank_question': question}
         with measure(stages, "hybrid_fusion" if config.get("hybrid_search", True) else "candidate_selection", "retrieval"):
-            candidate_ids = sorted(set(vector_scores) | set(bm25_scores))
+            candidate_ids = dict.fromkeys((*vector_scores, *bm25_scores))
             vector_normalized = self._normalize({key: vector_scores.get(key, 0.0) for key in candidate_ids})
             bm25_normalized = self._normalize({key: bm25_scores.get(key, 0.0) for key in candidate_ids})
             alpha = float(config.get("hybrid_alpha", .5))
@@ -328,8 +333,12 @@ class VectorRetriever:
                 vector_score, bm25_score = vector_normalized.get(chunk_id, 0.0), bm25_normalized.get(chunk_id, 0.0)
                 combined = alpha * vector_score + (1 - alpha) * bm25_score if config.get("hybrid_search", True) else vector_score
                 ranked.append({"chunk_id": chunk_id, "vector_score": vector_score, "bm25_score": bm25_score, "combined": combined})
-            # CandidateK caps the shared recall pool before the optional second stage.
-            ranked = sorted(ranked, key=lambda item: (-item["combined"], item["chunk_id"]))[:candidate_k]
+            if equivalence:
+                # Break exact fusion ties by retrieval signals, then by recall order.
+                ranked.sort(key=lambda item: (-item['combined'], -item['vector_score'], -item['bm25_score']))
+                ranked = deduplicate_pool(ranked, equivalence, by_id, candidate_k, raw_k, trace)
+            else:
+                ranked = sorted(ranked, key=lambda item: (-item["combined"], item["chunk_id"]))[:candidate_k]
         if trace is not None:
             trace.update({'status': 'collected', 'candidate_stage': 'post_metadata_filter_fusion_candidate_cap_pre_rerank',
                           'config': deepcopy(config), 'question': question, 'queries': query_list, 'aliases': deepcopy(aliases),
@@ -338,9 +347,10 @@ class VectorRetriever:
                           'candidates': [{**self._materialize(by_id[item['chunk_id']], item['combined']), 'rank': rank,
                                           'vector_raw': vector_scores.get(item['chunk_id']), 'bm25_raw': bm25_scores.get(item['chunk_id']),
                                           'vector_normalized': item['vector_score'], 'bm25_normalized': item['bm25_score'], 'fusion_score': item['combined'],
+                                          **({'same_text_copies': item['same_text_copies']} if equivalence else {}),
                                           'sources': [name for name, scores in [('vector', vector_scores), ('bm25', bm25_scores)] if item['chunk_id'] in scores]}
                                          for rank, item in enumerate(ranked, 1)]})
-        if (self._bundle or {}).get('manifest', {}).get('knowledge_identity'):
+        if knowledge:
             from .knowledge_pipeline import AlibabaProvider, expand_parents
             import json
             hits = [self._materialize(by_id[item['chunk_id']], item['combined']) for item in ranked]
@@ -383,6 +393,35 @@ class VectorRetriever:
         return final
 
 
+def deduplicate_pool(ranked, equivalence, chunks, candidate_k, raw_k, trace):
+    """The first hit per group already has the highest query-specific fusion score."""
+    index = group_index(equivalence['groups'])
+    pools = {}
+    for row in ranked:
+        chunk_id = row['chunk_id']
+        group_id = index[chunk_id][0] if chunk_id in index else None
+        pools.setdefault((group_id, None if group_id else chunk_id), []).append(row)
+    groups = list(pools.values())
+    selected = [group[0] for group in groups[:candidate_k]]
+    if trace is not None:
+        # Include the complete scoped group for any observed hit, including Golden
+        # members that never entered the recall window. Scores only exist for observed hits.
+        used_groups = {index[row['chunk_id']][0] for row in ranked if row['chunk_id'] in index}
+        trace['evidence_equivalence'] = {**equivalence, 'groups': {
+            key: members for key, members in equivalence['groups'].items() if key in used_groups}}
+        trace['candidate_dedup'] = {
+            'raw_limit_per_retriever': raw_k, 'raw_candidate_count': len(ranked),
+            'cutoff_chunk_ids': [row['chunk_id'] for group in groups[candidate_k:] for row in group],
+        }
+        for group in groups[:candidate_k]:
+            group[0]['same_text_copies'] = [
+                {'chunk_id': row['chunk_id'], 'fusion_score': row['combined'],
+                 'section_path': chunks[row['chunk_id']].get('section_path') or chunks[row['chunk_id']].get('section')}
+                for row in group[1:]
+            ]
+    return selected
+
+
 def enhancement_effect(query_sources, labels, candidates, final):
     """增强生效遥测（朋友报告里的"HyDE 生效 N 次、multi_query 生效 N 次、增强带来新命中 N 次"）。
     新命中 = 只由辅助查询找到、原问题自己查不到的资料；分"进了候选池"和"进了最终交给模型的资料"两级统计。"""
@@ -419,13 +458,33 @@ def evidence_coverage(trace, required_ids):
     result = {'required_chunk_ids': required}
     for field, key in (('candidate_recall', 'candidates'), ('final_context', 'final')):
         entries = trace.get(key) if trace else None
-        intersection = sorted(set(required) & {key for entry in entries for key in entry.get('matched_child_ids', [entry['chunk_id']])}) if entries is not None else None
+        matches = stage_matches(trace, entries, required) if entries is not None else None
+        intersection = sorted({key for match in matches for key in match['matched_chunk_ids']}) if matches is not None else None
         result[field] = {'status': 'collected' if entries is not None else 'not_collected', 'matched_chunk_ids': intersection,
                          'any_hit': bool(intersection) if intersection is not None and required else None,
                          'all_hit': len(intersection) == len(required) if intersection is not None and required else None,
                          'coverage': len(intersection) / len(required) if intersection is not None and required else None}
+        if trace and isinstance(trace.get('evidence_equivalence'), dict):
+            for key in ('strict_source_ids', 'other_source_ids'):
+                result[field][key] = sorted({source for match in matches for source in match[key]}) if matches is not None else None
+    if trace and isinstance(trace.get('evidence_equivalence'), dict):
+        result['equivalence_version'] = trace['evidence_equivalence'].get('equivalence_version')
     candidate, final = result['candidate_recall'], result['final_context']
     result['diagnostic_basis'] = ('final_evidence_available' if final['all_hit'] is True else
                                   'ranking_context_selection_failure' if candidate['all_hit'] is True and final['all_hit'] is False else
                                   'retrieval_failure' if candidate['all_hit'] is False else 'not_collected')
     return result
+
+
+def evidence_retrieval_metrics(trace, retrieved, required):
+    """Recall/precision/rank use the same scoped matches as coverage."""
+    if 'evidence_equivalence' in trace:
+        rows = trace.get('final')
+        if not isinstance(rows, list):
+            return dict.fromkeys(('retrieval_hit', 'retrieval_precision', 'retrieval_rank'))
+    else:
+        rows = [{'chunk_id': key} for entry in retrieved for key in matched_child_ids(entry)]
+    ranks = [rank for rank, match in enumerate(stage_matches(trace, rows, required), 1) if match['matched_chunk_ids']]
+    return {'retrieval_hit': bool(ranks) if required else None,
+            'retrieval_precision': len(ranks) / len(rows) * 100 if required and rows else None,
+            'retrieval_rank': ranks[0] if ranks else None}

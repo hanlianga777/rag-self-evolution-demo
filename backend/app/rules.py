@@ -44,6 +44,7 @@ BASELINE = {
     'generation_thinking': 'off',
     'temperature': 0,
 }
+CANDIDATE_DEDUP = {'enabled': True, 'recall_multiplier': 3, 'equivalence_version': 'evidence-equivalence-v1'}
 ITEM_THRESHOLDS = {'positive': [80, 80, 75], 'ablation': [70, 75, 65]}
 GATES = {
     'positive_avg': [80, 80, 75],
@@ -84,6 +85,7 @@ RULES = {
     'golden': GOLDEN,
     'judge': JUDGE,
     'baseline': BASELINE,
+    'candidate_dedup': CANDIDATE_DEDUP,
     'item_thresholds': ITEM_THRESHOLDS,
     'gates': GATES,
     'agent': AGENT,

@@ -117,6 +117,34 @@ def _saved_verdict(case):
     return None
 
 
+def _scoped_evidence_checks(trace, bindings, stage_gaps):
+    from .evidence_equivalence import stage_matches
+
+    candidates = trace.get('candidates')
+    merged = [copy for row in candidates if isinstance(row, dict)
+              for copy in row.get('same_text_copies', [])] if isinstance(candidates, list) else []
+    cutoff = [{'chunk_id': key} for key in (trace.get('candidate_dedup') or {}).get('cutoff_chunk_ids', [])]
+    relevant_ranks = set()
+    checks = []
+    for index, binding in enumerate(bindings, 1):
+        required = binding['chunk_ids']
+        check = {'evidence_index': index, 'quote': binding['quote']}
+        for stage, key in (('candidate', 'candidates'), ('rerank', 'reranked'), ('final', 'final')):
+            rows = trace.get(key)
+            matches = stage_matches(trace, rows, required) if isinstance(rows, list) else []
+            ranks = [rank for rank, match in enumerate(matches, 1) if match['matched_chunk_ids']]
+            check[f'{stage}_rank'] = (ranks[0] if ranks else None) if isinstance(rows, list) else '记录缺失'
+            check[f'{stage}_hit'] = bool(ranks) if required and isinstance(rows, list) and not stage_gaps.get(key) else None
+            check[f'{stage}_other_source_ids'] = sorted({key for match in matches for key in match['other_source_ids']})
+            if stage == 'final':
+                relevant_ranks.update(ranks)
+        for stage, rows in (('merged', merged), ('cutoff', cutoff)):
+            check[f'{stage}_strict_source_ids'] = sorted({
+                key for match in stage_matches(trace, rows, required) for key in match['strict_source_ids']})
+        checks.append(check)
+    return checks, sorted(relevant_ranks)
+
+
 def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fingerprint=None):
     """Task 004: deterministic saved-text diagnosis, with no scoring, writes or KB reads.
 
@@ -161,18 +189,27 @@ def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fin
             if quote and quote in _text(row.get('content') or row.get('chunk_text') or row.get('text')):
                 return index
         return None
-    checks = [{'evidence_index': i + 1, 'quote': quotes[i].get('quote', '') if isinstance(quotes[i], dict) else quotes[i],
-               'candidate_hit': any(q in t for t in entries['candidates']) if q and not stage_gaps['candidates'] else None,
-               'final_hit': any(q in t for t in entries['final']) if q and not stage_gaps['final'] else None,
-               'candidate_rank':rank(q,'candidates'), 'rerank_rank':rank(q,'reranked'), 'final_rank':rank(q,'final')}
-              for i, q in enumerate(normalized)]
+    if 'evidence_equivalence' in trace:
+        from .evidence_equivalence import anchored_quotes
+        bindings = metrics.get('standard_evidence_bindings') or anchored_quotes(golden or case)
+        if len(bindings) != len(quotes) or any(not binding['chunk_ids'] for binding in bindings):
+            gaps.append('缺少标准证据与子块的冻结绑定')
+        checks, relevant = _scoped_evidence_checks(trace, bindings, stage_gaps)
+    else:
+        checks = [{'evidence_index': i + 1, 'quote': quotes[i].get('quote', '') if isinstance(quotes[i], dict) else quotes[i],
+                   'candidate_hit': any(q in t for t in entries['candidates']) if q and not stage_gaps['candidates'] else None,
+                   'final_hit': any(q in t for t in entries['final']) if q and not stage_gaps['final'] else None,
+                   'candidate_rank':rank(q,'candidates'), 'rerank_rank':rank(q,'reranked'), 'final_rank':rank(q,'final')}
+                  for i, q in enumerate(normalized)]
+        relevant = [index + 1 for index, text in enumerate(entries['final']) if any(q in text for q in normalized)]
     retrieval = {'recall_at_k': None, 'precision_at_k': None, 'mrr': None,
                  'evidence_count': len(quotes), 'evidence_hit_count': None,
                  'final_count': len(entries['final']) if isinstance(trace.get('final'), list) else None,
                  'relevant_final_count': None, 'first_relevant_rank': None}
-    if normalized and all(normalized) and not stage_gaps['final'] and trace.get('status') in (None, 'completed'):
+    if (normalized and all(normalized) and len(checks) == len(quotes)
+            and all(check['final_hit'] is not None for check in checks)
+            and not stage_gaps['final'] and trace.get('status') in (None, 'completed')):
         hits = sum(check['final_hit'] for check in checks)
-        relevant = [index + 1 for index, text in enumerate(entries['final']) if any(q in text for q in normalized)]
         retrieval.update(recall_at_k=hits / len(quotes),
                          precision_at_k=len(relevant) / len(entries['final']) if entries['final'] else 0.0,
                          mrr=1 / relevant[0] if relevant else 0.0,
@@ -231,7 +268,14 @@ def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fin
     missing = [str(c['evidence_index']) for c in checks if not c['candidate_hit']]
     if missing:
         result['subfeature']='Golden Chunk 未进入 Top-K'
-        return conclude('检索失败', 'Retrieval', '第' + '、'.join(missing) + '段标准证据未进入该次候选，查找环节没有找全。', 1, 'candidate_recall')
+        merged = [str(c['evidence_index']) for c in checks if not c['candidate_hit'] and c.get('merged_strict_source_ids')]
+        reason = '第' + '、'.join(missing) + '段标准证据未进入该次候选，查找环节没有找全。'
+        if merged:
+            reason += '第' + '、'.join(merged) + '段在原始召回中出现，合并后代表的范围不符。'
+        cutoff = [str(c['evidence_index']) for c in checks if not c['candidate_hit'] and c.get('cutoff_strict_source_ids')]
+        if cutoff:
+            reason += '第' + '、'.join(cutoff) + '段在原始召回中出现，但其同文组排在候选池限额之外。'
+        return conclude('检索失败', 'Retrieval', reason, 1, 'candidate_recall')
     missing = [str(c['evidence_index']) for c in checks if not c['final_hit']]
     if missing:
         result['subfeature']='关键片段排名过低'

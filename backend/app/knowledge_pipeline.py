@@ -1186,6 +1186,8 @@ class KnowledgePipeline:
             coverage = build_plan(children, vectors, {'name': 'full', **GENERATION_PROFILES['full']}, identity, identity['embedding_artifact_id'])
             (staging/'coverage.json').write_text(json.dumps(coverage, ensure_ascii=False))
             manifest['coverage_plan_id'] = coverage['plan_id']
+            from .evidence_equivalence import build_equivalence, write_equivalence
+            write_equivalence(staging, build_equivalence(identity, records, children))
             manifest['artifacts'].update({p.name: checksum(p.read_bytes()) for p in staging.iterdir() if p.is_file() and p.name != 'manifest.json'})
             (staging/'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False))
             if {doc['id']: source_fingerprint(doc) for doc in documents} != identity['sources']:
