@@ -47,6 +47,12 @@ class KnowledgeBrowserTests(unittest.TestCase):
         self.assertIsNone(chunk_diagnostics(self.corpus)['average_child_tokens'])
         self.assertIsNone(chunk_diagnostics(self.corpus)['single_child_parent_ratio'])
 
+    def test_active_document_list_uses_saved_index_only(self):
+        (self.path/'manifest.json').write_text(json.dumps({'knowledge_identity': {'corpus_snapshot_id': 'current'}}))
+        with patch('app.corpus.discover_documents', return_value=[{'id': 'OLD', 'name': '旧版.pdf'}]):
+            self.assertEqual([doc['id'] for doc in self.corpus.documents()], ['D'])
+            self.assertIsNone(self.corpus.detail('OLD'))
+
     def test_browser_keeps_exact_overlap_and_only_saved_golden_anchors(self):
         before = self.db.total_changes
         value = chunk_browser(self.corpus, self.store)
@@ -76,6 +82,8 @@ class KnowledgeBrowserTests(unittest.TestCase):
         self.assertIsNone(chunk_diagnostics(self.corpus)['average_children_per_parent'])
 
     def test_http_routes_are_read_only_with_isolated_database(self):
+        self.db.execute('CREATE TABLE evaluation_runs (status TEXT)')
+        self.db.commit()
         code = """
 import json, os
 from unittest.mock import patch

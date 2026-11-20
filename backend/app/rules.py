@@ -1,5 +1,8 @@
 """Execution rules for the 2026-11-20 rulebook."""
 
+import hashlib
+import json
+
 RULES_VERSION = '2026-11-20'
 CHUNKING = {
     'strategy': 'parent-child-v2',
@@ -87,6 +90,14 @@ RULES = {
     'launch': LAUNCH,
     'consistency_check': CONSISTENCY_CHECK,
 }
+
+
+def canonical_hash(value):
+    canonical = json.dumps(value, sort_keys=True, separators=(',', ':'), allow_nan=False)
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+RULES_HASH = canonical_hash(RULES)[:12]
 
 # Pipeline value domains also support reading and comparing historical runs.
 THINKING_LEVELS = ("off", "low", "high", "max")

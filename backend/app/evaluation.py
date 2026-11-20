@@ -234,7 +234,7 @@ class EvaluationRunner:
     def _require_generation_contract(self, judge):
         contract = getattr(self.runtime, 'generation_contract', None)
         if isinstance(contract, dict) and any(judge.get(k) != v for k, v in contract.items()):
-            raise ValueError('Generation contract不匹配，禁止跨版本生成或续跑')
+            raise ValueError('Generation contract 的 prompt_version 不匹配，禁止跨版本生成或续跑')
         if isinstance(contract, dict) and judge.get('common_identity_version') != 'round0-common-1':
             raise ValueError('Generation/Thinking 共同合同缺失（历史未知），禁止新生成或比较')
         if judge.get('common_identity_version') == 'round0-common-1':
@@ -734,7 +734,10 @@ class EvaluationRunner:
         judge = {**source['judge'], **VERSIONS, 'model': self.runtime.model, 'source_evaluation_id': source_id, 'execution_kind': 'answer_replay'}
         judge['evaluation_identity'] = evaluation_identity(snapshot, judge)
         items = self.snapshot_items(snapshot)
-        run_id = self.store.create_evaluation_run(snapshot, {**source['config'], 'run_target': 'answer_replay', 'source_evaluation_id': source_id}, judge)
+        from .evaluation_snapshot import run_snapshot
+        config = {**source['config'], 'run_target': 'answer_replay', 'source_evaluation_id': source_id}
+        judge['run_snapshot'] = run_snapshot(snapshot, config, judge)
+        run_id = self.store.create_evaluation_run(snapshot, config, judge)
         result=self.store.evaluation_run(run_id)['result']
         result.update(execution_owner_pid=os.getpid(),auto_recovery={'enabled':True,'state':'ready'},
                       checkpoints={key:{'execution':value,'attempts':[]} for key,value in executions.items()})
@@ -1000,10 +1003,12 @@ class EvaluationRunner:
             return self.store.finish_evaluation_run(run_id, 'partial' if cases or any('execution' in c for c in checkpoints.values()) else 'failed', progress(), str(error))
 
     def recover_run(self,run_id):
+        from .evaluation_snapshot import require_resume_snapshot, shared_judge
         from .paid_run import PaidRun,controlled_run,accounting_only
         run=self.store.evaluation_run(run_id)
         auto=run['result'].get('auto_recovery',{})
         if not auto.get('enabled', auto.get('authorized')) or auto.get('state')=='stopped' or run['result'].get('stop_request'):return
+        require_resume_snapshot(run['judge'])
         snapshot=json.loads(run['dataset_snapshot_json'])
         if run['judge'].get('evaluation_identity')!=evaluation_identity(snapshot,run['judge']) or not policy_current(run['judge']):raise ValueError('自动恢复Evaluation Identity不匹配')
         if run['config'].get('run_target')=='answer_replay':
@@ -1013,11 +1018,11 @@ class EvaluationRunner:
             execute=lambda:self.execute_replay(run_id,items,executions)
         elif run['config'].get('candidate_id'):
             items,config,candidate,baseline=self.candidate_inputs(run['config']['candidate_id'])
-            if config!=run['config'] or baseline['judge']!=run['judge']:raise ValueError('自动恢复 Candidate 身份不匹配')
+            if config!=run['config'] or shared_judge(baseline['judge'])!=shared_judge(run['judge']):raise ValueError('自动恢复 Candidate 身份不匹配')
             execute=lambda:self.execute_candidate(run_id,items,config,candidate,baseline)
         else:
             current,items,config,judge=self.baseline_inputs(run_id)
-            if current!=snapshot or config!=run['config'] or judge!=run['judge']:raise ValueError('自动恢复冻结配置不匹配')
+            if current!=snapshot or config!=run['config'] or judge!=shared_judge(run['judge']):raise ValueError('自动恢复冻结配置不匹配')
             execute=lambda:self.execute_baseline(run_id,items,config)
         if auto.get('ledger_path'):
             def check_ledger_identity():

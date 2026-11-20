@@ -41,6 +41,46 @@ class ResumeTests(unittest.TestCase):
     def run_once(self):
         run,items,config=self.runner.start_baseline()
         with patch('app.evaluation.time.sleep'):return self.runner.execute_baseline(run,items,config)
+
+    def test_baseline_persists_start_snapshot(self):
+        key, _, config = self.runner.start_baseline()
+        run = self.store.evaluation_run(key)
+        frozen = run['judge'].get('run_snapshot', {})
+        self.assertEqual(frozen.get('pipeline_config'), {key: value for key, value in config.items() if key != 'run_target'})
+        self.assertEqual(frozen['rules_version'], '2026-11-20')
+        self.assertRegex(frozen['rules_hash'], r'^[0-9a-f]{12}$')
+        self.assertEqual(frozen['judge_config'], {'model': 'fixture', 'thinking': 'off', 'temperature': 0, 'samples': 3})
+        self.assertEqual(frozen['golden_version'], 'fixture-golden')
+        self.assertEqual(frozen['knowledge_identity'], json.loads(run['dataset_snapshot_json'])['corpus_fingerprint'])
+        versions = frozen['prompt_version']
+        self.assertEqual(set(versions), {'Strict', 'Looser', 'Safe', 'judge', 'agent_system'})
+        self.assertEqual(len(set(versions.values())), 5)
+        self.assertTrue(all(len(value) == 64 for value in versions.values()))
+
+    def test_baseline_resume_reports_current_rules_and_prompt_changes(self):
+        from app import rules
+        from app.ai_service import PROMPT_STRATEGIES
+        source, _, _ = self.runner.start_baseline(automatic=True)
+        self.store.finish_evaluation_run(source, 'partial', {'auto_recovery': {'enabled': True}}, 'fixture stopped')
+        with patch.dict(rules.RULES, {'rules_version': 'changed'}), patch.dict(PROMPT_STRATEGIES, {'Looser': 'changed'}):
+            reason = self.runner.baseline_preflight(source)['resume_reason']
+            self.assertIn('rules_hash', reason or '')
+            self.assertIn('prompt_version.Looser', reason)
+            with self.assertRaisesRegex(ValueError, r'rules_hash.*prompt_version\.Looser'):
+                self.runner.start_baseline(source)
+            with self.assertRaisesRegex(ValueError, 'rules_hash'):
+                self.runner.recover_run(source)
+        self.assertEqual(self.runtime.answers, [])
+
+    def test_legacy_resume_does_not_invent_a_start_snapshot(self):
+        key, _, _ = self.runner.start_baseline()
+        run = self.store.evaluation_run(key)
+        run['judge'].pop('run_snapshot', None)
+        with self.store.connection() as connection:
+            connection.execute('UPDATE evaluation_runs SET status=?, judge_json=? WHERE id=?',
+                               ('partial', json.dumps(run['judge']), key))
+        with self.assertRaisesRegex(ValueError, 'rules_hash.*prompt_version'):
+            self.runner.start_baseline(key)
     def test_resume_uses_frozen_request_limits_without_new_paid_context(self):
         from app.paid_run import PaidRun,controlled_run,REQUEST_LIMITS
         paid=PaidRun(Path(self.tmp.name)/'paid.json',10.,{}, {},output_limits=REQUEST_LIMITS)

@@ -1,5 +1,6 @@
 """Keep the live rule values and their explanations aligned with the rulebook."""
 import ast
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -16,7 +17,10 @@ def test_rulebook_machine_contract():
     data = re.search(r'```json rules\s*\n(.*?)\n```',
                      (ROOT / '指挥/规则总表.md').read_text(), re.S)
     assert data
-    assert json.dumps(rules.RULES, sort_keys=True) == json.dumps(json.loads(data[1]), sort_keys=True)
+    documented = json.loads(data[1])
+    assert json.dumps(rules.RULES, sort_keys=True) == json.dumps(documented, sort_keys=True)
+    canonical = json.dumps(documented, sort_keys=True, separators=(',', ':'))
+    assert getattr(rules, 'RULES_HASH', None) == hashlib.sha256(canonical.encode()).hexdigest()[:12]
     assert rules.RULES_VERSION == rules.RULES['rules_version']
     assert all(FRIEND_BASELINE_CONFIG[key] == value for key, value in rules.BASELINE.items())
     assert set(ALLOWED_SEARCH_SPACE) - {'generation_thinking'} == set(rules.AGENT['tunable'])

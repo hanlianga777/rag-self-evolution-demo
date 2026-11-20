@@ -58,7 +58,8 @@ EVALUATION_RUNTIME_CONTRACT = {**VERSIONS, 'judge_prompt_sha256':hashlib.sha256(
         'sandbox_resume_guard':GovernanceStore.validate_evaluation_resume,'sandbox_preflight':EvaluationRunner.candidate_resume_plan}.items()}}
 
 app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
-app.mount("/documents", StaticFiles(directory=Path(__file__).resolve().parents[1] / "documents"), name="documents")
+if DOCUMENTS_DIR.is_dir():
+    app.mount("/documents", StaticFiles(directory=DOCUMENTS_DIR), name="documents")
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR, check_dir=False), name="uploads")
 TRUSTED_ORIGINS = ["http://localhost:5174", "http://127.0.0.1:5174"]
 app.add_middleware(CORSMiddleware, allow_origins=TRUSTED_ORIGINS, allow_methods=["*"], allow_headers=["*"], expose_headers=["X-Read-Version"])

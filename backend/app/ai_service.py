@@ -92,6 +92,20 @@ def generation_contract(version=GENERATION_PROMPT_VERSION):
             'generation_boundary_sha256': hashlib.sha256(boundary.encode()).hexdigest()}
 
 
+def generation_system_prompt(version, strategy):
+    strategy_text = {
+        "Grounded": "只能基于给定证据回答；证据不足时明确说明。",
+        "Completeness": "在不超出证据的前提下覆盖用户问题的所有必要步骤；证据不足时明确说明。",
+        "Abstention": "证据不足、风险不明或问题应拒答时，明确拒答或要求澄清；不得补造事实。",
+        "Tiered": STRICT_STRATEGY,
+        **PROMPT_STRATEGIES,
+    }[strategy or "Strict"]
+    boundary = generation_boundary(version)
+    if version in NUMBERED_PROMPT_VERSIONS:
+        return boundary + "\n回答策略：" + strategy_text
+    return f"你是机器人官方 PDF 知识助手。{strategy_text}{boundary}回答使用中文，简洁、可执行。"
+
+
 def attach_heading_scopes(entries, chunks):
     """Read existing standalone model headings; never rewrite frozen source bodies."""
     headings={}
@@ -258,18 +272,10 @@ class AiService:
             context = generation_context(evidence, numbered=self.generation_prompt_version in NUMBERED_PROMPT_VERSIONS)
         if not self.live_enabled:
             raise ProviderRequestError("未配置 DEEPSEEK_API_KEY")
-        strategy = {
-            "Grounded": "只能基于给定证据回答；证据不足时明确说明。",
-            "Completeness": "在不超出证据的前提下覆盖用户问题的所有必要步骤；证据不足时明确说明。",
-            "Abstention": "证据不足、风险不明或问题应拒答时，明确拒答或要求澄清；不得补造事实。",
-            "Tiered": STRICT_STRATEGY,
-            **PROMPT_STRATEGIES,
-        }[config.get("prompt_strategy") or "Strict"]
-        boundary = generation_boundary(self.generation_prompt_version)
         from .providers import answer_content
         with measure(stages, "generation"), thinking_task(generation_task, effort), answer_content(on_token):
             response = self.provider.complete_with_metrics(
-                boundary + "\n回答策略：" + strategy if self.generation_prompt_version in NUMBERED_PROMPT_VERSIONS else f"你是机器人官方 PDF 知识助手。{strategy}{boundary}回答使用中文，简洁、可执行。",
+                generation_system_prompt(self.generation_prompt_version, config.get("prompt_strategy")),
                 f"问题：{question}\n证据：\n{context}",
                 stream=True, temperature=rules.BASELINE['temperature'],
             )

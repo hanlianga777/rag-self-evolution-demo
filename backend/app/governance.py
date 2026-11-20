@@ -2591,20 +2591,22 @@ class GovernanceStore:
 
     def validate_evaluation_resume(self, connection, snapshot, config, judge, source_id, *, candidate_id=None, manual_resume=False):
         from .evaluation_contract import evaluation_identity, policy_current
+        from .evaluation_snapshot import require_resume_snapshot, shared_judge
         if snapshot.get('corpus_fingerprint') != manifest_identity(current_manifest()):
             raise ValueError('续跑Corpus身份不匹配，禁止混合结果')
         source = connection.execute('SELECT * FROM evaluation_runs WHERE id=?', (source_id,)).fetchone()
         if source is not None:source = {**dict(source), 'result_json':_json(self._evaluation_result(connection, source))}
         if source is None or (source['status'] not in {'partial','failed'} and not (source['status']=='completed' and _load(source['result_json'],{}).get('technical_failed'))) or _load(source['config_json'], {}).get('run_target') != ('sandbox_candidate' if candidate_id else 'baseline'):
             raise ValueError('仅中断的同身份评测可以续跑')
+        source_judge = _load(source['judge_json'], {})
+        require_resume_snapshot(source_judge, judge)
         from .paid_run import require_reconciled_execution
         require_reconciled_execution(_load(source['result_json'], {}))
-        source_judge = _load(source['judge_json'], {})
         from .evaluation_contract import experiment_config_identity
         if source_judge.get('common_identity_version') == 'round0-common-1' and _load(source['result_json'],{}).get('experiment_config_identity') != experiment_config_identity(_load(source['config_json'],{})):
             raise ValueError('实验配置身份不匹配，禁止复用或续跑')
         if (_load(source['dataset_snapshot_json'], {}) != snapshot or _load(source['config_json'], {}) != config or not policy_current(source_judge)
-            or source_judge.get('evaluation_identity') != evaluation_identity(snapshot, judge) or (candidate_id and source_judge != judge)
+            or source_judge.get('evaluation_identity') != evaluation_identity(snapshot, judge) or (candidate_id and shared_judge(source_judge) != shared_judge(judge))
             or any(source_judge.get(k) != judge.get(k) for k in ('model','temperature','execution_snapshot','baseline_version'))):
             raise ValueError('Golden/Corpus/Judge/Evaluation Identity或配置不同，禁止混合；请明确fresh新建完整评测')
         if connection.execute("SELECT id FROM evaluation_runs WHERE json_extract(result_json,'$.resume_source_id')=?", (source_id,)).fetchone():
@@ -2616,6 +2618,8 @@ class GovernanceStore:
         return source, rows
 
     def create_baseline_run(self, snapshot, config, judge, source_id=None, candidate_id=None, automatic=False, judge_replay=None, manual_resume=False):
+        from .evaluation_snapshot import run_snapshot
+
         run_id = f"EVAL-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
@@ -2659,7 +2663,8 @@ class GovernanceStore:
                 result['auto_recovery']={'enabled':True,'state':'ready','ledger_path':str(paid.path) if paid else None,'ledger_identity':paid.identity if paid else None}
             result['execution_owner_pid']=os.getpid()
             small = self._save_checkpoints(connection,run_id,result)
-            connection.execute('INSERT INTO evaluation_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (run_id,'running','real','real',snapshot['id'],_json(snapshot),_json(config),_json({'rules_version': rules.RULES_VERSION, **judge}),_json(small),None,_now(),None))
+            saved_judge = {'rules_version': rules.RULES_VERSION, **judge, 'run_snapshot': run_snapshot(snapshot, config, judge)}
+            connection.execute('INSERT INTO evaluation_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (run_id,'running','real','real',snapshot['id'],_json(snapshot),_json(config),_json(saved_judge),_json(small),None,_now(),None))
             if candidate_id:
                 attempts = candidate['reasoning']['sandbox_attempts']
                 attempts[-1].update(evaluation_run_id=run_id, resume_source_id=source_id)

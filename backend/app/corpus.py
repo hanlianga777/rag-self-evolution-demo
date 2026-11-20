@@ -241,9 +241,11 @@ class CorpusStore:
 
     def documents(self) -> list[dict]:
         from .knowledge_pipeline import document_category
-        persisted = _read_json(self.index_dir / "documents.json", [])
+        path = self.index_dir.resolve()
+        persisted = _read_json(path / "documents.json", [])
         by_id = {entry["id"]: entry for entry in persisted if entry.get("id")}
-        catalog_by_id = {entry["id"]: entry for entry in discover_documents()}
+        active_version = _read_json(path / "manifest.json", {}).get('knowledge_identity')
+        catalog_by_id = {} if active_version else {entry["id"]: entry for entry in discover_documents()}
         records = []
         for document_id in dict.fromkeys([*by_id, *catalog_by_id]):
             catalog = catalog_by_id.get(document_id, {})

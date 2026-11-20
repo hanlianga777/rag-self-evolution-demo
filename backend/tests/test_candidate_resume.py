@@ -34,6 +34,37 @@ class CandidateResumeTests(unittest.TestCase):
             c.execute('UPDATE evaluation_runs SET judge_json=? WHERE id=?',(json.dumps(judge),self.baseline['id']))
         return self.store.evaluation_run(self.baseline['id'])
 
+    def test_sandbox_saves_own_pipeline_and_blocks_prompt_drift_on_resume(self):
+        from app import rubric_judge
+        run, _, config, _, baseline = self.runner.start_candidate(self.cid)
+        judge = self.store.evaluation_run(run)['judge']
+        frozen = judge.get('run_snapshot', {})
+        self.assertEqual(frozen.get('pipeline_config'), {key: value for key, value in config.items()
+                                                        if key not in {'run_target', 'candidate_id'}})
+        self.assertEqual(frozen['pipeline_config']['top_k'], 6)
+        self.assertEqual(baseline['judge']['run_snapshot']['pipeline_config']['top_k'], 4)
+        self.assertEqual(frozen['judge_config'], baseline['judge']['run_snapshot']['judge_config'])
+        self.store.request_evaluation_stop(run)
+        budget = self.store.experiment(self.exp)['evaluation_budget']['used']
+        with patch.object(rubric_judge, 'RUBRIC_JUDGE_PROMPT', 'changed'):
+            self.assertIn('prompt_version.judge', self.runner.candidate_resume_plan(self.cid)['reason'] or '')
+            with self.assertRaisesRegex(ValueError, r'prompt_version\.judge'):
+                self.runner.start_candidate(self.cid)
+        self.assertEqual(self.store.experiment(self.exp)['evaluation_budget']['used'], budget)
+        self.assertEqual(self.runtime.answers, [])
+
+    def test_automatic_sandbox_recovery_checks_rules_and_keeps_its_snapshot(self):
+        from app import rules
+        run, _, _, _, _ = self.runner.start_candidate(self.cid, automatic=True)
+        saved = self.store.evaluation_run(run)['judge']['run_snapshot']
+        with patch.dict(rules.RULES, {'rules_version': 'changed'}):
+            with self.assertRaisesRegex(ValueError, 'rules_hash'):
+                self.runner.recover_run(run)
+        self.assertEqual(self.runtime.answers, [])
+        result = self.runner.recover_run(run)
+        self.assertEqual(result['status'], 'evaluated')
+        self.assertEqual(self.store.evaluation_run(run)['judge']['run_snapshot'], saved)
+
     def test_abc_api_inherits_frozen_limits_and_keeps_optimization_parameters(self):
         import time
         from fastapi.testclient import TestClient
@@ -67,7 +98,8 @@ class CandidateResumeTests(unittest.TestCase):
                     self.assertEqual(candidate['status'],'evaluated')
                     self.assertEqual(candidate['config'],config)
                     run=self.store.evaluation_run(response.json()['id'])
-                    self.assertEqual(run['judge'],baseline['judge'])
+                    self.assertEqual({k: v for k, v in run['judge'].items() if k != 'run_snapshot'},
+                                     {k: v for k, v in baseline['judge'].items() if k != 'run_snapshot'})
                     self.assertEqual(run['result']['completed'],4)
         self.assertTrue(observed)
         self.assertTrue(all(value==limits[task] for task,value in observed))
