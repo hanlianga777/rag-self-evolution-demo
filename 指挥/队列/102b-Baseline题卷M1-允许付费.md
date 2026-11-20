@@ -1,3 +1,8 @@
+> **续做说明（总指挥 16:35）**：上次停下，是因为任务单第 1.3 项误写成"与 101b 一致"，这是总指挥的笔误，现已改为 101f。
+> - 1b 只读审计已经完成，结论通过：12 道题的 QC 绑定的是补丁之后的 Probe；10 道 88 分题的理由各自针对本题。**不要重做。**
+> - 本次只做两件事：第 2 节启动 Baseline，第 3 节导出。
+> - Baseline 在服务端后台运行。启动后每 10 分钟提交一次进度。中断后续做时只需接着监控，**不要重复发起请求**。
+
 # 102b：Baseline（题卷 M1）——只跑 Baseline 并导出，不加难、不启动 Agent
 
 **依据**：规则总表 v2026-11-20 四.1、五、十一、十二.4。
@@ -10,7 +15,7 @@
 
 1. 运行规则一致性测试、`rules_e2e_check.py`，贴出规则指纹。
 2. 核对 `baseline_inputs()` 的 config，逐项与规则总表四.1 一致。
-3. 核对 `baseline_preflight().can_start=True`，且冻结快照为 102 报告第一行里的那个，`knowledge_identity` 与 101b 一致。
+3. 核对 `baseline_preflight().can_start=True`，且冻结快照为 102 报告第一行里的那个，`knowledge_identity` 与 101f 一致（`CORPUS-96d21a4e4e09f3d35dbb` / `KP-a57054eadc20d73c3e6a` / `IDX-655db665bb96db192284`）。
 
 ## 1b. 开跑前只读审计（GPT 关卡 3 要求，不调用模型）
 
