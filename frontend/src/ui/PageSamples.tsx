@@ -42,7 +42,7 @@ export function PageSamples() {
         flow={[
           { label: "知识库", fact: "4 份文档已索引", tips: ["9 个知识主题", "Parent-Child 分块"] },
           { label: "Golden Dataset", fact: "50 题已冻结", tips: ["Positive 20 · Ablation 10 · Negative 20", "硬校验 · Probe · QC 全部通过"] },
-          { label: "Baseline", fact: "11/11 Hard Gate · 6 个 Bad Case", tips: ["Thinking Max", "检索层 5 · 生成层 1"] },
+          { label: "历史 Baseline", fact: "11/11 Hard Gate · 6 个 Bad Case", tips: ["Thinking Max", "检索层 5 · 生成层 1"] },
           { label: "Agent", fact: "3 轮 + Candidate D", tips: ["Round 3 · Candidate C 首次零新增 Bad Case", "Candidate D 再修好 Q04"] },
           { label: "发布", fact: "Candidate D 待发布" },
           { label: "问答验证", fact: "4 道修好的题可逐题对比" },
@@ -178,7 +178,7 @@ export function PageSamples() {
     </section>
 
     <section>
-      <h2 className="ui-sample-title">Baseline · Baseline 报告</h2>
+      <h2 className="ui-sample-title">Baseline · 历史评测样例</h2>
       <BaselineHero gates={{ passed: 11, total: 11 }} correct={44} total={50} badCount={6} layers={[{ label: "检索层", count: 5 }, { label: "生成层", count: 1 }]} thinking="Max" p50={16.7} p99={42.2}
         stages={[{ label: "Generation", seconds: 838.4, share: 95.8 }, { label: "Embedding Retrieval", seconds: 17.3, share: 2.0 }, { label: "Rerank", seconds: 16.2, share: 1.9 }, { label: "其他", seconds: 2.8, share: 0.3 }]} />
           <BaselineBreakdown
@@ -191,7 +191,7 @@ export function PageSamples() {
     <section>
       <h2 className="ui-sample-title">发布 · 发布前</h2>
       <ReleasePanel
-        online={{ name: "Baseline（初始配置）", params: [{ label: "Candidate K", value: "12" }, { label: "Top-K", value: "4" }, { label: "Thinking", value: "Max" }] }}
+        online={{ name: "历史 Baseline（初始配置）", params: [{ label: "Candidate K", value: "12" }, { label: "Top-K", value: "4" }, { label: "Thinking", value: "Max" }] }}
         candidate={{ name: "Candidate D", params: [{ label: "Candidate K", value: "24" }, { label: "Top-K", value: "6" }, { label: "Thinking", value: "High" }] }}
         changes={[{ key: "candidate_k", label: "Candidate K", from: "12", to: "24" }, { key: "top_k", label: "Top-K", from: "4", to: "6" }, { key: "thinking", label: "Thinking", from: "Max", to: "High" }]}
         results={{ correct: { from: 44, to: 48 }, total: 50, newBad: 0, gates: { passed: 11, total: 11 }, p99: { from: 42.2, to: 36.7 } }}
@@ -200,7 +200,7 @@ export function PageSamples() {
       <div style={{ height: 16 }} />
       <h2 className="ui-sample-title">发布 · 发布后</h2>
       <ReleasePanel
-        online={{ name: "Baseline（初始配置）", params: [{ label: "Candidate K", value: "12" }, { label: "Top-K", value: "4" }, { label: "Thinking", value: "Max" }] }}
+        online={{ name: "历史 Baseline（初始配置）", params: [{ label: "Candidate K", value: "12" }, { label: "Top-K", value: "4" }, { label: "Thinking", value: "Max" }] }}
         candidate={{ name: "Candidate D", params: [{ label: "Candidate K", value: "24" }, { label: "Top-K", value: "6" }, { label: "Thinking", value: "High" }] }}
         changes={[{ key: "candidate_k", label: "Candidate K", from: "12", to: "24" }, { key: "top_k", label: "Top-K", from: "4", to: "6" }, { key: "thinking", label: "Thinking", from: "Max", to: "High" }]}
         results={{ correct: { from: 44, to: 48 }, total: 50, newBad: 0, gates: { passed: 11, total: 11 }, p99: { from: 42.2, to: 36.7 } }}

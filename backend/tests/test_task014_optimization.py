@@ -6,8 +6,8 @@ class RoundContractTests(unittest.TestCase):
     def proposals(self):
         return [
             {'id':'A','direction':'检索召回增强','config_diff':{'candidate_k':24}},
-            {'id':'B','direction':'回答策略','config_diff':{'prompt_strategy':'Tiered'}},
-            {'id':'C','direction':'效率（降档 + 检索补偿）','config_diff':{'generation_thinking':'high','hyde':True}},
+            {'id':'B','direction':'回答策略','config_diff':{'prompt_strategy':'Looser'}},
+            {'id':'C','direction':'上下文预算','config_diff':{'retrieval_max_tokens':8192,'hyde':True}},
         ]
 
     def test_valid(self):
@@ -59,8 +59,8 @@ class AgentRetryTests(unittest.TestCase):
             self.assertIn('恰好',provider.calls[1]['validation_rejection']['reason'])
             self.assertEqual(len(result['candidates']),3)
             self.assertEqual(result['evaluation_budget']['used'],0)
-            self.assertEqual(result['candidates'][2]['config']['generation_thinking'],'high')
-            self.assertEqual(result['candidates'][2]['reasoning']['direction'],'效率（降档 + 检索补偿）')
+            self.assertEqual(result['candidates'][2]['config']['retrieval_max_tokens'],8192)
+            self.assertEqual(result['candidates'][2]['reasoning']['direction'],'上下文预算')
 
 
 class CompositeEfficiencyTests(unittest.TestCase):

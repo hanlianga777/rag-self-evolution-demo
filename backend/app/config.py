@@ -2,6 +2,11 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import rules
+
+
+_REMOVED_RULE_KEYS = {'BASELINE_THINKING', 'JUDGE_THINKING', 'JUDGE_SAMPLES'}
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -9,9 +14,9 @@ class Settings:
     base_url: str
     model: str
     timeout_seconds: float = 240.0
-    baseline_thinking: str = "max"
-    judge_thinking: str = "low"
-    judge_samples: int = 3
+    baseline_thinking: str = rules.BASELINE['generation_thinking']
+    judge_thinking: str = rules.JUDGE['thinking']
+    judge_samples: int = rules.JUDGE['samples']
 
     @property
     def configured(self) -> bool:
@@ -24,7 +29,10 @@ def load_values(env: dict[str, str] | None = None, env_file: Path | None = None)
     if file_path.exists():
         for line in file_path.read_text().splitlines():
             key, separator, value = line.partition("=")
-            if separator and key and key not in values:
+            key = key.strip().removeprefix('export ').strip()
+            if separator and key in _REMOVED_RULE_KEYS:
+                raise ValueError(f'{key}：规则项已移到 rules.py，请从 .env 删除')
+            if separator and key and key not in values and not key.startswith('#'):
                 values[key] = value
     return values
 
@@ -36,21 +44,9 @@ def load_settings(env: dict[str, str] | None = None, env_file: Path | None = Non
         raise ValueError("DEEPSEEK_TIMEOUT_SECONDS must be between 0 and 600")
     model = values.get("DEEPSEEK_MODEL", "deepseek-flash")
     if model == "deepseek-v4-flash": model = "deepseek-flash"
-    baseline_thinking = values.get("BASELINE_THINKING", "max")
-    if baseline_thinking not in {"off", "low", "high", "max"}:
-        raise ValueError("BASELINE_THINKING must be off/low/high/max")
-    judge_thinking = values.get("JUDGE_THINKING", "low")
-    if judge_thinking not in {"off", "low", "high", "max"}:
-        raise ValueError("JUDGE_THINKING must be off/low/high/max")
-    judge_samples = int(values.get("JUDGE_SAMPLES", "3"))
-    if judge_samples not in {1, 3, 5}:
-        raise ValueError("JUDGE_SAMPLES must be 1, 3 or 5")
     return Settings(
         api_key=values.get("DEEPSEEK_API_KEY", "").strip(),
         base_url=values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/"),
         model=model,
         timeout_seconds=timeout,
-        baseline_thinking=baseline_thinking,
-        judge_thinking=judge_thinking,
-        judge_samples=judge_samples,
     )

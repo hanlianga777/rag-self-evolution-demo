@@ -19,15 +19,15 @@ class StrategyTests(unittest.TestCase):
                 {'id':'B','direction':'检索召回增强','config_diff':{'query_rewrite':True}},
                 {'id':'C','direction':'上下文预算','config_diff':{'retrieval_max_tokens':8192}}]
 
-    def test_no_preset_directions_and_round_three_downgrade_required(self):
+    def test_no_preset_directions_or_round_three_downgrade(self):
         rows=self.rows()
         validate_round_contract(rows,DEFAULT_PIPELINE_CONFIG,[],completed=0)
         _,p=build_agent_prompt([],DEFAULT_PIPELINE_CONFIG,[],[],list('ABC'),evaluation_budget={'used':6}, round_number=3)
-        self.assertTrue(p['round_contract']['downgrade_required'])
+        self.assertNotIn('downgrade_required', p['round_contract'])
         validate_round_contract(rows,DEFAULT_PIPELINE_CONFIG,[],completed=6)
         winner={'id':'old','status':'evaluated','config':DEFAULT_PIPELINE_CONFIG,'result':{'qualification':{'qualified':True}}}
         _,p=build_agent_prompt([],DEFAULT_PIPELINE_CONFIG,[winner],[],list('ABC'),evaluation_budget={'used':6}, round_number=3)
-        self.assertTrue(p['round_contract']['downgrade_required'])
+        self.assertNotIn('downgrade_required', p['round_contract'])
         validate_round_contract(self.rows(),DEFAULT_PIPELINE_CONFIG,[winner],completed=6)
 
     def test_disjoint_parameters_remain_required(self):

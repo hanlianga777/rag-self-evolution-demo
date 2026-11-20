@@ -142,7 +142,7 @@ export function pipelineValue(value: unknown, key?: string): string | undefined 
 }
 
 export const descriptions: Record<string, string> = {
-  generation_thinking: "可选择 Off / Low / High / Max", query_decompose: "拆解独立意图并分别检索；默认 OFF", retrieval_max_tokens: "Unlimited / 8192 / 4096；缺少 tokenizer 时按字符数估算 token",
+  generation_thinking: "Baseline 关闭思考，Agent 不调这一项", query_decompose: "拆解独立意图并分别检索；默认 OFF", retrieval_max_tokens: "Unlimited / 8192 / 4096；缺少 tokenizer 时按字符数估算 token",
   candidate_k: "初始候选召回数量", top_k: "进入回答上下文的证据数量", min_score: "进入上下文前的最低相关分",
   hybrid_search: "组合向量与BM25", hybrid_alpha: "Embedding Retrieval 在 Hybrid Search 中的权重", rerank: "模型 Rerank、原排序或仅原问题的 BM25 排序",
   query_rewrite: "生成标准化检索问法", multi_query: "生成互补检索问法", hyde: "先写一段假设答案，再拿去检索",

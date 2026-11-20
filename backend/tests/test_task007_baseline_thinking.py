@@ -13,22 +13,17 @@ import test_reviewed_csv_machine_checks as machine_fixture
 
 
 class BaselineThinkingTests(unittest.TestCase):
-    def setUp(self):
-        judge=patch.dict('os.environ', {'JUDGE_THINKING':'low'})
-        judge.start();self.addCleanup(judge.stop)
-
-    def test_backend_setting_default_and_validation(self):
+    def test_removed_env_key_leaves_baseline_rule_fixed(self):
         from pathlib import Path
         import tempfile
         with tempfile.TemporaryDirectory() as directory:
             empty = Path(directory) / 'missing.env'
-            self.assertEqual(load_settings({}, empty).baseline_thinking, 'max')
-            for effort in ('off', 'low', 'high', 'max'):
-                self.assertEqual(load_settings({'BASELINE_THINKING': effort}, empty).baseline_thinking, effort)
-            with self.assertRaisesRegex(ValueError, 'BASELINE_THINKING'):
-                load_settings({'BASELINE_THINKING': 'typo'}, empty)
+            self.assertEqual(load_settings({'BASELINE_THINKING':'high'}, empty).baseline_thinking, 'off')
+            empty.write_text('BASELINE_THINKING=max\n')
+            with self.assertRaisesRegex(ValueError, '规则项已移到 rules.py'):
+                load_settings({}, empty)
 
-    def test_generation_uses_config_and_default_max_with_independent_judge(self):
+    def test_generation_preserves_explicit_history_and_defaults_off(self):
         provider = DeepSeekProvider(Settings('fixture', 'https://invalid', 'deepseek-flash'))
         service = AiService(object(), object(), provider, False)
         service.retriever = SimpleNamespace(retrieve=lambda *a, **k: [{'chunk_id': 'C1', 'content': 'source'}])
@@ -47,8 +42,8 @@ class BaselineThinkingTests(unittest.TestCase):
             with thinking_task('judge','off'):
                 provider.complete('judge','answer')
         self.assertEqual(result['generation_thinking'], 'high')
-        self.assertEqual(default['generation_thinking'], 'max')
-        self.assertEqual([r.get('reasoning_effort', 'off') for r in requests], ['high', 'max', 'low', 'off'])
+        self.assertEqual(default['generation_thinking'], 'off')
+        self.assertEqual([r.get('reasoning_effort', 'off') for r in requests], ['high', 'off', 'off', 'off'])
         self.assertNotIn('temperature', requests[0])
 
     def test_baseline_freezes_effort_and_configuration_identity(self):
@@ -63,9 +58,9 @@ class BaselineThinkingTests(unittest.TestCase):
         runner = EvaluationRunner(store, runtime)
         with patch.object(runner, 'snapshot_items', return_value=items):
             _, _, config, judge = runner.baseline_inputs()
-        self.assertEqual(config['generation_thinking'], 'high')
-        self.assertEqual(judge['execution_snapshot']['generation_thinking']['reasoning_effort'], 'high')
-        self.assertEqual(judge['judge_thinking']['reasoning_effort'], 'low')
+        self.assertEqual(config['generation_thinking'], 'off')
+        self.assertEqual(judge['execution_snapshot']['generation_thinking']['thinking'], {'type':'disabled'})
+        self.assertEqual(judge['judge_thinking']['thinking'], {'type':'disabled'})
         self.assertNotEqual(experiment_config_identity(config), experiment_config_identity({**config, 'generation_thinking': 'max'}))
 
 

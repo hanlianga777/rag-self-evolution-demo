@@ -5,7 +5,7 @@ import { TruncatedText } from "./Primitives";
 import { Drawer } from "./Dialog";
 
 export { parameterNames, descriptions } from "../display";
-export const draftDefaults: Record<string, unknown> = { generation_thinking: "high", retrieval_max_tokens: false };
+export const draftDefaults: Record<string, unknown> = { generation_thinking: "off", retrieval_max_tokens: false };
 
 export function thinkingLabel(value: unknown): string {
   if (value && typeof value === "object") {

@@ -37,7 +37,7 @@ class IdentityTests(unittest.TestCase):
     def test_runtime_judge_thinking_change_blocks_comparison(self):
         runtime=SimpleNamespace(model='deepseek-flash',generation_contract={'generation_prompt_version':'generation-vnext-2'})
         runner=EvaluationRunner(None,runtime)
-        runner._require_generation_contract(self.judge)
+        runner._require_generation_contract({**self.judge,'judge_thinking':{'task':'judge','thinking':{'type':'disabled'}}})
         with self.assertRaisesRegex(ValueError,'Thinking'):
             runner._require_generation_contract({**self.judge,'judge_thinking':{'reasoning_effort':'high'}})
 
@@ -73,8 +73,10 @@ class BaselineConfigTests(unittest.TestCase):
     def test_new_baseline_fixes_strict_and_preserves_saved_production(self):
         _,_,config,judge=self.runtime_store().baseline_inputs()
         self.assertEqual(config['prompt_strategy'],'Strict')
-        self.assertEqual(config['generation_thinking'],'max')
-        self.assertEqual(judge['judge_thinking']['reasoning_effort'],'low')
+        self.assertEqual(config['generation_thinking'],'off')
+        self.assertEqual(judge['judge_thinking']['thinking'],{'type':'disabled'})
+        self.assertEqual(config['temperature'],0)
+        self.assertEqual(judge['rules_version'],'2026-11-20')
         self.assertEqual(judge['generation_prompt_version'],'generation-vnext-4')
 
     def test_current_draft_is_consumed_but_stale_draft_blocks(self):
@@ -85,11 +87,11 @@ class BaselineConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'Draft'):
             self.runtime_store({**draft,'identity':{'fixture':'stale'}}).baseline_inputs()
 
-    def test_new_baseline_overrides_draft_thinking_with_default_max(self):
+    def test_new_baseline_overrides_draft_thinking_with_off(self):
         from app.policy import DEFAULT_PIPELINE_CONFIG
         draft={'identity':{'fixture':'same'},'config':{**DEFAULT_PIPELINE_CONFIG,'generation_thinking':'low'}}
         _,_,config,_=self.runtime_store(draft).baseline_inputs()
-        self.assertEqual(config['generation_thinking'],'max')
+        self.assertEqual(config['generation_thinking'],'off')
 
     def test_hybrid_off_draft_does_not_reintroduce_alpha(self):
         from app.policy import DEFAULT_PIPELINE_CONFIG
@@ -115,7 +117,7 @@ class BaselineConfigTests(unittest.TestCase):
         del runner.runtime.generation_contract
         _,_,_,judge=runner.baseline_inputs()
         self.assertEqual(judge.get('common_identity_version'),'round0-common-1')
-        self.assertEqual(judge['judge_thinking']['reasoning_effort'],'low')
+        self.assertEqual(judge['judge_thinking']['thinking'],{'type':'disabled'})
         runner._require_generation_contract(judge)
 
 

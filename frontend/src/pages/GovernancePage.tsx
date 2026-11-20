@@ -202,6 +202,7 @@ export function GovernancePage({ data }: { data: any }) {
     { key: "qc-risk", label: "QC 未通过", match: (row: Candidate) => row.qc_status === "qc_failed" },
     { key: "p0", label: "QC P0", match: (row: Candidate) => row.qc?.priority === "P0" },
     { key: "p1", label: "QC P1", match: (row: Candidate) => row.qc?.priority === "P1" },
+    { key: "qc-review", label: "QC 需人工看过", match: (row: Candidate) => row.attention_reasons?.some((reason: string) => ["QC P1", "QC 低分待审阅"].includes(reason)) },
     { key: "p0-acceptance", label: "QC P0 待人工接受", match: (row: Candidate) => row.approval_eligibility?.requires_qc_p0_acceptance && row.approval_eligibility?.blocking_reasons?.length === 0 },
     { key: "fake-negative", label: "疑似伪负向", match: (row: Candidate) => row.probe?.probe_details?.classification === "FAKE_NEGATIVE_RISK" },
     { key: "retrieval-incoherent", label: "检索不连贯", match: (row: Candidate) => row.probe?.probe_details?.classification === "RETRIEVAL_INCOHERENT" },

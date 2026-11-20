@@ -2,6 +2,7 @@
 import json
 from collections import defaultdict
 
+from . import rules
 from .agent_inputs import new_failure_ids
 from .paid_run import provider_task
 from .telemetry import collect_usage, cost_fields
@@ -234,7 +235,7 @@ def validate_causal_proposals(response, comparisons):
     directions = [c.get('direction') for c in candidates]
     if len(directions) != len(set(directions)):
         raise ValueError('同轮方案方向必须不同')
-    if any(len(c.get('config_diff', {})) > 2 for c in candidates):
+    if any(len(c.get('config_diff', {})) > rules.AGENT['max_changed_parameters'] for c in candidates):
         raise ValueError('每个方案相对基础方案最多改两个参数')
     for plan in response.get('prior_round_review', {}).get('plans', []):
         facts = comparisons.get(plan.get('candidate_id'), [])

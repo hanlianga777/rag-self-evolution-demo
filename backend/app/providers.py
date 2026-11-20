@@ -12,14 +12,15 @@ import time
 import urllib.error
 import urllib.request
 
-from .config import Settings, load_settings
+from . import rules
+from .config import Settings
 from .telemetry import record_usage
 from .evaluation_contract import abstention_valid, claim_consistent, normalize, scoped_reference_valid
 
 
 DEFAULT_TASK_THINKING = {
-    'baseline': 'max', 'generation': 'max', 'answer': 'max', 'candidate': 'max',
-    'judge': 'low', 'agent': 'high', 'query_rewrite': 'off', 'multi_query': 'off',
+    **dict.fromkeys(('baseline', 'generation', 'answer', 'candidate'), rules.BASELINE['generation_thinking']),
+    'judge': rules.JUDGE['thinking'], 'agent': 'high', 'query_rewrite': 'off', 'multi_query': 'off',
     'hyde': 'off', 'query_decompose': 'off', 'query': 'off', 'auxiliary': 'off',
 }
 # 规则总表三.3：只有检索辅助调用（改写、多问法、HyDE 等）固定关闭思考；
@@ -51,9 +52,9 @@ def judge_fail_fast(enabled=True):
 @contextmanager
 def judge_thinking(effort=None):
     """Freeze Judge effort for one run without changing settings or other tasks."""
-    effort = thinking_config('judge').get('reasoning_effort', 'off') if effort is None else effort
+    effort = rules.JUDGE['thinking'] if effort is None else effort
     if effort not in {'off', 'low', 'high', 'max'}:
-        raise ValueError('JUDGE_THINKING must be off/low/high/max')
+        raise ValueError('Judge Thinking must be off/low/high/max')
     token = _judge_thinking.set(effort)
     try: yield
     finally: _judge_thinking.reset(token)
@@ -74,7 +75,7 @@ def thinking_config(task=None, effort=None):
         task, effort = selected or (_task.get() or 'auxiliary', None)
         if _task.get() in {'judge', 'agent'}: task, effort = _task.get(), None
     if task == 'judge':
-        effort = _judge_thinking.get() or (load_settings().judge_thinking if effort is None else effort)
+        effort = _judge_thinking.get() or (rules.JUDGE['thinking'] if effort is None else effort)
         if effort not in {'off', 'low', 'high', 'max'}:
             raise ProviderRequestError('请求本地校验：Judge Thinking必须为off/low/high/max')
     if task in DETERMINISTIC_TASKS:
@@ -259,7 +260,8 @@ class DeepSeekProvider:
         }
         thinking = thinking_config()
         payload.update({key: value for key, value in thinking.items() if key != 'task'})
-        if thinking['thinking']['type'] == 'disabled': payload['temperature'] = 0
+        if thinking['thinking']['type'] == 'disabled':
+            payload['temperature'] = rules.JUDGE['temperature'] if thinking['task'] == 'judge' else rules.BASELINE['temperature']
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
         if stream:
@@ -418,7 +420,7 @@ class DeepSeekProvider:
     def _judge_business(self, question, expected, answer, context):
         from .evaluation_contract import BUSINESS_JUDGE_PROMPT, validate_business_judgment,business_judge_input
         _response_metadata.set({})
-        content=self.complete(BUSINESS_JUDGE_PROMPT,business_judge_input(question,expected,answer,context),json_mode=True,temperature=0)
+        content=self.complete(BUSINESS_JUDGE_PROMPT,business_judge_input(question,expected,answer,context),json_mode=True,temperature=rules.JUDGE['temperature'])
         try:
             text=content.strip().removeprefix('\ufeff')
             recovery=None
@@ -434,7 +436,7 @@ class DeepSeekProvider:
         from .rubric_judge import RUBRIC_JUDGE_PROMPT, rubric_input, parse_rubric_output
         _response_metadata.set({})
         content = self.complete(RUBRIC_JUDGE_PROMPT, rubric_input(question, expected, answer, context.get('category'), context.get('negative_subtype'), context.get('final_texts', [])),
-                                json_mode=True, temperature=0)
+                                json_mode=True, temperature=rules.JUDGE['temperature'])
         try:
             result = parse_rubric_output(content, context.get('category'))
             return {**result, 'raw_provider_response': content, 'response_metadata': _response_metadata.get()}
@@ -474,7 +476,7 @@ class DeepSeekProvider:
             "你是 RAG 评测 Judge。请只返回 JSON。完整输出形状示例：" + json.dumps(example,ensure_ascii=False) + "。示例只说明字段和类型，不代表评分；所有值必须独立依据样本判断，不得照搬示例。correctness为0-4整数，completeness/faithfulness为0-1数值。unsupported_claims非空时claim_reviews须逐项完整覆盖，字段见下述合同。" + contract,
             json.dumps({"question": question, "reference_answer": expected, "actual_answer": answer, **(context or {})}, ensure_ascii=False),
             json_mode=True,
-            temperature=0,
+            temperature=rules.JUDGE['temperature'],
         )
         try:
             parsed_content=content.strip().removeprefix('\ufeff')

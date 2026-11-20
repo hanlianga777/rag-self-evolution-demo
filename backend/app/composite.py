@@ -3,6 +3,7 @@ import json
 from itertools import combinations
 
 from .agent_inputs import evidence_positions, new_failure_ids
+from . import rules
 from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, FIXED_PIPELINE_PARAMETERS, GATE_DEFINITIONS, PARAMETER_EXPLANATIONS, validate_candidate_config
 
 D_FACTS_VERSION = 'winner-refinement-2'
@@ -121,7 +122,7 @@ def usable_repairs(facts):
         for source in failure['historical_fixes']:
             if failure['question_id'] not in source['fixed_question_ids']:continue
             for key,value in parameter_diff(source['config'],winner).items():
-                if key in preserved:continue
+                if key in preserved or key not in rules.AGENT['tunable']:continue
                 evidence = []
                 for pos in positions:
                     final,rank,candidate = (pos.get(stage) for stage in ('final','reranked','candidates'))
@@ -145,7 +146,10 @@ def usable_repairs(facts):
                 configs = [('verified',whole)] + ([('partial',{**winner,key:value})] if contrast_ids else [])
                 for kind,config in configs:
                     diff = parameter_diff(config,winner)
-                    if not diff or len(diff)>2 or any(k in diff for k in preserved):continue
+                    if (not diff or set(diff) - set(rules.AGENT['tunable']) or
+                            len(diff.keys() | preserved.keys()) > rules.AGENT['max_changed_parameters'] or
+                            any(k in diff for k in preserved)):
+                        continue
                     effective = {k:v for k,v in config.items() if k!='hybrid_alpha' or config['hybrid_search'] is not False}
                     if key not in effective or not validate_candidate_config(effective)['valid']:continue
                     repairs.append({'question_id':failure['question_id'],'parameter':key,'value':value,
@@ -160,6 +164,8 @@ def usable_repairs(facts):
 def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
     diff = suggestion.get('proposed_config_diff')
     if not isinstance(diff,dict) or set(diff)-set(ALLOWED_SEARCH_SPACE):raise ValueError('非法Pipeline参数')
+    if rules.AGENT['thinking_locked'] and 'generation_thinking' in diff:
+        raise ValueError('思考档位锁定，D 不得调整 generation_thinking')
     base = pipeline_config(baseline_config)
     winner_config = pipeline_config(winner['config'])
     config = pipeline_config({**winner_config, **diff})
@@ -167,7 +173,8 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
     if ('hybrid_alpha' in diff and config['hybrid_search'] is False) or not validate_candidate_config(effective_config)['valid']:
         raise ValueError('取值不在Pipeline ALLOWED_SEARCH_SPACE选项里，hybrid_alpha仅在 Hybrid Search 开启时可选')
     changes = parameter_diff(config,winner_config)
-    if len(changes)>2:raise ValueError('相对 Winner 最多改2个参数')
+    if len(parameter_diff(config, base)) > rules.AGENT['max_changed_parameters']:
+        raise ValueError(f"相对 Baseline 最多改 {rules.AGENT['max_changed_parameters']} 个参数")
     if any(k not in effective_config or effective_config[k]!=v or type(effective_config[k]) is not type(v) for k,v in parameter_diff(winner_config,base).items()):
         raise ValueError('不得撤销或改变 Winner 自己的改动')
     if not changes:raise ValueError('D必须不同于 Winner')

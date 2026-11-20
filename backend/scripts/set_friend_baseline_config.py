@@ -1,7 +1,6 @@
 """把当前生产配置换成朋友式朴素默认配置（用户 2026-11-18 决定），旧版本归档保留，不删。
 
 默认 dry-run，只打印将要写入的配置；加 --apply 才写。不调用任何付费接口。
-还需在本机 .env 设 BASELINE_THINKING=high（Baseline 实际请求档位取这个设置）。
 
 PYTHONPATH=backend python3 backend/scripts/set_friend_baseline_config.py [--apply]
 """

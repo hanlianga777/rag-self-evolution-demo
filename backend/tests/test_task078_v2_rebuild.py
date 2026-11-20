@@ -55,3 +55,42 @@ def test_v2_strips_page_flow_markers_in_table_captions_and_footnotes():
     block = {'type': 'table', 'table_caption': ['4.2.2 维护计划续前页'], 'table_footnote': ['i 说明文字', '下一页继续'],
              'table_body': _html([['维护活动', '每12个月'], ['检查信息标签', 'x']])}
     assert _v2_block_text(block) == '4.2.2 维护计划\n维护活动=检查信息标签；每12个月=x\ni 说明文字'
+
+
+def test_numbered_sections_keep_titles_and_short_parents():
+    from app.knowledge_pipeline import parent_child_v2
+
+    def heading(value, page=0, kind='text'):
+        return {'type': kind, 'text_level': 1, 'text': value, 'page_idx': page}
+
+    def body(value, page=0):
+        return {'type': 'text', 'text': value, 'page_idx': page}
+
+    blocks = [
+        heading('目录'), heading('5.4.1 更换底座 …… 90'), heading('5.4.2 检查底座 98'),
+        heading('5.4.3 安装盖板 100'), heading('5.4.4 检查电缆 101'),
+        heading('5.4.1 更换底座', 1), body('请参阅 5.4.2。', 1),
+        heading('从下臂上分离电缆束', 1), body('先核对型号。', 1),
+        heading('5.4.1 更换底座续前页', 2, 'header'), body('此页是同一章。', 2),
+        heading('表 3', 2), heading('xx2300001370', 2, 'image'),
+        heading('5.4.2 检查底座', 3), body('核对标签。', 3),
+        heading('5.4.3 安装盖板', 4), body('归档。', 4),
+        heading('5.4.4 检查电缆', 5), body('记录。', 5),
+        heading('5.4.1 更换底座', 6), body('这是独立出现的同名小节。', 6),
+    ]
+    parents, children, _ = parent_child_v2({'id': 'DOC-TEST', 'name': '手册.pdf'}, blocks, len)
+    titles = ['5.4.1 更换底座', '5.4.2 检查底座', '5.4.3 安装盖板', '5.4.4 检查电缆', '5.4.1 更换底座']
+    assert [p['chapter'] for p in parents] == titles
+    assert all(p['token_count'] < 400 for p in parents)
+    assert [c['chunk_text'].splitlines()[0] for c in children] == titles
+    for parent, title in zip(parents, titles):
+        assert all(item not in parent['chunk_text'].splitlines() for item in set(titles) - {title})
+    assert '此页是同一章。' in parents[0]['chunk_text']
+    assert '从下臂上分离电缆束' in parents[0]['chunk_text']
+    assert 'xx2300001370' not in parents[0]['chunk_text']
+
+
+def test_denoise_removes_picture_ids_and_only_converts_simple_latex():
+    from app.knowledge_pipeline import _v2_block_text
+    text = r'xx1400000590' + '\n' + r'编号 xx1400000590；$580 \text{ ml}^{\text{i}}$；$DTC^{ij}$；$H_2O_2$；$-25^{\circ}C$；$\frac{a}{b}$'
+    assert _v2_block_text({'type': 'text', 'text': text}) == r'编号 xx1400000590；580 ml；DTC；H2O2；-25°C；$\frac{a}{b}$'

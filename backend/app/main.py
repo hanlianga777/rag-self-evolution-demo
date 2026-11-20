@@ -62,6 +62,7 @@ app.mount("/documents", StaticFiles(directory=Path(__file__).resolve().parents[1
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR, check_dir=False), name="uploads")
 TRUSTED_ORIGINS = ["http://localhost:5174", "http://127.0.0.1:5174"]
 app.add_middleware(CORSMiddleware, allow_origins=TRUSTED_ORIGINS, allow_methods=["*"], allow_headers=["*"], expose_headers=["X-Read-Version"])
+provider_settings = load_settings()
 corpus = CorpusStore()
 require_consistent_switch(corpus.index_dir, os.getenv("RAG_DEMO_DB_PATH") or None)
 safe_start = os.getenv("RAG_SAFE_START", "1") == "1"
@@ -72,7 +73,7 @@ app.add_middleware(ReadCacheMiddleware, database_path=store.database_path,
                   store.database_path.parent / 'corpus_operations', store.database_path.parent / 'corpus_state.json',
                   Path(__file__).resolve().parents[2] / '.env'])
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=3)
-ai_service = AiService(store, corpus, DeepSeekProvider(load_settings()), os.getenv("RAG_FORCE_MOCK") == "1")
+ai_service = AiService(store, corpus, DeepSeekProvider(provider_settings), os.getenv("RAG_FORCE_MOCK") == "1")
 corpus_manager = CorpusManager(ai_service.retriever, knowledge_pipeline=True, on_knowledge_activated=lambda: start_knowledge_golden())
 if not safe_start:
     store.interrupt_revision_runs()
@@ -234,6 +235,7 @@ class BatchReviewRequest(BaseModel):
     actor: str = Field(default="local_user", min_length=1, max_length=80)
     confirmed_manual_review: bool = False
     reason: str | None = None
+    review_notes: dict[str, str] = Field(default_factory=dict)
 
 
 class ReviewedImportRequest(BaseModel):
@@ -1468,7 +1470,7 @@ def _revision_attempt(run_store, revision_id, stage, service, work, *, question_
 def review_mini_batch(payload: BatchReviewRequest):
     """A single explicit operator action writes individual, auditable Human Review decisions."""
     try:
-        return store.review_generation_batch(payload.question_ids, payload.actor, confirmed_manual_review=payload.confirmed_manual_review, reason=payload.reason)
+        return store.review_generation_batch(payload.question_ids, payload.actor, confirmed_manual_review=payload.confirmed_manual_review, reason=payload.reason, review_notes=payload.review_notes)
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
     except ValueError as error:

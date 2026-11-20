@@ -14,7 +14,7 @@ class RefinementTests(unittest.TestCase):
         clock=patch('app.paid_schedule.utc_now',return_value=__import__('datetime').datetime(2026,11,7,tzinfo=__import__('datetime').timezone.utc))
         clock.start();self.addCleanup(clock.stop)
         context.CompositeTests.setUp(self)
-        self.winner_config = {**DEFAULT_PIPELINE_CONFIG, 'candidate_k':24, 'generation_thinking':'high'}
+        self.winner_config = {**DEFAULT_PIPELINE_CONFIG, 'candidate_k':24}
         self.snapshot['questions'] = [{'id':q,'evidence':[{'source_chunk_ids':['c']}]} for q in ('q','q2','q3')]
         self.snapshot['question_ids'] = ['q','q2','q3']
         with self.store.connection() as db:
@@ -36,7 +36,7 @@ class RefinementTests(unittest.TestCase):
 
     def suggestion(self):
         return {'should_generate_d':True,'action_name':'扩大赢家上下文','proposed_config_diff':{'top_k':6},
-                'root_cause_alignment':'q2最终截断','complementary_capabilities':'保护赢家扩候选和high','expected_improvement':'预期修1坏0','risks':'q3曾翻错','explanation':'已验证参数优先',
+                'root_cause_alignment':'q2最终截断','complementary_capabilities':'保护赢家扩候选','expected_improvement':'预期修1坏0','risks':'q3曾翻错','explanation':'已验证参数优先',
                 'hypothesis':'增加上下文覆盖','root_cause':'Retrieval','intervention_direction':'combined','evidence_assertions':[],
                 'changes':[{'parameter':'top_k','source_type':'verified','source_candidates':[self.other['id']], 'reason':'历史修好q2',
                             'target_question_ids':['q2'],'evidence_basis':'D事实表remaining_failures q2证据最终位置1',

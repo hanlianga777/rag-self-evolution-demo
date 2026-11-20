@@ -4,10 +4,10 @@ import pytest
 
 from app import policy
 from app.policy import (qualify_candidate, qualify_release, protected_question, validate_candidate_config,
-                        select_final_candidate, is_downgrade_with_retrieval, DEFAULT_PIPELINE_CONFIG,
+                        select_final_candidate, DEFAULT_PIPELINE_CONFIG,
                         ALLOWED_SEARCH_SPACE)
 from app.optimization_cycle import staged_decision
-from app.optimization import validate_round_contract, downgrade_required
+from app.optimization import validate_round_contract
 from app.agent_strategy import validate_d_mode
 from app.providers import thinking_config
 
@@ -27,9 +27,9 @@ def base_config():
 
 # ---------- 一、二：搜索空间与固定参数 ----------
 
-def test_defaults_are_strict_and_max():
+def test_defaults_are_strict_and_off():
     assert DEFAULT_PIPELINE_CONFIG["prompt_strategy"] == "Strict"
-    assert DEFAULT_PIPELINE_CONFIG["generation_thinking"] == "max"
+    assert DEFAULT_PIPELINE_CONFIG["generation_thinking"] == "off"
     assert ALLOWED_SEARCH_SPACE["prompt_strategy"] == ("Strict", "Looser", "Safe")  # 2026-11-19 规则修订：回答提示词与问题拆解进入 Agent 可调范围
     assert ALLOWED_SEARCH_SPACE["generation_thinking"] == ("off", "low", "high", "max")
 
@@ -95,39 +95,15 @@ def test_staged_decision(round_number, qualified, used, decision):
     assert staged_decision(round_number, qualified, used) == decision
 
 
-# ---------- 五.4：降档补位；五.1：最多改两个参数 ----------
-
-def _prior(config_diff, label="A", round_number=1):
-    return {"id": f"R{round_number}-{label}", "status": "evaluated", "config": {**base_config(), **config_diff},
-            "reasoning": {"candidate_label": label, "round": round_number}, "result": {}}
-
-
-def test_downgrade_detection():
-    base = base_config()
-    assert is_downgrade_with_retrieval({**base, "generation_thinking": "high", "candidate_k": 24}, base)
-    assert not is_downgrade_with_retrieval({**base, "generation_thinking": "high"}, base)
-    assert not is_downgrade_with_retrieval({**base, "candidate_k": 24}, base)
-
-
-def test_downgrade_required_only_in_round3_when_never_tried():
-    base = base_config()
-    tried = [_prior({"generation_thinking": "high", "top_k": 6})]
-    never = [_prior({"candidate_k": 24})]
-    assert downgrade_required(never, base, 3)
-    assert not downgrade_required(tried, base, 3)
-    assert not downgrade_required(never, base, 2)
-
-
-def test_round3_c_must_fill_downgrade():
-    base = base_config()
-    prior = [_prior({"candidate_k": 24})]
-    no_downgrade = [{"id": "A", "config_diff": {"top_k": 6}}, {"id": "B", "config_diff": {"hyde": True}},
-                    {"id": "C", "config_diff": {"min_score": 0.1}}]
-    with pytest.raises(ValueError, match="降档补位"):
-        validate_round_contract(no_downgrade, base, prior, round_number=3)
-    ok = [{"id": "A", "config_diff": {"top_k": 6}}, {"id": "B", "config_diff": {"hyde": True}},
-          {"id": "C", "config_diff": {"generation_thinking": "high", "candidate_k": 24}}]
-    validate_round_contract(ok, base, prior, round_number=3)
+def test_agent_thinking_locked_without_round_three_downgrade():
+    for thinking in ('off', 'max'):
+        base = {**base_config(), 'generation_thinking': thinking}
+        candidates = [{"id": "A", "config_diff": {"top_k": 6}}, {"id": "B", "config_diff": {"hyde": True}},
+                      {"id": "C", "config_diff": {"min_score": 0.1}}]
+        validate_round_contract(candidates, base, [], round_number=3)
+        candidates[2]["config_diff"]["generation_thinking"] = "high"
+        with pytest.raises(ValueError, match="思考档位已锁定"):
+            validate_round_contract(candidates, base, [], round_number=3)
 
 
 def test_max_two_parameters_per_candidate():

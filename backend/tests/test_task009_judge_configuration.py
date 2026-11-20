@@ -33,11 +33,10 @@ class JudgeConfigurationTests(unittest.TestCase):
     def test_settings_default_file_and_validation(self):
         self.assertEqual(load_settings({}, self.empty).judge_thinking, 'off')
         self.empty.write_text('JUDGE_THINKING=low\n')
-        self.assertEqual(load_settings({}, self.empty).judge_thinking, 'low')
-        self.assertEqual(load_settings({'JUDGE_THINKING': 'high'}, self.empty).judge_thinking, 'high')
-        for effort in ('', 'typo'):
-            with self.assertRaisesRegex(ValueError, 'JUDGE_THINKING'):
-                load_settings({'JUDGE_THINKING': effort}, self.empty)
+        with self.assertRaisesRegex(ValueError, '规则项已移到 rules.py'):
+            load_settings({'JUDGE_THINKING': 'high'}, self.empty)
+        self.empty.write_text('')
+        self.assertEqual(load_settings({'JUDGE_THINKING': 'high'}, self.empty).judge_thinking, 'off')
 
     def test_judge_context_is_frozen_and_independent_from_generation(self):
         with judge_thinking('low'):
@@ -51,7 +50,7 @@ class JudgeConfigurationTests(unittest.TestCase):
             with judge_thinking('max'):
                 self.assertEqual(thinking_config('judge')['reasoning_effort'], 'max')
             self.assertEqual(thinking_config('judge')['reasoning_effort'], 'low')
-        self.assertEqual(thinking_config('judge')['reasoning_effort'], 'high')
+        self.assertEqual(thinking_config('judge')['thinking'], {'type':'disabled'})
         with judge_thinking('off'):
             self.assertEqual(thinking_config('judge')['thinking'], {'type':'disabled'})
 

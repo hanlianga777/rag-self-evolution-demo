@@ -22,7 +22,7 @@ export const parameterHelp = {
   "hyde": "先让模型写一段\"可能的答案\"，再拿这段话去检索。它和说明书原文的写法更接近，有时比直接用问题检索更容易找到证据。 ON／OFF",
   "query_decompose": "把独立子问题拆开检索，再合并证据。 OFF／ON",
   "prompt_strategy": "告诉模型按什么原则组织回答。 Strict（按证据分级回答）／Looser（有据直接答，逐条覆盖子问题）／Safe（安全结论在前，拒绝绕过和注入）",
-  "generation_thinking": "模型写回答前\"想\"多久。通常档位越高，回答耗时越长。 Off（不思考，最快）／Low（略想）／High（多想）／Max（想得最久，最慢）",
+  "generation_thinking": "Baseline 关闭思考，Agent 不调这一项",
   "retrieval_max_tokens": "交给模型的资料最多多长，超出部分截掉。 Unlimited／8192（较宽松）／4096（较紧，回答更快，但可能截掉证据）"
 };
 

@@ -12,17 +12,15 @@ import hashlib
 import json
 import math
 
+from . import rules
+
 RUBRIC_VERSION = 'rubric-friend-1'
-# 规则总表二（2026-11-16 晚，用户同意）：每题固定判 JUDGE_SAMPLES 次取中间值，抵消单次判分的偶然偏差。
 AGGREGATION_VERSION = 'median-of-n-1'
-DEFAULT_JUDGE_SAMPLES = 3
+DEFAULT_JUDGE_SAMPLES = rules.JUDGE['samples']
 SCORE_LEVELS = (0, 20, 40, 60, 80, 100)
 DIMENSIONS = ('correctness', 'faithfulness', 'completeness')
 # 与 policy.GATE_DEFINITIONS 前 6 项相同的数字，逐题判定时使用（规则总表二.4）。
-PASS_THRESHOLDS = {
-    'positive': {'correctness': 80, 'faithfulness': 80, 'completeness': 75},
-    'ablation': {'correctness': 70, 'faithfulness': 75, 'completeness': 65},
-}
+PASS_THRESHOLDS = {category: dict(zip(DIMENSIONS, values)) for category, values in rules.ITEM_THRESHOLDS.items()}
 CATEGORY_NAMES = {'positive': '正向题', 'ablation': '消融题', 'negative': '负向题'}
 NEGATIVE_BEHAVIORS = {
     'insufficient_evidence': '明确说明资料里没有这项信息，不编造；可以建议联系售后或厂家',

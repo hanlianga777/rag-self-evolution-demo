@@ -50,6 +50,7 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
     if name not in {'mini','medium'} or any(type(profile.get(key)) is not int or profile[key]!=value for key,value in GENERATION_PROFILES[name].items()):
         raise ValueError('Owner delegation requires a valid Mini20 or Medium50 profile')
     scope={'name':name,**GENERATION_PROFILES[name]}
+    from . import rules
     governed=any(item['raw'].get('business_requirements') for item in items.values())
     count=scope['expected_count']
     ids=run['question_ids']
@@ -59,9 +60,13 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
     if Counter(items[key]['test_category'] for key in ids)!=Counter({group:scope[f'{group}_count'] for group in ('positive','ablation','negative')}) or len(state['frozen_plan'].get('clusters',[]))!=9:
         raise ValueError('Owner delegation Profile groups/Topics changed')
     def reviewable(row):
-        if (row.get('qc',{}).get('score',0)<85 or row.get('qc',{}).get('priority')=='P0') and governed:return False
+        qc = row.get('qc') or {}
+        if qc.get('priority') in rules.GOLDEN['qc_blocks_on']:
+            return False
+        if governed and qc.get('rule_version') != rules.QC_CONTRACT and (qc.get('score') or 0) < rules.QC_REVIEW_SCORE:
+            return False
         if row['qualification_status'] in {'machine_qualified','owner_delegated_approved'}: return True
-        return bool(row.get('attention_reasons')) and set(row.get('attention_reasons',[])) <= {'检索不连贯','QC P1','语义/安全争议待复核','题目质量需修订','人工标记需修订'} and row.get('probe_status')=='probe_passed' and row.get('qc_status')=='qc_passed'
+        return bool(row.get('attention_reasons')) and set(row.get('attention_reasons',[])) <= {'检索不连贯','QC P1','QC 低分待审阅','语义/安全争议待复核','题目质量需修订','人工标记需修订'} and row.get('probe_status')=='probe_passed' and row.get('qc_status')=='qc_passed'
     if run['status']!='completed' or any(not reviewable(r) for r in rows if r['id'] in selected) or {r['id'] for r in rows}!=set(ids):
         raise ValueError('Owner delegation cannot waive machine quality')
     from .business_golden import CHECKS as BUSINESS_CHECKS, QUALITY_CONTRACT, audit_passed
@@ -93,7 +98,7 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
                 raise ValueError('Delegated retrieval risk requires explicit independent acceptance')
             if 'QC P1' in row.get('attention_reasons',[]) and (not row.get('qc',{}).get('id') or accepted.get('qc_id')!=row['qc']['id'] or not accepted.get('qc_issue_disposition')):
                 raise ValueError('QC P1 requires a current independent issue disposition')
-        if governed and set(row.get('attention_reasons',[])) & {'QC P1','语义/安全争议待复核','题目质量需修订','人工标记需修订'} and (not isinstance(review.get('issue_disposition'), str) or not review['issue_disposition'].strip()):
+        if governed and set(row.get('attention_reasons',[])) & {'QC P1','QC 低分待审阅','语义/安全争议待复核','题目质量需修订','人工标记需修订'} and (not isinstance(review.get('issue_disposition'), str) or not review['issue_disposition'].strip()):
             raise ValueError('Delegated semantic/safety dispute requires explicit current disposition')
         if review.get('content_hash')!=content_hash(item) or review.get('decision')!='A' or review.get('risk')!='none':
             raise ValueError('Delegated review stale or has unresolved risk')

@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[1]
 # Reuse pure budget functions; do not instantiate GovernanceStore or import main.
 sys.path.insert(0, str(ROOT / 'backend'))
+from app.rules import RULES_VERSION
 from app.governance import MAX_EVALS, sandbox_attempts_used
 TORONTO = ZoneInfo('America/Toronto')
 ACTIVE = {'queued', 'running', 'generating', 'coverage', 'validation', 'validating', 'probing', 'qc', 'waiting'}
@@ -191,9 +192,10 @@ def export_status(database, data_dir, output):
     body = build_status(database, data_dir)
     output = Path(output)
     previous = output.read_text() if output.exists() else ''
-    if previous.partition('\n\n')[2] == body:
+    version_line = f'规则版本：{RULES_VERSION}\n'
+    if previous.startswith(version_line) and previous.partition('\n\n')[2] == body:
         return False
-    text = '更新时间（多伦多）：' + datetime.now(TORONTO).strftime('%Y-%m-%d %H:%M:%S %Z') + '\n\n' + body
+    text = version_line + '更新时间（多伦多）：' + datetime.now(TORONTO).strftime('%Y-%m-%d %H:%M:%S %Z') + '\n\n' + body
     output.parent.mkdir(parents=True, exist_ok=True)
     temp = output.with_suffix('.md.tmp')
     temp.write_text(text)

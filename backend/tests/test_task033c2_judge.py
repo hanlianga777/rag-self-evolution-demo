@@ -16,20 +16,20 @@ from app.paid_run import provider_task
 
 
 class JudgeRecoveryTests(unittest.TestCase):
-    def test_default_judge_request_is_low_while_generation_defaults_max(self):
+    def test_default_judge_and_generation_requests_are_off(self):
         with tempfile.TemporaryDirectory() as folder:
             env = Path(folder) / '.env'
             env.write_text('')
             with patch.dict('os.environ', {'RAG_DEMO_ENV_PATH':str(env), 'DEEPSEEK_API_KEY':'fixture'}, clear=True):
                 settings = load_settings()
-                self.assertEqual(Settings('', '', 'test').judge_thinking, 'low')
+                self.assertEqual(Settings('', '', 'test').judge_thinking, 'off')
                 provider = DeepSeekProvider(settings)
                 with judge_thinking(), provider_task('judge'):
                     payload = json.loads(provider._request('system', 'user', True, False, .9).data)
-                self.assertEqual(payload['thinking'], {'type':'enabled'})
-                self.assertEqual(payload['reasoning_effort'], 'low')
-                self.assertNotIn('temperature', payload)
-                self.assertEqual(thinking_config('answer')['reasoning_effort'], 'max')
+                self.assertEqual(payload['thinking'], {'type':'disabled'})
+                self.assertNotIn('reasoning_effort', payload)
+                self.assertEqual(payload['temperature'], 0)
+                self.assertEqual(thinking_config('answer')['thinking'], {'type':'disabled'})
 
     def test_frozen_off_run_does_not_inherit_new_low_default(self):
         from app.evaluation import frozen_run_judge

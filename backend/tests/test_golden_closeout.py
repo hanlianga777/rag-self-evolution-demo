@@ -116,13 +116,31 @@ class CloseoutTests(unittest.TestCase):
 
     def test_84_85_p0_and_p1_are_consistent(self):
         key=self.store.questions()[0]['id'];self.assertTrue(self.probe(key)['passed'])
-        for score,priority,expected in [(84,'P2','qc_failed'),(85,'P2','qc_passed'),(95,'P0','qc_failed'),(90,'P1','qc_passed')]:
+        for score,priority,expected in [(84,'P2','qc_passed'),(85,'P2','qc_passed'),(95,'P0','qc_failed'),(90,'P1','qc_passed')]:
             reply=semantic_reply(self.store.question(key),self.chunks,score,priority)
             saved=self.store.record_qc(key,reply,'passed')
             self.assertEqual(saved['status'],expected)
             row=self.store.candidate_rows([key])[0]
-            if expected=='qc_failed' or priority=='P1':self.assertEqual(row['qualification_status'],'needs_human_review')
+            if expected=='qc_failed' or priority=='P1' or score < 85:self.assertEqual(row['qualification_status'],'needs_human_review')
         with self.assertRaises(ValueError):self.store.review_generation_batch([key],'fixture',confirmed_manual_review=True)
+
+    def test_batch_gate_requires_separate_reason_for_each_qc_review(self):
+        self.complete_quality()
+        run = self.store.generation_run(self.run_id)
+        low, p1 = run['question_ids'][:2]
+        for key, score, priority in [(low, 84, 'P2'), (p1, 92, 'P1')]:
+            self.store.record_qc(key, semantic_reply(self.store.question(key), self.chunks, score, priority), 'passed')
+            eligibility = self.store.approval_eligibility(key)
+            self.assertTrue(eligibility['can_approve'])
+            self.assertTrue(eligibility['requires_issue_resolution'])
+        notes = {low:'核对了低分项及原文。', p1:'核对了 P1 诊断及适用范围。'}
+        with self.assertRaisesRegex(ValueError, p1):
+            self.store.review_generation_batch(run['question_ids'], 'fixture', confirmed_manual_review=True,
+                                               review_notes={low:notes[low]})
+        self.assertEqual(self.store.dataset_snapshots(), [])
+        self.store.review_generation_batch(run['question_ids'], 'fixture', confirmed_manual_review=True, review_notes=notes)
+        self.assertEqual({key:self.store.review_history(key)[0]['reason'] for key in notes}, notes)
+        self.assertEqual(set(self.store.create_generation_snapshot(self.run_id)['question_ids']), set(run['question_ids']))
 
     def test_individual_review_cannot_bypass_failed_business_audit(self):
         self.complete_quality()
@@ -180,16 +198,15 @@ class CloseoutTests(unittest.TestCase):
         self.store.update_quality_rerun(self.run_id,{'status':'running'},start=True)
         main._run_quality_rerun(self.run_id,[q['id'] for q in self.store.questions()],self.store,self.service,self.corpus)
 
-    def test_p1_safety_dispute_requires_current_explicit_resolution(self):
+    def test_p1_safety_dispute_is_a_content_blocker(self):
         self.complete_quality();key=self.store.questions()[0]['id']
         reply=semantic_reply(self.store.question(key),self.chunks,90,'P1')
         reply['content_review']['safety_valid']=False
         reply['content_review']['disputes']=['fixture safety ambiguity']
         self.store.record_qc(key,reply,'passed')
         self.assertEqual(self.store.candidate_rows([key])[0]['qualification_status'],'needs_human_review')
-        with self.assertRaisesRegex(ValueError,'复核结论'):self.store.review_question(key,'approved','fixture')
-        self.store.review_question(key,'approved','fixture-human',reason='fixture explicit scope and safety disposition')
-        self.assertEqual(self.store.candidate_rows([key])[0]['qualification_status'],'human_approved')
+        with self.assertRaisesRegex(ValueError,'内容'):
+            self.store.review_question(key,'approved','fixture-human',reason='fixture cannot waive unsafe content')
         self.store.record_qc(key,semantic_reply(self.store.question(key),self.chunks,95,'P0'),'passed')
         self.assertEqual(self.store.candidate_rows([key])[0]['qualification_status'],'needs_human_review')
         with self.assertRaises(ValueError):self.store.review_question(key,'approved','fixture',accept_qc_p0=True,reason='cannot waive')

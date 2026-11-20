@@ -1,3 +1,4 @@
+from . import rules
 from .corpus import manifest_identity
 import time
 import math
@@ -235,7 +236,7 @@ class AiService:
     def _generate(self, question, config, started_at, evidence, context_budget, stages, trace, auxiliary_usage, on_token):
         generation_task = 'baseline' if config.get('run_target') == 'baseline' else 'candidate' if config.get('run_target') == 'sandbox_candidate' else 'generation'
         # 规则总表三.3：配置写的档位就是实际请求的档位。
-        effort = config.get('generation_thinking') or 'max'
+        effort = config.get('generation_thinking') or rules.BASELINE['generation_thinking']
         if effort not in {'off', 'low', 'high', 'max'}:
             raise ProviderRequestError('请求本地校验：generation_thinking必须为off/low/high/max')
         generation_settings = thinking_config(generation_task, effort)
@@ -270,7 +271,7 @@ class AiService:
             response = self.provider.complete_with_metrics(
                 boundary + "\n回答策略：" + strategy if self.generation_prompt_version in NUMBERED_PROMPT_VERSIONS else f"你是机器人官方 PDF 知识助手。{strategy}{boundary}回答使用中文，简洁、可执行。",
                 f"问题：{question}\n证据：\n{context}",
-                stream=True, temperature=0,
+                stream=True, temperature=rules.BASELINE['temperature'],
             )
         return {"answer": response["content"], "reused_from": response.get("reused_from"), "mode": "live", "model": self.provider.settings.model, "latency_ms": round((time.perf_counter() - started_at) * 1000) + (response.get("generation_ms", 0) if response.get("reused_from") else 0), "timing_provenance": "检索本次实测，生成复用来源实测" if response.get("reused_from") else "本次实测", "ttft_ms": response["ttft_ms"], "retrieval": citations, "citation_markers": {f"[{n}]": int(n) - 1 for n in re.findall(r"\[([1-9]\d*)\]", response["content"]) if int(n) <= len(citations)}, "input_tokens": response["input_tokens"], "output_tokens": response["output_tokens"], "stages": stages, "token_usage": {"auxiliary_queries": auxiliary_usage, "generation": response.get("usage", {})}, **cost_fields(self.model, [*auxiliary_usage, *([response["usage"]] if response.get("usage") else [])]), **retrieval_fields}
 
@@ -326,9 +327,8 @@ class AiService:
         context = context or {}
         from .rubric_judge import RUBRIC_VERSION, reuse_parts
         if context.get('contract_version') == RUBRIC_VERSION:
-            from .rubric_judge import aggregate_samples
-            from .config import load_settings
-            count = load_settings().judge_samples
+            from .rubric_judge import DEFAULT_JUDGE_SAMPLES, aggregate_samples
+            count = DEFAULT_JUDGE_SAMPLES
             samples, usage, recovery, reused = [], [], [], []
             for sample in range(1, count + 1):
                 parts = reuse_parts(question, expected, answer, category, context.get('negative_subtype'), context.get('final_texts', []), thinking_config('judge'), sample)

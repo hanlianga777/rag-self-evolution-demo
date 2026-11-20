@@ -11,6 +11,8 @@ import numpy as np
 
 PLANNER_VERSION = 'golden-planner-v2.1'
 VALIDATOR_VERSION = 'golden-validator-v2.4-precheck-freeze'
+from . import rules
+
 PARAMETERS = {'target_cluster_size': 40, 'min_cluster_size': 3, 'seed': 42, 'n_init': 10, 'max_iter': 100, 'distance': 'squared_euclidean_on_l2_normalized_vectors'}
 SPECIAL_LIMITS = {'mini': 2, 'medium': 4, 'full': 8}
 GROUPS = ('positive', 'ablation', 'negative')
@@ -408,17 +410,21 @@ def validate_answer_content(candidate, sources, review=None):
             'reason': '完整要求及安全适用性已由绑定的人工记录确认' if approved else '语义改写、必答完整性、安全条件及负向整库边界需人工核对；不要求逐字复制'}
 
 
-QC_THRESHOLD = 85
-QC_CONTRACT = 'golden-quality-85-v1'
+QC_THRESHOLD = rules.QC_REVIEW_SCORE
+QC_CONTRACT = rules.QC_CONTRACT
 
 
 def qc_outcome(result):
     score, priority = result.get('score'), result.get('priority')
-    passed = (type(score) in (int, float) and math.isfinite(score) and QC_THRESHOLD <= score <= 100
-              and priority in {'P1', 'P2'} and result.get('ablation_valid') is not False)
+    valid_score = type(score) in (int, float) and math.isfinite(score) and 0 <= score <= 100
     review = result.get('content_validation') or {}
-    return {'passed': passed, 'needs_review': priority == 'P1' or bool(review) and review.get('status') != 'supported',
-            'threshold': QC_THRESHOLD}
+    disputed = bool(review) and (review.get('status') != 'supported' or
+                                  any(review.get(key) is False for key in ('scope_valid', 'safety_valid', 'prohibited_clear')))
+    legacy = result.get('rule_version') == rules.LEGACY_QC_CONTRACT
+    passed = valid_score and priority in ({'P0', 'P1', 'P2'} - set(rules.GOLDEN['qc_blocks_on'])) and result.get('ablation_valid') is not False
+    passed = passed and (score >= QC_THRESHOLD if legacy else not disputed)
+    needs_review = disputed or (priority == 'P1' and rules.GOLDEN['qc_p1_requires_review_note']) or (not legacy and valid_score and score < QC_THRESHOLD)
+    return {'passed': passed, 'needs_review': needs_review, 'threshold': QC_THRESHOLD}
 
 
 def validate_qc_content(item, result, chunks):

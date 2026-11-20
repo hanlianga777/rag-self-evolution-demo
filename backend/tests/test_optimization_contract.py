@@ -8,6 +8,7 @@ from pathlib import Path
 from identity_fixture import completed_baseline
 from app.governance import GovernanceStore
 from app.optimization import OptimizationAgent
+from app.rules import AGENT
 from app.policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, search_space_contract, validate_candidate_config
 
 
@@ -92,8 +93,9 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertNotIn("all_bad_case_audit",provider.prompt)
         self.assertIn("all_bad_case_audit",audit)
         self.assertIsNone(provider.prompt["goal"]["failed_gates"])
-        self.assertEqual(provider.prompt["allowed_parameter_values"], search_space_contract())
-        self.assertEqual(set(provider.prompt["allowed_parameter_values"]), set(ALLOWED_SEARCH_SPACE))
+        self.assertEqual(provider.prompt["allowed_parameter_values"],
+                         {key: value for key, value in search_space_contract().items() if key in AGENT["tunable"]})
+        self.assertEqual(set(provider.prompt["allowed_parameter_values"]), set(AGENT["tunable"]))
         self.assertNotIn("excluded_automatic_parameters",provider.prompt)
         self.assertEqual({key: provider.prompt["allowed_parameter_values"]["multi_query"][key] for key in ("type", "allowed")}, {"type": "boolean false or integer", "allowed": [False, 2, 4, 6]})
 
@@ -165,7 +167,7 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual(result['result']['generation_status'],'insufficient_evidence')
 
     def test_cross_stage_changes_are_allowed_and_raw_audit_is_retained(self):
-        response=drafts();response['candidates'][1]['config_diff']['generation_thinking']='high'
+        response=drafts();response['candidates'][1]['config_diff']['prompt_strategy']='Looser'
         experiment,trace,audit,_,raw=self.run_drafts(response)
         self.assertEqual(trace['status'],'completed')
         self.assertEqual([c['reasoning']['candidate_label'] for c in experiment['candidates']],['A','B','C'])

@@ -19,8 +19,8 @@ class StableRequests(unittest.TestCase):
             env = Path(folder) / '.env'
             env.write_text('')
             settings = load_settings({}, env)
-            self.assertEqual(settings.baseline_thinking, 'max')
-            self.assertEqual(settings.judge_thinking, 'low')
+            self.assertEqual(settings.baseline_thinking, 'off')
+            self.assertEqual(settings.judge_thinking, 'off')
             self.assertEqual(load_settings({'JUDGE_THINKING':'off'}, env).judge_thinking, 'off')
         with judge_thinking('off'):
             self.assertEqual(thinking_config('judge'), {'task':'judge', 'thinking':{'type':'disabled'}})
@@ -43,18 +43,18 @@ class StableRequests(unittest.TestCase):
             payload = json.loads(provider._request('system', 'user', True, False, .9).data)
             self.assertEqual(payload['temperature'], 0)
 
-    def test_round_three_requires_downgrade_with_retrieval_if_never_tried(self):
+    def test_round_three_accepts_retrieval_changes_without_thinking(self):
         from app.optimization import validate_round_contract, build_agent_prompt
-        candidates = [{'id':label, 'config_diff':diff} for label,diff in zip('ABC', ({'top_k':6},{'candidate_k':24},{'generation_thinking':'high','hyde':True}))]
+        candidates = [{'id':label, 'config_diff':diff} for label,diff in zip('ABC', ({'top_k':6},{'candidate_k':24},{'hyde':True}))]
         validate_round_contract(candidates, DEFAULT_PIPELINE_CONFIG, [], completed=6)
         system, prompt = build_agent_prompt([], DEFAULT_PIPELINE_CONFIG, [], [], list('ABC'), evaluation_budget={'used':6}, round_number=3)
-        self.assertTrue(prompt['round_contract']['downgrade_required'])
-        self.assertIn('generation_thinking', prompt['allowed_parameter_values'])
+        self.assertNotIn('downgrade_required', prompt['round_contract'])
+        self.assertNotIn('generation_thinking', prompt['allowed_parameter_values'])
         self.assertIn('prompt_strategy', prompt['allowed_parameter_values'])  # 2026-11-19 规则修订：回答提示词与问题拆解进入 Agent 可调范围
         self.assertNotIn('Max降到High', system)
 
-    def test_agent_can_tune_all_four_generation_thinking_levels(self):
-        self.assertEqual(DEFAULT_PIPELINE_CONFIG['generation_thinking'], 'max')
+    def test_pipeline_can_read_all_four_historical_thinking_levels(self):
+        self.assertEqual(DEFAULT_PIPELINE_CONFIG['generation_thinking'], 'off')
         self.assertEqual(ALLOWED_SEARCH_SPACE['generation_thinking'], ('off','low','high','max'))
 
 

@@ -147,7 +147,7 @@ class FullRoundsTests(unittest.TestCase):
         self.assertEqual(facts['hard_gates'][0]['margin'],5)
         self.assertEqual(facts['latency_p99_seconds'],51.8)
         self.assertEqual(prompt['round_contract']['count'],2)
-        self.assertFalse(prompt['round_contract']['downgrade_required'])
+        self.assertNotIn('downgrade_required', prompt['round_contract'])
         self.assertIn('剩余',system)
         validate_round_contract([{'id':'A','config_diff':{'top_k':6}},{'id':'B','config_diff':{'candidate_k':24}}],DEFAULT_PIPELINE_CONFIG,[],labels=['A','B'])
 

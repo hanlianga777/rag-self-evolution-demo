@@ -6,6 +6,7 @@ import os
 import json
 import time
 import math
+from . import rules
 from .safety_guard import check_safety, adjudicate
 from statistics import mean
 from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims, validate_business_judgment, business_check_roles, quote_present
@@ -280,7 +281,7 @@ class EvaluationRunner:
             raise ValueError("正式评测需要完整 approved Golden：Positive、Ablation、Negative、Safety Critical 与 Prompt Injection")
         production = self.store.active_production() or {"config": {}}
         source = self.store.evaluation_run(resume_source_id) if resume_source_id else None
-        config = {**DEFAULT_PIPELINE_CONFIG, "generation_thinking": getattr(getattr(getattr(self.runtime, "provider", None), "settings", None), "baseline_thinking", "max"), **{k:v for k,v in production["config"].items() if k in DEFAULT_PIPELINE_CONFIG}, "run_target": "baseline"}
+        config = {**DEFAULT_PIPELINE_CONFIG, **{k:v for k,v in production["config"].items() if k in DEFAULT_PIPELINE_CONFIG}, "run_target": "baseline"}
         if source:
             self._require_generation_contract(source['judge'])
             from .evaluation_contract import experiment_config_identity
@@ -299,10 +300,6 @@ class EvaluationRunner:
                     raise ValueError('Config Draft参数非法：' + '; '.join(validation['errors']))
                 config.update(draft['config'])
                 if config.get('hybrid_search') is False: config.pop('hybrid_alpha', None)
-            if not isinstance(draft, dict) or not isinstance(draft.get('config'), dict):
-                config.setdefault('generation_thinking', getattr(getattr(getattr(self.runtime, 'provider', None), 'settings', None), 'baseline_thinking', 'max'))
-            if config['generation_thinking'] not in {'off', 'low', 'high', 'max'}:
-                raise ValueError('BASELINE_THINKING必须为off/low/high/max')
         index_info = self.runtime.corpus.index_info() if hasattr(self.runtime, "corpus") and hasattr(self.runtime.corpus, "index_info") else {}
         if not isinstance(index_info, dict):
             index_info = {}
@@ -319,12 +316,13 @@ class EvaluationRunner:
             config.setdefault('candidate_k', index_info['knowledge_config']['candidate_k'])
             config.setdefault('top_k', index_info['knowledge_config']['top_k'])
         if not source:
-            # 规则总表三.1/三.3：新 Baseline 固定 Strict，Thinking 取 BASELINE_THINKING（默认 max），配置即实际请求档位。
-            config['prompt_strategy'] = 'Strict'
-            config['generation_thinking'] = getattr(getattr(getattr(self.runtime, 'provider', None), 'settings', None), 'baseline_thinking', 'max')
-            if config['generation_thinking'] not in {'off', 'low', 'high', 'max'}:
-                raise ValueError('BASELINE_THINKING必须为off/low/high/max')
-        judge_meta = {"model": self.runtime.model, **VERSIONS, "temperature":0, "baseline_version": production.get("id"), "execution_snapshot": {"embedding_model": index_info.get("embedding_model"), "vector_index": index_info.get("vector_index"), "generation_model": self.runtime.model, "temperature": 0.2}}
+            config.update({key: rules.BASELINE[key] for key in ('prompt_strategy', 'generation_thinking', 'temperature')})
+        temperature = config.get('temperature', rules.BASELINE['temperature'])
+        judge_meta = {"model": self.runtime.model, **VERSIONS, "rules_version": rules.RULES_VERSION,
+                      "temperature": rules.JUDGE['temperature'], "baseline_version": production.get("id"),
+                      "execution_snapshot": {"embedding_model": index_info.get("embedding_model"),
+                                             "vector_index": index_info.get("vector_index"),
+                                             "generation_model": self.runtime.model}}
         from .paid_run import current_paid_run
         limits=current_paid_run().output_limits if current_paid_run() else (source or {}).get('judge',{}).get('execution_snapshot',{}).get('request_limits')
         if not limits:
@@ -345,7 +343,7 @@ class EvaluationRunner:
             generation_model_constraint=self.runtime.model,
             frozen_business_rules={'source':'docs/RAG_SELF_EVOLUTION_SPEC.md','contract':'round0-20261028'})
         judge_meta['execution_snapshot'].update(generation_thinking=thinking_config('baseline', config['generation_thinking']),
-            temperature=0, effective_temperature=0 if config['generation_thinking']=='off' else None,
+            temperature=temperature, effective_temperature=temperature if config['generation_thinking']=='off' else None,
             temperature_ignored=config['generation_thinking']!='off', evaluation_passes=1)
         judge_meta["evaluation_identity"] = evaluation_identity(snapshot, judge_meta)
         return snapshot, approved, config, judge_meta

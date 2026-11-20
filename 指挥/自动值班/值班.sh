@@ -114,12 +114,15 @@ record() {
   push_now
 }
 
+# 规则检查不通过的任务仍留在队列，本次值班从下一张继续。
+rules_skipped=''
 # 队列里按文件名排第一的任务单；以 _ 开头的是草稿，跳过
 next_task() {
   local f
   for f in "$REPO/$QUEUE"/*.md; do
     [ -e "$f" ] || return 1
     case "$(basename "$f")" in _*) continue ;; esac
+    case "$rules_skipped" in *$'\n'"${f#$REPO/}"$'\n'*) continue ;; esac
     echo "${f#$REPO/}"
     return 0
   done
@@ -332,6 +335,13 @@ while :; do
     say "队列是空的，等待新任务单"
     [ "$ONCE" -eq 1 ] && break
     sleep "$CHECK_EVERY"; continue
+  fi
+
+  rules_log="$LOGDIR/规则一致性-$(date +%Y%m%d-%H%M%S)-${task##*/}.log"
+  if ! (cd "$REPO/backend" && PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider tests/test_rules_sync.py) >"$rules_log" 2>&1; then
+    record "跳过：$task，规则一致性测试未通过（$rules_log）"
+    rules_skipped+=$'\n'"$task"$'\n'
+    continue
   fi
 
   record "开始：$task"
