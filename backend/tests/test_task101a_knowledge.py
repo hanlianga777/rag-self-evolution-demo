@@ -113,6 +113,29 @@ def test_volume_continuation_and_preface_sampling():
     assert set(plan['chunk_clusters']) == {c['chunk_id'] for c in children[1:]}
 
 
+def test_numbered_parent_paths_follow_table_titles_and_continue_across_parents():
+    prefix = '5 维修 / 5.5 上臂和下臂'
+    procedure = table([['', '操作', '注释'], ['1', '甲' * 137, '保留列名。']])
+    procedure['table_caption'] = ['装回盖板']
+    blocks = [block('5 维修', heading=True), block('5.5 上臂和下臂', heading=True),
+              block('准备工作', heading=True), block('准备工具。' * 25), procedure,
+              *[block('乙' * 232 + '。', i) for i in range(1, 9)],
+              block('结束步骤', 9, True), block('丙' * 200 + '。', 9),
+              block('6 标定', 10, True), block('丁' * 200 + '。', 10)]
+    parents, children, _ = parent_child_v2({'id': 'D', 'name': '手册.pdf'}, blocks, len)
+
+    table_child = next(c for c in children if c['chunk_text'].lstrip().startswith('装回盖板\n'))
+    assert table_child['section_path'] == prefix + ' / 装回盖板'
+    assert '1 | 操作=' + '甲' * 137 + '；注释=保留列名。' in table_child['chunk_text']
+    assert parents[0]['parent_section_path'] == prefix
+    assert parents[0]['parent_subheadings'] == ['准备工作', '装回盖板']
+    continued = next(c for c in children if c['parent_chunk_id'] == parents[1]['chunk_id'])
+    assert continued['section_path'] == prefix + ' / 装回盖板'
+    assert continued['section_heading']['block_id'] == 'D-BLOCK-00005'
+    assert parents[1]['parent_subheadings'] == ['装回盖板', '结束步骤']
+    assert children[-1]['section_path'] == '6 标定'
+
+
 def test_same_chunk_id_isolated_across_golden_history_agent_sandbox_and_resume(tmp_path, monkeypatch):
     index = tmp_path / 'index'
     archive = tmp_path / 'index_versions' / 'old'

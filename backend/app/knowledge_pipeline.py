@@ -145,7 +145,7 @@ V2_CONFIG = {**CONFIG, 'chunk_strategy': rules.CHUNKING['strategy'],
              'child_tail_min_tokens': 80, 'child_target_min_tokens': 200,
              'table_intro_max_tokens': 200, 'toc_min_entries': 3, 'toc_min_fraction': 0.5,
              'repeat_page_fraction': 0.30, 'repeat_short_line_chars': 40, 'repeat_min_pages': 2,
-             'table_normalize': 'table-kv-v4', 'denoise_version': 'mineru-noise-v8', 'heading_context': 'child-section-v3',
+             'table_normalize': 'table-kv-v4', 'denoise_version': 'mineru-noise-v8', 'heading_context': 'child-section-v4',
              'header_footer_identity_max_chars': 12,
              'list_layout': 'numbered-steps-image-labels-v1',
              'heading_hierarchy': 'manual-chapters-v3-numbered'}
@@ -253,6 +253,7 @@ _STEP_LINE = re.compile(r'^\s*\d+(?:[.、]|\s*\|)\s*\D')
 _STEP_TABLE_HEADERS = ['', '操作', '注释']
 _STEP_TABLE_ROW = re.compile(r'^(?:\d+ \| 操作=.*；注释=|[ \t]*\| 操作 \| 注释：)')
 _TABLE_TITLE = re.compile(r'^(?:地面安装|墙壁安装|倒置安装|运输姿态|所需(?:的)?(?:工具和设备|维修部件|耗材和易损件)|必需的耗材|结束步骤|(?:拆卸|拆下|卸下|装回|重新安装|重新连接|固定|检查)[^。！？!?；;：:]{2,32})$')
+_SUBHEADING_INTRO = re.compile(r'^(?:所需|必需|卸下|断开|松开|布置|从.{1,25}分离|将.{1,28}(?:放倒|固定|装回)|设计中遵循的)|^悬挂$')
 _MANUAL_VOLUME = re.compile(r'(3HAC\d{6}-\d{3})_第(\d+)部分', re.I)
 
 
@@ -318,6 +319,105 @@ def _v2_table_boundaries(text):
     # A cut can follow that row, but cannot leave the header on its own.
     header = re.search(r'^[ \t]*\|[ \t]*操作[ \t]*\|(?![ \t]*注释：)[^\n]*\n[^\n]*', text, re.M)
     return [m.end() for m in re.finditer(r'\n', text) if not header or m.end() >= header.end()]
+
+
+def _v2_numbered_subheadings(units, parsed):
+    """Resolve source-order heading positions independently of chunk boundaries."""
+    parts = [parsed[key] for key in dict.fromkeys(unit['block_id'] for unit in units if not unit.get('heading'))]
+    events = defaultdict(list)
+    body = []
+    visual_starts = {}
+    for part in parts:
+        raw = part['raw']
+        kind = raw.get('type')
+        text = part['text']
+        if kind in {'text', 'table', 'list'} and text:
+            body.append(part)
+        if part.get('heading_kind') in {'parser', 'table_intro'}:
+            events[part['block_id']].append((0, 0, text, part['heading_kind']))
+        elif kind == 'table':
+            # Match only parser caption lines, never material from the table body.
+            captions = raw.get('table_caption', [])
+            head = _v2_clean('\n'.join(captions))
+            if head and (text == head or text.startswith(head + '\n')):
+                removed = {item['text'] for item in part.get('removed_lines', [])}
+                offset, kept_offset = 0, 0
+                for line in head.splitlines(keepends=True):
+                    title = line.strip()
+                    if line.rstrip('\n') not in removed:
+                        if _v2_heading_label(title):
+                            indent = len(line) - len(line.lstrip())
+                            events[part['block_id']].append((kept_offset + indent, offset + indent, title, 'table_caption'))
+                        kept_offset += len(line)
+                    offset += len(line)
+
+    known = {title for marks in events.values() for _, _, title, _ in marks}
+    for index, part in enumerate(body):
+        text = part['text']
+        if part['raw'].get('type') != 'text' or events.get(part['block_id']) or not _v2_heading_label(text):
+            continue
+        following = body[index + 1:index + 7]
+        near = following[0] if following else None
+        before_table = near and near['raw'].get('type') == 'table' and near['page'] - part['page'] <= 1
+        explains_procedure = (near and near['page'] == part['page']
+                              and re.match(r'^(?:使用此|按照下列|按照此|请按下列|按下列).*(?:流程|程序|步骤)', near['text']))
+        table_echo = any(candidate['page'] == part['page'] and candidate['raw'].get('type') == 'table'
+                         and text in candidate['text'] for candidate in following)
+        if text in known or ((_TABLE_TITLE.fullmatch(text) or _SUBHEADING_INTRO.search(text))
+                             and (before_table or explains_procedure or table_echo)):
+            events[part['block_id']].append((0, 0, text, 'body_structure'))
+
+    for part in parts:
+        raw = part['raw']
+        box = raw.get('bbox')
+        text = part['text']
+        if (raw.get('type') != 'header' or not box or not _v2_heading_label(text)
+                or not (_TABLE_TITLE.fullmatch(text) or _SUBHEADING_INTRO.search(text))):
+            continue
+        # MinerU can emit a body title as a trailing header. Confirm that it is
+        # directly above a source table on the page, without moving its text.
+        for candidate in body:
+            table_box = candidate['raw'].get('bbox')
+            if (candidate['page'] == part['page'] and candidate['raw'].get('type') == 'table'
+                    and table_box and 0 <= table_box[1] - box[3] <= 12 and box[0] < table_box[0]):
+                events[part['block_id']].append((0, 0, text, 'body_structure'))
+                visual_starts[part['block_id']] = candidate['block_id']
+                break
+
+    current = None
+    by_block = {}
+    order = {part['block_id']: index for index, part in enumerate(parts)}
+    for part in sorted(parts, key=lambda item: (
+            order[visual_starts[item['block_id']]] - 0.5 if item['block_id'] in visual_starts else order[item['block_id']])):
+        block_id = part['block_id']
+        positions = [(0, current)]
+        for offset, source_offset, title, kind in events.get(block_id, ()):
+            current = {'title': title, 'page': part['page'], 'block_id': block_id, 'char_offset': source_offset, 'kind': kind}
+            positions.append((offset, current))
+            part.setdefault('subheading_positions', []).append(current)
+        by_block[block_id] = positions
+    return by_block
+
+
+def _v2_heading_label(text):
+    return (0 < len(text) <= 100 and any(char.isalpha() for char in text)
+            and not re.search(r'[\n。！？!?；;：:=|]', text)
+            and not re.match(r'^(?:图|表)\s*\d|^(?:参见|参阅|请|下表|适用于|此程序)', text)
+            and not (_NUMBERED_HEADING.fullmatch(text) or _STEP_LINE.match(text)
+                     or _WARNING_LABEL.fullmatch(text) or IMAGE_IDENTIFIER.fullmatch(text)))
+
+
+def _v2_parent_headings(spans, by_block):
+    positions = []
+    for span in spans:
+        block_start = span.get('block_start', 0)
+        block_end = block_start + len(span['text'])
+        source = by_block.get(span['block_id'], [(0, None)]) if not span.get('heading') else [(0, None)]
+        current = next(heading for offset, heading in reversed(source) if offset <= block_start)
+        positions.append((span['start'], current))
+        positions.extend((span['start'] + offset - block_start, heading)
+                         for offset, heading in source if block_start < offset < block_end)
+    return positions
 
 
 def _v2_child_range(child, text, spans, start, end, counter):
@@ -580,11 +680,14 @@ def parent_child_v2(document, blocks, counter, *, previous_sections=None):
             end = max(candidates) if candidates else _v2_fit(text, start, limit, counter)
             current.append({'text': text[start:end], 'page': part['page'], 'block_id': part['block_id'],
                             'section_path': part['section_path'], 'table': block.get('type') == 'table',
-                            'subheading': subheading, 'warning': warning})
+                            'subheading': subheading, 'warning': warning, 'block_start': start})
             start = end
     if current: chapters.append((top, current))
-    parents, children, parent_spans = [], [], {}
+    parents, children, parent_spans, parent_headings = [], [], {}, {}
+    parsed_by_id = {part['block_id']: part for part in parsed}
     for top, units in chapters:
+        chapter_path = units[0]['section_path']
+        heading_positions = _v2_numbered_subheadings(units, parsed_by_id) if use_numbering and units[0].get('heading') else {}
         _v2_group_step_labels(units, parsed)
         # Bind a short leading explanation to its table before packing Parents.
         bundles, index = [], 0
@@ -639,7 +742,8 @@ def parent_child_v2(document, blocks, counter, *, previous_sections=None):
             for unit in combined:
                 within = max(0, min(len(unit['text']), cut - offset))
                 if within: left.append({**unit, 'text': unit['text'][:within]})
-                if within < len(unit['text']): right.append({**unit, 'text': unit['text'][within:]})
+                if within < len(unit['text']):
+                    right.append({**unit, 'text': unit['text'][within:], 'block_start': unit.get('block_start', 0) + within})
                 offset += len(unit['text']) + 1
             groups[first:last + 1] = [left, right]
             index += 1
@@ -664,6 +768,15 @@ def parent_child_v2(document, blocks, counter, *, previous_sections=None):
                       **({'numbered_section': _numbered_heading(top)[0]} if use_numbering and _numbered_heading(top) else {})}
             parents.append(parent)
             parent_spans[parent_id] = spans
+            if use_numbering:
+                headings = _v2_parent_headings(spans, heading_positions)
+                parent_headings[parent_id] = headings
+                titles = list(dict.fromkeys(heading['title'] for _, heading in headings if heading))
+                parent.update(section_path=chapter_path, parent_section_path=chapter_path,
+                              subsections=titles, parent_subheadings=titles,
+                              section_paths=list(dict.fromkeys(
+                                  chapter_path + ' / ' + heading['title'] if heading else chapter_path
+                                  for _, heading in headings)))
             warning_ends = {point for s in spans if s.get('warning') for point in (s['end'], s['end'] + 1)}
             bounds = [b for b in _v2_boundaries(text) if b not in warning_ends]
             start = 0
@@ -738,7 +851,20 @@ def parent_child_v2(document, blocks, counter, *, previous_sections=None):
                for a, b in ((left['char_start'], start), (start, right['char_end']))):
             children[index] = _v2_child_range(left, text, spans, left['char_start'], start, counter)
             children[index + 1] = _v2_child_range(right, text, spans, start, right['char_end'], counter)
-    for number, child in enumerate(children, 1): child['chunk_id'] = f"{document['id']}-V2-C-{number:05d}"
+    for number, child in enumerate(children, 1):
+        child['chunk_id'] = f"{document['id']}-V2-C-{number:05d}"
+        if use_numbering:
+            parent_id = child['parent_chunk_id']
+            base = by_parent[parent_id]['parent_section_path']
+            start = child['char_start'] + len(child['text']) - len(child['text'].lstrip())
+            marks = parent_headings[parent_id]
+            heading = next((heading for offset, heading in reversed(marks) if offset <= start), None)
+            paths = [base + ' / ' + heading['title'] if heading else base]
+            paths.extend(base + ' / ' + later['title'] if later else base
+                         for offset, later in marks if start < offset < child['char_end'])
+            child.update(section_path=paths[0], section=paths[0], section_paths=list(dict.fromkeys(paths)))
+            if heading:
+                child['section_heading'] = heading
     return parents, children, parsed
 
 
@@ -751,6 +877,8 @@ def expand_parents(hits, parents, top_k):
             parent = by_id[key]
             expanded[key] = {**hit, 'parent_chunk_id': key, 'content': parent['chunk_text'], 'child_content': hit['content'],
                              'parent_page_start': parent['page_start'], 'parent_page_end': parent['page_end'], 'matched_child_ids': []}
+            if 'parent_section_path' in parent:
+                expanded[key].update(parent_section_path=parent['parent_section_path'], parent_subheadings=parent['parent_subheadings'])
         expanded[key]['matched_child_ids'].append(hit['chunk_id'])
     return list(expanded.values())[:top_k]
 
