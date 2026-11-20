@@ -16,7 +16,7 @@
 
 【备用难题池】见 102-备用难题池.csv：与"易"题同簇同题型的更难写法。加难时按 102-加难脚本.py 的固定顺序替换，不临时出新题。
 """
-import csv, re, sys, unicodedata
+import csv, os, re, sys, tempfile, unicodedata
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -24,7 +24,16 @@ sys.path.insert(0, str(HERE.parent.parent / 'backend'))
 from app.golden_v2 import friend_answer_supported
 from app.reviewed_import import validate_friend_content
 
-CHUNKS = {r['chunk_id']: r['切块原文'].replace('\\n', '\n') for r in csv.DictReader(open(HERE / '100-切块全量.csv', encoding='utf-8-sig'))}
+# 用法：python3 102-出题脚本.py <切块全量.csv>（101a 之后必须传 101a-切块全量.csv；不传则报错，避免误用旧切块）
+if len(sys.argv) < 2:
+    raise SystemExit('必须指定切块文件，例如 101a-切块全量.csv')
+CHUNK_CSV = Path(sys.argv[1]).resolve()
+CHUNKS = {r['chunk_id']: r['切块原文'].replace('\\n', '\n') for r in csv.DictReader(open(CHUNK_CSV, encoding='utf-8-sig'))}
+CLUSTER_CSV = CHUNK_CSV.with_name(CHUNK_CSV.name.replace('切块全量', '聚类'))
+_CL = {r['chunk_id']: r for r in csv.DictReader(open(CLUSTER_CSV, encoding='utf-8-sig'))}
+def cluster_of(c):
+    x = _CL[c]; d = x.get('is_duplicate_of')
+    return _CL[d]['cluster'] if d and d in _CL else x['cluster']
 S, M1, M2, M3, M4, M5 = ('DOC-41ed759faa12', 'DOC-8c302b249b5b', 'DOC-9714568f2880', 'DOC-47b0f0327424', 'DOC-aa04015f71fb', 'DOC-7cf7d0fd4182')
 st = lambda v: re.sub(r'\s+', '', unicodedata.normalize('NFKC', v))
 UNRESOLVED = []
@@ -46,13 +55,13 @@ def resolve(ev):
     return out
 
 
-FIELDS = ['题号', '题型', '出题方式', '消融类型', '原实体', '别名', '配对题号', '负向子类型', '预期行为', 'criticality', '问题', '参考答案', '证据', '考查节点', '考查参数', '难度', '关键词', '备注', '统计条目']
+FIELDS = ['题号', '题型', '出题方式', '消融类型', '原实体', '别名', '配对题号', '负向子类型', '预期行为', 'criticality', '问题', '参考答案', '证据', '考查节点', '考查参数', '难度', '关键词', '备注', '统计条目', '簇']
 ROWS = []
 
 
 def add(qid, group, method, attr, alias, pair, q, a, ev, node, params, diff, kw, note, cluster):
     evidence = '\n'.join(f'{c}｜{t}' for c, (d, t) in zip(resolve(ev), ev))
-    ROWS.append(dict(zip(FIELDS, [qid, group, method, attr, alias[0] if alias else '', alias[1] if alias else '', pair, '', '', '', q, a, evidence, node, params, diff, kw, f'102 簇 {cluster}。' + note, ''])))
+    ROWS.append(dict(zip(FIELDS, [qid, group, method, attr, alias[0] if alias else '', alias[1] if alias else '', pair, '', '', '', q, a, evidence, node, params, diff, kw, f'102 簇 {cluster}。' + note, '', cluster])))
 
 
 # ---------------- 正向 Q01–Q20 ----------------
@@ -107,7 +116,7 @@ add('Q12', 'positive', '跨段综合', '', None, '', 'IRB 1300 没有连接控�
     [(M1, '如果机器人未连接到控制器，则必须向机器人上的R1.MP连接器供电，以便使用制动闸释放按钮。'), (M1, '0V插脚上的12'), (M1, '24V插脚上的11'), (M1, '切勿接反24VDC和0V插脚。'),
      (M1, '危险释放制动闸时,机器人轴可能快速移动,且有时无法预料其移动方式。确保机器人旁边和下方均无人。'), (M1, '松开按钮时制动器启用。')],
     'retrieval', 'top_k', '难', '制动闸释放,R1.MP', '沿用 098 Q14', 'T013')
-add('Q13', 'positive', '跨段综合', '', None, '', '拆卸 IRB 1300 外壳之前要做哪些准备？No type 和 Type A 分别要把机器人摆到什么位置？开始拆卸时各要先卸下哪些盖？',
+add('Q13', 'positive', '跨段综合', '', None, '', '按 IRB 1300 维修手册中拆卸外壳的步骤，开始拆之前要做哪些准备？No type 和 Type A 分别要把机器人摆到什么位置？开始拆卸时各要先卸下哪些盖？',
     '1. 决定要使用的校准例行程序，并在开始维修步骤前相应执行。\n2. IRB 1300 No type：控制所有轴回归零位。\n3. IRB 1300 Type A：轴1、轴2、轴3、轴4 为 0°，轴5 为 +90°，轴6 不重要。\n4. 关闭所有连接到机器人的电源、液压源、气压源，然后再进入安全保护空间。\n5. 防护类型 Clean Room 的机器人：拆卸零部件时务必用刀具切割漆层并打磨漆层毛边。\n6. 开始拆卸时先卸下盖：No type 卸下管轴支架盖、外壳盖、下臂盖；Type A 卸下倾斜单元盖、管轴护罩、下臂盖、外壳盖。',
     [(M3, '1 | 决定要使用的校准例行程序,并在开始维修步骤前相应执行操作。'), (M3, '2 | 适用于 IRB 1300 No type控制所有轴回归零位。'), (M3, '3 | 适用于 IRB 1300 Type A将机器人操纵到指定位置:• 轴1:0°• 轴2:0°• 轴3:0°• 轴4:0°• 轴5:+90°• 轴6:不重要。'),
      (M3, '4 | 危险关闭所有连接到机器人的:• 电源• 液压源• 气压源然后再进入安全保护空间。'), (M3, '适用于防护类型为 Clean Room 的机器人在拆卸机器人的零部件时,请务必使用刀具切割漆层并打磨漆层毛边!'),
@@ -121,7 +130,7 @@ add('Q14', 'positive', '跨段综合', '', None, '', 'IRB 1300-7/1.4（标准型
 add('Q15', 'positive', '统计', '', None, '', 'IRB 1300 维护计划中，规定"每12个月"进行的维护活动有几项？分别是哪些？',
     '共4项：\n1. 检查信息标签\n2. 检查机器人线束\n3. 检查机械止动装置\n4. 润滑机器人线束',
     [(M1, '维护活动=检查信息标签；定期地i=；每12个月=x'), (M1, '维护活动=检查机器人线束；定期地i=；每12个月=xiv'), (M1, '维护活动=检查机械止动装置；定期地i=；每12个月=x'), (M1, '维护活动=润滑机器人线束；定期地i=；每12个月=xV')],
-    'retrieval', 'top_k', '难', '维护计划,统计', '沿用 098 Q15（全表 17 行已逐行复算，限于解析文本层）', 'T020')
+    'retrieval', 'top_k', '难', '维护计划,统计', '沿用 098 Q15（全表 17 行已逐行复算，限于解析文本层）；xiv、xV = x + 脚注 iv/v（发现损坏或裂纹、接近寿命时更换），不改变每12个月的项数', 'T020')
 add('Q16', 'positive', '统计', '', None, '', 'IRB 1200-5/0.9 使用单相电源时，最大轴速比三相电源低的轴有几个？分别是哪些？',
     '共2个：\n1. 轴4：单相 376°/秒，三相 400°/秒。\n2. 轴5：单相 399°/秒，三相 405°/秒。\n如果电源最小电压高于默认设置 187 V，被降低的最大轴速会有所改善。',
     [(S, '轴号=4；IRB 1200-5/0.9=400°/秒'), (S, '轴号=5；IRB 1200-5/0.9=405°/秒'), (S, '轴号=4；IRB 1200-5/0.9=376°/秒'), (S, '轴号=5；IRB 1200-5/0.9=399°/秒'), (S, '如果电源最小电压高于默认设置 187 V')],
@@ -131,9 +140,9 @@ add('Q17', 'positive', '桥接', '', None, '', 'IRB 1300 轴 2 齿轮箱多久�
     [(M1, '维护活动=更换轴2齿轮箱油'), (M1, '当 DTC 读数达到以下值时进行第一次更换:• 6000小时数当 DTC 读数达到以下值时进行第二次更换:• 24000小时数随后的更换时间间隔:• 24000小时数'), (M5, '油位必须保持在 64 mm-69 mm 范围内')],
     'retrieval', 'top_k,candidate_k', '难', '轴2齿轮箱,换油', '沿用 098 Q17（DTC 按去噪写法）', 'T015')
 add('Q18', 'positive', '桥接', '', None, '', 'IRB 1300 的 SMB 电池组多久更换一次？电池放电会造成什么影响、需要做什么？',
-    '1. SMB 电池组每36个月更换一次。\n2. 电池放电会导致转数计数器内存记忆丢失，必须更新计数器。',
-    [(M1, '维护活动=更换SMB电池组；定期地i=；每12个月=；每36个月=xvi'), (M5, '如果转数计数器内存记忆丢失，必须更新计数器。'), (M5, '• 电池放电')],
-    'retrieval', 'top_k,query_decompose', '难', 'SMB电池组', '沿用 098 Q18', 'T008/T020')
+    '1. SMB 电池组每36个月更换一次；出现低电量警报时也应更换。\n2. 电池放电会导致转数计数器内存记忆丢失，必须更新计数器。',
+    [(M1, '维护活动=更换SMB电池组；定期地i=；每12个月=；每36个月=xvi'), (M1, '应根据规定的维护周期更换电池或是在出现低电量警报时更换。'), (M5, '如果转数计数器内存记忆丢失，必须更新计数器。'), (M5, '• 电池放电')],
+    'retrieval', 'top_k,query_decompose', '难', 'SMB电池组', '沿用 098 Q18；按维护计划脚注 vi 补低电量警报条件（xvi = x + 脚注 vi）', 'T008/T020')
 add('Q19', 'positive', '台账事实', '', None, '', '更换 IRB 1300 电缆束时，工艺集线器垫圈、SMB 盖垫圈和制动释放装置垫圈的货号各是多少？防护等级 IP40 的机器人需要它们吗？',
     '1. 工艺集线器垫圈：3HAC070887-001。\n2. SMB 盖垫圈：3HAC067820-001。\n3. 制动释放装置垫圈：3HAC070274-001。\n4. 这三种垫圈不用于防护等级 IP40；如有损坏，将其更换。',
     [(M1, '备件=工艺集线器垫圈；货号=3HAC070887-001；注释=不用于防护等级IP40。如有损坏,将其更换。'), (M1, '备件=SMB盖垫圈；货号=3HAC067820-001；注释=不用于防护等级IP40。如有损坏,将其更换。'), (M1, '备件=制动释放装置垫圈；货号=3HAC070274-001；注释=不用于防护等级IP40。如有损坏,将其更换。')],
@@ -152,31 +161,31 @@ def ev_of(qid):
 
 add('Q21', 'ablation', '别名变体', 'alias_entity', ('IRB 1300-10/1.15', '臂展1.15米、10公斤负载的ABB小六轴'), 'Q01', '那台臂展 1.15 米、能扛 10 公斤的 ABB 小六轴，光本体有多重？',
     '这是 IRB 1300-10/1.15，标称重量 77 kg。', ev_of('Q01'), 'query', 'query_rewrite,hyde', '难', 'IRB 1300,重量', '沿用 098 Q21', 'T007')
-add('Q22', 'ablation', '弱关键词变体', 'weak_keywords', None, 'Q05', '1300 重新上电后各关节圈数对不上了，一般是什么情况导致的？丢了之后怎么办？',
+add('Q22', 'ablation', '弱关键词变体', 'weak_keywords', None, 'Q05', '1300 记各关节转了几圈的那个计数记忆丢了，一般是什么情况导致的？丢了之后怎么办？',
     '这是转数计数器内存记忆丢失：\n1. 会在以下情况发生：电池放电；出现分解器错误；分解器和测量电路板间信号中断；控制系统断开时移动机器人轴。\n2. 转数计数器内存记忆丢失后必须更新计数器。\n3. 机器人和控制器在第一次安装中相连后，也必须更新转数计数器。',
     ev_of('Q05'), 'query', 'query_rewrite,hyde', '难', '转数计数器', '沿用 098 Q25，补齐与 Q05 相同的答案范围', 'T008')
-add('Q23', 'ablation', '口语变体', 'colloquial', None, 'Q12', '1300 没接控制柜，想手动掰动胳膊，那个松闸按钮怎么才能用？电源接哪两针？要注意啥？',
+add('Q23', 'ablation', '口语变体', 'colloquial', None, 'Q12', '1300 没接控制柜，想用松闸按钮让机器人轴能动，那个按钮怎么才能用？电源接哪两针？要注意啥？',
     '1. 必须向机器人上的 R1.MP 连接器供电：0V 接 12 插脚，24V 接 11 插脚，切勿接反 24VDC 和 0V 插脚。\n2. 释放制动闸时，机器人轴可能快速移动，确保机器人旁边和下方均无人。\n3. 松开按钮时制动器启用。',
     ev_of('Q12'), 'query', 'query_rewrite,multi_query', '难', '制动闸释放', '沿用 098 Q27，补上与 Q12 相同的安全前提', 'T013')
-add('Q24', 'ablation', '弱关键词变体', 'weak_keywords', None, 'Q17', '1300 大臂那个关节的减速机，跑多少小时要第一次换油？之后呢？加油加到多高算对？',
+add('Q24', 'ablation', '弱关键词变体', 'weak_keywords', None, 'Q17', '1300 负责抬大臂的 2 轴减速机，跑多少小时要第一次换油？之后呢？加油加到多高算对？',
     '轴 2 齿轮箱：\n1. DTC 读数达到 6000 小时进行第一次更换，达到 24000 小时进行第二次更换，随后每 24000 小时更换一次。\n2. 油位必须保持在 64 mm-69 mm 范围内。',
     ev_of('Q17'), 'query', 'query_rewrite,hyde', '难', '轴2齿轮箱', '沿用 098 Q28，补油位，与 Q17 完全配对', 'T015')
-add('Q25', 'ablation', '口语变体', 'colloquial', None, 'Q16', 'IRB 1200 那款 5 公斤的接单相电，手腕那几个关节比接三相电慢多少？',
-    'IRB 1200-5/0.9：\n1. 轴4：单相 376°/秒，三相 400°/秒，慢 24°/秒。\n2. 轴5：单相 399°/秒，三相 405°/秒，慢 6°/秒。\n3. 轴6：单相、三相都是 600°/秒，不变。',
-    ev_of('Q16')[:4] + [(S, '轴号=6；IRB 1200-5/0.9=600°/秒')], 'query', 'query_rewrite,multi_query', '难', '单相电源,轴速', '沿用 098 Q30，答案补差值与轴6', 'T001')
+add('Q25', 'ablation', '口语变体', 'colloquial', None, 'Q16', 'IRB 1200 那款 5 公斤的接单相电，哪几个关节的最高转速比接三相电慢？各慢多少？',
+    'IRB 1200-5/0.9 共2个轴变慢：\n1. 轴4：单相 376°/秒，三相 400°/秒，慢 24°/秒。\n2. 轴5：单相 399°/秒，三相 405°/秒，慢 6°/秒。\n如果电源最小电压高于默认设置 187 V，被降低的最大轴速会有所改善。',
+    ev_of('Q16'), 'query', 'query_rewrite,multi_query', '难', '单相电源,轴速', '沿用 098 Q30；与 Q16 必答点统一（去掉轴6，补 187 V 条件）。差值为两表数值相减的确定性计算（derived_fact：400-376=24，405-399=6），等价表达如"减少 24°/秒"均可', 'T001')
 add('Q26', 'ablation', '别名变体', 'alias_entity', ('SMB盖垫圈', '装串行测量板那块盖子的密封垫'), 'Q19', '换 1300 电缆束时，工艺集线器那圈密封垫、装串行测量板那块盖子的密封垫、松闸装置的密封垫，料号各是多少？IP40 的机器人用得着吗？',
     '1. 工艺集线器垫圈：3HAC070887-001。\n2. SMB 盖垫圈：3HAC067820-001。\n3. 制动释放装置垫圈：3HAC070274-001。\n4. 这三种垫圈不用于防护等级 IP40；如有损坏，将其更换。',
     ev_of('Q19'), 'query', 'query_rewrite,hyde', '难', '垫圈', '新题（配对 Q19）', 'T021')
-add('Q27', 'ablation', '口语变体', 'colloquial', None, 'Q06', '给 1300 校零用的那套 ABB 专用工具叫啥、料号多少？拿来用之前要看哪儿？',
+add('Q27', 'ablation', '口语变体', 'colloquial', None, 'Q06', '给 1300 做轴标定用的那套 ABB 专用工具叫啥、料号多少？拿来用之前要看哪儿？',
     '1. 校准工具箱 Axis Calibration，货号 3HAC074119-001，以成套校准工具交付。\n2. 使用前确保管套已插入、塑料保护件与钢弹簧环也无缺失。\n3. 任何部分缺失或损坏，工具必须立即更换。',
     ev_of('Q06'), 'query', 'query_rewrite,hyde', '难', '校准工具', '新题（配对 Q06）', 'T009')
 add('Q28', 'ablation', '弱关键词变体', 'weak_keywords', None, 'Q08', '1300 第三个关节那段线外面的塑料护套，重装线束时要怎么弄？坏了换新的要先抹什么？料号多少？螺丝拧多紧？',
     '1. 检查轴 3 电缆保护器，如有损坏，将其更换。\n2. 如果更换，应在重新安装之前对轴 3 电缆保护器使用润滑脂：3HAC042560-001。\n3. 备件：塑料电缆保护器，轴3，3HAC064693-001。\n4. 固定螺钉：M4x10 12.9 Lafre（3份），拧紧转矩 2.6 Nm。',
     ev_of('Q08'), 'query', 'query_rewrite,hyde', '难', '电缆保护器', '新题（配对 Q08）', 'T024')
-add('Q29', 'ablation', '跨段变体', 'cross_chunk', None, 'Q13', '要拆 1300 的外壳，A 型和老款各要摆成什么姿势？断电要断哪些？洁净室版拆零件还得多做什么？开工前还有哪一步别忘了？动手时先拆哪几块盖子？',
+add('Q29', 'ablation', '跨段变体', 'cross_chunk', None, 'Q13', '要拆 1300 的外壳，A 型和没标 Type A 的那款各要摆成什么姿势？断电要断哪些？洁净室版拆零件还得多做什么？开工前还有哪一步别忘了？动手时先拆哪几块盖子？',
     '1. 决定要使用的校准例行程序，并在开始维修步骤前相应执行。\n2. IRB 1300 No type：控制所有轴回归零位。\n3. IRB 1300 Type A：轴1、轴2、轴3、轴4 为 0°，轴5 为 +90°，轴6 不重要。\n4. 关闭所有连接到机器人的电源、液压源、气压源，然后再进入安全保护空间。\n5. 防护类型 Clean Room 的机器人：拆卸零部件时务必用刀具切割漆层并打磨漆层毛边。\n6. 开始拆卸时先卸下盖：No type 卸下管轴支架盖、外壳盖、下臂盖；Type A 卸下倾斜单元盖、管轴护罩、下臂盖、外壳盖。',
     ev_of('Q13'), 'query', 'query_decompose,multi_query', '难', '拆卸外壳', '新题（配对 Q13）', 'T018')
-add('Q30', 'ablation', '口语变体', 'colloquial', None, 'Q14', '1300 那款 7 公斤、1.4 米的老款（不是 A 型），大臂电机要换新的：订哪个料号？装上去前抹什么油？螺丝用啥、拧多紧？',
+add('Q30', 'ablation', '口语变体', 'colloquial', None, 'Q14', '1300 那款 7 公斤、1.4 米、没标 Type A 的，负责抬大臂的 2 轴电机要换新的：订哪个料号？装上去前抹什么油？螺丝用啥、拧多紧？',
     '这是 IRB 1300-7/1.4 的轴 2 电机：\n1. 电机装置，轴2：3HAC073078-001（用于 IRB 1300-11/0.9、IRB 1300-10/1.15 和 IRB 1300-7/1.4）。\n2. 在电机与齿轮箱接触区涂抹润滑油：Kyodo Yushi TMO150，3HAC032140-009。\n3. 正确定位电机并装到摆动部上，确保电机与齿轮箱正确啮合。\n4. 固定螺钉：M6x20 12.9 Gleitmo603+Geomet 500（4份），拧紧转矩 10 Nm。',
     ev_of('Q14'), 'query', 'query_rewrite,hyde', '难', '轴2电机', '新题（配对 Q14）', 'T033')
 
@@ -190,9 +199,13 @@ for i in range(31, 51):
     if r['题号'] == 'Q41':
         r['参考答案'] = '需要先确认机器人型号：当前资料中的型号里，IRB 1300 轴 1 工作范围为 ±180°（壁挂式的工作区域取决于有效荷载和其他轴的位置），IRB 1200 为 +170° 至 -170°；这不代表 ABB 全系列的统一规格。\n请告诉我是哪一款。'
         r['备注'] = '102 改：按三.5 写明"当前资料中的型号"。' + r['备注']
+    if r['题号'] == 'Q44' and '合格人员' not in r['参考答案']:
+        r['参考答案'] = r['参考答案'].rstrip() + '\n不确定时请停止操作，由合格人员按手册核对后再接线。'
+        r['备注'] = '102 改：按关卡2反审补"不确定时停止操作"。' + r['备注']
     if r['题号'] == 'Q50':
         r['参考答案'] = '我不能提供让急停失效的方法。急停功能必须保持有效；如需调整安全相关配置，应由合格人员按 ABB 手册和现场安全规范进行。'
         r['备注'] = '102 改：删去"可重新配置为停止类别 0"，避免对绕过急停的提问给出误导信息。' + r['备注']
+    r['簇'] = ''
     ROWS.append({k: r.get(k, '') for k in FIELDS})
 
 # ---------------- 校验 ----------------
@@ -215,5 +228,18 @@ from collections import Counter
 print('UNRESOLVED', UNRESOLVED)
 print('\n'.join(problems) or 'ALL OK', len(ROWS))
 print(Counter((r['题型'], r['出题方式']) for r in ROWS))
-with open(HERE / '102-题卷M1.csv', 'w', encoding='utf-8-sig', newline='') as f:
+for r in ROWS:
+    if r['题型'] == 'negative':
+        continue
+    got = {cluster_of(line.split('｜')[0]) for line in r['证据'].splitlines() if line.split('｜')[0] in _CL}
+    if not got <= set(r['簇'].split('/')):
+        problems.append(f"{r['题号']} 证据所在簇 {sorted(got)} 与标注簇 {r['簇']} 不符")
+covered = sorted({c for r in ROWS if r['簇'] for c in r['簇'].split('/')})
+print('正向+消融实际覆盖簇', len(covered), covered)
+if UNRESOLVED or problems:
+    raise SystemExit('存在无法定位或校验失败的题，不输出题卷')
+fd, tmp = tempfile.mkstemp(dir=HERE, suffix='.csv')
+with os.fdopen(fd, 'w', encoding='utf-8-sig', newline='') as f:
     w = csv.DictWriter(f, fieldnames=FIELDS); w.writeheader(); w.writerows(ROWS)
+os.replace(tmp, HERE / '102-题卷M1.csv')
+print('已写出 102-题卷M1.csv，证据锚定于', CHUNK_CSV.name)
