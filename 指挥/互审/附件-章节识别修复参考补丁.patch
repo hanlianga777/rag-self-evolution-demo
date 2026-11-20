@@ -1,0 +1,38 @@
+diff --git a/backend/app/knowledge_pipeline.py b/backend/app/knowledge_pipeline.py
+index 622dbab..2e60701 100644
+--- a/backend/app/knowledge_pipeline.py
++++ b/backend/app/knowledge_pipeline.py
+@@ -147,7 +147,7 @@ V2_CONFIG = {**CONFIG, 'chunk_strategy': 'parent-child-v2', 'parent_min_tokens':
+              'table_normalize': 'table-kv-v3', 'denoise_version': 'mineru-noise-v5', 'heading_context': 'child-section-v2',
+              'header_footer_identity_max_chars': 12,
+              'list_layout': 'numbered-steps-image-labels-v1',
+-             'heading_hierarchy': 'manual-chapters-v1'}
++             'heading_hierarchy': 'manual-chapters-v2-numbered'}
+ DOCUMENT_CATEGORIES = ('清洁机器人说明书', '巡检机器人说明书', '遥控器说明书', '电池与充电器说明书', '其他')
+ # MinerU flattened these manuals' headings. Chapter starts were checked against
+ # cached content, never inferred from Golden questions. Page is one-based.
+@@ -315,6 +315,10 @@ def parent_child_v2(document, blocks, counter):
+     # honors the parser's real level 1/2 headings.
+     known = MANUAL_CHAPTERS.get(document['id'], [])
+     has_level_one = any(p['raw'].get('text_level') == 1 for p in parsed)
++    # 2026-11-19（080 审核）：ABB 这类手册的 MinerU 一级标题不可靠（"目录""从下臂上分离电缆束"被标成一级，真正的"5.6.2 更换轴 2 电机"反而不是），
++    # 导致章节路径停在旧标题上，"文档名 · 章节路径"的向量前缀错位。手册里编号标题足够多时，改为按编号标题分章（同名续页标题不另起章）。
++    numbered = re.compile(r'^\d+(?:\.\d+){0,3}\s+\S')
++    use_numbering = not known and sum(1 for p in parsed if p['raw'].get('text_level') and numbered.match(_strip_page_flow(p['text'] or ''))) >= 5
+     for part in parsed:
+         block, text = part['raw'], part['text']
+         footnote = block.get('type') == 'page_footnote'
+@@ -341,7 +345,12 @@ def parent_child_v2(document, blocks, counter):
+         if text in {'危险', '警告', '小心', '注意', '注意：', '提示', '提示：', '原因：'} or re.match(r'^\d+[.、]\s*.*(?:按下|点击|输入|拧|创建|选择|装|打开|拔|拉|检查)', text):
+             level = None
+         if level and text:
+-            starts_chapter = any(part['page'] == page and text == heading for page, heading in known) if known else level == 1 or (not has_level_one and not title_path)
++            if use_numbering:
++                starts_chapter = bool(numbered.match(text)) and text != top
++                if numbered.match(text) and text == top:
++                    title_path = [top]; part['section_path'] = top; part['heading_only'] = True; continue
++            else:
++                starts_chapter = any(part['page'] == page and text == heading for page, heading in known) if known else level == 1 or (not has_level_one and not title_path)
+             if starts_chapter:
+                 if current and (chapters or top != document['name']):
+                     chapters.append((top, current)); current = []
