@@ -4,7 +4,7 @@ CSV 列（UTF-8，可带 BOM）：
   题号, 题型(positive/ablation/negative), 出题方式(单段标准/跨段综合/统计/桥接/台账事实/口语变体/别名变体/弱关键词变体/跨段变体/负向),
   消融类型(colloquial/alias_entity/weak_keywords/cross_chunk，消融题必填), 原实体, 别名, 配对题号,
   负向子类型, 预期行为, criticality, 问题, 参考答案,
-  证据（每行一段，格式：chunk_id｜切块原文中的连续片段）, 考查节点, 考查参数, 难度, 关键词, 备注, 统计条目（统计题必填，用｜分隔）
+  证据（每行一段，格式：chunk_id｜切块原文中的连续片段）, 考查节点, 考查参数, 难度, 关键词, 备注, 业务主题, 业务分组（可空）, 统计条目（统计题必填，用｜分隔）
 
 默认 dry-run：逐题跑朋友同款硬校验（证据逐字定位、答案锚点、跨段校验、统计/桥接/事实构造检查、页码题禁出等），
 打印每题错误，不写库；加 --apply 才写入一个新的候选版本（不冻结、不做 Gate 1）。
@@ -45,6 +45,8 @@ def to_candidate(row):
                  'difficulty': row.get('难度', '').strip() or None, 'note': row.get('备注', '').strip() or None,
                  'keywords': [k.strip() for k in (row.get('关键词') or '').replace('，', ',').split(',') if k.strip()],
                  'paired_question': row.get('配对题号', '').strip() or None,
+                 'business_topic': (row.get('业务主题') or '').strip() or None,
+                 'business_group': (row.get('业务分组') or '').strip() or None,
                  'golden_contract': 'friend-golden-v1'}
     if method == '统计':
         candidate['aggregation_items'] = [item.strip() for item in (row.get('统计条目') or '').split('｜') if item.strip()]

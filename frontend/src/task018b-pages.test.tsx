@@ -11,7 +11,7 @@ const mount=async(node:React.ReactNode)=>{root=createRoot(document.body.appendCh
 afterEach(()=>{if(root)act(()=>root.unmount());vi.unstubAllGlobals();document.body.innerHTML='';});
 it('places processing before expanded coverage, keeps one title, and restores document deletion',async()=>{
  const changed=vi.fn(),knowledge={identity:{corpus_snapshot_id:'fixture'}};
- const topics=[{name:'设备维护',size:7,questions:null,clusters:[]}];
+ const topics=[{name:'设备维护',size:7,quota:1,sections:[],questions:null,clusters:[]}];
  const fetcher=vi.fn(async(url:string,init?:RequestInit)=>new Response(JSON.stringify(init?.method==='DELETE'?{id:'operation',status:'completed'}:url.endsWith('/knowledge/topics')?{has_frozen_exam:false,topics}:{knowledge,index:{}})));
  vi.stubGlobal('fetch',fetcher);
  await mount(<KnowledgePage data={{documents:[{id:'D1',name:'设备手册.pdf',chunks:7,status:'Indexed'}]}} onChanged={changed}/>);

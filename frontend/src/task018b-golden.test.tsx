@@ -53,3 +53,20 @@ it('hides empty optional cards, groups duplicate evidence and preserves the save
  expect(JSON.stringify(row)).toBe(saved);
  await act(async()=>root.unmount());
 });
+
+it("displays cross-topic evidence as auxiliary references in question details", async () => {
+ const root = createRoot(document.body.appendChild(document.createElement('div')));
+ const row = {question:'同时涉及两章的题',raw:{business_topic:'维修',business_group:'06-01'},evidence_details:[{chunks:[
+  {document_name:'手册',business_topic:'维修',page_start:10,chunk_text:'维修主证据'},
+  {document_name:'手册',business_topic:'安全',page_start:20,chunk_text:'安全辅助证据'},
+ ]}]};
+ await act(async()=>root.render(<FrozenQuestionDetails row={row}/>));
+ const sections = [...document.querySelectorAll('.drawer-section')];
+ const core = sections.find(section => section.querySelector('h3')?.textContent === '核心证据');
+ const auxiliary = sections.find(section => section.querySelector('h3')?.textContent === '辅助引用');
+ expect(core?.textContent).toContain('维修主证据');
+ expect(core?.textContent).not.toContain('安全辅助证据');
+ expect(auxiliary?.textContent).toContain('安全辅助证据');
+ expect(sections.find(section => section.querySelector('h3')?.textContent === '题目信息')?.textContent).toContain('业务主题：维修');
+ await act(async()=>root.unmount());
+});

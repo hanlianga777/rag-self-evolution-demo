@@ -32,6 +32,8 @@ def chunk_diagnostics(corpus):
 
 
 def chunk_browser(corpus, store):
+    from .business_topics import chunk_business_topic
+
     parents = _read_json(corpus.index_dir/'parents.json', [])
     children = corpus.chunks()
     by_id = {c['chunk_id']: c for c in children}
@@ -46,13 +48,16 @@ def chunk_browser(corpus, store):
         anchors = frozen_evidence_ids(q)
         unmatched.update(anchors - by_id.keys())
         hits = [c for c in children if c['chunk_id'] in anchors]
+        if q.get('business_topic'):
+            hits = [{**c, 'business_topic': chunk_business_topic(c)} for c in hits]
         # Project frozen data; never join mutable candidate/probe/QC records here.
         question = {key: q.get(key) for key in ('id', 'display_id', 'question', 'reference_answer', 'test_category', 'evaluation_group', 'expected_behavior', 'negative_subtype', 'topic_cluster')}
         question['display_id'] = q.get('display_id') or q.get('coverage_slot') or '题号未记录'
         question['test_category'] = q.get('evaluation_group') or q.get('test_category')
         question.update(child_ids=[c['chunk_id'] for c in hits],
                         parent_ids=list(dict.fromkeys(c['parent_chunk_id'] for c in hits if c.get('parent_chunk_id') in parent_ids)),
-                        raw={'business_requirements': q.get('business_requirements', {})},
+                        raw={'business_requirements': q.get('business_requirements', {}),
+                             **{field: q[field] for field in ('business_topic', 'business_group') if field in q}},
                         evidence_details=[{'chunks': hits}])
         questions.append(question)
     grouped = {}

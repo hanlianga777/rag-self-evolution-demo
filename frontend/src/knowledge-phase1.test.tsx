@@ -18,8 +18,8 @@ it('keeps Legacy Production separate when the active Knowledge lifecycle has no 
 });
 it('shows every business topic and expands the final topic without adding a drawer', async () => {
   const topics = Array.from({ length: 9 }, (_, i) => ({
-    name: `主题${i+1}`, size: 5, questions: null,
-    clusters: [{ id: `S${i+1}`, name: `小节${i+1}`, size: 5, purity: 1, questions: null }],
+    name: `主题${i+1}`, size: 5, quota: 2, sections: [{ number: `${i+1}.1`, title: `小节${i+1}` }], questions: null,
+    clusters: [{ id: `S${i+1}`, name: `分组${i+1}`, size: 5, quota: 2, homogeneity: 1, sections: [{ number: `${i+1}.1`, title: `小节${i+1}` }], questions: null }],
   }));
   vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith('/knowledge/topics') ? { has_frozen_exam: false, topics } : { knowledge: {} }))));
   const root = createRoot(document.body.appendChild(document.createElement('div')));

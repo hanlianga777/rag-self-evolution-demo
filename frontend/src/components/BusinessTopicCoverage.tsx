@@ -5,15 +5,34 @@ import { Icon, IconLabel } from "../ui/icons";
 
 const categories = [["positive", "正向"], ["ablation", "消融"], ["negative", "负向"]] as const;
 
+type NumberedSection = { number: string; title: string };
+
 type TopicCoverage = {
   has_frozen_exam: boolean;
   topics: {
     name: string;
-    size: number;
+    model: string | null;
+    size: number | null;
+    quota: number | null;
     questions: Record<typeof categories[number][0], number> | null;
-    clusters: { id: string; name: string; size: number; purity: number; questions: number | null }[];
+    sections: NumberedSection[];
+    clusters: {
+      id: string;
+      name: string;
+      size: number;
+      homogeneity: number;
+      quota: number;
+      questions: number | null;
+      sections: NumberedSection[];
+    }[];
   }[];
 };
+
+function SectionDirectory({ sections }: { sections: NumberedSection[] }) {
+  return <ul className="business-sections">
+    {sections.map(({ number, title }) => <li key={number}>{number} {title}</li>)}
+  </ul>;
+}
 
 export function BusinessTopicCoverage() {
   const [coverage, setCoverage] = useState<TopicCoverage>();
@@ -28,39 +47,54 @@ export function BusinessTopicCoverage() {
   }, []);
 
   const topics = coverage?.topics || [];
-  const maxChunks = Math.max(1, ...topics.map(topic => topic.size));
+  const maxChunks = Math.max(1, ...topics.map(topic => topic.size ?? 0));
   return <section className="ui-card knowledge-coverage" aria-label="知识主题覆盖">
     <h2><IconLabel name="coverage">知识主题覆盖</IconLabel>
-      <HoverCard content="业务主题按手册章节划分；大章节内部用 K-means 再分组，用于让题目分散到不同小节；片段数按正文去重计算">
+      <HoverCard content="按文档章节划分的知识覆盖，不是跨产品的语义分类。大章节内部用 K-means 把相近的小节归为一组，用于让题目分散到不同的业务单元。片段数按正文去重计算。">
         <span className="ui-kc-info" tabIndex={0} aria-label="口径说明"><Icon name="info" size={13} /></span>
       </HoverCard>
     </h2>
     {topics.length > 0 ? <table className="business-topics">
-      <colgroup><col /><col className="business-fragments-col" /></colgroup>
+      <colgroup><col /><col className="business-fragments-col" /><col /></colgroup>
       <colgroup span={3} />
+      <colgroup><col /></colgroup>
       <thead>
         <tr><th scope="col" rowSpan={2}>业务主题</th><th scope="col" rowSpan={2}>知识片段数</th>
-          <th scope="colgroup" colSpan={3}>实际题数{!coverage?.has_frozen_exam && <> <small>题卷导入后显示</small></>}</th></tr>
+          <th scope="col" rowSpan={2}>目标正向配额</th>
+          <th scope="colgroup" colSpan={3}>实际题数{!coverage?.has_frozen_exam && <> <small>题卷冻结后显示</small></>}</th>
+          <th scope="col" rowSpan={2}>正向缺口</th></tr>
         <tr>{categories.map(([key, label]) => <th scope="col" key={key}>{label}</th>)}</tr>
       </thead>
       <tbody>{topics.map(topic => {
+        const expandable = topic.sections.length > 0;
         const open = expanded === topic.name;
+        const gap = topic.quota != null && topic.questions ? topic.quota - topic.questions.positive : 0;
         return <Fragment key={topic.name}>
-          <tr className="business-topic-row" onClick={() => setExpanded(open ? undefined : topic.name)}>
-            <th scope="row"><button className="text-button business-topic-toggle" aria-expanded={open}>
-              <Icon name="go" size={14} />{topic.name}
-            </button></th>
-            <td><span className="ui-kc-bar"><i aria-hidden="true" style={{ width: `${topic.size / maxChunks * 100}%` }} /><b className="ui-num">{topic.size}</b></span></td>
+          <tr className={expandable ? "business-topic-row" : undefined}
+            onClick={expandable ? () => setExpanded(open ? undefined : topic.name) : undefined}>
+            <th scope="row">
+              {expandable ? <button type="button" className="text-button business-topic-toggle" aria-expanded={open}>
+                <Icon name="go" size={14} />{topic.name}
+              </button> : topic.name}
+              {topic.model && <small className="business-topic-model">{topic.model}</small>}
+            </th>
+            <td>{topic.size == null ? "—" : <span className="ui-kc-bar">
+              <i aria-hidden="true" style={{ width: `${topic.size / maxChunks * 100}%` }} /><b className="ui-num">{topic.size}</b>
+            </span>}</td>
+            <td className="ui-num">{topic.quota ?? "—"}</td>
             {categories.map(([key]) => <td key={key} className="ui-num">{topic.questions?.[key] ?? "—"}</td>)}
+            <td className="ui-num">{gap || null}</td>
           </tr>
-          {open && <tr className="business-topic-detail"><td colSpan={5}>
+          {open && <tr className="business-topic-detail"><td colSpan={7}>
             {topic.clusters.length ? <table aria-label={`${topic.name}的分组`}>
-              <thead><tr><th scope="col">分组名称</th><th scope="col">片段数</th><th scope="col">纯度</th><th scope="col">题数</th></tr></thead>
+              <thead><tr><th scope="col">分组名称与成员小节</th><th scope="col">片段数</th><th scope="col">业务同质性</th>
+                <th scope="col">目标正向配额</th><th scope="col">实际题数</th></tr></thead>
               <tbody>{topic.clusters.map(group => <tr key={group.id}>
-                <th scope="row">{group.name}</th><td className="ui-num">{group.size}</td>
-                <td className="ui-num">{(group.purity * 100).toFixed(1)}%</td><td className="ui-num">{group.questions ?? "—"}</td>
+                <th scope="row"><strong>{group.name}</strong><SectionDirectory sections={group.sections} /></th>
+                <td className="ui-num">{group.size}</td><td className="ui-num">{(group.homogeneity * 100).toFixed(1)}%</td>
+                <td className="ui-num">{group.quota}</td><td className="ui-num">{group.questions ?? "—"}</td>
               </tr>)}</tbody>
-            </table> : <p className="pending-note">该主题未再分组</p>}
+            </table> : <><strong>编号小节目录</strong><SectionDirectory sections={topic.sections} /></>}
           </td></tr>}
         </Fragment>;
       })}</tbody>

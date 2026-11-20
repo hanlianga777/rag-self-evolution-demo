@@ -11,7 +11,8 @@ import {sampleExperiment} from './ui/evolution/fixture';
 let root:ReturnType<typeof createRoot>;
 const clusters=[{cluster_id:'tiny',semantic_label:'小主题',size:1,quotas:{positive:1,ablation:0,negative:1}},{cluster_id:'large',label:'大主题',size:99,quotas:{positive:9,ablation:0,negative:9}}];
 const knowledge={identity:{corpus_snapshot_id:'corpus'},coverage:{profile:{name:'full',expected_count:20},clusters}};
-const topics=[{name:'小主题',size:1,questions:null,clusters:[]},{name:'大主题',size:99,questions:null,clusters:[{id:'one',name:'主要小节',size:99,purity:.8,questions:null}]}];
+const groupSections=[{number:'5.1',title:'电机'}];
+const topics=[{name:'小主题',size:1,quota:1,sections:[{number:'1.1',title:'安全说明'}],questions:null,clusters:[]},{name:'大主题',size:99,quota:2,sections:groupSections,questions:null,clusters:[{id:'one',name:'主要小节',size:99,quota:2,homogeneity:.8,sections:groupSections,questions:null}]}];
 const questions=[{id:'q1',slot:'Q01',question:'必须保留的题目原文',test_category:'positive',probe_status:'probe_passed',qc_status:'qc_passed',source_summary:'宇树_B2四足机器人用户手册_中文版.pdf · 第 8 页',scoring_summary:{required:2,auxiliary:1}}];
 const run={id:'gen',status:'completed',profile:{name:'mini',expected_count:1},question_ids:['q1'],artifacts:{hard_validation:{}}};
 const snapshot={id:'gd',created_at:'2026-11-04T11:55:33Z',snapshot:{generation_run_id:'gen',question_ids:['q1'],questions,profile:run.profile}};
@@ -27,7 +28,7 @@ it('opens business topic groups inline without the old details drawer',async()=>
  expect(document.querySelector('.business-topic-detail')?.textContent).toContain('主要小节');
  expect(document.querySelector('[role=dialog]')).toBeNull();
  await click('小主题');
- expect(document.querySelector('.business-topic-detail')?.textContent).toContain('该主题未再分组');
+ expect(document.querySelector('.business-topic-detail')?.textContent).toContain('1.1 安全说明');
 });
 it('uses the frozen record and saved quality states in the Golden summary',async()=>{
  await mount(<GovernancePage data={{workspace:{current_golden_id:'gd'},generationRuns:[run],snapshots:[snapshot],dataset:questions}}/>);

@@ -31,13 +31,13 @@ it('renders retained regression evidence while completed runs revalidate after a
 it('refreshes the actual topic counts when a new exam is frozen without document changes',async()=>{
   let frozen=false;
   const fetcher=vi.fn(async(input:string)=>{
-    const coverage={has_frozen_exam:frozen,topics:[{name:'维修',size:5,questions:frozen?{positive:1,ablation:0,negative:0}:null,clusters:[]}]};
+    const coverage={has_frozen_exam:frozen,topics:[{name:'维修',size:5,quota:1,sections:[{number:'5.1',title:'简介'}],questions:frozen?{positive:1,ablation:0,negative:0}:null,clusters:[]}]};
     return new Response(JSON.stringify(input.endsWith('/knowledge/topics')?coverage:{knowledge:{}}));
   });
   vi.stubGlobal('fetch',fetcher);
   root=createRoot(document.body.appendChild(document.createElement('div')));
   await act(async()=>root.render(<KnowledgePage data={{documents:[],workspace:{current_golden_id:'old'}}}/>));
-  const counts=()=>[...document.querySelectorAll('.business-topic-row td')].slice(-3).map(cell=>cell.textContent);
+  const counts=()=>[...document.querySelectorAll('.business-topic-row td')].slice(2,5).map(cell=>cell.textContent);
   expect(counts()).toEqual(['—','—','—']);
   frozen=true;
   await act(async()=>root.render(<KnowledgePage data={{documents:[],workspace:{current_golden_id:'new'}}}/>));

@@ -54,11 +54,11 @@ it('separates the short conclusion from before and after evidence ranks',()=>{
  expect(why).toHaveProperty('headline','关键证据被截掉 → 放宽 Top-K 后进入上下文 → 补上达标维度 ①');
  expect(why.steps[1].text).toContain('Before 重排 第 5 位');expect(why.steps[1].text).toContain('After 重排 第 6 位');
 });
-it.each([true,false])('uses only evidence counts returned for the frozen exam (%s)',async(frozen)=>{
- const topics=[{name:'维修',size:30,questions:frozen?{positive:6,ablation:0,negative:1}:null,clusters:[]}];
+it.each([true,false])('uses only actual counts returned for the frozen exam (%s)',async(frozen)=>{
+ const topics=[{name:'维修',size:30,quota:7,sections:[{number:'5.1',title:'简介'}],questions:frozen?{positive:6,ablation:0,negative:1}:null,clusters:[]}];
  vi.stubGlobal('fetch',vi.fn(async(input:string)=>new Response(JSON.stringify(input.endsWith('/knowledge/topics')?{has_frozen_exam:frozen,topics}:{}))));
  await mount(<KnowledgePage data={{workspace:{current_golden_id:'current'},overview:{dataset:{total:9}},documents:[]}}/>);
- expect([...document.querySelectorAll('.business-topic-row td')].slice(-3).map(n=>n.textContent)).toEqual(frozen?['6','0','1']:['—','—','—']);
- expect(document.querySelector('.business-topics thead small')?.textContent).toBe(frozen?undefined:'题卷导入后显示');
+ expect([...document.querySelectorAll('.business-topic-row td')].slice(2,5).map(n=>n.textContent)).toEqual(frozen?['6','0','1']:['—','—','—']);
+ expect(document.querySelector('.business-topics thead small')?.textContent).toBe(frozen?undefined:'题卷冻结后显示');
  expect((fetch as any).mock.calls.some(([url]:any[])=>url.includes('/snapshots'))).toBe(false);
 });

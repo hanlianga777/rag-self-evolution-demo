@@ -1280,6 +1280,7 @@ class GovernanceStore:
             reviews = {question_id: [] for question_id in ids}
             for row in connection.execute(f"SELECT question_id, gate, decision, actor, created_at, metadata_json FROM review_events WHERE question_id IN ({marks}) ORDER BY id DESC", ids):
                 reviews[row["question_id"]].append({**dict(row), **_load(row["metadata_json"], {}), "reviewed_at": row["created_at"]})
+        from .business_topics import chunk_business_topic
         by_chunk = {chunk["chunk_id"]: chunk for chunk in chunks}
         questions = []
         for number, question_id in enumerate(ids, 1):
@@ -1289,7 +1290,7 @@ class GovernanceStore:
                 matched = []
                 for chunk_id in evidence.get("source_chunk_ids", []):
                     chunk = by_chunk.get(chunk_id)
-                    matched.append({"chunk_id": chunk_id, "resolution": "matched" if chunk else "missing_current_index", "document_id": chunk.get("document_id") if chunk else None, "document_name": chunk.get("document_name") if chunk else None, "section_path": chunk.get("section_path") if chunk else None, "page_start": chunk.get("page_start") if chunk else None, "page_end": chunk.get("page_end") if chunk else None, "chunk_text": chunk.get("chunk_text", chunk.get("text")) if chunk else None})
+                    matched.append({"chunk_id": chunk_id, "business_topic": chunk_business_topic(chunk) if chunk and item["raw"].get("business_topic") else None, "resolution": "matched" if chunk else "missing_current_index", "document_id": chunk.get("document_id") if chunk else None, "document_name": chunk.get("document_name") if chunk else None, "section_path": chunk.get("section_path") if chunk else None, "page_start": chunk.get("page_start") if chunk else None, "page_end": chunk.get("page_end") if chunk else None, "chunk_text": chunk.get("chunk_text", chunk.get("text")) if chunk else None})
                 evidence_details.append({**evidence, "chunks": matched})
             slot = item["raw"].get("coverage_slot") or f"Q{number:02d}"
             attempts = run["artifacts"].get("slot_audit", {}).get(slot, [])

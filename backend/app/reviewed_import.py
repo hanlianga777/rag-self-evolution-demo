@@ -84,6 +84,27 @@ def validate_content(candidate, chunks):
             raise ValueError('负向题（Negative）子类与预期行为不匹配')
 
 
+def inherit_business_scope(questions):
+    """Resolve ablation pairs from the same batch or frozen snapshot."""
+    positives = {
+        key: question
+        for question in questions
+        if (question.get('evaluation_group') or question.get('test_category')) == 'positive'
+        for key in (question.get('id'), question.get('coverage_slot'), question.get('display_id'))
+        if key
+    }
+    scoped = []
+    for question in questions:
+        if (question.get('evaluation_group') or question.get('test_category')) == 'ablation':
+            pair = (question.get('source_positive_id') or question.get('paired_question_id')
+                    or question.get('paired_question') or question.get('source_positive_slot'))
+            parent = positives.get(pair, {})
+            question = {**question, 'business_topic': parent.get('business_topic'),
+                        'business_group': parent.get('business_group')}
+        scoped.append(question)
+    return scoped
+
+
 def import_batch(store, candidates, source_sha256, source, review_note, *, machine_checks=False, contract=None):
     from .governance import _json, _now, _normalized, GENERATION_PROFILES
     from datetime import datetime, timezone
@@ -99,6 +120,7 @@ def import_batch(store, candidates, source_sha256, source, review_note, *, machi
         chunks = CorpusStore().chunks()
         friend = contract == FRIEND_CONTRACT
         if friend:
+            candidates = inherit_business_scope(candidates)
             machine_checks = True
             for candidate in candidates:
                 validate_friend_content(candidate, chunks)
