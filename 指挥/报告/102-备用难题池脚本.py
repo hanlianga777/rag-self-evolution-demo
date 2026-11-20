@@ -69,6 +69,7 @@ for slot, rid, group, method, q, a, ev, diff, cl in POOL:
         bad.append(f'{rid} 答案锚点不过')
     got = {cluster_of(c) for c, _ in pairs}
     old = M1[slot]
+    cl = old['簇']  # 簇以 M1 槽位在当前聚类下的标注为准（101a 重新聚类后编号已变）
     if got != {cl} or old['簇'] != cl or old['题型'] != group or old['出题方式'] != method or RANK[diff] <= RANK[old['难度']]:
         bad.append(f'{rid} 簇/题型/出题方式/难度不满足同簇同题型且更难：证据簇{sorted(got)} 槽位簇{old["簇"]}')
     kw, node, params, why = META[rid]
