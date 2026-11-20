@@ -1,18 +1,17 @@
 import {ChunkBrowser, ChunkDiagnostics, ParentSectionInfo} from '../components/ChunkBrowser';
-import {FrozenQuestionDetails} from './FrozenQuestionDetails';
+import { BusinessTopicCoverage } from "../components/BusinessTopicCoverage";
 import { pagePurpose } from "../helpText";
 import { IconLabel, IconTile } from "../ui/icons";
 import { KnowledgeFlow, type FlowLane } from "../ui/knowledge/KnowledgeFlow";
-import { KnowledgeCoverage } from "../ui/pages3";
 import { LocalPagination, useLocalPage } from "../components/LocalPagination";
 import { DataTable } from "../components/DataTable";
 import { PageShell } from "../components/PageShell";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FileText, Search } from "lucide-react";
 import { ConfirmDialog, Drawer } from "../components/Dialog";
 import { LoadingSkeleton, Badge, DrawerSection, Section, Status, EmptyState, TruncatedText } from "../components/Primitives";
 import { apiUrl, cachedJson, getJson, invalidateReads } from "../api";
-import { detailJson, PageWarmupContext, useDetailPrefetch, useHoverPrefetch } from "../preload";
+import { detailJson, useDetailPrefetch, useHoverPrefetch } from "../preload";
 import { goldenCached, goldenFetch } from "../goldenCache";
 import { displayText } from "../display";
 import type { Citation } from "../types";
@@ -21,16 +20,12 @@ type CorpusOperation = { id: string; status: string; stage: string; completed: n
 const stageName: Record<string, string> = { queued: "排队", validate: "校验文件", build: "准备索引", parse: "解析 PDF", chunk: "生成 Parent / Child", coverage: "K-means 覆盖规划", embedding: "生成 Embedding", index: "更新索引", activate: "切换当前 Corpus", completed: "已完成", failed: "更新失败" };
 
 export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChanged }: { data: any; openedDocument?: { name?: string; citation?: Citation }; onOpenedDocument?: () => void; onChanged?: () => void }) {
-  const pagesWarming = useContext(PageWarmupContext);
   const knowledgeScope = JSON.stringify([data.workspace?.current_corpus_fingerprint, data.documents]);
   const retainedPipeline = goldenCached<any>(knowledgeScope, "/api/pipeline");
   const [pipelineReady, setPipelineReady] = useState(!!retainedPipeline);
   const [selected, setSelected] = useState<any>();
-  const [browserOpen,setBrowserOpen]=useState(false),[browserParent,setBrowserParent]=useState<string>(),[topicQuestion,setTopicQuestion]=useState<any>();
+  const [browserOpen, setBrowserOpen] = useState(false);
   const [knowledge, setKnowledge] = useState<any>(retainedPipeline?.knowledge || data.overview?.knowledge || {});
-  const [clusterId, setClusterId] = useState<string>();
-  const [clusterDetail, setCluster] = useState<any>();
-  const cluster = clusterDetail || (clusterId ? cachedJson<any>(`/api/knowledge/clusters/${clusterId}`) : undefined);
   const [child, setChild] = useState<any>();
   useEffect(() => { setChild(undefined); setDetail(undefined); }, [knowledge.identity?.corpus_snapshot_id]);
   const documentVersion = JSON.stringify(data.documents || []), previousDocuments = useRef(documentVersion);
@@ -39,8 +34,6 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
     if (previousDocuments.current !== documentVersion) { invalidateReads(); previousDocuments.current = documentVersion; }
     let cancelled = false; setPipelineReady(!!goldenCached(knowledgeScope, "/api/pipeline")); void goldenFetch<any>(knowledgeScope, "/api/pipeline").then(value => { if (!cancelled) { setPipelineReady(true); setKnowledge(value.knowledge || {}); if (value.knowledge?.operation?.status === "running") { setOperation(value.knowledge.operation); setBusy(true); } } }).catch(reason => { if (!cancelled) { setPipelineReady(true); setError(String(reason)); } }); return () => { cancelled = true; };
   }, [documentVersion]);
-  useEffect(() => { let cancelled = false; setCluster(undefined); if (clusterId) void detailJson(`/api/knowledge/clusters/${clusterId}`).then(value => { if (!cancelled) setCluster(value); }).catch(reason => { if (!cancelled) { setCluster({load_error:String(reason)}); setError(String(reason)); } }); return () => { cancelled = true; }; }, [clusterId, knowledge.identity?.corpus_snapshot_id, knowledge.coverage?.plan_id]);
-
   const [documentDetail, setDetail] = useState<any>();
   const detail = documentDetail || (selected ? cachedJson<any>(`/api/documents/${selected.id}`) : undefined);
   const selectedParent = detail?.parents?.find((parent: any) => parent.chunk_id === child?.parent_chunk_id);
@@ -90,29 +83,8 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
     setModelAction({ title: `确认上传并索引 ${file.name}`, url: `/api/documents?filename=${encodeURIComponent(file.name)}`, method: "POST", file });
     if (uploadInput.current) uploadInput.current.value = "";
   };
-  const clusters = knowledge.coverage?.clusters || [];
   const hover = useHoverPrefetch();
   useDetailPrefetch((data.documents || []).map((doc: any) => `/api/documents/${doc.id}`));
-  const topicKey = JSON.stringify([knowledge.identity?.corpus_snapshot_id, knowledge.coverage?.plan_id, clusters.map((item: any) => item.cluster_id)]);
-  useEffect(() => {
-    if (pagesWarming) return;
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      for (const item of clusters) {
-        if (cancelled) break;
-        try {
-          await detailJson(`/api/knowledge/clusters/${item.cluster_id}`);
-        } catch { /* Opening the detail retains the existing retry/error path. */ }
-      }
-    }, 150);
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [topicKey, pagesWarming]);
-  // Display aliases only; the saved topic names and cluster identities remain untouched.
-  const topicNames: Record<string, string> = { "设备运行与操作": "设备操作", "一般提示": "安全与维护", "警告": "警告提示", "蓄电池": "电池与充电", "示教新路线的准备工作": "路线示教执行", "位置代码": "定位与分区", "开启清洁机组": "清洁与维护", "机器人如何与环境通信？": "环境与遥控", "机器人如何与环境通信?": "环境与遥控", "显示屏显示故障": "显示屏故障" };
-  const topicName = (item: any) => { const name = item.semantic_label || item.label || item.cluster_id; return topicNames[name] || name; };
-  const topics = clusters.map((item: any) => ({ name: topicName(item), chunks: item.size, ...item.quotas,
-    protectedSlot: (item.protected_slot ?? item.small_topic_protected) === true,
-  }));
   const lanes: FlowLane[] = [
     {key:'offline',name:'离线入库',purpose:'说明书怎样变成可检索的知识',steps:[
       {icon:'parse',label:'文档解析',detail:'保留正文、表格与原页位置'},
@@ -139,18 +111,11 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
 
     {(!knowledge.identity || knowledge.operation?.status === "failed") && <p className="knowledge-notice">{knowledge.identity ? "知识资产更新失败，保留上一个有效版本。" : "当前知识资产属于 Legacy。新 Knowledge Pipeline 待重建；下方策略展示目标配置。"}{knowledge.operation?.error && ` ${knowledge.operation.error}`}</p>}
     <section className="panel">{!pipelineReady ? <LoadingSkeleton label="正在读取知识处理配置" /> : <KnowledgeFlow lanes={lanes} action={<button className="secondary" disabled={!(data.documents || []).length} onClick={() => setBrowserOpen(true)}>分块浏览器</button>} />}</section>
-    <ChunkDiagnostics/><ChunkBrowser open={browserOpen} parentId={browserParent} onClose={()=>setBrowserOpen(false)}/><section className="ui-card knowledge-coverage"><h2><IconLabel name="coverage">知识主题覆盖</IconLabel></h2>
-    {operation?.status === "running" || !knowledge.coverage ? <p className="pending-note">{operation?.status === "running" || knowledge.coverage_status === "calculating" ? "覆盖规划 重新计算中" : "知识主题覆盖待更新"}</p> : clusters.every((item: any) => typeof item.size === "number" && ["positive", "ablation", "negative"].every(key => typeof item.quotas?.[key] === "number")) ? <KnowledgeCoverage hideTitle topics={topics} slotLabel="规划题位" onOpen={name => setClusterId(clusters.find((item: any) => topicName(item) === name)?.cluster_id)} /> : <div className="cluster-scroll">{clusters.map((item: any) => <button className="cluster-card" key={item.cluster_id} onClick={() => setClusterId(item.cluster_id)}><strong>{topicName(item)}</strong><small>{item.size ?? "未知"} 个知识片段</small><small>三类规划题位未完整记录</small></button>)}</div>}
-    </section>
+    <ChunkDiagnostics/><ChunkBrowser open={browserOpen} onClose={()=>setBrowserOpen(false)}/>
+    <BusinessTopicCoverage key={JSON.stringify([knowledgeScope, data.workspace?.current_golden_id])} />
 
     <Section title={<IconLabel name="doc">文档列表</IconLabel>} action={<div className="header-actions"><label className="search"><Search size={15} /><input aria-label="搜索文档" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索文档" /></label></div>}><LocalPagination {...documentPagination}/><div className="table-scroll"><DataTable><thead><tr><th>文档名</th><th>文档类别</th><th className="num">页数</th><th className="num">Parent 数</th><th className="num">Child 数</th><th>解析状态</th><th>索引状态</th><th>操作</th></tr></thead><tbody>{documentPagination.rows.map((doc: any) => <tr key={doc.id} {...hover([`/api/documents/${doc.id}`])} role="button" tabIndex={0} onClick={() => open(doc)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); open(doc); } }}><td><button className="text-button detail-button" onClick={() => open(doc)}><FileText size={15} /><TruncatedText lines={1}>{doc.name}</TruncatedText></button></td><td>{doc.category || "未分类"}</td><td className="num">{doc.pages ?? "待解析"}</td><td className="num">{doc.parent_chunks ?? "—"}</td><td className="num">{doc.chunks}</td><td className="muted">{doc.parse_status ? displayText(doc.parse_status) : doc.status === "Indexed" ? "已解析" : doc.status ? displayText(doc.status) : "待解析"}</td><td><Status value={doc.index_status || doc.status || "未知"} /></td><td><div className="header-actions"><button className="secondary small" onClick={event => { event.stopPropagation(); open(doc); }}>查看</button><button className="text-button quiet-danger document-delete" disabled={busy} onClick={event => { event.stopPropagation(); setModelAction({ title: `确认删除 ${doc.name}`, url: `/api/documents/${doc.id}`, method: "DELETE" }); }} onKeyDown={event => event.stopPropagation()}>删除</button></div></td></tr>)}{!documents.length && <tr><td colSpan={8}><EmptyState title="还没有匹配的文档">添加 PDF 文档后可查看解析和索引结果。</EmptyState></td></tr>}</tbody></DataTable></div></Section>
 
-    <Drawer open={!!clusterId} onOpenChange={() => setClusterId(undefined)} title={cluster ? topicName(cluster) : '知识主题'}><div className="drawer-body">{cluster?.load_error ? <p role="alert">{cluster.load_error}</p> : cluster ? <>
-      <DrawerSection title="这个主题讲什么"><p>{cluster.description || '主题说明未记录'}</p><p className="muted">{cluster.keywords?.join('、')}</p></DrawerSection>
-      <DrawerSection title="包含哪些 Parent">{cluster.parents?.map((parent:any,index:number)=><button className="secondary topic-parent" key={parent.chunk_id} onClick={()=>{setBrowserParent(parent.chunk_id);setBrowserOpen(true);}}>段落 {index+1} · {parent.document_name} · 第 {parent.page_start} 页 · {parent.section_path || parent.chapter}</button>)}{!cluster.parents?.length && <p>暂无关联段落</p>}</DrawerSection>
-      <DrawerSection title="对应哪些考题">{['positive','ablation','negative'].map(category=><section key={category}><h4>{displayText(category)}</h4>{cluster.questions?.filter((q:any)=>q.test_category===category).map((q:any)=><button className="text-button topic-question" key={q.id} onClick={()=>setTopicQuestion(q)}>{q.display_id} · {q.question}</button>)}{!cluster.questions?.some((q:any)=>q.test_category===category) && <p className="muted">暂无</p>}</section>)}</DrawerSection>
-    </> : <LoadingSkeleton label="正在读取知识详情"/>}</div></Drawer>
-    <Drawer open={!!topicQuestion} onOpenChange={value=>!value && setTopicQuestion(undefined)} title="主题考题">{topicQuestion && <FrozenQuestionDetails row={topicQuestion}/>}</Drawer>
     <Drawer open={!!selected} onOpenChange={() => { setSelected(undefined); setDetail(undefined); }} title={selected?.name || "文档检查器"}>{selected && <div className="drawer-body document-inspector"><DrawerSection title="文档信息"><Badge tone="accent">{selected.category || "未分类"}</Badge><div className="parameter-list">{(selected.product || selected.version) && <div><span>{[selected.product && "产品", selected.version && "版本"].filter(Boolean).join(" / ")}</span><strong>{[selected.product, selected.version].filter(Boolean).join(" / ")}</strong></div>}<div><span>页数 / Chunk 数</span><strong>{selected.pages ?? "—"} / {selected.chunks ?? "—"}</strong></div>{(detail?.parser || selected.parser) && <div><span>解析器</span><strong>{detail?.parser || selected.parser}</strong></div>}</div></DrawerSection><div className="tabs"><button data-label="PDF 原文" className={tab === "pdf" ? "selected" : ""} onClick={() => setTab("pdf")}>PDF 原文</button><button data-label="分块结果" className={tab === "chunks" ? "selected" : ""} onClick={() => setTab("chunks")}>分块结果</button><button data-label="索引信息" className={tab === "index" ? "selected" : ""} onClick={() => setTab("index")}>索引信息</button></div>{<div hidden={tab !== "pdf"} className="pdf-panel drawer-section"><p className="muted">原始 PDF · 第 {page} 页</p>{selected.pdf_url ? <iframe title={`${selected.name} PDF 原文`} src={`${apiUrl(selected.pdf_url)}#page=${page}`} /> : <p className="muted">未记录 PDF 原文链接；可查看已采集 Chunk。</p>}</div>}{<div hidden={tab !== "chunks"} style={{display: tab === "chunks" ? undefined : "none"}} className="chunk-panel">{detail?.load_error ? <p role="alert">{detail.load_error}</p> : !detail ? <LoadingSkeleton label="正在读取分块与 Parent" /> : <>{child && <article className="parent-context"><h3>Child → Parent</h3><p>Child → 所属 Parent</p><p>{child.document_name} · P.{child.page_start}–{child.page_end} · {child.section_path || "未记录章节"}</p><h4>Child Text</h4><div className="muted-prose"><TruncatedText lines={3}>{(child.chunk_text || "").replace(/=/g,"：")}</TruncatedText></div><h4>Parent Context</h4><ParentSectionInfo parent={selectedParent}/><div className="muted-prose"><TruncatedText lines={3}>{selectedParent?.chunk_text || "未保存 Parent 上下文"}</TruncatedText></div><button className="text-button" onClick={() => { setPage(child.page_start); setTab("pdf"); }}>定位 PDF 原文</button></article>}{(detail?.chunks || []).map((chunk: any) => <article className="chunk-card" key={chunk.chunk_id}><header><strong>知识片段</strong><span>{chunk.section_path}</span><span>P.{chunk.page_start}</span></header><div className="muted-prose"><TruncatedText lines={3}>{(chunk.chunk_text || chunk.text || "").replace(/=/g,"：")}</TruncatedText></div>{chunk.parent_chunk_id && <button className="secondary" onClick={() => setChild(chunk)}>查看所属 Parent</button>}<button className="text-button" onClick={() => { setPage(chunk.page_start); setTab("pdf"); }}>定位 PDF 原文</button></article>)}{detail && !(detail.chunks || []).length && <p className="muted">暂无真实分块。</p>}</>}</div>}{<div hidden={tab !== "index"}>{detail?.load_error ? <p role="alert">{detail.load_error}</p> : !detail ? <LoadingSkeleton label="正在读取文档索引" /> : <DrawerSection title="索引信息"><dl><dt>解析器</dt><dd>{detail?.parser || selected.parser || "—"}</dd><dt>状态</dt><dd><Status value={detail?.status || selected.status} /></dd><dt>切片策略</dt><dd>{detail?.chunk_strategy || selected.chunk_strategy || "—"}</dd><dt>Embedding</dt><dd>{detail?.index?.embedding_model || "未采集"}</dd><dt>向量索引</dt><dd>{detail?.index?.vector_index || "未采集"}</dd></dl></DrawerSection>}</div>}</div>}</Drawer>
   </PageShell>;
 }

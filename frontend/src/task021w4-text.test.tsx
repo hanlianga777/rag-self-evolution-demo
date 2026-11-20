@@ -9,16 +9,13 @@ import { OperationProvider } from './operation';
 let root: ReturnType<typeof createRoot>;
 afterEach(() => { act(() => root?.unmount()); document.body.innerHTML = ''; sessionStorage.clear(); history.replaceState(null, '', '/'); vi.unstubAllGlobals(); });
 async function mount(node: React.ReactNode) { root = createRoot(document.body.appendChild(document.createElement('div'))); await act(async () => root.render(node)); }
-it('shows only backend protection flags and distinguishes planned slots from frozen questions without nested cards', async () => {
- const clusters = [{cluster_id:'large',size:63,quotas:{positive:8,ablation:3,negative:8}}, {cluster_id:'small',size:1,small_topic_protected:true,quotas:{positive:1,ablation:0,negative:1}}];
- const knowledge = {identity:{},coverage:{clusters}};
- vi.stubGlobal('fetch',vi.fn(async () => new Response(JSON.stringify({knowledge}))));
- await mount(<KnowledgePage data={{documents:[],dataset:Array.from({length:50},(_,i)=>({id:i})),overview:{knowledge}}}/>);
- expect(document.querySelectorAll('.ui-kc-tag')).toHaveLength(1);
- expect(document.querySelector('.ui-kc-row.clickable')?.textContent).not.toContain('保底');
- expect(document.querySelector('.panel .ui-kc')).toBeNull();
- expect(document.body.textContent).not.toContain('FULL');
- expect(document.querySelector('.knowledge-coverage-counts')).toBeNull();
+it('keeps the business topic table separate from knowledge processing and ignores the candidate count', async () => {
+ const topics = [{name:'设备维护',size:63,questions:null,clusters:[]}];
+ vi.stubGlobal('fetch',vi.fn(async (url:string) => new Response(JSON.stringify(url.endsWith('/knowledge/topics')?{has_frozen_exam:false,topics}:{}))));
+ await mount(<KnowledgePage data={{documents:[],dataset:Array.from({length:50},(_,i)=>({id:i}))}}/>);
+ expect(document.querySelector('.panel .business-topics')).toBeNull();
+ expect(document.querySelector('.knowledge-coverage')?.textContent).not.toMatch(/50|保底|题位/);
+ expect(document.querySelector('.knowledge-coverage')?.textContent).toContain('题卷导入后显示');
 });
 it('computes category scores from saved verdicts and opens the same Bad Case details from the report', async () => {
  const cases = [{question_id:'q1',question:'正向原文',test_category:'positive',passed:true}, {question_id:'q2',question:'消融原文',test_category:'ablation',passed:false,diagnostic_view:{diagnosis_category:'检索层问题'}}, {question_id:'q3',question:'负向原文',test_category:'negative',passed:true}];

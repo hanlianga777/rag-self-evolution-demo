@@ -354,6 +354,13 @@ def knowledge():
                 'operation': operation, 'sample_children': corpus.chunks()[:3] if index.get('knowledge_identity') else []}
 
 
+@app.get('/api/knowledge/topics')
+def knowledge_topics():
+    from .business_topics import topic_coverage
+    with CORPUS_LOCK:
+        return topic_coverage(corpus.index_dir.resolve(), store.database_path)
+
+
 @app.get('/api/knowledge/chunk-diagnostics')
 def knowledge_chunk_diagnostics():
     from .knowledge_browser import chunk_diagnostics

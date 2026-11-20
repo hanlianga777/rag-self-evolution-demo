@@ -73,7 +73,7 @@ def bridge_material(first, second):
 
 def largest_remainder(total, sizes):
     denominator = sum(sizes)
-    quotas = [total * size // denominator for size in sizes]
+    quotas = [int(total * size // denominator) for size in sizes]
     order = sorted(range(len(sizes)), key=lambda i: (-(total * sizes[i] % denominator), i))
     for i in order[:total - sum(quotas)]:
         quotas[i] += 1

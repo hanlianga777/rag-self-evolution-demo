@@ -28,21 +28,19 @@ it('renders retained regression evidence while completed runs revalidate after a
   } finally {await act(async()=>pending.forEach(resolve=>resolve()));}
 });
 
-it('shows cached knowledge topic details immediately when reopened after a minute',async()=>{
-  const cluster={cluster_id:'T01',label:'设备主题',size:5,source_documents:['保存的手册.pdf'],parents:[{chunk_id:'p',document_name:'保存的手册.pdf',page_start:1}],questions:[],slots:[],merge_mapping:[]};
-  let hold=false;
-  const pending:Array<()=>void>=[];
-  vi.stubGlobal('fetch',vi.fn(async(input:string)=>{
-    if(hold && input.includes('/clusters/'))await new Promise<void>(resolve=>pending.push(resolve));
-    return new Response(JSON.stringify(input.includes('/clusters/')?cluster:{index:{},knowledge:{coverage:{clusters:[cluster]}}}));
-  }));
-  await getJson('/api/knowledge/clusters/T01');
-  vi.spyOn(Date,'now').mockReturnValue(Date.now()+60000);hold=true;
+it('refreshes the actual topic counts when a new exam is frozen without document changes',async()=>{
+  let frozen=false;
+  const fetcher=vi.fn(async(input:string)=>{
+    const coverage={has_frozen_exam:frozen,topics:[{name:'维修',size:5,questions:frozen?{positive:1,ablation:0,negative:0}:null,clusters:[]}]};
+    return new Response(JSON.stringify(input.endsWith('/knowledge/topics')?coverage:{knowledge:{}}));
+  });
+  vi.stubGlobal('fetch',fetcher);
   root=createRoot(document.body.appendChild(document.createElement('div')));
-  try {
-    await act(async()=>root.render(<KnowledgePage data={{documents:[]}}/>));
-    await act(async()=>document.querySelector<HTMLButtonElement>('.cluster-card')!.click());
-    expect(document.querySelector('[role=dialog]')?.textContent).toContain('保存的手册.pdf');
-    expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('加载中');
-  } finally {await act(async()=>pending.forEach(resolve=>resolve()));}
+  await act(async()=>root.render(<KnowledgePage data={{documents:[],workspace:{current_golden_id:'old'}}}/>));
+  const counts=()=>[...document.querySelectorAll('.business-topic-row td')].slice(-3).map(cell=>cell.textContent);
+  expect(counts()).toEqual(['—','—','—']);
+  frozen=true;
+  await act(async()=>root.render(<KnowledgePage data={{documents:[],workspace:{current_golden_id:'new'}}}/>));
+  expect(counts()).toEqual(['1','0','0']);
+  expect(fetcher.mock.calls.filter(([url])=>url.endsWith('/knowledge/topics'))).toHaveLength(2);
 });

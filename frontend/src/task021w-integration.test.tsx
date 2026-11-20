@@ -11,17 +11,23 @@ import {sampleExperiment} from './ui/evolution/fixture';
 let root:ReturnType<typeof createRoot>;
 const clusters=[{cluster_id:'tiny',semantic_label:'小主题',size:1,quotas:{positive:1,ablation:0,negative:1}},{cluster_id:'large',label:'大主题',size:99,quotas:{positive:9,ablation:0,negative:9}}];
 const knowledge={identity:{corpus_snapshot_id:'corpus'},coverage:{profile:{name:'full',expected_count:20},clusters}};
+const topics=[{name:'小主题',size:1,questions:null,clusters:[]},{name:'大主题',size:99,questions:null,clusters:[{id:'one',name:'主要小节',size:99,purity:.8,questions:null}]}];
 const questions=[{id:'q1',slot:'Q01',question:'必须保留的题目原文',test_category:'positive',probe_status:'probe_passed',qc_status:'qc_passed',source_summary:'宇树_B2四足机器人用户手册_中文版.pdf · 第 8 页',scoring_summary:{required:2,auxiliary:1}}];
 const run={id:'gen',status:'completed',profile:{name:'mini',expected_count:1},question_ids:['q1'],artifacts:{hard_validation:{}}};
 const snapshot={id:'gd',created_at:'2026-11-04T11:55:33Z',snapshot:{generation_run_id:'gen',question_ids:['q1'],questions,profile:run.profile}};
-beforeEach(()=>{sessionStorage.clear();history.replaceState(null,'','/');vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/pipeline')?{knowledge,index:{child_count:100}}:url.includes('/clusters/')?{label:'小主题',children:[],slots:[]}:url.includes('/candidates?')?{rows:questions,total:1,candidate_index:questions}:[]))));});
+beforeEach(()=>{sessionStorage.clear();history.replaceState(null,'','/');vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/pipeline')?{knowledge,index:{child_count:100}}:url.endsWith('/knowledge/topics')?{has_frozen_exam:false,topics}:url.includes('/candidates?')?{rows:questions,total:1,candidate_index:questions}:[]))));});
 afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();});
 async function mount(node:React.ReactNode){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));}
 async function click(label:string){await act(async()=>[...document.querySelectorAll('button')].find(b=>(b.getAttribute('aria-label') || b.textContent)===label)!.click());}
-it('uses dynamic topic quotas and backend protection flags and keeps topic details reachable',async()=>{
+it('opens business topic groups inline without the old details drawer',async()=>{
  await mount(<KnowledgePage data={{documents:[],overview:{knowledge}}}/>);
- expect(document.querySelectorAll('.ui-kc-row.clickable')).toHaveLength(2);expect(document.querySelectorAll('.ui-kc-tag')).toHaveLength(0);expect(document.body.textContent).not.toContain('FULL');expect(document.querySelector('.knowledge-coverage-counts')).toBeNull();expect(document.body.textContent).not.toContain('主题聚类 · 初始');
- await act(async()=>document.querySelector<HTMLElement>('.ui-kc-row.clickable')!.click());expect(document.querySelector('[role=dialog]')).not.toBeNull();expect((fetch as any).mock.calls.some(([url]:any[])=>url.endsWith('/clusters/tiny'))).toBe(true);
+ expect(document.querySelectorAll('.business-topic-row')).toHaveLength(2);
+ expect(document.querySelector('.knowledge-coverage')?.textContent).not.toMatch(/FULL|规划题位/);
+ await click('大主题');
+ expect(document.querySelector('.business-topic-detail')?.textContent).toContain('主要小节');
+ expect(document.querySelector('[role=dialog]')).toBeNull();
+ await click('小主题');
+ expect(document.querySelector('.business-topic-detail')?.textContent).toContain('该主题未再分组');
 });
 it('uses the frozen record and saved quality states in the Golden summary',async()=>{
  await mount(<GovernancePage data={{workspace:{current_golden_id:'gd'},generationRuns:[run],snapshots:[snapshot],dataset:questions}}/>);

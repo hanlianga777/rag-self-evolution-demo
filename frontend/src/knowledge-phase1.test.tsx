@@ -16,23 +16,29 @@ it('keeps Legacy Production separate when the active Knowledge lifecycle has no 
   expect(document.querySelector('.ui-ov-action')?.textContent).toContain('Golden');
   await act(async () => root.unmount());
 });
-it('shows every real Cluster and loads the selected Cluster details', async () => {
-  const clusters = Array.from({ length: 7 }, (_, i) => ({ cluster_id: `T00${i+1}`, label: `主题${i+1}`, size: 5, anchor_quota: 2 }));
-  const knowledge = { legacy: false, index: { embedding_model: 'text-embedding-v4', dimension: 1024, parent_count: 7, child_count: 35, indexed_count: 35 }, target_config: { parent_tokens: 1400, child_tokens: 400, overlap_tokens: 80 }, coverage_status: 'ready', coverage: { clusters, initial_k: 9, final_k: 7, merge_mapping: [] } };
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(url.includes('/clusters/') ? { ...clusters[6], description:'保存的主题说明',parents:[{chunk_id:'p',document_name:'manual.pdf',page_start:1}],questions:[{id:'q',display_id:'Q98',question:'保存的问题',test_category:'negative'}],products: ['B2'], source_documents: ['manual.pdf'], representative_children: [], slots: [{ slot_id: 'Q98', evaluation_group: 'negative', construction_type: 'Ordinary' }], merge_mapping: [] } : { index: knowledge.index, knowledge }), { status: 200 })));
+it('shows every business topic and expands the final topic without adding a drawer', async () => {
+  const topics = Array.from({ length: 9 }, (_, i) => ({
+    name: `主题${i+1}`, size: 5, questions: null,
+    clusters: [{ id: `S${i+1}`, name: `小节${i+1}`, size: 5, purity: 1, questions: null }],
+  }));
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith('/knowledge/topics') ? { has_frozen_exam: false, topics } : { knowledge: {} }))));
   const root = createRoot(document.body.appendChild(document.createElement('div')));
   await act(async () => root.render(<OperationProvider><KnowledgePage data={{ documents: [] }} /></OperationProvider>));
-  expect(document.querySelectorAll('.cluster-card')).toHaveLength(7);
-  await act(async () => (document.querySelectorAll('.cluster-card')[6] as HTMLButtonElement).click());
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Q98');
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('manual.pdf');
+  expect(document.querySelectorAll('.business-topic-row')).toHaveLength(9);
+  await act(async () => document.querySelectorAll<HTMLButtonElement>('.business-topic-toggle')[8].click());
+  expect(document.querySelector('.business-topic-detail')?.textContent).toContain('小节9');
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
   await act(async () => root.unmount());
 });
 it('ignores an older Pipeline response after the document refresh', async () => {
   let releaseOld!: (value: Response) => void;
   const old = new Promise<Response>(resolve => { releaseOld = resolve; });
   let calls = 0;
-  vi.stubGlobal('fetch', vi.fn(() => ++calls === 1 ? old : Promise.resolve(new Response(JSON.stringify({ index: { child_count: 80 }, knowledge: { identity: { corpus_snapshot_id: 'new' } } }), { status: 200 }))));
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (!url.endsWith('/api/pipeline')) return new Response('{}');
+    if (++calls === 1) return old;
+    return new Response(JSON.stringify({ index: { child_count: 80 }, knowledge: { identity: { corpus_snapshot_id: 'new' } } }));
+  }));
   const root = createRoot(document.body.appendChild(document.createElement('div')));
   await act(async () => root.render(<OperationProvider><KnowledgePage data={{ documents: [] }} /></OperationProvider>));
   await act(async () => root.render(<OperationProvider><KnowledgePage data={{ documents: [{ id: 'D', name: 'new.pdf', status: 'Indexed', parser: 'MinerU', pages: 1, chunks: 80 }] }} /></OperationProvider>));

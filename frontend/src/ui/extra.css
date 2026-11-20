@@ -104,6 +104,27 @@
 .ui-kp-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
 .knowledge-coverage { padding:20px 22px; }
 .knowledge-coverage > h2 { margin:0 0 14px; font-size:var(--ui-fs-card); }
+.business-topics { table-layout:fixed; font-size:var(--ui-fs-body); }
+.business-topics col:first-child { width:34%; }
+.business-topics col.business-fragments-col { width:33%; }
+.business-topics :is(th, td) { padding:8px; overflow-wrap:anywhere; }
+.business-topics thead th { font-size:var(--ui-fs-meta); }
+.business-topics thead th small { margin-inline-start:8px; color:var(--ui-muted); font-weight:400; font-size:inherit; }
+.business-topics .business-topic-row { cursor:pointer; }
+.business-topics .business-topic-row:hover { background:var(--ui-page); }
+.business-topics .ui-kc-bar b { flex:none; white-space:nowrap; }
+.business-topics .business-topic-toggle { justify-content:flex-start; padding:0; text-align:left; color:var(--ui-ink); }
+.business-topic-toggle .ui-icon { flex:none; }
+.business-topic-toggle[aria-expanded="true"] .ui-icon { transform:rotate(90deg); }
+.business-topics .business-topic-detail > td { padding:6px 8px 12px 22px; background:var(--ui-page); }
+.business-topic-detail table th:first-child { width:54%; }
+.business-topic-detail tbody th { color:var(--ui-ink); font-size:inherit; font-weight:400; }
+@media (max-width:560px) {
+  .business-topics col.business-fragments-col { width:24%; }
+  .business-topics :is(th,td) { padding-inline:4px; }
+  .business-topics thead th small { display:block; margin-inline-start:0; }
+  .business-topics .business-topic-detail > td { padding-inline:8px; }
+}
 .knowledge-page .table-scroll td:last-child .header-actions { flex-wrap:nowrap; gap:6px; }
 .knowledge-page .table-scroll td .secondary.small { height:28px; min-height:28px; padding:0 8px; font-size:12px; font-weight:400; white-space:nowrap; }
 .verification-page .monitoring-question { justify-content:flex-start; min-width:0; }

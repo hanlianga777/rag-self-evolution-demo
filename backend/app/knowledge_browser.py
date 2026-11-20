@@ -7,6 +7,16 @@ from .sqlite_support import open_database
 from .corpus import _read_json
 
 
+def frozen_evidence_ids(question):
+    anchors = set()
+    for source in (question.get('evidence') or []) + (question.get('acceptable_evidence') or []):
+        anchors.update(source.get('source_chunk_ids') or [])
+    for source in (question.get('business_requirements') or {}).get('sources') or []:
+        if source.get('chunk_id'):
+            anchors.add(source['chunk_id'])
+    return anchors
+
+
 def chunk_diagnostics(corpus):
     parents = _read_json(corpus.index_dir/'parents.json', [])
     children = corpus.chunks()
@@ -33,11 +43,7 @@ def chunk_browser(corpus, store):
     snapshot = json.loads(row['snapshot_json']) if row else {}
     questions, unmatched = [], set()
     for q in snapshot.get('questions', []):
-        anchors = set()
-        for source in q.get('evidence', []) + q.get('acceptable_evidence', []):
-            anchors.update(source.get('source_chunk_ids', []))
-        for source in q.get('business_requirements', {}).get('sources', []):
-            if source.get('chunk_id'): anchors.add(source['chunk_id'])
+        anchors = frozen_evidence_ids(q)
         unmatched.update(anchors - by_id.keys())
         hits = [c for c in children if c['chunk_id'] in anchors]
         # Project frozen data; never join mutable candidate/probe/QC records here.
