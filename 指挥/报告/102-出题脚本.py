@@ -30,6 +30,23 @@ if len(sys.argv) < 2:
 CHUNK_CSV = Path(sys.argv[1]).resolve()
 CHUNKS = {r['chunk_id']: r['切块原文'].replace('\\n', '\n') for r in csv.DictReader(open(CHUNK_CSV, encoding='utf-8-sig'))}
 SECTION = {r['chunk_id']: r['section_path'] for r in csv.DictReader(open(CHUNK_CSV, encoding='utf-8-sig'))}
+import re as _re
+_REPORT = (CHUNK_CSV.parent / (CHUNK_CSV.name.split('-')[0] + '.md'))
+GROUP_OF_SECTION, GROUP_NAME, GROUP_QUOTA = {}, {}, {}
+if _REPORT.exists():
+    for _line in _REPORT.read_text(encoding='utf-8').splitlines():
+        _m = _re.match(r'\| (TP-[0-9a-f]+/\d\d-\d\d) \| ([^|]+) \|.*\| (\d+) \| ([^|]+) \|\s*$', _line)
+        if _m:
+            gid, name, quota, members = _m.group(1), _m.group(2).strip(), int(_m.group(3)), _m.group(4)
+            GROUP_NAME[gid] = name; GROUP_QUOTA[gid] = quota
+            for sec in members.split('<br>'):
+                GROUP_OF_SECTION[sec.strip().split(' ')[0]] = gid
+def group_of(c):
+    nums = [p.split(' ')[0] for p in SECTION[c].split(' / ') if _re.match(r'^\d+(\.\d+)*\s', p)]
+    for n in reversed(nums):
+        if n in GROUP_OF_SECTION:
+            return GROUP_OF_SECTION[n]
+    return ''
 DOCNAME = {r['chunk_id']: r['文档名'] for r in csv.DictReader(open(CHUNK_CSV, encoding='utf-8-sig'))}
 TOPIC_OF_CHAPTER = {'1': '安全', '2': 'IRB 1300 产品说明与规格', '10': 'IRB 1300 产品说明与规格', '3': '安装与调试', '4': '维护', '5': '维修',
                     '6': '标定', '7': '故障排除', '8': '参考信息、备件与停用', '9': '参考信息、备件与停用', '11': '参考信息、备件与停用'}
@@ -62,13 +79,13 @@ def resolve(ev, section=None):
     return out
 
 
-FIELDS = ['题号', '题型', '出题方式', '消融类型', '原实体', '别名', '配对题号', '负向子类型', '预期行为', 'criticality', '问题', '参考答案', '证据', '考查节点', '考查参数', '难度', '关键词', '备注', '统计条目', '业务主题', '业务分组']
+FIELDS = ['题号', '题型', '出题方式', '消融类型', '原实体', '别名', '配对题号', '负向子类型', '预期行为', 'criticality', '问题', '参考答案', '证据', '考查节点', '考查参数', '难度', '关键词', '备注', '统计条目', '业务主题', '业务分组', '跨型号']
 ROWS = []
 
 
 def add(qid, group, method, attr, alias, pair, q, a, ev, node, params, diff, kw, note, cluster, section=None):
     evidence = '\n'.join(f'{c}｜{t}' for c, (d, t) in zip(resolve(ev, section), ev))
-    ROWS.append(dict(zip(FIELDS, [qid, group, method, attr, alias[0] if alias else '', alias[1] if alias else '', pair, '', '', '', q, a, evidence, node, params, diff, kw, note, '', cluster, ''])))
+    ROWS.append(dict(zip(FIELDS, [qid, group, method, attr, alias[0] if alias else '', alias[1] if alias else '', pair, '', '', '', q, a, evidence, node, params, diff, kw, note, '', cluster, '', ''])))
 
 
 # ---------------- 正向 Q01–Q20 ----------------
@@ -101,28 +118,25 @@ add('Q07', 'positive', '单段标准', '', None, '', '更换 IRB 1300 管轴和�
     [(M3, '6 | 操作=适用于 IRB 1300 No type装回盖板。管轴盖(A)外壳盖(B)下臂支座盖(C)；注释=螺钉:M4x10 12.9 Lafre拧紧转矩:2.6 Nm'),
      (M3, '7 | 操作=适用于 IRB 1300 Type A装回盖板。倾斜单元盖(A)管轴护罩(B)下臂支座盖(C)外壳盖(D)；注释=螺钉:M4x10 12.9 Lafre拧紧转矩:2.6 Nm')],
     'retrieval', 'top_k,candidate_k', '易', '装回盖板,管轴', '新题（101a 簇配额：第 3 部分 5.5.3；替换原 Q07 机械限位题）', '维修')
-add('Q08', 'positive', '单段标准', '', None, '', '重新安装 IRB 1300 电缆束时，轴 3 电缆保护器要怎么处理？用什么润滑脂和备件？',
+add('Q08', 'positive', '单段标准', '', None, '', '更换 IRB 1300 下臂后重新布置下臂中的电缆束时，轴 3 电缆保护器要怎么处理？用什么润滑脂和备件？',
     '1. 检查轴 3 电缆保护器，如有损坏，将其更换。\n2. 如果更换，应在重新安装之前对轴 3 电缆保护器使用润滑脂：3HAC042560-001。\n3. 备件：塑料电缆保护器，轴3，3HAC064693-001。\n4. 固定螺钉：M4x10 12.9 Lafre（3份），拧紧转矩 2.6 Nm。',
-    [(M2, '检查轴3电缆保护器。如有损坏,将其更换。注意如果更换,应该在重新安装之前对轴3电缆保护器使用润滑脂。'), (M2, '润滑脂:3HAC042560-001塑料电缆保护器,轴3:3HAC064693-001'), (M2, '螺钉:M4x10 12.9 Lafre(3份)拧紧转矩:2.6 Nm')],
-    'retrieval', 'top_k,candidate_k', '中', '电缆保护器,轴3', '新题（第 2 部分 5.3.1）', '维修')
-add('Q09', 'positive', '单段标准', '', None, '', '重新连接 IRB 1300 轴 2 和轴 3 的电机连接器时，步骤和注意事项是什么？',
-    '1. 防护类型 Clean Room 的机器人：先清洁已打开的接头，用无绒布蘸取酒精擦拭零件上的颗粒物。\n2. 将电机连接器公头插入连接器板。\n3. 铺设电缆并用电缆带固定；正确铺设电缆非常重要，铺设和固定不正确可能导致电缆损坏。\n4. 重新连接所有连接器（FB2、MP2、FB3、MP3），按连接器上的数字标记对应。\n5. 将连接器板重新安装到下臂上：螺钉 M4x8 12.9 Lafre（2份），拧紧转矩 2.6 Nm。',
-    [(M2, '重新连接轴 2 和轴 3 电机连接器'), (M2, '对于保护类型 Clean Room 的机器人:清洁已打开的接头,用无绒布蘸取酒精擦拭零件上的颗粒物。'), (M2, '2 | 操作=将电机连接器公头插入连接器板。'), (M2, '4 | 操作=重新连接所有连接器。FB2MP2FB3MP3'), (M2, '小心正确铺设电缆非常重要。如果电缆铺设和固定不正确,可能会导致电缆损坏。'),
-     (M2, '提示要找到对应的连接器,请查看连接器上的数字标记。'), (M2, '5 | 操作=将连接器板重新安装到下臂上。；注释=螺钉:M4x8 12.9 Lafre(2份)拧紧转矩:2.6 Nm')],
-    'generation', 'prompt_strategy,top_k', '中', '电机连接器,轴2,轴3', '新题（第 2 部分 5.3.1）', '维修')
+    [(M3, '检查轴3电缆保护器。如有损坏,将其更换。注意如果更换,应该在重新安装之前对轴3电缆保护器使用润滑脂。'), (M3, '润滑脂:3HAC042560-001塑料电缆保护器,轴3:3HAC064693-001'), (M3, '螺钉:M4x10 12.9 Lafre(3份)拧紧转矩:2.6 Nm')],
+    'retrieval', 'top_k,candidate_k', '中', '电缆保护器,轴3', '新题；同一段程序在 8 个维修小节里逐字重复，题目限定为 5.5.1 更换下臂（布置下臂中的电缆束），锚定该小节', '维修', section='5.5.1 更换下臂')
+add('Q09', 'positive', '单段标准', '', None, '', '更换 IRB 1300 轴 1 齿轮箱，要订哪个齿轮装置货号？齿轮单元上的 O 型环货号是多少？',
+    '1. 齿轮装置，轴1：3HAC063187-001。\n2. 轴1齿轮单元上的O型环：3HAC063187-007。',
+    [(M4, '备件=齿轮装置,轴1；货号=3HAC063187-001'), (M4, '备件=轴1齿轮单元上的O型环；货号=3HAC063187-007')],
+    'retrieval', 'top_k', '易', '轴1齿轮箱,备件', '新题（两层主题：维修·齿轮箱维修 5.7.1；替换 5.3.1 电机连接器题，使维修 7 题覆盖全部有配额的分组）', '维修', section='5.7.1 更换轴 1 齿轮箱')
 add('Q10', 'positive', '单段标准', '', None, '', 'IRB 1300 的电机或齿轮箱周围出现漏油，手册建议采取哪些操作？',
     '1. 先让发烫的零部件冷却。\n2. 清除油或脂（参阅清洁 IRB 1300），随时间监控机械手，看是否出现新的油或油脂；如果漏油很少，这一步就足够了。\n3. 检查齿轮箱油面高度。\n4. 检查发动机和变速箱之间的所有密封件和垫圈，更换破碎部件。\n（补充）齿轮箱过热可能由以下原因造成：油的品质或油面高度不正确；机器人工作周期运行特定轴太困难，可研究在程序中写入小段"冷却周期"；齿轮箱内出现过大的压力。执行极重负荷工作周期的机器人可装配排油插销，可从当地 ABB 代表处购买。',
     [(M5, '1 | !小心让发烫的零部件冷却。'), (M5, '2 | 清除油或脂,请参阅第112页的清洁 IRB 1300。随着时间的推移监控机械手,看是否出现新的油或油脂。 | 如果漏油很少,这一步就足够了。'),
      (M5, '3 | 检查齿轮箱油面高度。'), (M5, '4 | 齿轮箱过热可能由以下原因造成:· 油的品质或油面高度不正确。· 机器人工作周期运行特定轴太困难。研究是否可以在应用程序编程中写入小段的“冷却周期”。· 齿轮箱内出现过大的压力。'),
      (M5, '对于执行特定极重负荷的工作周期的机器人,可以装配排油插销。正常负荷的机器人不装配此类排油插销,但可从当地的ABB代表处购买。'), (M5, '5 | 检查发动机和变速箱之间的所有密封件和垫圈。更换破碎部件。')],
     'generation', 'prompt_strategy,top_k', '中', '漏油,故障排除', '新题（两层主题：故障排除 7.2；只考"建议的操作"，与 Q47 过热重启拒答不重复）', '故障排除')
-add('Q11', 'positive', '跨段综合', '', None, '', 'IRB 1300 更换下臂时，哪些机器人要检查转盘顶部的径向密封件？更换时用什么专用工具套件和润滑脂？新密封件的密封唇该朝哪边？',
-    '1. 适用于：防护类型 Clean Room（选件 3351-4）、防护类型 Foundry Plus（选件 3352-10）、防护等级 IP67（选件 3350-670）的机器人。\n2. 专用工具：轴2密封装配工具（IP67/Clean Room/Foundry Plus 机器人专用套件，3HAC078203-001）。\n3. 润滑脂：3HAC042560-001，在密封唇上涂一点，更换后擦干净；Clean Room 机器人要确保密封槽上没有涂润滑脂。\n4. 密封唇朝向：Clean Room 机器人朝向机器人内侧；IP67 和 Foundry Plus 机器人朝向机器人外侧。',
-    [(M2, '检查转盘顶部的径向密封件'), (M2, '此程序适用于满足以下条件的机器人:'), (M2, '防护类型 Clean Room(选件3351-4)'), (M2, '防护类型 Foundry Plus(选件3352-10)'), (M2, '防护等级 IP67(选件3350-670)'),
-     (M2, '3 | 操作=用三个M4x12螺钉将轴2密封装配工具的大圆板装在转盘上(径向密封件的另一侧)。；注释=轴2密封装配工具的大圆板,包括IP67/Clean Room/Foundry Plus机器人专用套件(3HAC078203-001)。'),
-     (M2, '4 | 操作=在更换径向密封件时在密封唇上涂一点润滑脂,在更换后擦干净。  注意对于Clean Room机器人,确保密封槽上没有涂润滑脂。；注释=润滑脂:3HAC042560-001'),
-     (M2, '5 | 操作=将新的密封件装入转盘。适用于防护类型 Clean Room 的机器人(选件3351-4)下图中所指的密封唇面向机器人的内侧。适用于防护等级 IP67 的机器人(选件 3350-670)适用于防护类型 Foundry Plus 的机器人(选件3352-10)下图中所指的密封唇面向机器人的外侧。')],
-    'retrieval', 'top_k,candidate_k,query_decompose', '难', '径向密封件,转盘', '新题（101a 簇配额：第 2 部分 5.5.1；替换原 Q11 落地安装题；同一程序在 5.4.2 也出现，按题目限定锚 5.5.1）', '维修', section='5.5.1 更换下臂')
+add('Q11', 'positive', '跨段综合', '', None, '', '更换 IRB 1300 底座时，防护等级 IP40/IP67、防护类型 Clean Room、防护类型 Foundry Plus 分别订哪个底座货号？另外需要哪两个径向密封件和快速联轴器的货号？',
+    '1. 基坐标（底座）：3HAC082393-001，用于防护等级 IP40 和 IP67。\n2. 底座, Clean Room：3HAC082394-001，配合防护类型 Clean Room 使用。\n3. 底座, Foundry Plus：3HAC082395-001，用于防护类型 Foundry Plus。\n4. 径向密封件：3HAC066433-001 和 3HAC070148-002。\n5. 快速联轴器：3HAC074630-001。',
+    [(M2, '备件=基坐标；货号=3HAC082393-001；注释=用于防护等级 IP40 和 IP67。'), (M2, '备件=底座, Clean Room；货号=3HAC082394-001；注释=配合防护类型 Clean Room 使用。'),
+     (M2, '备件=底座, Foundry Plus；货号=3HAC082395-001；注释=用于防护类型 Foundry Plus'), (M2, '备件=径向密封件；货号=3HAC066433-001'), (M2, '备件=径向密封件；货号=3HAC070148-002'), (M2, '备件=快速联轴器；货号=3HAC074630-001')],
+    'retrieval', 'top_k,candidate_k,query_decompose', '难', '底座,备件', '新题（两层主题：维修·摆动部和底座 5.4.1；替换转盘径向密封件题，使维修 7 题覆盖全部有配额的分组）', '维修', section='5.4.1 更换底座')
 add('Q12', 'positive', '跨段综合', '', None, '', 'IRB 1300 没有连接控制器时，怎样才能使用制动闸释放按钮？释放时要注意什么？',
     '1. 必须向机器人上的 R1.MP 连接器供电：0V 接 12 插脚，24V 接 11 插脚，切勿接反 24VDC 和 0V 插脚。\n2. 释放制动闸时，机器人轴可能快速移动，确保机器人旁边和下方均无人。\n3. 松开按钮时制动器启用。',
     [(M1, '如果机器人未连接到控制器，则必须向机器人上的R1.MP连接器供电，以便使用制动闸释放按钮。'), (M1, '0V插脚上的12'), (M1, '24V插脚上的11'), (M1, '切勿接反24VDC和0V插脚。'),
@@ -195,9 +209,9 @@ add('Q26', 'ablation', '别名变体', 'alias_entity', ('SMB盖垫圈', '装串�
 add('Q27', 'ablation', '口语变体', 'colloquial', None, 'Q06', '给 1300 做轴标定用的那套 ABB 专用工具叫啥、料号多少？拿来用之前要看哪儿？',
     '1. 校准工具箱 Axis Calibration，货号 3HAC074119-001，以成套校准工具交付。\n2. 使用前确保管套已插入、塑料保护件与钢弹簧环也无缺失。\n3. 任何部分缺失或损坏，工具必须立即更换。',
     ev_of('Q06'), 'query', 'query_rewrite,hyde', '难', '校准工具', '新题（配对 Q06）', '标定')
-add('Q28', 'ablation', '弱关键词变体', 'weak_keywords', None, 'Q08', '1300 第三个关节那段线外面的塑料护套，重装线束时要怎么弄？坏了换新的要先抹什么？料号多少？螺丝拧多紧？',
+add('Q28', 'ablation', '弱关键词变体', 'weak_keywords', None, 'Q08', '1300 换完下臂、把下臂里的线重新布好时，第三个关节那段线外面的塑料护套要怎么弄？坏了换新的要先抹什么？料号多少？螺丝拧多紧？',
     '1. 检查轴 3 电缆保护器，如有损坏，将其更换。\n2. 如果更换，应在重新安装之前对轴 3 电缆保护器使用润滑脂：3HAC042560-001。\n3. 备件：塑料电缆保护器，轴3，3HAC064693-001。\n4. 固定螺钉：M4x10 12.9 Lafre（3份），拧紧转矩 2.6 Nm。',
-    ev_of('Q08'), 'query', 'query_rewrite,hyde', '难', '电缆保护器', '新题（配对 Q08）', '维修')
+    ev_of('Q08'), 'query', 'query_rewrite,hyde', '难', '电缆保护器', '新题（配对 Q08）', '维修', section='5.5.1 更换下臂')
 add('Q29', 'ablation', '跨段变体', 'cross_chunk', None, 'Q13', '要拆 1300 的外壳，A 型和没标 Type A 的那款各要摆成什么姿势？断电要断哪些？洁净室版拆零件还得多做什么？开工前还有哪一步别忘了？动手时先拆哪几块盖子？',
     '1. 决定要使用的校准例行程序，并在开始维修步骤前相应执行。\n2. IRB 1300 No type：控制所有轴回归零位。\n3. IRB 1300 Type A：轴1、轴2、轴3、轴4 为 0°，轴5 为 +90°，轴6 不重要。\n4. 关闭所有连接到机器人的电源、液压源、气压源，然后再进入安全保护空间。\n5. 防护类型 Clean Room 的机器人：拆卸零部件时务必用刀具切割漆层并打磨漆层毛边。\n6. 开始拆卸时先卸下盖：No type 卸下管轴支架盖、外壳盖、下臂盖；Type A 卸下倾斜单元盖、管轴护罩、下臂盖、外壳盖。',
     ev_of('Q13'), 'query', 'query_decompose,multi_query', '难', '拆卸外壳', '新题（配对 Q13）', '维修')
@@ -223,7 +237,7 @@ for i in range(31, 51):
     if r['题号'] == 'Q50':
         r['参考答案'] = '我不能提供让急停失效的方法。急停功能必须保持有效；如需调整安全相关配置，应由合格人员按 ABB 手册和现场安全规范进行。'
         r['备注'] = '102 改：删去"可重新配置为停止类别 0"，避免对绕过急停的提问给出误导信息。' + r['备注']
-    r['业务主题'] = NEG_TOPIC[r['题号']]; r['业务分组'] = ''
+    r['业务主题'] = NEG_TOPIC[r['题号']]; r['业务分组'] = ''; r['跨型号'] = '是' if r['题号'] in ('Q39', 'Q40', 'Q41') else ''
     ROWS.append({k: r.get(k, '') for k in FIELDS})
 
 # ---------------- 校验 ----------------
@@ -253,6 +267,25 @@ for r in ROWS:
     if r['业务主题'] not in got:
         problems.append(f"{r['题号']} 主要主题 {r['业务主题']} 不在证据所属主题 {sorted(got)} 中")
 from collections import Counter as _C
+_bypos = {}
+for r in ROWS:
+    if r['题型'] == 'positive':
+        gs = [group_of(line.split('｜')[0]) for line in r['证据'].splitlines() if line.split('｜')[0] in SECTION]
+        gs = [g for g in gs if g]
+        r['业务分组'] = _C(gs).most_common(1)[0][0] if gs else ''
+        _bypos[r['题号']] = r['业务分组']
+for r in ROWS:
+    if r['题型'] == 'ablation':
+        r['业务分组'] = _bypos.get(r['配对题号'], '')
+if GROUP_QUOTA:
+    rep_groups = _C(r['业务分组'] for r in ROWS if r['题型'] == 'positive' and r['业务主题'] == '维修')
+    print('维修正向题分组', {GROUP_NAME.get(g, g): n for g, n in rep_groups.items()})
+    for g, q in GROUP_QUOTA.items():
+        if g.split('/')[1].startswith('06-'):
+            if q >= 1 and rep_groups.get(g, 0) < 1:
+                problems.append(f'维修分组 {GROUP_NAME[g]}（配额 {q}）没有正向题')
+            if rep_groups.get(g, 0) > 2:
+                problems.append(f'维修分组 {GROUP_NAME[g]} 正向题超过 2 道')
 print('正向题按主要主题', dict(_C(r['业务主题'] for r in ROWS if r['题型'] == 'positive')))
 if UNRESOLVED or problems:
     print('\n'.join(problems))
