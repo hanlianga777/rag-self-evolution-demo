@@ -231,12 +231,19 @@ class MonitoringAssessmentRequest(BaseModel):
     severity: str = Field(pattern="^(ordinary|critical)$")
 
 
+class PreauthorizedReviewAudit(BaseModel):
+    authorized_by: str = Field(min_length=1, max_length=80)
+    executed_by: str = Field(min_length=1, max_length=80)
+    review_method: Literal["预授权代确认"]
+
+
 class BatchReviewRequest(BaseModel):
     question_ids: list[str] = Field(min_length=1)
     actor: str = Field(default="local_user", min_length=1, max_length=80)
     confirmed_manual_review: bool = False
     reason: str | None = None
     review_notes: dict[str, str] = Field(default_factory=dict)
+    review_audit: PreauthorizedReviewAudit | None = None
 
 
 class ReviewedImportRequest(BaseModel):
@@ -1478,7 +1485,8 @@ def _revision_attempt(run_store, revision_id, stage, service, work, *, question_
 def review_mini_batch(payload: BatchReviewRequest):
     """A single explicit operator action writes individual, auditable Human Review decisions."""
     try:
-        return store.review_generation_batch(payload.question_ids, payload.actor, confirmed_manual_review=payload.confirmed_manual_review, reason=payload.reason, review_notes=payload.review_notes)
+        return store.review_generation_batch(payload.question_ids, payload.actor, confirmed_manual_review=payload.confirmed_manual_review, reason=payload.reason, review_notes=payload.review_notes,
+                                             review_audit=payload.review_audit.model_dump() if payload.review_audit else None)
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
     except ValueError as error:

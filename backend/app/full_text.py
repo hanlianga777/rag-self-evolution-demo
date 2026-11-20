@@ -3,7 +3,9 @@ import hashlib
 import json
 import re
 import threading
+from collections import defaultdict
 from pathlib import Path
+from zipfile import BadZipFile, ZipFile
 
 # ponytail: one process-wide lock pins short corpus reads/activation; use a RW lock only if measured contention warrants it.
 CORPUS_LOCK = threading.RLock()
@@ -91,7 +93,7 @@ def validate_bundle(index_dir, *, require_full_text=False):
     return {'path': index_dir, 'manifest': manifest, 'chunks': chunks, 'documents': documents, 'full_text': full_text}
 
 
-def search_full_text(question, full_text):
+def search_full_text(question, full_text, *, index_dir=None):
     if full_text is None:
         return {'status': 'not_collected', 'coverage': None, 'matches': [], 'signal_only': True, 'reason': 'raw_full_text_unavailable'}
     # General anchors only: identifiers, numbers/units, Chinese phrases (6-8 chars), bounded at 24.
@@ -110,17 +112,52 @@ def search_full_text(question, full_text):
         matches.append({**{key: page[key] for key in ('document_id', 'page', 'parser', 'text_checksum')},
                         'matched_terms': terms, 'method': 'raw_page_anchor',
                         'content': page['text'], 'content_preview': page['text'][max(0, position - 100):position + 300]})
-    return {'status': 'searched', 'corpus_fingerprint': full_text['corpus_fingerprint'], 'coverage': effective_coverage(full_text), 'anchors': anchors, 'matches': matches, 'signal_only': True}
+    return {'status': 'searched', 'corpus_fingerprint': full_text['corpus_fingerprint'], 'coverage': effective_coverage(full_text, index_dir=index_dir), 'anchors': anchors, 'matches': matches, 'signal_only': True}
 
 
-def effective_coverage(full_text):
+def _intentional_blank_pages(index_dir, blank):
+    blank_by_doc = defaultdict(set)
+    for page in blank:
+        blank_by_doc[page['document_id']].add(page['page'])
+    intentional = set()
+    for document_id, page_numbers in blank_by_doc.items():
+        try:
+            with ZipFile(index_dir / f'{document_id}-mineru.zip') as archive:
+                names = [name for name in archive.namelist()
+                         if name.endswith('_content_list.json') or Path(name).name == 'content_list.json']
+                if len(names) != 1:
+                    continue
+                blocks = json.loads(archive.read(names[0]))
+        except (OSError, BadZipFile, ValueError):
+            continue
+        if not isinstance(blocks, list) or not all(isinstance(block, dict) for block in blocks):
+            continue
+        page_texts = defaultdict(set)
+        for block in blocks:
+            page_index = block.get('page_idx')
+            if type(page_index) is not int or page_index + 1 not in page_numbers:
+                continue
+            text = block.get('text')
+            if block.get('type') != 'text' or not isinstance(text, str):
+                page_texts[page_index + 1].add(None)
+            elif text.strip():
+                page_texts[page_index + 1].add(text.strip())
+        intentional.update((document_id, page) for page, texts in page_texts.items()
+                           if texts == {'此页刻意留白'})
+    return intentional
+
+
+def effective_coverage(full_text, *, index_dir=None):
     """2026-11-19（096 审核）：源 PDF 本身有空白页（IRB 1200 规格第 70、71 页，IRB 1300 手册第 5 部分第 182 页，PyMuPDF 无文字、OCR 无结果、
     渲染纯白），按原规则"每页都要有字"永远是 insufficient，导致所有"资料不足 / 需追问"负向题探针判为不确定。
     这里不改落盘的 full_text.json（不动知识身份），只在读取时给出 effective_status：所有页都有记录、空白页不超过总页数 1%，视为全文覆盖完整；
-    空白页清单原样列出供审计。"""
+    只含留白标记的原始 MinerU 页单列，两个清单均保留以供审计。"""
     coverage = dict(full_text.get('coverage') or {})
     pages = full_text.get('pages') or []
     blank = [{'document_id': page['document_id'], 'page': page['page'], 'parser': page.get('parser')} for page in pages if not page['text'].strip()]
+    intentional = _intentional_blank_pages(index_dir, blank) if index_dir is not None else set()
+    coverage['intentional_blank_pages'] = [page for page in blank if (page['document_id'], page['page']) in intentional]
+    blank = [page for page in blank if (page['document_id'], page['page']) not in intentional]
     total = coverage.get('total_pages') or 0
     all_present = total > 0 and len({(page['document_id'], page['page']) for page in pages}) == total
     coverage['blank_pages'] = blank

@@ -1,4 +1,7 @@
 """098：源 PDF 的少量空白页不应让全文覆盖永远 insufficient。"""
+import json
+from zipfile import ZipFile
+
 from app.full_text import effective_coverage
 
 
@@ -17,3 +20,19 @@ def test_many_blank_or_missing_pages_stay_insufficient():
     assert effective_coverage(_ft(['x'] * 90 + [''] * 10))['effective_status'] == 'insufficient'
     ft = _ft(['x'] * 100); ft['pages'] = ft['pages'][:-1]
     assert effective_coverage(ft)['effective_status'] == 'insufficient'
+
+
+def test_only_raw_mineru_pages_with_just_the_blank_marker_are_exempt(tmp_path):
+    ft = _ft(['x'] * 197 + ['', '', ''])
+    with ZipFile(tmp_path / 'D-mineru.zip', 'w') as archive:
+        archive.writestr('D_content_list.json', json.dumps([
+            {'type': 'text', 'text': '此页刻意留白', 'page_idx': 197},
+            {'type': 'text', 'text': '此页刻意留白', 'page_idx': 198},
+            {'type': 'table', 'table_body': '<table>正文</table>', 'page_idx': 198},
+        ]))
+    cov = effective_coverage(ft, index_dir=tmp_path)
+    assert cov['effective_status'] == 'complete'
+    assert [p['page'] for p in cov['intentional_blank_pages']] == [198]
+    assert [p['page'] for p in cov['blank_pages']] == [199, 200]
+    ft['coverage']['total_pages'] += 1
+    assert effective_coverage(ft, index_dir=tmp_path)['effective_status'] == 'insufficient'

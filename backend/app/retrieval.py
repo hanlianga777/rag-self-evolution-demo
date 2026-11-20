@@ -140,8 +140,9 @@ class VectorRetriever:
         return self._bundle['chunks'] if self._bundle is not None else self.corpus.chunks()
 
     def full_text_probe(self, question):
-        with self.snapshot():
-            return search_full_text(question, self._bundle.get('full_text') if self._bundle else None)
+        with self.snapshot() as bundle:
+            return search_full_text(question, bundle.get('full_text') if bundle else None,
+                                    index_dir=bundle['path'] if bundle else None)
 
     def _load(self):
         if self._index is not None:

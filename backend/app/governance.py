@@ -2239,10 +2239,10 @@ class GovernanceStore:
         from .golden_v2 import probe_reason_fields
         return [{**_load(row["result_json"], {}), **probe_reason_fields(_load(row["result_json"],{})), "created_at": row["created_at"]} for row in rows]
 
-    def review_generation_batch(self, question_ids: list[str], actor: str, *, confirmed_manual_review: bool = False, reason: str | None = None, review_notes=None):
+    def review_generation_batch(self, question_ids: list[str], actor: str, *, confirmed_manual_review: bool = False, reason: str | None = None, review_notes=None, review_audit=None):
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK:
-            return self._review_generation_batch(question_ids, actor, confirmed_manual_review=confirmed_manual_review, reason=reason, review_notes=review_notes)
+            return self._review_generation_batch(question_ids, actor, confirmed_manual_review=confirmed_manual_review, reason=reason, review_notes=review_notes, review_audit=review_audit)
 
     def review_owner_delegated_batch(self, generation_run_id, authorization_id, reviews):
         from .full_text import CORPUS_LOCK
@@ -2280,9 +2280,16 @@ class GovernanceStore:
                     connection.execute('INSERT INTO approvals(gate,target_id,decision,actor,created_at) VALUES (?,?,?,?,?)',('dataset',question_id,'owner_delegated_confirmed','Codex',now))
             return {'reviewed':[self.question(key) for key in delegated['reviews']], 'generation_run_id':generation_run_id}
 
-    def _review_generation_batch(self, question_ids, actor, *, confirmed_manual_review=False, delegated=None, reason=None, review_notes=None):
+    def _review_generation_batch(self, question_ids, actor, *, confirmed_manual_review=False, delegated=None, reason=None, review_notes=None, review_audit=None):
         if not confirmed_manual_review and delegated is None:
             raise ValueError("Human Review confirmation is required")
+        audit = {}
+        if review_audit is not None:
+            if (not confirmed_manual_review or delegated is not None or not (reason or '').strip()
+                    or review_audit.get('authorized_by') != actor or not (review_audit.get('executed_by') or '').strip()
+                    or review_audit.get('review_method') != '预授权代确认'):
+                raise ValueError('预授权审阅须记录与审核人一致的授权人、实际执行人和授权原因')
+            audit = {key: review_audit[key] for key in ('authorized_by', 'executed_by', 'review_method')}
         candidates = [self.question(question_id) for question_id in question_ids]
         runs = {item["raw"].get("generation_run_id") for item in candidates}
         run = self.generation_run(next(iter(runs)), qualification=False) if len(runs) == 1 and None not in runs else None
@@ -2315,7 +2322,7 @@ class GovernanceStore:
                     if validation['approved']:
                         continue
                     metadata = {'qualification_source':'human_reviewed_csv', 'quality_identity':validation['identity'],
-                                'reason':reason.strip(), 'review_qc_id':None, 'machine_quality_executed':False}
+                                'reason':reason.strip(), 'review_qc_id':None, 'machine_quality_executed':False, **audit}
                     connection.execute('UPDATE questions SET stage=?,review_status=?,updated_at=? WHERE id=?', ('golden','approved',now,item['id']))
                     connection.execute('INSERT INTO review_events(question_id,gate,decision,actor,created_at,metadata_json) VALUES (?,?,?,?,?,?)',
                         (item['id'],'dataset','dataset_confirmed',actor,now,_json(metadata)))
@@ -2354,7 +2361,7 @@ class GovernanceStore:
                 item=next(q for q in candidates if q['id']==question_id)
                 raw,proof=self._finalize_golden_validation(item,actor,delegated=delegated)
                 identity=self._quality_identity(item,connection)
-                metadata={'qualification_source':'human','reason':notes.get(question_id, reason),'quality_identity':identity,'content_review':proof,'review_qc_id':connection.execute('SELECT MAX(id) FROM qc_results WHERE question_id=?',(question_id,)).fetchone()[0]}
+                metadata={'qualification_source':'human','reason':notes.get(question_id, reason),'quality_identity':identity,'content_review':proof,'review_qc_id':connection.execute('SELECT MAX(id) FROM qc_results WHERE question_id=?',(question_id,)).fetchone()[0], **audit}
                 if delegated is not None:
                     metadata={**{k:v for k,v in delegated.items() if k!='reviews'},'qualification_source':'owner_delegated','review':delegated['reviews'][question_id],
                               'qc_created_at':self.qc_history(question_id)[0]['created_at'],'quality_identity':identity,'content_review':proof,'review_qc_id':metadata['review_qc_id']}

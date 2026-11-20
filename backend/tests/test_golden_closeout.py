@@ -138,8 +138,13 @@ class CloseoutTests(unittest.TestCase):
             self.store.review_generation_batch(run['question_ids'], 'fixture', confirmed_manual_review=True,
                                                review_notes={low:notes[low]})
         self.assertEqual(self.store.dataset_snapshots(), [])
-        self.store.review_generation_batch(run['question_ids'], 'fixture', confirmed_manual_review=True, review_notes=notes)
+        audit = {'authorized_by': '用户', 'executed_by': '总指挥', 'review_method': '预授权代确认'}
+        self.store.review_generation_batch(run['question_ids'], '用户', confirmed_manual_review=True,
+                                           reason='用户预先授权', review_notes=notes, review_audit=audit)
         self.assertEqual({key:self.store.review_history(key)[0]['reason'] for key in notes}, notes)
+        history = [self.store.review_history(key)[0] for key in run['question_ids']]
+        self.assertTrue(all(event['actor'] == '用户' and event['decision'] == 'dataset_confirmed'
+                            and all(event[key] == value for key, value in audit.items()) for event in history))
         self.assertEqual(set(self.store.create_generation_snapshot(self.run_id)['question_ids']), set(run['question_ids']))
 
     def test_individual_review_cannot_bypass_failed_business_audit(self):
