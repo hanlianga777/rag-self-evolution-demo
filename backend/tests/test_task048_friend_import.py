@@ -57,6 +57,9 @@ def test_csv_reads_topic_group_and_keeps_negative_evidence_empty():
     assert candidate['business_topic'] == '知识库外'
     assert candidate['business_group'] is None
     assert candidate['evidence'] == []
+    assert 'cross_model' not in candidate
+    assert to_candidate({**row, '跨型号': '是'})['cross_model'] is True
+    assert 'cross_model' not in to_candidate({**row, '跨型号': '否'})
 
 
 def test_ablation_inherits_both_fields_before_persistence():

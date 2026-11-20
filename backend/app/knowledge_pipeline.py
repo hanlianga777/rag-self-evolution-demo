@@ -145,7 +145,7 @@ V2_CONFIG = {**CONFIG, 'chunk_strategy': rules.CHUNKING['strategy'],
              'child_tail_min_tokens': 80, 'child_target_min_tokens': 200,
              'table_intro_max_tokens': 200, 'toc_min_entries': 3, 'toc_min_fraction': 0.5,
              'repeat_page_fraction': 0.30, 'repeat_short_line_chars': 40, 'repeat_min_pages': 2,
-             'table_normalize': 'table-kv-v4', 'denoise_version': 'mineru-noise-v8', 'heading_context': 'child-section-v4',
+             'table_normalize': 'table-kv-v4', 'denoise_version': 'mineru-noise-v8', 'heading_context': 'child-section-v5-table-intro',
              'header_footer_identity_max_chars': 12,
              'list_layout': 'numbered-steps-image-labels-v1',
              'heading_hierarchy': 'manual-chapters-v3-numbered'}
@@ -354,17 +354,30 @@ def _v2_numbered_subheadings(units, parsed):
     known = {title for marks in events.values() for _, _, title, _ in marks}
     for index, part in enumerate(body):
         text = part['text']
-        if part['raw'].get('type') != 'text' or events.get(part['block_id']) or not _v2_heading_label(text):
+        if part['raw'].get('type') != 'text' or events.get(part['block_id']):
             continue
         following = body[index + 1:index + 7]
         near = following[0] if following else None
         before_table = near and near['raw'].get('type') == 'table' and near['page'] - part['page'] <= 1
+        lines = list(re.finditer(r'[^\n]+', text))
+        for line, next_line in zip(lines, lines[1:]):
+            title = line[0].strip()
+            if _v2_heading_label(title) and next_line[0].lstrip().startswith('下表给出了'):
+                offset = line.start() + len(line[0]) - len(line[0].lstrip())
+                events[part['block_id']].append((offset, offset, title, 'body_structure'))
+        if not _v2_heading_label(text):
+            continue
+        table_intro = (near and near['page'] - part['page'] <= 1
+                       and near['text'].startswith('下表给出了'))
         explains_procedure = (near and near['page'] == part['page']
                               and re.match(r'^(?:使用此|按照下列|按照此|请按下列|按下列).*(?:流程|程序|步骤)', near['text']))
         table_echo = any(candidate['page'] == part['page'] and candidate['raw'].get('type') == 'table'
                          and text in candidate['text'] for candidate in following)
-        if text in known or ((_TABLE_TITLE.fullmatch(text) or _SUBHEADING_INTRO.search(text))
-                             and (before_table or explains_procedure or table_echo)):
+        # A list item or a prose qualifier before a table is still body text.
+        short_title = not re.match(r'^(?:[•●▪◦·–—]|上述|以下|下列|除了|除非|另请)', text)
+        if (text in known or (short_title and (before_table or table_intro))
+                or ((_TABLE_TITLE.fullmatch(text) or _SUBHEADING_INTRO.search(text))
+                    and (before_table or explains_procedure or table_echo))):
             events[part['block_id']].append((0, 0, text, 'body_structure'))
 
     for part in parts:

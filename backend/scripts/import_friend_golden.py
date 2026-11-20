@@ -4,7 +4,7 @@ CSV 列（UTF-8，可带 BOM）：
   题号, 题型(positive/ablation/negative), 出题方式(单段标准/跨段综合/统计/桥接/台账事实/口语变体/别名变体/弱关键词变体/跨段变体/负向),
   消融类型(colloquial/alias_entity/weak_keywords/cross_chunk，消融题必填), 原实体, 别名, 配对题号,
   负向子类型, 预期行为, criticality, 问题, 参考答案,
-  证据（每行一段，格式：chunk_id｜切块原文中的连续片段）, 考查节点, 考查参数, 难度, 关键词, 备注, 业务主题, 业务分组（可空）, 统计条目（统计题必填，用｜分隔）
+  证据（每行一段，格式：chunk_id｜切块原文中的连续片段）, 考查节点, 考查参数, 难度, 关键词, 备注, 业务主题, 业务分组（可空，填写版本化组 ID）, 跨型号（可选）, 统计条目（统计题必填，用｜分隔）
 
 默认 dry-run：逐题跑朋友同款硬校验（证据逐字定位、答案锚点、跨段校验、统计/桥接/事实构造检查、页码题禁出等），
 打印每题错误，不写库；加 --apply 才写入一个新的候选版本（不冻结、不做 Gate 1）。
@@ -57,6 +57,8 @@ def to_candidate(row):
     if group == 'negative':
         candidate.update(negative_subtype=row.get('负向子类型', '').strip(), expected_behavior=row.get('预期行为', '').strip(),
                          expected_response=candidate['reference_answer'], evidence=[])
+        if (row.get('跨型号') or '').strip().casefold() in {'是', '跨型号', 'true', '1', 'yes'}:
+            candidate['cross_model'] = True
         if row.get('criticality', '').strip():
             candidate['criticality'] = row['criticality'].strip()
     return candidate
@@ -73,18 +75,22 @@ def main(argv=None):
     os.environ['RAG_DEMO_DB_PATH'] = str(database.resolve())
     os.environ['RAG_SAFE_START'] = '1'
     from app.main import store
+    from app.business_topics import validate_import_groups
     from app.corpus import CorpusStore
     from app.golden_v2 import validate_golden_candidate
     from app.reviewed_import import FRIEND_CONTRACT, import_batch, validate_friend_content
     data = args.csv.read_bytes()
     # 单元格内有换行（多段证据、分行答案），不能先 splitlines 再交给 csv。
     rows = list(csv.DictReader(io.StringIO(data.decode('utf-8-sig'), newline='')))
-    chunks = CorpusStore().chunks()
+    corpus = CorpusStore()
+    chunks = corpus.chunks()
     report, candidates = [], []
     for row in rows:
         errors = []
         try:
             candidate = to_candidate(row)
+            if candidate['test_category'] != 'ablation':
+                validate_import_groups([candidate], corpus.index_dir.resolve())
             validate_friend_content(candidate, chunks)
             checked = {**candidate, 'evidence': [] if candidate['test_category'] == 'negative' else candidate['evidence']}
             result = validate_golden_candidate(checked, chunks)

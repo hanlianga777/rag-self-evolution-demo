@@ -120,7 +120,9 @@ def import_batch(store, candidates, source_sha256, source, review_note, *, machi
         chunks = CorpusStore().chunks()
         friend = contract == FRIEND_CONTRACT
         if friend:
+            from .business_topics import validate_import_groups
             candidates = inherit_business_scope(candidates)
+            validate_import_groups(candidates, CorpusStore().index_dir.resolve())
             machine_checks = True
             for candidate in candidates:
                 validate_friend_content(candidate, chunks)

@@ -20,6 +20,7 @@ def test_largest_remainder_respects_topic_minimum_and_distributes_groups_by_frag
 
     assert topic_quotas([103, 33, 25, 94, 100, 867, 56, 15, 47]) == [2, 1, 1, 2, 2, 7, 2, 1, 2]
     assert topic_quotas([10_000, 1, 1]) == [18, 1, 1]
+    assert topic_quotas([10_000, 0, 1]) == [19, 0, 1]
     assert cluster_quotas(3, [20, 5, 100]) == [1, 0, 2]
     assert cluster_quotas(5, [20, 5, 100]) == [2, 1, 2]
     assert cluster_quotas(4, [5, 20, 100]) == [0, 2, 2]
@@ -48,7 +49,7 @@ def test_section_clustering_keeps_one_assignment_per_section(monkeypatch):
     assert [group['size'] for group in repair['clusters']] == [2, 1, 1]
     assert [group['sections'][0]['number'] for group in repair['clusters']] == ['5.6.1', '5.6.2', '5.6.10']
     assert [group['name'] for group in repair['clusters']] == ['电机更换'] * 3
-    assert safety['clusters'] == []
+    assert sum(group['quota'] for group in safety['clusters']) == 1
     assert safety['sections'] == [{'number': '1.1', 'title': '简介'}]
     by_id = {row['chunk_id']: row for row in plan['assignments']}
     assert by_id['M5']['is_duplicate_of'] == 'M1'
@@ -89,84 +90,64 @@ def test_section_with_only_cross_section_duplicates_stays_in_plan(monkeypatch):
     assert len(repair['clusters']) == 1
     assert repair['clusters'][0]['size'] == 1
     assert repair['clusters'][0]['sections'] == repair['sections']
-    assert plan['assignments'][1]['cluster_id'] == '06-01'
+    assert plan['assignments'][1]['cluster_id'] == f"{plan['topic_plan_version']}/06-01"
 
 
-def test_small_group_merges_into_nearest_weighted_centroid(monkeypatch):
-    # Initial groups are [0, 1], [2.6], [5]. Only the weighted center of [0, 1] is farther from 2.6 than 5 is.
-    repair = repair_groups(monkeypatch, 3, [
-        (0, 45, '电机', 0), (1, 1, '电机', 0), (2.6, 2, '电机', 0), (5, 52, '电机', 0),
-    ])
-    assert repair['initial_k'] == 3
-    assert [group['size'] for group in repair['clusters']] == [46, 54]
-    assert [s['number'] for s in repair['clusters'][1]['sections']] == ['5.1.3', '5.1.4']
-    assert [group['quota'] for group in repair['clusters']] == [1, 2]
+def test_consistent_small_group_is_preserved(monkeypatch):
+    repair = repair_groups(monkeypatch, 3, [(0, 45, '电机', 0), (5, 2, '机械限位', 0), (10, 53, '齿轮箱', 0)])
+    assert [group['size'] for group in repair['clusters']] == [45, 2, 53]
+    assert repair['clusters'][1]['small_group'] is True
+    assert repair['clusters'][1]['name'] == '机械限位'
 
 
-def test_small_group_at_exactly_five_percent_stays(monkeypatch):
-    repair = repair_groups(monkeypatch, 3, [(0, 45, '电机', 0), (5, 5, '电机', 0), (10, 50, '电机', 0)])
-    assert [group['size'] for group in repair['clusters']] == [45, 5, 50]
+def test_infeasible_quota_stops_without_exceeding_group_cap(monkeypatch):
+    with pytest.raises(ValueError, match=r'维修配额不可行（5 题，2 个有效组）'):
+        repair_groups(monkeypatch, 5, [(0, 20, '电机', 0), (10, 80, '齿轮箱', 0)])
 
 
-@pytest.mark.parametrize(('position', 'expected_sizes'), [(4, [40, 40, 20]), (2, [60, 20, 20])])
-def test_large_mixed_group_is_split_only_once(monkeypatch, position, expected_sizes):
-    repair = repair_groups(monkeypatch, 2, [
-        (0, 20, '电机', 0), (1, 20, '电机' if position == 4 else '机械限位', 0),
-        (position, 20, '齿轮箱', 0), (8, 20, '齿轮箱', 0), (20, 20, '电缆', 0),
-    ])
-    assert repair['initial_k'] == 2
-    assert [group['size'] for group in repair['clusters']] == expected_sizes
-
-
-def test_only_oversized_mixed_group_is_split(monkeypatch):
-    repair = repair_groups(monkeypatch, 2, [
-        (0, 52, '电机', 0), (10, 24, '齿轮箱', 0), (11, 24, '机械限位', 0),
-    ])
-    assert [group['size'] for group in repair['clusters']] == [52, 24, 24]
-
-
-def test_oversized_group_split_uses_fragment_weights(monkeypatch):
-    repair = repair_groups(monkeypatch, 2, [
-        (0, 68, '电机', 0), (4, 8, '齿轮箱', 0), (10, 4, '机械限位', 0), (30, 20, '电缆', 0),
-    ])
-    assert [group['size'] for group in repair['clusters']] == [68, 12, 20]
-
-
-def test_section_clustering_reports_collapsed_vectors():
+def test_index_fragments_are_marked_excluded_and_do_not_suppress_spec_tables(monkeypatch):
     from app.business_topics import build_topics
 
-    chunks = [chunk('A1', '5 维修 / 5.6.1 更换电机', '甲'),
-              chunk('A2', '5 维修 / 5.6.1 更换电机', '乙'),
-              chunk('A3', '5 维修 / 5.6.1 更换电机', '甲'),
-              chunk('B', '5 维修 / 5.6.2 更换电机', '丙'),
-              chunk('C', '5 维修 / 5.7.2 更换齿轮箱', '丁')]
-    with pytest.raises(ValueError, match=r'维修.*k=3.*实得 2 组.*向量.*重复'):
-        build_topics(chunks, [[2, 0], [0, 2], [8, 8], [1, 1], [0, 1]])
+    monkeypatch.setattr('app.business_topics.topic_quotas', lambda sizes: [2])
+    rows = [
+        chunk('A', '11 备件 / 11.1 备件列表和插图', '索引\n限位, 23电缆, 34机架, 45'),
+        chunk('B', '11 备件 / 11.1 备件列表和插图', 'ABB Robotics\nTelephone: +1 615 237 6360'),
+        chunk('C', '11 备件 / 11.1 备件列表和插图', '间隔=预计使用周期, 12；工作量=4,000；范围=负载, 10'),
+        chunk('D', '9 参考信息 / 9.4 螺钉接头', '查阅规范并确认类型。'),
+    ]
+    plan = build_topics(rows, [[0], [1], [2], [3]])
+    topic = plan['topics'][0]
+    assert (topic['size'], topic['auxiliary_index_fragments']) == (2, 2)
+    assert [(r['chunk_id'], r.get('fragment_kind'), r['cluster_id']) for r in plan['assignments'][:2]] == [
+        ('A', '辅助索引片段', None), ('B', '辅助索引片段', None),
+    ]
 
 
-@pytest.mark.parametrize(('titles', 'expected'), [
-    (['更换电机'] * 3 + ['换油', '清洁工具'], ('电机更换', .6, False)),
-    (['更换电机'] * 2 + ['更换齿轮箱'] * 2 + ['清洁工具'], ('电机更换 与 齿轮箱维修', .4, False)),
-    (['拆除上臂'] * 2 + ['更换电机', '清洁工具', '例行介绍'], ('混合：机械结构与密封件、电机更换 等', .4, True)),
-    (['简介', '通用要求'], ('混合：未归类', 0, True)),
-    (['齿轮箱润滑油的类型', '油类型'], ('润滑剂', 1, False)),
-    (['工作范围', '空间限制', '以机械方式限制工作范围'], ('工作范围限制', 1, False)),
-    (['机器人退役介绍', '废弃机器人', '环境信息'], ('停用与废弃', 1, False)),
-    (['适用标准', '单位转换', '重量规格', '标准工具包', '特殊工具'], ('参考资料与工具', 1, False)),
-    (['松闸', '按钮卡滞', '制动器'], ('制动闸', 1, False)),
-    (['载荷', '负载', '转动惯量', '加速度', '速度', '性能', 'ISO 9283'], ('负载与性能', 1, False)),
-    (['技术数据', '型号', '关于 IRB 1200'], ('产品与技术数据', 1, False)),
-    (['同步标记', '检查同步位置'], ('同步位置检查', 1, False)),
-])
-def test_business_names_follow_section_family_thresholds(titles, expected):
-    from app.business_topics import business_group_name
+def test_small_fallback_merges_into_largest_peer_in_same_manual_unit():
+    from app.business_topics import _group_topic
 
-    assert business_group_name(titles) == expected
+    sections = [
+        {'number': number, 'title': title, 'manual_unit': (unit, unit_title)}
+        for number, title, unit, unit_title in [
+            ('5.2.1', '密封件', '5.2', '通用操作程序'),
+            ('5.2.2', '下臂', '5.2', '通用操作程序'),
+            ('5.2.3', '松闸按钮卡滞', '5.2', '通用操作程序'),
+            ('5.5.1', '外壳', '5.5', '上臂和下臂'),
+            ('5.6.1', '电机', '5.6', '电机'),
+        ]
+    ]
+    _, groups = _group_topic(5, sections, np.array([[0.], [0.], [10.], [0.], [10.]]),
+                             dict(zip((row['number'] for row in sections), [30, 30, 2, 30, 50])), 2)
+    structure = groups[0]
+    assert [s['number'] for s in structure['sections']] == ['5.2.1', '5.2.2', '5.2.3', '5.5.1']
+    assert structure['homogeneity'] == .75
+    assert structure['weighted_homogeneity'] == 90 / 92
 
 
-def test_deepest_section_used_outside_repair_and_maintenance():
+def test_deepest_section_used_outside_repair_and_maintenance(monkeypatch):
     from app.business_topics import build_topics
 
+    monkeypatch.setattr('app.business_topics.topic_quotas', lambda sizes: [1, 1])
     chunks = [chunk('I', '3 安装 / 3.1 机械 / 3.1.1 安装 / 3.1.1.1 提升', '甲'),
               chunk('M', '4 维护 / 4.2 计划 / 4.2.1 维护计划 / 4.2.1.1 说明', '乙')]
     installation, maintenance = build_topics(chunks, [[1, 1], [1, 0]])['topics']
@@ -174,7 +155,25 @@ def test_deepest_section_used_outside_repair_and_maintenance():
     assert maintenance['sections'] == [{'number': '4.2.1', 'title': '维护计划'}]
 
 
+def test_unclassified_small_group_uses_nearest_weighted_centroid_without_same_unit():
+    from app.business_topics import _group_topic
+
+    sections = [
+        {'number': '5', 'title': '通用概述', 'manual_unit': ('5', '通用概述')},
+        {'number': '5.2.1', 'title': '更换电机', 'manual_unit': ('5.2', '通用操作')},
+        {'number': '5.2.2', 'title': '拆下电机', 'manual_unit': ('5.2', '通用操作')},
+        {'number': '5.7.1', 'title': '更换齿轮箱', 'manual_unit': ('5.7', '齿轮箱')},
+        {'number': '5.7.2', 'title': '拆下齿轮箱', 'manual_unit': ('5.7', '齿轮箱')},
+    ]
+    _, groups = _group_topic(5, sections, np.array([[2.6], [0.], [1.], [5.], [5.]]),
+                             dict(zip((row['number'] for row in sections), [2, 45, 1, 26, 26])), 3)
+    gearbox = next(group for group in groups if group['name'] == '齿轮箱维修')
+    assert [member['number'] for member in gearbox['sections']] == ['5', '5.7.1', '5.7.2']
+    assert gearbox['weighted_homogeneity'] == 52 / 54
+
+
 def test_http_counts_only_frozen_question_metadata(tmp_path, monkeypatch):
+    monkeypatch.setattr('app.business_topics.topic_quotas', lambda sizes: [1, 2])
     store = GovernanceStore(tmp_path / 'test.db')
     monkeypatch.setattr(main, 'store', store)
     monkeypatch.setattr(main, 'corpus', CorpusStore(tmp_path))
@@ -186,13 +185,17 @@ def test_http_counts_only_frozen_question_metadata(tmp_path, monkeypatch):
     (tmp_path / 'chunks.json').write_text(json.dumps(chunks))
     np.save(tmp_path / 'embeddings.npy', [[1, 0], [0, 1], [1, 0]])
     client = TestClient(main.app)
+    from app.business_topics import index_topics, validate_import_groups
+
+    plan = index_topics(tmp_path, 'IDX-test')
+    repair_group = next(t for t in plan['topics'] if t['name'] == '维修')['clusters'][0]['id']
     questions = [
         {'id': 'A', 'test_category': 'ablation', 'paired_question': 'Q01', 'business_topic': '安全',
          'business_group': '05-02', 'evidence': [{'source_chunk_ids': ['S']}]},
         {'id': 'P', 'coverage_slot': 'Q01', 'test_category': 'positive', 'business_topic': '维修',
-         'business_group': '06-01', 'evidence': [{'source_chunk_ids': ['C1', 'C2', 'S']}]},
-        {'id': 'N', 'test_category': 'negative', 'business_topic': '安全', 'evidence': []},
-        {'id': 'N2', 'test_category': 'negative', 'business_topic': '知识库外', 'evidence': []},
+         'business_group': repair_group, 'evidence': [{'source_chunk_ids': ['C1', 'C2', 'S']}]},
+        {'id': 'N', 'test_category': 'negative', 'business_topic': '安全', 'negative_subtype': 'safety_critical', 'evidence': []},
+        {'id': 'N2', 'test_category': 'negative', 'business_topic': '知识库外', 'negative_subtype': 'prompt_injection', 'cross_model': True, 'evidence': []},
         {'id': 'Old', 'test_category': 'positive', 'evidence': [{'source_chunk_ids': ['S']}]},
         {'id': 'A2', 'test_category': 'ablation', 'source_positive_id': 'Old', 'business_topic': '安全'},
     ]
@@ -223,5 +226,33 @@ def test_http_counts_only_frozen_question_metadata(tmp_path, monkeypatch):
     assert safety['questions'] == {'positive': 0, 'ablation': 0, 'negative': 1}
     assert outside['name'] == '知识库外（负向）'
     assert outside['questions'] == {'positive': 0, 'ablation': 0, 'negative': 1}
+    assert outside['cross_model'] is True
+    assert result['risk_counts'] == {'safety_critical': 1, 'prompt_injection': 1}
+    assert result['group_version_mismatch'] is False
+    assert result['topic_plan_version'] == plan['topic_plan_version']
     assert store.database_path.read_bytes() == before
     assert client.post(url).status_code == 405
+
+    validate_import_groups([questions[1]], tmp_path)
+    questions[1]['business_group'] = 'TP-obsolete/' + repair_group.split('/')[1]
+    with pytest.raises(ValueError, match='Q01 分组版本已变化，需要重新映射'):
+        validate_import_groups([questions[1]], tmp_path)
+    save('E')
+    stale = client.get(url).json()
+    assert stale['group_version_mismatch'] is True
+    assert stale['topics'][1]['questions'] == {'positive': 0, 'ablation': 0, 'negative': 0}
+    assert all(g['questions'] is None for g in stale['topics'][1]['clusters'])
+
+
+def test_101f_dual_threshold_falls_back_to_manual_headings():
+    from app.business_topics import _group_topic
+
+    sections = [
+        {'number': '5.3.1', 'title': '电缆', 'manual_unit': ('5.3', '电缆线束')},
+        {'number': '5.3.2', 'title': 'SMB', 'manual_unit': ('5.3', '电缆线束')},
+        {'number': '5.4.1', 'title': '底座', 'manual_unit': ('5.4', '摆动部和底座')},
+    ]
+    _, groups = _group_topic(5, sections, np.array([[0.], [1.], [2.]]),
+                             {'5.3.1': 20, '5.3.2': 15, '5.4.1': 65}, 1)
+    assert [group['name'] for group in groups] == ['电缆线束', '摆动部和底座']
+    assert all(group['homogeneity'] == group['weighted_homogeneity'] == 1 for group in groups)

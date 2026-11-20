@@ -12,7 +12,7 @@ const legacy = { coverage: { clusters: [{ label: "旧主题", size: 44, quotas: 
 const repairSections = [{ number: "5.6.2", title: "更换轴 2 电机" }];
 const repair = {
   name: "维修", model: "IRB 1300（手册）", size: 90, quota: 7, questions: null, sections: repairSections,
-  clusters: [{ id: "06-01", name: "电机更换", size: 90, homogeneity: 0.75, quota: 7, questions: null,
+  clusters: [{ id: "TP-test/06-01", name: "电机更换", size: 90, homogeneity: 0.75, weighted_homogeneity: 0.9, basis: "family", quota: 2, questions: null,
     sections: repairSections }],
 };
 const safety = {
@@ -20,9 +20,9 @@ const safety = {
   sections: [{ number: "1.6.3", title: "制动闸测试" }],
 };
 
-async function renderCoverage(topics: unknown[], frozen: boolean) {
+async function renderCoverage(topics: unknown[], frozen: boolean, context = {}) {
   const fetcher = vi.fn(async (url: string) => new Response(JSON.stringify(
-    url.endsWith("/api/knowledge/topics") ? { has_frozen_exam: frozen, topics } : { knowledge: legacy }
+    url.endsWith("/api/knowledge/topics") ? { has_frozen_exam: frozen, topics, ...context } : { knowledge: legacy }
   )));
   vi.stubGlobal("fetch", fetcher);
   root = createRoot(document.body.appendChild(document.createElement("div")));
@@ -44,6 +44,8 @@ it("shows source models, targets and section directories before a new exam is fr
   await act(async () => toggle.click());
   expect(toggle.getAttribute("aria-expanded")).toBe("true");
   expect(coverage.querySelector(".business-topic-detail")!.textContent).toContain("电机更换");
+  expect(coverage.querySelector(".business-topic-detail")!.textContent).toContain("TP-test/06-01");
+  expect(coverage.querySelector(".business-topic-detail")!.textContent).toContain("90.0%");
   expect(coverage.querySelector(".business-topic-detail li")!.textContent).toBe("5.6.2 更换轴 2 电机");
   await act(async () => [...coverage.querySelectorAll("button")].find(button => button.textContent === "安全")!.click());
   expect(coverage.querySelector(".business-topic-detail li")!.textContent).toBe("1.6.3 制动闸测试");
@@ -60,4 +62,15 @@ it("shows actual counts, positive shortfalls and the outside-knowledge negative 
   expect(rows.map(cells)).toEqual([["90", "7", "5", "3", "2", "2"], ["12", "1", "1", "0", "0", ""], ["—", "—", "0", "0", "4", ""]]);
   expect(rows[2].textContent).toContain("知识库外（负向）");
   expect(rows[2].querySelector("button")).toBeNull();
+});
+
+it("shows auxiliary index counts, risk subtypes, CSV tags and stale group mappings", async () => {
+  const coverage = await renderCoverage([{ ...safety, auxiliary_index_fragments: 4, cross_model: true }], true, {
+    topic_plan_version: "TP-test", group_version_mismatch: true,
+    risk_counts: { safety_critical: 2, prompt_injection: 1 },
+  });
+  expect(coverage.textContent).toContain("辅助索引片段 4");
+  expect(coverage.textContent).toContain("安全关键题数 2 · 提示注入题数 1 · 业务主题题数 ≠ 安全测试总数");
+  expect(coverage.textContent).toContain("跨型号");
+  expect(coverage.textContent).toContain("分组版本已变化，需要重新映射");
 });

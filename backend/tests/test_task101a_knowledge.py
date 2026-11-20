@@ -197,3 +197,21 @@ def test_same_chunk_id_isolated_across_golden_history_agent_sandbox_and_resume(t
         store.create_baseline_run(new_snapshot, config, judge)
     with store.connection() as db, pytest.raises(ValueError, match='知识库身份'):
         store.validate_evaluation_resume(db, new_snapshot, config, {}, 'old-run')
+
+
+def test_short_table_titles_continue_through_following_table_rows():
+    prefix = '9 参考信息 / 9.4 螺钉接头'
+    title = '润滑型六角螺钉（Molykote、Gleitmo 或等同螺钉）的拧紧扭矩'
+    direct_title = '干式接头'
+    joint = table([['尺寸', '力矩'], *[[f'M{i}', '甲' * 140] for i in range(4, 9)]])
+    blocks = [block('9 参考信息', heading=True), block('9.4 螺钉接头', heading=True),
+              block('油润滑型螺钉', heading=True), block('正文。' * 80),
+              block(title), block('下表给出了建议的标准拧紧力矩。'), joint,
+              block(direct_title), table([['规格', '参数'], ['M20', '乙' * 300]]),
+              block('9.5 重量规格', heading=True), block('检查重量。' * 60)]
+    _, children, _ = parent_child_v2({'id': 'D', 'name': '手册.pdf'}, blocks, len)
+    continued = [c for c in children if c['chunk_text'].lstrip().startswith('尺寸=')]
+    assert len(continued) >= 2
+    assert {c['section_path'] for c in continued} == {prefix + ' / ' + title}
+    assert any(c['section_path'] == prefix + ' / ' + direct_title and '规格=M20' in c['chunk_text'] for c in children)
+    assert children[-1]['section_path'] == '9 参考信息 / 9.5 重量规格'
