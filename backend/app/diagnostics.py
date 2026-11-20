@@ -5,7 +5,7 @@ from .diagnostic_categories import DIAGNOSTIC_CATEGORIES, category_definition
 
 TYPICAL = tuple(row['label'] for row in DIAGNOSTIC_CATEGORIES)
 @memoized_view
-def _current_corpus(trace):
+def _current_corpus(trace, *, historical=False):
     """Read persisted chunks only after their manifest/source identities are verified."""
     import hashlib
     import json
@@ -13,11 +13,16 @@ def _current_corpus(trace):
     from .full_text import CORPUS_LOCK
     try:
         with CORPUS_LOCK:
-            manifest=json.loads((INDEX_DIR/'manifest.json').read_text())
+            path=INDEX_DIR
+            target=trace.get('corpus_fingerprint')
+            if historical and target:
+                from .knowledge_pipeline import index_for_config
+                path=index_for_config(INDEX_DIR, {'knowledge_identity': target} if isinstance(target,dict) and target.get('pipeline_version_id') else {})
+            manifest=json.loads((path/'manifest.json').read_text())
             identity=manifest_identity(manifest)
-            if not trace.get('corpus_fingerprint') or trace['corpus_fingerprint']!=identity or identity!=manifest_identity(current_manifest()):
+            if not target or target!=identity or (not historical and identity!=manifest_identity(current_manifest())):
                 return [], None
-            artifacts={name:(INDEX_DIR/name).read_bytes() for name in ('chunks.json','parents.json')}
+            artifacts={name:(path/name).read_bytes() for name in ('chunks.json','parents.json')}
             if any(manifest.get('artifacts',{}).get(name)!=hashlib.sha256(raw).hexdigest() for name,raw in artifacts.items()):
                 return [], None
             parents={p['chunk_id']:p for p in json.loads(artifacts['parents.json'])}

@@ -2149,7 +2149,7 @@ def diagnostic_evidence_preflight(run_id: str,question_id: str):
     from .diagnostics import _current_corpus
     run=store.evaluation_run(run_id)
     if not run:raise HTTPException(404,'Run not found')
-    chunks,fingerprint=_current_corpus({'corpus_fingerprint':json.loads(run['dataset_snapshot_json'])['corpus_fingerprint']})
+    chunks,fingerprint=_current_corpus({'corpus_fingerprint':json.loads(run['dataset_snapshot_json'])['corpus_fingerprint']}, historical=True)
     try:return resolve_persisted(store,run_id,question_id,chunks,fingerprint)
     except ValueError as error:raise HTTPException(409,str(error)) from error
 

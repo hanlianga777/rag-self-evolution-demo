@@ -149,6 +149,10 @@ def build_plan(chunks, embeddings, profile, corpus_fingerprint=None, embedding_i
     if vectors.ndim != 2 or len(vectors) != len(chunks) or not np.isfinite(vectors).all() or np.any(np.linalg.norm(vectors, axis=1) == 0):
         raise ValueError('Coverage Embedding 与 Chunk 不一致或包含零向量')
     order = sorted(range(len(chunks)), key=lambda i: chunks[i]['chunk_id'])
+    chunk_fingerprint = digest([chunks[i] for i in order])
+    order = [i for i in order if chunks[i].get('section_path') != '前言']
+    if not order:
+        raise ValueError('Corpus 只有前言，无法规划聚类抽题')
     chunks, vectors = [chunks[i] for i in order], vectors[order]
     vectors = vectors / np.linalg.norm(vectors, axis=1)[:, None]
     n = len(chunks)
@@ -204,7 +208,7 @@ def build_plan(chunks, embeddings, profile, corpus_fingerprint=None, embedding_i
                     slot['negative_subtype'], slot['expected_behavior'] = NEGATIVES[sum(s['test_category'] == 'negative' for s in slots) % len(NEGATIVES)]
                 slots.append(slot)
                 used.update(source_ids)
-    plan = {'planner_version': PLANNER_VERSION, 'status': 'preview', 'profile': profile, 'corpus_fingerprint': corpus_fingerprint, 'chunk_fingerprint': digest(chunks), 'embedding_identity': embedding_identity, 'embedding_fingerprint': hashlib.sha256(vectors.tobytes()).hexdigest(), 'parameters': PARAMETERS, 'seed': PARAMETERS['seed'], 'initial_k': k, 'final_k': len(groups), 'merge_mapping': merges, 'clusters': clusters, 'slots': slots, 'chunk_clusters': labels, 'usage_counts': dict(sorted(history.items())), 'reuse_statistics': {'reused_slots': sum(s['reused'] for s in slots), 'unique_chunks': len(used)}, 'gaps': gaps, 'construction_audit': {'special_limit': special_limit, 'planned': dict(Counter(s['construction_type'] for s in slots)), 'fallback': 'Ordinary when explicit supported material or specialty budget is unavailable'}, 'coverage': {'anchor_topics': sorted({s['topic_cluster'] for s in slots}), 'evidence_topics': sorted({s['topic_cluster'] for s in slots if s['test_category'] != 'negative'})}}
+    plan = {'planner_version': PLANNER_VERSION, 'status': 'preview', 'profile': profile, 'corpus_fingerprint': corpus_fingerprint, 'chunk_fingerprint': chunk_fingerprint, 'embedding_identity': embedding_identity, 'embedding_fingerprint': hashlib.sha256(vectors.tobytes()).hexdigest(), 'parameters': PARAMETERS, 'seed': PARAMETERS['seed'], 'initial_k': k, 'final_k': len(groups), 'merge_mapping': merges, 'clusters': clusters, 'slots': slots, 'chunk_clusters': labels, 'usage_counts': dict(sorted(history.items())), 'reuse_statistics': {'reused_slots': sum(s['reused'] for s in slots), 'unique_chunks': len(used)}, 'gaps': gaps, 'construction_audit': {'special_limit': special_limit, 'planned': dict(Counter(s['construction_type'] for s in slots)), 'fallback': 'Ordinary when explicit supported material or specialty budget is unavailable'}, 'coverage': {'anchor_topics': sorted({s['topic_cluster'] for s in slots}), 'evidence_topics': sorted({s['topic_cluster'] for s in slots if s['test_category'] != 'negative'})}}
     plan['plan_id'] = 'PLAN-' + digest(plan)[:24]
     plan['created_at'] = datetime.now(timezone.utc).isoformat()
     return plan

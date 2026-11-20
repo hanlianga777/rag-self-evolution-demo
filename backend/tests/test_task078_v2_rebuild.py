@@ -67,7 +67,8 @@ def test_numbered_sections_keep_titles_and_short_parents():
         return {'type': 'text', 'text': value, 'page_idx': page}
 
     blocks = [
-        heading('目录'), heading('5.4.1 更换底座 …… 90'), heading('5.4.2 检查底座 98'),
+        heading('目录'), heading('5 维修 70'), heading('5.4 摆动部和底座 90'),
+        heading('5.4.1 更换底座 …… 90'), heading('5.4.2 检查底座 98'),
         heading('5.4.3 安装盖板 100'), heading('5.4.4 检查电缆 101'),
         heading('5.4.1 更换底座', 1), body('请参阅 5.4.2。', 1),
         heading('从下臂上分离电缆束', 1), body('先核对型号。', 1),

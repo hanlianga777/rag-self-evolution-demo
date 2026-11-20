@@ -84,7 +84,9 @@ def validate_bundle(index_dir, *, require_full_text=False):
             if not parent or chunk['document_id'] != parent['document_id'] or not parent['page_start'] <= chunk['page_start'] <= chunk['page_end'] <= parent['page_end'] or chunk['chunk_text'] not in parent['chunk_text']:
                 raise ValueError('Invalid Child to Parent traceability')
         plan = json.loads((index_dir/'coverage.json').read_text())
-        if plan['corpus_fingerprint'] != manifest['knowledge_identity'] or plan['plan_id'] != manifest['coverage_plan_id'] or set(plan['chunk_clusters']) != {c['chunk_id'] for c in chunks}:
+        expected_clusters = {c['chunk_id'] for c in chunks
+                             if config.get('heading_hierarchy') != 'manual-chapters-v3-numbered' or c.get('section_path') != '前言'}
+        if plan['corpus_fingerprint'] != manifest['knowledge_identity'] or plan['plan_id'] != manifest['coverage_plan_id'] or set(plan['chunk_clusters']) != expected_clusters:
             raise ValueError('Coverage does not belong to Knowledge bundle')
     return {'path': index_dir, 'manifest': manifest, 'chunks': chunks, 'documents': documents, 'full_text': full_text}
 

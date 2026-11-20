@@ -145,10 +145,10 @@ V2_CONFIG = {**CONFIG, 'chunk_strategy': rules.CHUNKING['strategy'],
              'child_tail_min_tokens': 80, 'child_target_min_tokens': 200,
              'table_intro_max_tokens': 200, 'toc_min_entries': 3, 'toc_min_fraction': 0.5,
              'repeat_page_fraction': 0.30, 'repeat_short_line_chars': 40, 'repeat_min_pages': 2,
-             'table_normalize': 'table-kv-v3', 'denoise_version': 'mineru-noise-v6', 'heading_context': 'child-section-v2',
+             'table_normalize': 'table-kv-v3', 'denoise_version': 'mineru-noise-v7', 'heading_context': 'child-section-v3',
              'header_footer_identity_max_chars': 12,
              'list_layout': 'numbered-steps-image-labels-v1',
-             'heading_hierarchy': 'manual-chapters-v2-numbered'}
+             'heading_hierarchy': 'manual-chapters-v3-numbered'}
 DOCUMENT_CATEGORIES = ('清洁机器人说明书', '巡检机器人说明书', '遥控器说明书', '电池与充电器说明书', '其他')
 # MinerU flattened these manuals' headings. Chapter starts were checked against
 # cached content, never inferred from Golden questions. Page is one-based.
@@ -199,6 +199,13 @@ def _v2_block_text(block):
         generic_header = (len(rows) > header_index + 1 and len(headers) >= 2 and not reader.complex and all(cell.strip() for cell in headers)
                           and not any(value_like.match(cell) for cell in headers))
         has_header = any(cell in labels for cell in headers) or '<th' in block.get('table_body', '') or generic_header
+        def clean_cell(cell):
+            # The safety table on IRB 1300 p. 23 fuses the first label after
+            # this image number. The source PDF identifies a 10-digit image ID.
+            cell = re.sub(r'(?<=654321)xx0900000820(?=1 2 3)', '', cell, flags=re.I)
+            return _TABLE_IMAGE_IDENTIFIER.sub('', cell)
+        rows = [[clean_cell(cell) for cell in row] for row in rows]
+        headers = rows[header_index]
         if has_header:
             lines = [' | '.join(rows[0])] if header_index else []
             for row in rows[header_index + 1:]:
@@ -221,10 +228,17 @@ def _strip_page_flow(text):
 
 
 
-IMAGE_IDENTIFIER = re.compile(r'xx\d{8,}', re.I)
+_TABLE_IMAGE_IDENTIFIER = re.compile(r'xx\d{8,13}(?!\d)', re.I)
+IMAGE_IDENTIFIER = re.compile(r'(?<![A-Za-z0-9])xx\d{8,13}(?![A-Za-z0-9])', re.I)
 LATEX_MATH = re.compile(r'\$\$[\s\S]*?\$\$|\$[^$]+\$|\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]')
 _NUMBERED_HEADING = re.compile(r'^(\d+(?:\.\d+)*)[ \t]+([^\n]+)$')
 _TOC_PAGE_NUMBER = re.compile(r'(?:[.．…·]{2,}|\s{3,})\s*\d+\s*$')
+_MANUAL_FOOTER = re.compile(r'(?:产品手册|产品规格)\s*[-–—]\s*[^\n]+?\s*3HAC\d{6}-\d{3}\s*修订\s*[:：]\s*[A-Z0-9]+', re.I)
+_PHASE_LABEL = re.compile(r'^\d+\s*相\s*(?:电源)?$')
+_WARNING_LABEL = re.compile(r'^(?:危险|警告|注意|小心|提示|原因)\s*[:：]?$')
+_STEP_LINE = re.compile(r'^\s*\d+(?:[.、]|\s*\|)\s*\D')
+_TABLE_TITLE = re.compile(r'^(?:地面安装|墙壁安装|倒置安装|运输姿态|所需(?:的)?(?:工具和设备|维修部件|耗材和易损件)|必需的耗材|结束步骤|(?:拆卸|拆下|卸下|装回|重新安装|重新连接|固定|检查)[^。！？!?；;：:]{2,32})$')
+_MANUAL_VOLUME = re.compile(r'(3HAC\d{6}-\d{3})_第(\d+)部分', re.I)
 
 
 def _v2_clean(text):
@@ -244,7 +258,16 @@ def _v2_clean(text):
         return re.sub(r'\s+', ' ', value).strip()
 
     clean = LATEX_MATH.sub(simplify, _strip_page_flow(text))
-    return '\n'.join(line for line in clean.splitlines() if not IMAGE_IDENTIFIER.fullmatch(line.strip())).strip()
+    lines = []
+    for line in clean.splitlines():
+        stripped = line.strip()
+        if stripped == '此页刻意留白' or _MANUAL_FOOTER.fullmatch(stripped) or IMAGE_IDENTIFIER.fullmatch(stripped):
+            continue
+        if _STEP_LINE.match(line):
+            line = re.sub(r'(?:' + IMAGE_IDENTIFIER.pattern + r'[ \t]*)+$',
+                          lambda match: IMAGE_IDENTIFIER.sub('', match[0]), line, flags=re.I)
+        lines.append(line)
+    return '\n'.join(lines).strip()
 
 
 def _numbered_heading(text):
@@ -252,7 +275,8 @@ def _numbered_heading(text):
     if not heading or _TOC_PAGE_NUMBER.search(text):
         return None
     title = heading[2].strip()
-    if not title or not any(char.isalpha() for char in title) or re.match(r'(?:请)?(?:参阅|参见|见第?\s*\d)|(?:图|表)\s*\d', title):
+    if (not title or not any(char.isalpha() for char in title) or _PHASE_LABEL.fullmatch(text)
+            or re.match(r'(?:请)?(?:参阅|参见|见第?\s*\d)|(?:图|表)\s*\d', title)):
         return None
     return heading[1], text
 
@@ -272,6 +296,24 @@ def _v2_header_footer_identity(text, document):
 
 def _v2_boundaries(text):
     return sorted({0, len(text), *(m.end() for m in re.finditer(r'[。！？!?；;](?:[”’」』])?|\n', text))})
+
+
+def _v2_table_boundaries(text):
+    # Merged-cell step tables keep a plain header followed by a numbered row.
+    # A cut can follow that row, but cannot leave the header on its own.
+    header = re.search(r'^\s*\|\s*操作\s*\|[^\n]*\n[^\n]*', text, re.M)
+    return [m.end() for m in re.finditer(r'\n', text) if not header or m.end() >= header.end()]
+
+
+def _v2_child_range(child, text, spans, start, end, counter):
+    covered = [s for s in spans if s['start'] < end and s['end'] > start]
+    paths = list(dict.fromkeys(s['section_path'] for s in covered))
+    body = text[start:end]
+    return {**child, 'char_start': start, 'char_end': end, 'chunk_text': body, 'text': body,
+            'token_count': counter(body), 'section_paths': paths, 'section_path': paths[0], 'section': paths[0],
+            'page_start': min(s['page'] for s in covered), 'page_end': max(s['page'] for s in covered),
+            'block_ids': list(dict.fromkeys(s['block_id'] for s in covered)),
+            'table': any(s['table'] for s in covered)}
 
 
 def _v2_fit(text, start, limit, counter):
@@ -318,7 +360,7 @@ def _v2_group_step_labels(units, parsed):
         index = end + 1
 
 
-def parent_child_v2(document, blocks, counter):
+def parent_child_v2(document, blocks, counter, *, previous_sections=None):
     """Offline, deterministic denoise/assemble/split; never calls a provider.
 
     Parsed blocks keep raw content and drop reasons for the diagnostic artifact.
@@ -349,29 +391,83 @@ def parent_child_v2(document, blocks, counter):
             toc_pages.add(page)
     repeated = {line for line, pages in line_pages.items() if len(pages) >= config['repeat_min_pages'] and len(pages) / max(page_count, 1) > config['repeat_page_fraction']}
     chapters, current, title_path = [], [], []
-    top = document['name']
-    # Use verified starts only for the four flattened cached manuals; other input
-    # honors the parser's real level 1/2 headings.
+    # Body headings and TOC entries corroborate the hierarchy independently.
     known = MANUAL_CHAPTERS.get(document['id'], [])
     has_level_one = any(p['raw'].get('text_level') == 1 for p in parsed)
-    marked_headings = [
-        heading for part in parsed
-        if part['page'] not in toc_pages and part['raw'].get('type') == 'text' and part['raw'].get('text_level')
-        if (heading := _numbered_heading(part['text']))
-    ]
-    heading_texts = set(marked_headings)
-    use_numbering = not known and len(marked_headings) >= 5 and len(heading_texts) >= 2
+    toc_headings = {}
+    for page in sorted(toc_pages):
+        for line in page_lines[page]:
+            if (page_number := re.search(r'\s+\d+\s*$', line)) and (heading := _numbered_heading(line[:page_number.start()].rstrip(' .．…·'))):
+                toc_headings[heading[0]] = heading[1]
+    local_headings = defaultdict(set)
+    for part in parsed:
+        if part['page'] not in toc_pages and part['raw'].get('type') == 'text' and part['raw'].get('text_level'):
+            if heading := _numbered_heading(part['text']):
+                local_headings[heading[0]].add(heading[1])
+    authoritative = dict(toc_headings)
+    for number, titles in local_headings.items():
+        toc_title = toc_headings.get(number)
+        corroborated = {title for title in titles if toc_title and re.sub(r'\s+', '', title) == re.sub(r'\s+', '', toc_title)}
+        if len(corroborated) == 1:
+            authoritative[number] = next(iter(corroborated))
+        elif not toc_title and len(titles) == 1:
+            title = next(iter(titles))
+            if '.' in number or not re.search(r'[。！？!?；;]', title):
+                authoritative[number] = title
+    previous_sections = previous_sections or {}
+    opening_number = next((heading[0] for part in parsed
+                           if part['page'] not in toc_pages and part['raw'].get('type') == 'text'
+                           and (heading := _numbered_heading(part['text']))
+                           and (heading[0] in local_headings or toc_headings.get(heading[0]) == heading[1])), None)
+    previous_leaf = next(reversed(previous_sections), None)
+    if previous_leaf and any(p['page'] == 1 and p['raw'].get('type') == 'header'
+                             and (heading := _numbered_heading(p['text']))
+                             and previous_leaf.startswith(heading[0] + '.') and previous_sections.get(heading[0]) == heading[1]
+                             for p in parsed):
+        # A volume can start with table rows and only name the continuing leaf on its second page.
+        if any(p['page'] <= 2 and (p['raw'].get('type') == 'text') and p['text'] == previous_sections[previous_leaf] for p in parsed):
+            opening_number = previous_leaf
+    inherited = {number: title for number, title in previous_sections.items()
+                 if opening_number and opening_number.startswith(number + '.')}
+    authoritative = {**inherited, **authoritative}
+
+    def numbered_heading(text):
+        heading = _numbered_heading(text)
+        if not heading or re.sub(r'\s+', '', authoritative.get(heading[0], '')) != re.sub(r'\s+', '', heading[1]):
+            return None
+        prefixes = heading[0].split('.')
+        return heading if all('.'.join(prefixes[:i]) in authoritative for i in range(1, len(prefixes))) else None
+
+    use_numbering = not known and any(numbered_heading(title) for titles in local_headings.values() for title in titles)
+    top = '前言' if use_numbering else document['name']
     numbered_path = {}
     active_number = None
     active_heading = None
     active_page = None
     section_path = top
+    # An opening continuation without a body heading on its first page uses the
+    # title confirmed by the previous volume and the second-page body heading.
+    continuation = next((p for p in parsed if p['page'] <= 2 and p['raw'].get('type') == 'text'
+                         and p['text'] == previous_sections.get(opening_number)), None) if use_numbering and opening_number == previous_leaf else None
+    if continuation and continuation['page'] == 2 and inherited:
+        active_heading = numbered_heading(continuation['text'])
+        if active_heading:
+            active_number, top = active_heading
+            numbered_path = {**inherited, active_number: top}
+            section_path = ' / '.join(numbered_path.values())
+            title_path, active_page, section_heading = [section_path], 1, continuation
+    next_content = None
+    for part in reversed(parsed):
+        if next_content and next_content['page'] == part['page'] and next_content['raw'].get('type') == 'table':
+            part['before_table'] = True
+        if part['text'] and part['raw'].get('type') in {'text', 'table', 'list'}:
+            next_content = part
     for part in parsed:
         block, text = part['raw'], part['text']
         footnote = block.get('type') == 'page_footnote'
         safety_header = block.get('type') in {'header', 'footer'} and bool(re.search(r'请|勿|不得|严禁|禁止|必须|务必|危险|警告|小心|注意|^\s*\d+[.、]', text))
-        numbered = use_numbering and block.get('type') in {'text', 'header'} and _numbered_heading(text)
-        preserve = footnote or safety_header or numbered in heading_texts and part['page'] not in toc_pages
+        numbered = use_numbering and block.get('type') in {'text', 'header'} and numbered_heading(text)
+        preserve = footnote or safety_header or numbered and part['page'] not in toc_pages
         reason = ('parser_page_number' if block.get('type') == 'page_number' else
                   None if preserve else
                   'table_of_contents' if part['page'] in toc_pages else _v2_noise(text))
@@ -390,11 +486,13 @@ def parent_child_v2(document, blocks, counter):
         level = block.get('text_level') if block.get('type') not in {'header', 'footer', 'page_footnote'} else None
         # Warning labels and numbered executable instructions are body content,
         # even where MinerU mislabeled them as headings.
-        if text in {'危险', '警告', '小心', '注意', '注意：', '提示', '提示：', '原因：'} or re.match(r'^\d+[.、]\s*.*(?:按下|点击|输入|拧|创建|选择|装|打开|拔|拉|检查)', text):
+        warning = bool(_WARNING_LABEL.fullmatch(text))
+        if warning or re.match(r'^(?:危险|警告|小心|注意|提示)[：:]|^\d+[.、]\s*.*(?:按下|点击|输入|拧|创建|选择|装|打开|拔|拉|检查)', text):
             level = None
+        subheading = False
         if use_numbering:
-            heading = _numbered_heading(text) if block.get('type') in {'text', 'header'} else None
-            if heading and (level or heading in heading_texts):
+            heading = numbered if part['page'] not in toc_pages else None
+            if heading:
                 number, title = heading
                 ancestor = active_number and active_number.startswith(number + '.')
                 repeated_heading = heading == active_heading and part['page'] - active_page <= 1
@@ -406,7 +504,8 @@ def parent_child_v2(document, blocks, counter):
                         chapters.append((top, current))
                         current = []
                     prefixes = number.split('.')
-                    numbered_path = {key: value for key, value in numbered_path.items() if number.startswith(key + '.')}
+                    numbered_path = {key: numbered_path.get(key, authoritative[key]) for i in range(1, len(prefixes))
+                                     if (key := '.'.join(prefixes[:i])) in authoritative}
                     numbered_path[number] = title
                     section_path = ' / '.join(numbered_path[key] for i in range(1, len(prefixes) + 1)
                                               if (key := '.'.join(prefixes[:i])) in numbered_path)
@@ -414,6 +513,7 @@ def parent_child_v2(document, blocks, counter):
                     active_page = part['page']
                     title_path = [section_path]
                     section_heading = part
+                    part['heading_kind'] = 'numbered'
                 elif repeated_heading:
                     active_page = part['page']
                 # Keep an encountered ancestor in the path where the parser puts it after its child.
@@ -425,9 +525,13 @@ def parent_child_v2(document, blocks, counter):
             if text in {'目录', '目 录'}:
                 part['drop_reason'] = 'table_of_contents_label'
                 continue
-            if (level and active_heading and block.get('type') == 'text' and len(text) <= 100
-                    and '\n' not in text and not re.match(r'^(?:图|表)\s*\d', text)):
-                title_path = [section_path, text]
+            if (block.get('type') == 'text' and not warning and not _NUMBERED_HEADING.fullmatch(text)
+                    and len(text) <= 100 and '\n' not in text and not re.match(r'^(?:图|表)\s*\d', text)
+                    and (level and text or part.get('before_table') and _TABLE_TITLE.fullmatch(text))):
+                subheading = True
+                part['heading_kind'] = 'parser' if level else 'table_intro'
+                if active_heading:
+                    title_path = [section_path, text]
             level = None
         if level and text:
             starts_chapter = any(part['page'] == page and text == heading for page, heading in known) if known else level == 1 or (not has_level_one and not title_path)
@@ -451,17 +555,18 @@ def parent_child_v2(document, blocks, counter):
             active_page = part['page']
         # Split oversized parser blocks, respecting sentence/row boundaries first.
         start = 0
-        boundaries = sorted({len(text), *(m.end() for m in re.finditer(r'\n', text))}) if block.get('type') == 'table' else _v2_boundaries(text)
+        boundaries = [*_v2_table_boundaries(text), len(text)] if block.get('type') == 'table' else _v2_boundaries(text)
         while start < len(text):
             remaining = counter(text[start:])
             limit = config['parent_tokens'] if remaining <= config['parent_tokens'] else math.ceil(remaining / math.ceil(remaining / config['parent_tokens']))
             candidates = [end for end in boundaries if end > start and counter(text[start:end]) <= limit]
             end = max(candidates) if candidates else _v2_fit(text, start, limit, counter)
             current.append({'text': text[start:end], 'page': part['page'], 'block_id': part['block_id'],
-                            'section_path': part['section_path'], 'table': block.get('type') == 'table'})
+                            'section_path': part['section_path'], 'table': block.get('type') == 'table',
+                            'subheading': subheading, 'warning': warning})
             start = end
     if current: chapters.append((top, current))
-    parents, children = [], []
+    parents, children, parent_spans = [], [], {}
     for top, units in chapters:
         _v2_group_step_labels(units, parsed)
         # Bind a short leading explanation to its table before packing Parents.
@@ -469,9 +574,17 @@ def parent_child_v2(document, blocks, counter):
         while index < len(units):
             unit = units[index]
             next_unit = units[index + 1] if index + 1 < len(units) else None
+            if next_unit and (unit.get('subheading') or unit.get('warning')):
+                end = index
+                while end < len(units) - 1 and (units[end].get('subheading') or units[end].get('warning')):
+                    end += 1
+                linked = units[index:end + 1]
+                if counter('\n'.join(u['text'] for u in linked)) <= config['parent_tokens']:
+                    bundles.append([{**u, 'keep_with_next': True} for u in linked[:-1]] + linked[-1:])
+                    index = end + 1
+                    continue
             if next_unit and next_unit['table'] and not unit['table'] and unit['page'] == next_unit['page'] and counter(unit['text']) <= config['table_intro_max_tokens'] and counter(unit['text'] + '\n' + next_unit['text']) <= config['parent_tokens']:
-                unit = {**unit, 'keep_with_next': True}
-                bundles.append([unit, next_unit]); index += 2
+                bundles.append([{**unit, 'keep_with_next': True}, next_unit]); index += 2
             else:
                 bundles.append([unit]); index += 1
         groups, group = [], []
@@ -493,7 +606,7 @@ def parent_child_v2(document, blocks, counter):
                 index = max(0, first - 1); continue
             boundaries, forbidden, offset = set(), [], 0
             for unit_index, unit in enumerate(combined):
-                ends = [m.end() for m in re.finditer(r'\n', unit['text'])] if unit['table'] else _v2_boundaries(unit['text'])
+                ends = _v2_table_boundaries(unit['text']) if unit['table'] else _v2_boundaries(unit['text'])
                 boundaries.update(offset + end for end in [0, len(unit['text']), *ends])
                 if unit.get('keep_with_next'):
                     forbidden.append((offset, offset + len(unit['text']) + 1 + len(combined[unit_index + 1]['text'])))
@@ -533,7 +646,9 @@ def parent_child_v2(document, blocks, counter):
                       'short_chapter': len(groups) == 1 and counter(text) < config['parent_min_tokens'],
                       **({'numbered_section': _numbered_heading(top)[0]} if use_numbering and _numbered_heading(top) else {})}
             parents.append(parent)
-            bounds = _v2_boundaries(text)
+            parent_spans[parent_id] = spans
+            warning_ends = {point for s in spans if s.get('warning') for point in (s['end'], s['end'] + 1)}
+            bounds = [b for b in _v2_boundaries(text) if b not in warning_ends]
             start = 0
             while start < len(text):
                 # A table that fits is kept whole; oversized KV tables split by rows.
@@ -548,7 +663,7 @@ def parent_child_v2(document, blocks, counter):
                 if counter(text[start:stop]) <= config['child_tokens']:
                     end = stop
                 else:
-                    cut_bounds = sorted({stop, *(m.end() + table_span['start'] for m in re.finditer(r'\n', table_span['text']))}) if table_span else bounds
+                    cut_bounds = sorted({stop, *(b + table_span['start'] for b in _v2_table_boundaries(table_span['text']))}) if table_span else bounds
                     choices = [b for b in cut_bounds if start < b <= stop and counter(text[start:b]) <= config['child_tokens']]
                     preferred = [b for b in choices if config['child_target_min_tokens'] <= counter(text[start:b]) <= config['child_tokens']]
                     end = min(preferred, key=lambda b: abs(counter(text[start:b]) - config['child_target_tokens'])) if preferred else max(choices, default=start)
@@ -559,14 +674,8 @@ def parent_child_v2(document, blocks, counter):
                         if balanced: end = min(balanced, key=lambda b: abs(counter(text[start:b]) - counter(text[b:stop])))
                 covered = [s for s in spans if s['start'] < end and s['end'] > start]
                 if not covered: start = end; continue
-                paths = list(dict.fromkeys(s['section_path'] for s in covered))
-                children.append({**metadata, 'chunk_id': f"{document['id']}-V2-C-{len(children) + 1:05d}",
-                                 'parent_chunk_id': parent_id, 'char_start': start, 'char_end': end,
-                                 'chunk_text': text[start:end], 'text': text[start:end], 'token_count': counter(text[start:end]),
-                                 'section_path': paths[0], 'section_paths': paths, 'section': paths[0],
-                                 'page_start': min(s['page'] for s in covered), 'page_end': max(s['page'] for s in covered),
-                                 'block_ids': list(dict.fromkeys(s['block_id'] for s in covered)),
-                                 'table': bool(table_span), 'embedding_status': 'Pending'})
+                children.append(_v2_child_range({**metadata, 'parent_chunk_id': parent_id, 'embedding_status': 'Pending'},
+                                                text, spans, start, end, counter))
                 if end == len(text): break
                 # Never overlap across table boundaries; otherwise only whole sentences.
                 overlaps = [b for b in bounds if start < b < end and 0 < counter(text[b:end]) <= config['overlap_tokens']]
@@ -586,14 +695,7 @@ def parent_child_v2(document, blocks, counter):
                 start, end = min(child['char_start'], neighbor['char_start']), max(child['char_end'], neighbor['char_end'])
                 body = parent['chunk_text'][start:end]
                 if counter(body) > config['child_tokens']: continue
-                ordered = sorted((child, neighbor), key=lambda c: c['char_start'])
-                merged = {**neighbor, 'char_start': start, 'char_end': end, 'chunk_text': body, 'text': body,
-                          'table': child['table'] or neighbor['table'],
-                          'token_count': counter(body), 'page_start': min(child['page_start'], neighbor['page_start']),
-                          'page_end': max(child['page_end'], neighbor['page_end']),
-                          'section_paths': list(dict.fromkeys(path for c in ordered for path in c['section_paths'])),
-                          'block_ids': list(dict.fromkeys(key for c in ordered for key in c['block_ids']))}
-                merged['section_path'] = merged['section'] = merged['section_paths'][0]
+                merged = _v2_child_range(neighbor, parent['chunk_text'], parent_spans[parent['chunk_id']], start, end, counter)
                 children[min(index, neighbor_index)] = merged
                 children.pop(max(index, neighbor_index))
                 index = max(0, index - 1)
@@ -601,6 +703,24 @@ def parent_child_v2(document, blocks, counter):
             else:
                 index += 1
         else: index += 1
+    for index in range(len(children) - 1):
+        left, right = children[index:index + 2]
+        if left['parent_chunk_id'] != right['parent_chunk_id']:
+            continue
+        parent = by_parent[left['parent_chunk_id']]
+        text, spans = parent['chunk_text'], parent_spans[parent['chunk_id']]
+        cut = left['char_end']
+        titles = [s['start'] for s in spans if s.get('subheading') and not s['table']
+                  and left['char_start'] < s['start'] < cut and s['end'] <= cut
+                  and all(t.get('subheading') or t.get('warning') for t in spans if s['end'] <= t['start'] < cut)]
+        if not titles:
+            continue
+        start = min(titles)
+        if all(config['child_tail_min_tokens'] <= counter(text[a:b]) <= config['child_tokens']
+               and len(text[a:b].strip()) >= 30
+               for a, b in ((left['char_start'], start), (start, right['char_end']))):
+            children[index] = _v2_child_range(left, text, spans, left['char_start'], start, counter)
+            children[index + 1] = _v2_child_range(right, text, spans, start, right['char_end'], counter)
     for number, child in enumerate(children, 1): child['chunk_id'] = f"{document['id']}-V2-C-{number:05d}"
     return parents, children, parsed
 
@@ -849,6 +969,10 @@ class KnowledgePipeline:
         staging = self.index_dir.parent/'index_versions'/(operation_id + '-building'); staging.mkdir(parents=True)
         parser = parser or MinerUProvider(values); embedder = embedder or AlibabaProvider(values)
         parents, children, records, pages = [], [], [], []
+        previous_volumes = {}
+        if chunk_version == 'parent-child-v2':
+            documents = sorted(documents, key=lambda doc: _MANUAL_VOLUME.sub(
+                lambda m: f'{m[1]}_第{int(m[2]):08d}部分', doc['name']))
         try:
             for number, doc in enumerate(documents, 1):
                 from .corpus import DOCUMENTS_DIR, UPLOADS_DIR
@@ -858,7 +982,13 @@ class KnowledgePipeline:
                 (staging/(doc['id'] + '-mineru.zip')).write_bytes(archive)
                 progress('chunk', number - 1, len(documents))
                 if chunk_version == 'parent-child-v2':
-                    ps, cs, parsed = parent_child_v2(doc, blocks, counter)
+                    volume = _MANUAL_VOLUME.search(doc['name'])
+                    key = (volume[1].upper(), int(volume[2])) if volume else None
+                    previous = previous_volumes.get((key[0], key[1] - 1)) if key else None
+                    ps, cs, parsed = parent_child_v2(doc, blocks, counter, previous_sections=previous)
+                    if key and ps and ps[-1].get('numbered_section'):
+                        previous_volumes[key] = dict(heading for title in ps[-1]['section_path'].split(' / ')
+                                                     if (heading := _numbered_heading(title)))
                 else:
                     ps, cs, parsed = parent_child(doc, blocks, counter, parent_tokens=config['parent_tokens'], child_tokens=config['child_tokens'], overlap=config['overlap_tokens'])
                 if not cs: raise ValueError('MinerU produced no searchable Child text')

@@ -2479,6 +2479,8 @@ class GovernanceStore:
                 continue
             if frozen.get("corpus_fingerprint") != fingerprint or not snapshot.get("question_ids") or any(frozen.get(key) != snapshot.get(key) for key in ("question_ids", "questions")):
                 continue
+            if isinstance(fingerprint, dict) and fingerprint.get('pipeline_version_id') and config.get('knowledge_identity') != fingerprint:
+                continue
             cases = connection.execute("SELECT question_id FROM evaluation_case_results WHERE run_id=?", (row["id"],)).fetchall()
             if sorted(case["question_id"] for case in cases) != sorted(snapshot["question_ids"]):
                 continue
@@ -2594,6 +2596,9 @@ class GovernanceStore:
         from .evaluation_snapshot import require_resume_snapshot, shared_judge
         if snapshot.get('corpus_fingerprint') != manifest_identity(current_manifest()):
             raise ValueError('续跑Corpus身份不匹配，禁止混合结果')
+        fingerprint = snapshot['corpus_fingerprint']
+        if isinstance(fingerprint, dict) and fingerprint.get('pipeline_version_id') and config.get('knowledge_identity') != fingerprint:
+            raise ValueError('续跑配置的知识库身份与冻结 Corpus 不同')
         source = connection.execute('SELECT * FROM evaluation_runs WHERE id=?', (source_id,)).fetchone()
         if source is not None:source = {**dict(source), 'result_json':_json(self._evaluation_result(connection, source))}
         if source is None or (source['status'] not in {'partial','failed'} and not (source['status']=='completed' and _load(source['result_json'],{}).get('technical_failed'))) or _load(source['config_json'], {}).get('run_target') != ('sandbox_candidate' if candidate_id else 'baseline'):
@@ -2624,6 +2629,9 @@ class GovernanceStore:
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
             self.validate_evaluation_start(connection, snapshot, judge, candidate_id=candidate_id)
+            fingerprint = snapshot.get('corpus_fingerprint')
+            if isinstance(fingerprint, dict) and fingerprint.get('pipeline_version_id') and config.get('knowledge_identity') != fingerprint:
+                raise ValueError('评测配置的知识库身份与冻结 Corpus 不同')
             if candidate_id:
                 candidate = self.reserve_candidate_evaluation(candidate_id, connection)
                 baseline = self.require_current_baseline(self.experiment(candidate['experiment_id'],light=True)['baseline_run_id'], connection)
