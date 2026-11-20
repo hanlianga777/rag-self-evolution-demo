@@ -17,6 +17,21 @@ CHUNKS = {r['chunk_id']: r['切块原文'].replace('\\n', '\n') for r in csv.Dic
 _META = {r['chunk_id']: r for r in csv.DictReader(open(CHUNK_CSV, encoding='utf-8-sig'))}
 _TOP = {'1': '安全', '2': 'IRB 1300 产品说明与规格', '10': 'IRB 1300 产品说明与规格', '3': '安装与调试', '4': '维护', '5': '维修',
         '6': '标定', '7': '故障排除', '8': '参考信息、备件与停用', '9': '参考信息、备件与停用', '11': '参考信息、备件与停用'}
+import re as _re
+_REPORT = CHUNK_CSV.parent / (CHUNK_CSV.name.split('-')[0] + '.md')
+_GOS = {}
+if _REPORT.exists():
+    for _line in _REPORT.read_text(encoding='utf-8').splitlines():
+        _m = _re.match(r'\| (TP-[0-9a-f]+/\d\d-\d\d) \| ([^|]+) \|.*\| (\d+) \| ([^|]+) \|\s*$', _line)
+        if _m:
+            for sec in _m.group(4).split('<br>'):
+                _GOS[sec.strip().split(' ')[0]] = _m.group(1)
+def group_of(c):
+    nums = [p.split(' ')[0] for p in _META[c]['section_path'].split(' / ') if _re.match(r'^\d+(\.\d+)*\s', p)]
+    for n in reversed(nums):
+        if n in _GOS:
+            return _GOS[n]
+    return ''
 def topic_of(c):
     m = _META[c]
     if 'IRB1200' in m['文档名']:
@@ -24,7 +39,7 @@ def topic_of(c):
     return _TOP.get(m['section_path'].split(' / ')[0].split(' ')[0], '前言')
 S, M1, M5 = 'DOC-41ed759faa12', 'DOC-8c302b249b5b', 'DOC-7cf7d0fd4182'
 st = lambda v: re.sub(r'\s+', '', unicodedata.normalize('NFKC', v))
-FIELDS = ['替换槽位', '备用号', '题型', '出题方式', '问题', '参考答案', '证据', '难度', '业务主题', '关键词', '考查节点', '考查参数', '难度依据', '备注']
+FIELDS = ['替换槽位', '备用号', '题型', '出题方式', '问题', '参考答案', '证据', '难度', '业务主题', '业务分组', '关键词', '考查节点', '考查参数', '难度依据', '备注']
 
 
 def loc(doc, quote):
@@ -78,8 +93,13 @@ for slot, rid, group, method, q, a, ev, diff, cl in POOL:
     cl = old['业务主题']  # 以 M1 槽位的主要业务主题为准
     if cl not in got or old['题型'] != group or old['出题方式'] != method or RANK[diff] <= RANK[old['难度']]:
         bad.append(f'{rid} 主题/题型/出题方式/难度不满足同主题同题型且更难：证据主题{sorted(got)} 槽位主题{cl}')
+    from collections import Counter as _C
+    _gs = [g for g in (group_of(c) for c, _ in pairs) if g]
+    grp = _C(_gs).most_common(1)[0][0] if _gs else ''
+    if cl == '维修' and grp != old['业务分组']:
+        bad.append(f'{rid} 维修备用题分组 {grp} 与槽位分组 {old["业务分组"]} 不一致')
     kw, node, params, why = META[rid]
-    rows.append(dict(zip(FIELDS, [slot, rid, group, method, q, a, '\n'.join(f'{c}｜{t}' for c, t in pairs), diff, cl, kw, node, params, why, '102 备用难题池（Baseline 前写定；同簇同题型替题，非原题措辞加难）'])))
+    rows.append(dict(zip(FIELDS, [slot, rid, group, method, q, a, '\n'.join(f'{c}｜{t}' for c, t in pairs), diff, cl, grp, kw, node, params, why, '102 备用难题池（Baseline 前写定；同簇同题型替题，非原题措辞加难）'])))
 print('问题：', bad or '无', len(rows))
 if bad:
     raise SystemExit('备用池校验失败，不输出')
