@@ -52,6 +52,31 @@ def test_image_tokens_and_footer_remove_only_matching_noise():
         '正文参见文档 3HAC070390-010。')
 
 
+def test_step_table_keeps_column_names_after_denoise_and_child_splits():
+    action = '取下护盖。' * 28
+    note = '保留螺钉。' * 12
+    blocks = [block('1 操作', heading=True)]
+    for page in range(3):
+        step_table = {
+            'type': 'table', 'page_idx': page,
+            'table_body': f'<table><tr><td colspan="3">注意保护第{page}处设备。</td></tr>'
+                          '<tr><td></td><td>操作</td><td>注释</td></tr>'
+                          + ''.join(f'<tr><td>{n}</td><td>{action}</td><td>{note}</td></tr>' for n in (1, 2))
+                          + '<tr><td>3</td><td>完成后检查。</td></tr></table>',
+        }
+        blocks.extend([block('重复页眉', page, kind='header'), step_table])
+
+    parents, children, parsed = parent_child_v2({'id': 'D', 'name': '手册.pdf'}, blocks, len)
+
+    for step in (1, 2):
+        row = f'{step} | 操作={action}；注释={note}'
+        assert sum(row in child['chunk_text'] for child in children) == 3
+    assert sum(child['chunk_text'].count('注意保护第') for child in children) == 3
+    assert sum(child['chunk_text'].count('| 操作 | 注释：3 | 完成后检查。') for child in children) == 3
+    assert all('重复页眉' not in parent['chunk_text'] for parent in parents)
+    assert all('repeated_short_line' != p.get('drop_reason') for p in parsed if p['raw']['type'] == 'table')
+
+
 def test_confirmed_title_moves_with_body_and_mapping_while_warning_is_body():
     title = '维护步骤'
     blocks = [block('1 操作', heading=True), block('甲' * 231 + '。'), block(title, 1, True),

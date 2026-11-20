@@ -145,7 +145,7 @@ V2_CONFIG = {**CONFIG, 'chunk_strategy': rules.CHUNKING['strategy'],
              'child_tail_min_tokens': 80, 'child_target_min_tokens': 200,
              'table_intro_max_tokens': 200, 'toc_min_entries': 3, 'toc_min_fraction': 0.5,
              'repeat_page_fraction': 0.30, 'repeat_short_line_chars': 40, 'repeat_min_pages': 2,
-             'table_normalize': 'table-kv-v3', 'denoise_version': 'mineru-noise-v7', 'heading_context': 'child-section-v3',
+             'table_normalize': 'table-kv-v4', 'denoise_version': 'mineru-noise-v8', 'heading_context': 'child-section-v3',
              'header_footer_identity_max_chars': 12,
              'list_layout': 'numbered-steps-image-labels-v1',
              'heading_hierarchy': 'manual-chapters-v3-numbered'}
@@ -206,7 +206,20 @@ def _v2_block_text(block):
             return _TABLE_IMAGE_IDENTIFIER.sub('', cell)
         rows = [[clean_cell(cell) for cell in row] for row in rows]
         headers = rows[header_index]
-        if has_header:
+        if _STEP_TABLE_HEADERS in rows:
+            step_header = rows.index(_STEP_TABLE_HEADERS)
+            lines = [' | '.join(row) for row in rows[:step_header]]
+            for row in rows[step_header + 1:]:
+                if row == _STEP_TABLE_HEADERS:
+                    continue
+                if len(row) == 3 and row[0].isdigit():
+                    lines.append(f'{row[0]} | 操作={row[1]}；注释={row[2]}')
+                elif len(row) > 1:
+                    # Merged cells can change column positions. Retain the source order.
+                    lines.append(' | '.join(_STEP_TABLE_HEADERS) + '：' + ' | '.join(row))
+                else:
+                    lines.extend(row)
+        elif has_header:
             lines = [' | '.join(rows[0])] if header_index else []
             for row in rows[header_index + 1:]:
                 lines.append('；'.join(f'{key}={value}' for key, value in zip(headers, row))
@@ -237,6 +250,8 @@ _MANUAL_FOOTER = re.compile(r'(?:产品手册|产品规格)\s*[-–—]\s*[^\n]+
 _PHASE_LABEL = re.compile(r'^\d+\s*相\s*(?:电源)?$')
 _WARNING_LABEL = re.compile(r'^(?:危险|警告|注意|小心|提示|原因)\s*[:：]?$')
 _STEP_LINE = re.compile(r'^\s*\d+(?:[.、]|\s*\|)\s*\D')
+_STEP_TABLE_HEADERS = ['', '操作', '注释']
+_STEP_TABLE_ROW = re.compile(r'^(?:\d+ \| 操作=.*；注释=|[ \t]*\| 操作 \| 注释：)')
 _TABLE_TITLE = re.compile(r'^(?:地面安装|墙壁安装|倒置安装|运输姿态|所需(?:的)?(?:工具和设备|维修部件|耗材和易损件)|必需的耗材|结束步骤|(?:拆卸|拆下|卸下|装回|重新安装|重新连接|固定|检查)[^。！？!?；;：:]{2,32})$')
 _MANUAL_VOLUME = re.compile(r'(3HAC\d{6}-\d{3})_第(\d+)部分', re.I)
 
@@ -301,7 +316,7 @@ def _v2_boundaries(text):
 def _v2_table_boundaries(text):
     # Merged-cell step tables keep a plain header followed by a numbered row.
     # A cut can follow that row, but cannot leave the header on its own.
-    header = re.search(r'^\s*\|\s*操作\s*\|[^\n]*\n[^\n]*', text, re.M)
+    header = re.search(r'^[ \t]*\|[ \t]*操作[ \t]*\|(?![ \t]*注释：)[^\n]*\n[^\n]*', text, re.M)
     return [m.end() for m in re.finditer(r'\n', text) if not header or m.end() >= header.end()]
 
 
@@ -381,6 +396,8 @@ def parent_child_v2(document, blocks, counter, *, previous_sections=None):
         if part['raw'].get('type') not in {'header', 'footer', 'page_number', 'page_footnote'}:
             page_lines[part['page']].extend(lines)
         for line in lines:
+            if part['raw'].get('type') == 'table' and _STEP_TABLE_ROW.match(line):
+                continue
             if 0 < len(line.strip()) <= config['repeat_short_line_chars']:
                 line_pages[line.strip()].add(part['page'])
     toc_pages = set()
