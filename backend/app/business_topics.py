@@ -24,10 +24,16 @@ NUMBERED_SECTION = re.compile(r'^(\d+(?:\.\d+)*)\s+(\S.*)$')
 OUTSIDE_TOPIC = '知识库外'
 FAMILIES = (
     ('润滑剂', r'油\s*(?:的\s*)?类型'),
+    ('同步位置检查', r'同步标记|同步位置'),
+    ('工作范围限制', r'工作范围|空间限制'),
     ('检查与维护计划', r'^检查|维护计划'),
     ('润滑与换油', r'换油'),
     ('润滑剂', r'润滑'),
-    ('电缆线束与连接器', r'电缆|线束|连接器|SMB|制动闸释放'),
+    ('制动闸', r'松闸|卡滞|制动器|制动闸'),
+    ('参考资料与工具', r'标准|单位转换|重量规格|工具包|特殊工具'),
+    ('负载与性能', r'载荷|负载|转动惯量|加速度|速度|性能|ISO\s*9283'),
+    ('产品与技术数据', r'技术数据|型号'),
+    ('电缆线束与连接器', r'电缆|线束|连接器|SMB'),
     ('电机更换', r'电机'),
     ('齿轮箱维修', r'齿轮箱'),
     ('机械结构与密封件', r'下臂|上臂|外壳|延长器|管轴|倾斜单元|摇摆部|底座|密封'),
@@ -42,7 +48,8 @@ FAMILIES = (
     ('校准方法与步骤', r'校准|标定'),
     ('螺钉与拧紧转矩', r'螺钉|拧紧'),
     ('备件', r'备件'),
-    ('停用与废弃', r'停用|废弃'),
+    ('停用与废弃', r'停用|退役|废弃|环境信息'),
+    ('产品与技术数据', r'关于'),
 )
 
 
@@ -64,7 +71,17 @@ def topic_quotas(sizes):
 
 
 def cluster_quotas(total, sizes):
-    return largest_remainder(total, sizes)
+    quotas = [min(2, quota) for quota in largest_remainder(total, sizes)]
+    remaining = total - sum(quotas)
+    # Redistribute clipped seats to the largest groups that still have room.
+    for i in sorted(range(len(sizes)), key=lambda i: -sizes[i]):
+        extra = min(remaining, 2 - quotas[i])
+        quotas[i] += extra
+        remaining -= extra
+        if not remaining:
+            break
+    return quotas
+
 
 def _topic_index(chunk):
     path = chunk.get('section_path') or ''
@@ -119,21 +136,58 @@ def _group_topic(topic_index, sections, section_vectors, sizes, quota):
     k = min(quota, len(sections))
     if not np.isfinite(section_vectors).all():
         raise ValueError(f'{TOPICS[topic_index]}的小节均值包含无效向量')
-    # No minimum cluster size: each observation is an entire numbered section.
-    labels = KMeans(n_clusters=k, random_state=PARAMETERS['seed'],
-                    n_init=PARAMETERS['n_init'], max_iter=PARAMETERS['max_iter']).fit_predict(section_vectors)
-    groups = sorted((np.flatnonzero(labels == label).tolist() for label in np.unique(labels)), key=lambda group: group[0])
-    if len(groups) < k:
+    weights = np.array([sizes[section['number']] for section in sections])
+    topic_size = sum(sizes.values())
+
+    def fit(members, count):
+        labels = KMeans(n_clusters=count, random_state=PARAMETERS['seed'],
+                        n_init=PARAMETERS['n_init'], max_iter=PARAMETERS['max_iter']).fit_predict(
+                            section_vectors[members], sample_weight=weights[members])
+        return [members[labels == label].tolist() for label in np.unique(labels)]
+
+    def fragment_count(group):
+        return int(weights[group].sum())
+
+    def centroid(group):
+        # A section can have zero weight if its fragments were all counted in another section.
+        return np.average(section_vectors[group], axis=0, weights=weights[group] if fragment_count(group) else None)
+
+    def group_name(group):
+        return business_group_name([sections[i]['title'] for i in group])
+
+    groups = fit(np.arange(len(sections)), k)
+    # A zero-weight section is still assigned, but cannot support its own center.
+    if len(groups) < min(k, np.count_nonzero(weights)):
         distinct = len(np.unique(section_vectors, axis=0))
         raise ValueError(f'{TOPICS[topic_index]} k={k} 实得 {len(groups)} 组：'
                          f'{len(sections)} 个小节中有 {distinct} 个不同的均值向量，'
                          '均值向量重复或 K-means 收敛时出现空组')
-    group_sizes = [sum(sizes[sections[i]['number']] for i in group) for group in groups]
+
+    while len(groups) > 1:
+        smallest = min(groups, key=lambda group: (fragment_count(group), group[0]))
+        if fragment_count(smallest) * 20 >= topic_size:
+            break
+        groups.remove(smallest)
+        center = centroid(smallest)
+        nearest = min(groups, key=lambda group: (np.linalg.norm(centroid(group) - center), group[0]))
+        nearest[:] = sorted(nearest + smallest)
+
+    oversized = max(
+        (group for group in groups if len(group) > 1
+         and fragment_count(group) * 100 > topic_size * 45 and group_name(group)[1] < .6),
+        key=lambda group: (fragment_count(group), -group[0]), default=None,
+    )
+    if oversized is not None:
+        groups.remove(oversized)
+        groups.extend(fit(np.array(oversized), 2))
+
+    groups.sort(key=lambda group: group[0])
+    group_sizes = [fragment_count(group) for group in groups]
     quotas = cluster_quotas(quota, group_sizes)
     clusters = []
     for index, (group, size, group_quota) in enumerate(zip(groups, group_sizes, quotas), 1):
         members = [sections[i] for i in group]
-        name, homogeneity, mixed = business_group_name([section['title'] for section in members])
+        name, homogeneity, mixed = group_name(group)
         clusters.append({'id': f'{topic_index + 1:02d}-{index:02d}', 'name': name, 'size': size,
                          'homogeneity': homogeneity, 'mixed': mixed, 'sections': members, 'quota': group_quota})
     return k, clusters
