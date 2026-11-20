@@ -14,13 +14,17 @@ if len(sys.argv) < 2:
     raise SystemExit('必须指定切块文件，例如 101a-切块全量.csv')
 CHUNK_CSV = Path(sys.argv[1]).resolve()
 CHUNKS = {r['chunk_id']: r['切块原文'].replace('\\n', '\n') for r in csv.DictReader(open(CHUNK_CSV, encoding='utf-8-sig'))}
-_CL = {r['chunk_id']: r for r in csv.DictReader(open(CHUNK_CSV.with_name(CHUNK_CSV.name.replace('切块全量', '聚类')), encoding='utf-8-sig'))}
-def cluster_of(c):
-    x = _CL[c]; d = x.get('is_duplicate_of')
-    return _CL[d]['cluster'] if d and d in _CL else x['cluster']
+_META = {r['chunk_id']: r for r in csv.DictReader(open(CHUNK_CSV, encoding='utf-8-sig'))}
+_TOP = {'1': '安全', '2': 'IRB 1300 产品说明与规格', '10': 'IRB 1300 产品说明与规格', '3': '安装与调试', '4': '维护', '5': '维修',
+        '6': '标定', '7': '故障排除', '8': '参考信息、备件与停用', '9': '参考信息、备件与停用', '11': '参考信息、备件与停用'}
+def topic_of(c):
+    m = _META[c]
+    if 'IRB1200' in m['文档名']:
+        return 'IRB 1200 产品规格'
+    return _TOP.get(m['section_path'].split(' / ')[0].split(' ')[0], '前言')
 S, M1, M5 = 'DOC-41ed759faa12', 'DOC-8c302b249b5b', 'DOC-7cf7d0fd4182'
 st = lambda v: re.sub(r'\s+', '', unicodedata.normalize('NFKC', v))
-FIELDS = ['替换槽位', '备用号', '题型', '出题方式', '问题', '参考答案', '证据', '难度', '簇', '关键词', '考查节点', '考查参数', '难度依据', '备注']
+FIELDS = ['替换槽位', '备用号', '题型', '出题方式', '问题', '参考答案', '证据', '难度', '业务主题', '关键词', '考查节点', '考查参数', '难度依据', '备注']
 
 
 def loc(doc, quote):
@@ -33,10 +37,12 @@ POOL = [
     ('Q01', 'R1', 'positive', '单段标准', 'IRB 1300 四个型号的标称重量各是多少？这个重量包含安装在机械臂上的工具和其他设备吗？',
      '1. IRB 1300-11/0.9：75 kg。\n2. IRB 1300-10/1.15：77 kg。\n3. IRB 1300-7/1.4：79 kg。\n4. IRB 1300-12/1.4：79 kg。\n该重量不包括安装在机械臂上的额外选项、工具和其他设备。',
      [(M1, 'IRB 1300-11/0.9: 75 kg'), (M1, 'IRB 1300-10/1.15: 77 kg'), (M1, 'IRB 1300-7/1.4: 79 kg'), (M1, 'IRB 1300-12/1.4: 79 kg'), (M1, '该重量不包括安装在机械臂上的额外选项、工具和其他设备。')], '中', 'T007'),
-    ('Q20', 'R2', 'positive', '台账事实', 'IRB 1300 机械臂的防护类型 Standard、Foundry Plus 2、Clean Room，以及带电磁阀的机械臂，各自的保护等级或洁净等级是什么？',
-     '1. Standard：IP40，可选 IP67（option 3350-670）。\n2. Foundry Plus 2：IP67。\n3. Clean Room：ISO 4。\n4. 带有电磁阀的机械臂（选件）：IP40，可选 IP67（option 3350-670）。',
-     [(M1, '防护类型=机械臂,防护类型 Standard；保护等级i/适用性等级ii=IP40IP67 (option 3350-670)'), (M1, '防护类型=机械臂,防护类型 Foundry Plus 2；保护等级i/适用性等级ii=IP67'),
-      (M1, '防护类型=机械臂,防护类型 Clean Room；保护等级i/适用性等级ii=ISO 4'), (M1, '防护类型=带有电磁阀的机械臂(选件)；保护等级i/适用性等级ii=IP40IP67 (option 3350-670)')], '中', 'T002'),
+    ('Q20', 'R2', 'positive', '台账事实', '用 Molykote 1000、Gleitmo 603 或同等润滑剂润滑的内六角螺钉，M10、M12、M16、M20 在 10.9 级和 12.9 级的标准拧紧转矩各是多少？实际拧紧时偏差最多允许多少？和维修步骤里的规定冲突时以哪个为准？',
+     '1. M10：10.9 级为 55 Nm；12.9 级为 70 Nm。\n2. M12：10.9 级为 96 Nm；12.9 级为 120 Nm。\n3. M16：10.9 级为 235 Nm；12.9 级为 300 Nm。\n4. M20：10.9 级为 460 Nm；12.9 级为 550 Nm。\n5. 指定值偏差最大容许值为 10%。\n6. 只要修理、维护或安装程序中规定了特殊力矩，就以特殊力矩为准。',
+     [(M5, '润滑型六角螺钉（Molykote、Gleitmo 或等同螺钉）的拧紧扭矩'), (M5, '尺寸=M10；拧紧转矩 (Nm)类别 10.9,油润滑i=55；拧紧转矩 (Nm)类别 12.9,油润滑i=70'),
+      (M5, '尺寸=M12；拧紧转矩 (Nm)类别 10.9,油润滑i=96；拧紧转矩 (Nm)类别 12.9,油润滑i=120'), (M5, '尺寸=M16；拧紧转矩 (Nm)类别 10.9,油润滑i=235；拧紧转矩 (Nm)类别 12.9,油润滑i=300'),
+      (M5, '尺寸=M20；拧紧转矩 (Nm)类别 10.9,油润滑i=460；拧紧转矩 (Nm)类别 12.9,油润滑i=550'), (M5, '指定值偏差最大容许值为 10%！'),
+      (M5, '不论标准力矩是多少，只要修理、维护或安装程序中规定了特殊力矩，就以这些特殊力矩为准。')], '难', '参考信息、备件与停用'),
     ('Q03', 'R3', 'positive', '单段标准', 'IRB 1300 不是落地安装时，Gravity Beta 和 Gravity Alpha 分别在什么情况下要重新定义、设为多少？安装角度定义错会有什么后果？',
      '1. 采用落地安装以外方式安装时，机器人基座和 Gravity Beta 必须重新定义：倒置安装为 π（+3.141593），墙上安装为 ±π/2（±1.570796）。\n2. 机器人装在墙壁上（绕 X 轴旋转）时，还要重新定义 Gravity Alpha，数值宜为 ±π/2（±1.570796）。\n3. 安装角度定义不正确会导致：机械结构过载；路径性能和路径精确度较低；Load Identification、Collision detection 等功能无法正常工作。',
      [(M1, '采用落地安装（绕y轴旋转）以外方式安装机器人时，机器人基座和系统参数GravityBeta 均必须重新定义。'), (M1, '如果机器人倒置安装（倒置），则 Gravity Beta 应为 π （+3.141593）。'), (M1, '如果机器人安装在墙上，那么 Gravity Beta 应为 ±π/2 (±1.570796)。'),
@@ -52,7 +58,7 @@ POOL = [
 
 META = {
     'R1': ('IRB 1300,重量,四型号', 'retrieval', 'top_k', '要点由 1 个增至 5 个（四型号重量 + 不含工具的说明）'),
-    'R2': ('防护类型,保护等级,洁净等级', 'retrieval', 'top_k', '要点由 1 个增至 4 个，含洁净等级与选件条件'),
+    'R2': ('拧紧转矩,螺钉,偏差', 'retrieval', 'top_k,candidate_k', '由 3 个尺寸增至 4 个尺寸并跨两个表块，另加偏差上限'),
     'R3': ('Gravity Beta,Gravity Alpha,安装角度', 'retrieval', 'top_k', '要点由 2 个增至 3 组，含 Gravity Alpha 与错误后果'),
     'R4': ('IRB 1200,RP,AT,比较', 'retrieval', 'top_k,candidate_k', '由单表 3 行增至两张表 8 个数值并做比较'),
     'R5': ('校准工具,定期检查,外径,平直度', 'retrieval', 'top_k', '要点由 3 个增至 4 个，含适用条件与测量公差'),
@@ -67,11 +73,11 @@ for slot, rid, group, method, q, a, ev, diff, cl in POOL:
     ids = list(dict.fromkeys(c for c, _ in pairs))
     if not friend_answer_supported(a, [{'chunk_text': CHUNKS[i], 'text': CHUNKS[i]} for i in ids]):
         bad.append(f'{rid} 答案锚点不过')
-    got = {cluster_of(c) for c, _ in pairs}
+    got = {topic_of(c) for c, _ in pairs}
     old = M1[slot]
-    cl = old['簇']  # 簇以 M1 槽位在当前聚类下的标注为准（101a 重新聚类后编号已变）
-    if got != {cl} or old['簇'] != cl or old['题型'] != group or old['出题方式'] != method or RANK[diff] <= RANK[old['难度']]:
-        bad.append(f'{rid} 簇/题型/出题方式/难度不满足同簇同题型且更难：证据簇{sorted(got)} 槽位簇{old["簇"]}')
+    cl = old['业务主题']  # 以 M1 槽位的主要业务主题为准
+    if cl not in got or old['题型'] != group or old['出题方式'] != method or RANK[diff] <= RANK[old['难度']]:
+        bad.append(f'{rid} 主题/题型/出题方式/难度不满足同主题同题型且更难：证据主题{sorted(got)} 槽位主题{cl}')
     kw, node, params, why = META[rid]
     rows.append(dict(zip(FIELDS, [slot, rid, group, method, q, a, '\n'.join(f'{c}｜{t}' for c, t in pairs), diff, cl, kw, node, params, why, '102 备用难题池（Baseline 前写定；同簇同题型替题，非原题措辞加难）'])))
 print('问题：', bad or '无', len(rows))
