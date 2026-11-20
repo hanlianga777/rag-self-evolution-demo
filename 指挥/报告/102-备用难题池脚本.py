@@ -45,7 +45,9 @@ POOL = [
 
 rows, bad = [], []
 for slot, rid, group, method, q, a, ev, diff, cl in POOL:
-    pairs = [(loc(d, t), t) for d, t in ev]
+    allhits = [[c for c in CHUNKS if c.startswith(d + '-V2-C-') and st(t) in st(CHUNKS[c])] for d, t in ev]
+    if not all(allhits): raise SystemExit(f'找不到 {rid}')
+    pairs = [(max(h, key=lambda c: (sum(c in x for x in allhits), -h.index(c))), t) for h, (d, t) in zip(allhits, ev)]
     ids = list(dict.fromkeys(c for c, _ in pairs))
     if not friend_answer_supported(a, [{'chunk_text': CHUNKS[i], 'text': CHUNKS[i]} for i in ids]):
         bad.append(rid)

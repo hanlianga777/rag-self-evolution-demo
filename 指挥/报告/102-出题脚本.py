@@ -30,11 +30,20 @@ st = lambda v: re.sub(r'\s+', '', unicodedata.normalize('NFKC', v))
 UNRESOLVED = []
 
 
-def loc(doc, quote):
-    hits = [c for c in CHUNKS if c.startswith(doc + '-V2-C-') and st(quote) in st(CHUNKS[c])]
-    if not hits:
-        UNRESOLVED.append((doc, quote)); return doc + '-V2-C-?????'
-    return hits[0]
+def hits_of(doc, quote):
+    return [c for c in CHUNKS if c.startswith(doc + '-V2-C-') and st(quote) in st(CHUNKS[c])]
+
+
+def resolve(ev):
+    """同一句话出现在多个块时（如各轴通用步骤），优先选同时包含本题其他证据句最多的块，避免锚到别的小节。"""
+    allhits = [hits_of(d, t) for d, t in ev]
+    out = []
+    for (d, t), hits in zip(ev, allhits):
+        if not hits:
+            UNRESOLVED.append((d, t)); out.append(d + '-V2-C-?????'); continue
+        score = lambda c: sum(c in h for h in allhits)
+        out.append(max(hits, key=lambda c: (score(c), -hits.index(c))))
+    return out
 
 
 FIELDS = ['题号', '题型', '出题方式', '消融类型', '原实体', '别名', '配对题号', '负向子类型', '预期行为', 'criticality', '问题', '参考答案', '证据', '考查节点', '考查参数', '难度', '关键词', '备注', '统计条目']
@@ -42,7 +51,7 @@ ROWS = []
 
 
 def add(qid, group, method, attr, alias, pair, q, a, ev, node, params, diff, kw, note, cluster):
-    evidence = '\n'.join(f'{loc(d, t)}｜{t}' for d, t in ev)
+    evidence = '\n'.join(f'{c}｜{t}' for c, (d, t) in zip(resolve(ev), ev))
     ROWS.append(dict(zip(FIELDS, [qid, group, method, attr, alias[0] if alias else '', alias[1] if alias else '', pair, '', '', '', q, a, evidence, node, params, diff, kw, f'102 簇 {cluster}。' + note, ''])))
 
 
@@ -80,7 +89,7 @@ add('Q08', 'positive', '单段标准', '', None, '', '重新安装 IRB 1300 电�
     'retrieval', 'top_k,candidate_k', '中', '电缆保护器,轴3', '新题（第 2 部分 5.3.1）', 'T024')
 add('Q09', 'positive', '单段标准', '', None, '', '重新连接 IRB 1300 轴 2 和轴 3 的电机连接器时，步骤和注意事项是什么？',
     '1. 防护类型 Clean Room 的机器人：先清洁已打开的接头，用无绒布蘸取酒精擦拭零件上的颗粒物。\n2. 将电机连接器公头插入连接器板。\n3. 铺设电缆并用电缆带固定；正确铺设电缆非常重要，铺设和固定不正确可能导致电缆损坏。\n4. 重新连接所有连接器（FB2、MP2、FB3、MP3），按连接器上的数字标记对应。\n5. 将连接器板重新安装到下臂上：螺钉 M4x8 12.9 Lafre（2份），拧紧转矩 2.6 Nm。',
-    [(M2, '重新连接轴 2 和轴 3 电机连接器'), (M2, '2 | 将电机连接器公头插入连接器板。'), (M2, '小心正确铺设电缆非常重要。如果电缆铺设和固定不正确,可能会导致电缆损坏。'),
+    [(M2, '重新连接轴 2 和轴 3 电机连接器'), (M2, '对于保护类型 Clean Room 的机器人:清洁已打开的接头,用无绒布蘸取酒精擦拭零件上的颗粒物。'), (M2, '2 | 将电机连接器公头插入连接器板。'), (M2, '4 | 重新连接所有连接器。FB2MP2FB3MP3'), (M2, '小心正确铺设电缆非常重要。如果电缆铺设和固定不正确,可能会导致电缆损坏。'),
      (M2, '提示要找到对应的连接器,请查看连接器上的数字标记。'), (M2, '5 | 将连接器板重新安装到下臂上。 | 螺钉:M4x8 12.9 Lafre(2份)拧紧转矩:2.6 Nm')],
     'generation', 'prompt_strategy,top_k', '中', '电机连接器,轴2,轴3', '新题（第 2 部分 5.3.1）', 'T028')
 add('Q10', 'positive', '单段标准', '', None, '', '重新安装 IRB 1300 延长器单元时，哪些机器人要检查管轴上的 O 型环？O 型环货号、延长器螺钉规格和拧紧转矩是多少？',
@@ -101,7 +110,7 @@ add('Q12', 'positive', '跨段综合', '', None, '', 'IRB 1300 没有连接控�
 add('Q13', 'positive', '跨段综合', '', None, '', '拆卸 IRB 1300 外壳之前要做哪些准备？No type 和 Type A 分别要把机器人摆到什么位置？开始拆卸时各要先卸下哪些盖？',
     '1. 决定要使用的校准例行程序，并在开始维修步骤前相应执行。\n2. IRB 1300 No type：控制所有轴回归零位。\n3. IRB 1300 Type A：轴1、轴2、轴3、轴4 为 0°，轴5 为 +90°，轴6 不重要。\n4. 关闭所有连接到机器人的电源、液压源、气压源，然后再进入安全保护空间。\n5. 防护类型 Clean Room 的机器人：拆卸零部件时务必用刀具切割漆层并打磨漆层毛边。\n6. 开始拆卸时先卸下盖：No type 卸下管轴支架盖、外壳盖、下臂盖；Type A 卸下倾斜单元盖、管轴护罩、下臂盖、外壳盖。',
     [(M3, '1 | 决定要使用的校准例行程序,并在开始维修步骤前相应执行操作。'), (M3, '2 | 适用于 IRB 1300 No type控制所有轴回归零位。'), (M3, '3 | 适用于 IRB 1300 Type A将机器人操纵到指定位置:• 轴1:0°• 轴2:0°• 轴3:0°• 轴4:0°• 轴5:+90°• 轴6:不重要。'),
-     (M3, '4 | 危险关闭所有连接到机器人的:• 电源• 液压源• 气压源然后再进入安全保护空间。'), (M3, '在拆卸机器人的零部件时,请务必使用刀具切割漆层并打磨漆层毛边!'),
+     (M3, '4 | 危险关闭所有连接到机器人的:• 电源• 液压源• 气压源然后再进入安全保护空间。'), (M3, '适用于防护类型为 Clean Room 的机器人在拆卸机器人的零部件时,请务必使用刀具切割漆层并打磨漆层毛边!'),
      (M3, '适用于IRB 1300 No type卸下盖。管轴支架盖(A)外壳盖(B)下臂盖(C)'), (M3, '适用于IRB 1300 Type A卸下盖。倾斜单元盖(A)管轴护罩(B)下臂盖(C)外壳盖(D)')],
     'retrieval', 'top_k,candidate_k', '难', '拆卸外壳,准备工作', '新题（第 3 部分 5.5.2）', 'T018')
 add('Q14', 'positive', '跨段综合', '', None, '', 'IRB 1300-7/1.4（标准型，非 Type A）更换轴 2 电机：要订哪个电机装置货号？装回电机时要在哪里涂什么油？固定螺钉规格和拧紧转矩是多少？',
