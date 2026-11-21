@@ -1,9 +1,10 @@
 """031d strategy contract and saved-result round retrospectives."""
 import json
+import re
 from collections import defaultdict
 
 from . import rules
-from .agent_inputs import new_failure_ids
+from .agent_inputs import case_comparisons, new_failure_ids
 from .paid_run import provider_task
 from .telemetry import collect_usage, cost_fields
 
@@ -105,6 +106,159 @@ def validate_round_conclusion(review, candidates):
     return review
 
 
+EXPLANATION_CONFLICT = '解释与程序事实冲突'
+REVIEW_STATES = {'修好', '新错', '仍错'}
+FINAL_MISS = r'(?:未[能曾]?|没(?:有)?)\s*(?:进入|进|到达)'
+FINAL_HIT = r'(?:已(?:经)?\s*(?:进入|进)|(?:进入|进)了)'
+NEW_FINAL_HITS = (r'新增\s*(?:Final|最终资料)\s*命中(?:数)?\s*(?:为|是|[:：=])?\s*(\d+)'
+                  r'|新增(?:了)?\s*(\d+)\s*(?:条|个|次)?\s*(?:Final|最终资料)')
+ENHANCEMENT_TERMS = {
+    'query_decompose':r'Query[ _]Decompose|拆分查询|查询拆分|查询拆解|拆解',
+    'query_rewrite':r'Query[ _]Rewrite|查询改写',
+    'multi_query':r'Multi[- _]Query|多查询',
+    'hyde':r'HyDE',
+}
+
+
+def _conflicts_with_case(text, facts, *, question=None, label=None):
+    """Check explicit prose claims, including older reviews without typed references."""
+    if not isinstance(text,str):
+        return False
+    for clause in re.split(r'[，,；;。！？\n]',text):
+        labels = set(re.findall(r'(?:方案|候选)\s*([A-D])\b',clause))
+        if (labels and label not in labels) or re.search(r'基线|Baseline|从.*(?:→|变为|变成)|如果|是否|可能',clause,re.I):
+            continue
+        questions = re.findall(r'Q\d{2,3}(?!\d)',clause) or ([question] if question else [])
+        for q in questions:
+            row = facts.get(q)
+            if not row:
+                continue
+            verdict = re.search(r'(?:判(?:定)?(?:为)?|答)\s*([对错])',clause)
+            if verdict and type(row['候选判对']) is bool and row['候选判对']!=(verdict[1]=='对'):
+                return True
+            hits = re.search(NEW_FINAL_HITS,clause,re.I)
+            if hits and row['候选增强新增命中'] is not None:
+                effect = row['候选增强新增命中']
+                methods = [key for key,pattern in ENHANCEMENT_TERMS.items() if re.search(pattern,clause,re.I)]
+                observed = (effect.get('new_final_hits') if not methods else
+                            effect['by_method'].get(methods[0],{}).get('new_final_hits') if len(methods)==1 else None)
+                if type(observed) is int and observed!=int(hits[1] or hits[2]):
+                    return True
+            if not re.search(r'标准(?:证据|引文|原文)|C-\d+|证据.*(?:最终|Final|位置)',clause,re.I):
+                continue
+            positions = row['候选标准证据位置']
+            final = re.search(r'最终|Final',clause,re.I)
+            if not isinstance(positions,list) or not final and re.search(r'候选|重排|排序|召回',clause):
+                continue
+            chunk_ids = re.findall(r'C-\d+',clause)
+            ranks = [p['final'] for p in positions if not chunk_ids or any(p['chunk_id'].endswith(k) for k in chunk_ids)]
+            if ranks and ((all(type(r) is int or '按原文判定' in str(r) for r in ranks) and re.search(FINAL_MISS,clause))
+                          or (all(r=='未进入' for r in ranks) and re.search(FINAL_HIT,clause))):
+                return True
+            if re.search(r'位置(?:仍)?(?:未变|没变|没有变化)',clause):
+                previous = row['基线标准证据位置']
+                if (isinstance(previous,list) and all(p['final']!='记录缺失' for p in [*previous,*positions])
+                        and [p['final'] for p in previous]!=[p['final'] for p in positions]):
+                    return True
+    return False
+
+
+def _review_with_facts(response, candidates, case_facts, causal):
+    if not isinstance(response,dict) or not isinstance(response.get('plans'),list):
+        raise ValueError('本轮结论必须包含plans')
+    by_id = {c['id']:c for c in candidates}
+    case_by_id = {cid:{r['题号']:r for r in rows} for cid,rows in case_facts.items()}
+    prose_fields = ('unmatched_reason','parameter_assessment','evidence_reason','conclusion')
+    plans = []
+    round_conflict = 'case_facts' in response and response['case_facts']!=case_facts
+    for item in response['plans']:
+        if not isinstance(item,dict) or item.get('candidate_id') not in by_id:
+            raise ValueError('本轮结论必须逐一覆盖已跑过的Candidate')
+        cid = item['candidate_id']
+        candidate = by_id[cid]
+        label = candidate['reasoning'].get('candidate_label')
+        facts = case_by_id[cid]
+        plan = {k:item[k] for k in ('candidate_id',*prose_fields) if k in item}
+        fixed = candidate['result'].get('all_fixed_question_ids', [])
+        matched = sorted(set(fixed) & set(predicted_ids(candidate)))
+        totals = {'fixed_question_ids':fixed,'new_failure_question_ids':new_failure_ids(candidate['result']),
+                  'matched_question_ids':matched,'prediction_match_count':len(matched)}
+        def disagrees(key, expected):
+            value = item.get(key)
+            if isinstance(expected,list):
+                return not isinstance(value,list) or sorted(value)!=sorted(expected)
+            return type(value) is not type(expected) or value!=expected
+        conflict = any(disagrees(k,v) for k,v in totals.items() if k in item)
+        conflict |= any(_conflicts_with_case(item.get(k),facts,label=label) for k in prose_fields)
+        plan.update(totals)
+        if causal:
+            reviews = item.get('case_reviews')
+            if not isinstance(reviews,list) or any(not isinstance(r,dict) for r in reviews):
+                raise ValueError('逐题复盘必须覆盖修好、新错、仍错题')
+            plan['case_reviews'] = []
+            for review in reviews:
+                q = review.get('question')
+                if q not in facts or facts[q]['变化'] not in REVIEW_STATES:
+                    raise ValueError('逐题复盘必须覆盖修好、新错、仍错题')
+                fact = facts[q]
+                row = {k:review[k] for k in ('question','reason','attributed_parameter','assessment') if k in review}
+                claims = review.get('fact_claims',{})
+                if (not isinstance(claims,dict) or any(k not in fact or type(v) is not type(fact[k]) or v!=fact[k] for k,v in claims.items())
+                        or ('state' in review and review['state']!=fact['变化'])
+                        or _conflicts_with_case(row.get('reason'),facts,question=q,label=label)
+                        or _unsupported_retrieval_assessment(row,fact)):
+                    conflict = True
+                row['state'] = fact['变化']
+                plan['case_reviews'].append(row)
+        if conflict:
+            plan.update(unmatched_reason=EXPLANATION_CONFLICT,parameter_assessment='不确定',
+                        evidence_reason=EXPLANATION_CONFLICT,conclusion=EXPLANATION_CONFLICT)
+            for row in plan.get('case_reviews',[]):
+                row.update(reason=EXPLANATION_CONFLICT,attributed_parameter='未知',assessment='不确定')
+            round_conflict = True
+        plans.append(plan)
+    lessons = response.get('lessons')
+    if isinstance(lessons,list):
+        round_conflict |= any(_conflicts_with_case(lesson,case_by_id[cid],label=c['reasoning'].get('candidate_label'))
+                              for lesson in lessons for cid,c in by_id.items())
+    return {'plans':plans,'lessons':[EXPLANATION_CONFLICT] if round_conflict else lessons}
+
+
+def _round_case_facts(baseline_cases, candidate_cases, questions):
+    frozen = {q['id']:q for q in questions}
+    return {cid:case_comparisons(baseline_cases,cases,frozen,include_facts=True)
+            for cid,cases in candidate_cases.items()}
+
+
+def round_conclusions_for_prompt(store, baseline, candidates, conclusions):
+    """Recheck old saved reviews for decision prompts without rewriting the audit."""
+    by_id = {c['id']:c for c in candidates}
+    projected = {}
+    for number,saved in (conclusions or {}).items():
+        if saved.get('status')!='saved':
+            continue
+        item = {k:saved[k] for k in ('status','review','case_facts') if k in saved}
+        projected[number] = item
+        if 'case_facts' in item or 'review' not in item:
+            continue
+        review = item['review']
+        plans = review.get('plans',[])
+        selected = [by_id[p['candidate_id']] for p in plans if p.get('candidate_id') in by_id]
+        if len(selected)!=len(plans):
+            item['review'] = {'plans':[],'lessons':['复盘引用的保存方案缺失，待核对']}
+            continue
+        candidate_cases = {c['id']:store.evaluation_case_results(c['result']['evaluation_run_id'])
+                           if c['result'].get('evaluation_run_id') else [] for c in selected}
+        facts = _round_case_facts(store.evaluation_case_results(baseline['id']),candidate_cases,
+                                  json.loads(baseline['dataset_snapshot_json']).get('questions',[]))
+        try:
+            item['review'] = _review_with_facts(review,selected,facts,any('case_reviews' in p for p in plans))
+        except (ValueError, TypeError, KeyError):
+            item['review'] = {'plans':[],'lessons':['旧复盘的逐题说明无法与保存记录核对']}
+        item['case_facts'] = facts
+    return projected
+
+
 def _save(store, experiment_id, number, saved):
     with store.connection() as db:
         db.execute('BEGIN IMMEDIATE')
@@ -134,18 +288,24 @@ def conclude_round(store, runtime, experiment_id, *, final_d=False):
     evaluated = [c for c in current if c['status'] == 'evaluated']
     from .optimization import build_agent_prompt
     baseline = store.evaluation_run(experiment['baseline_run_id'])
+    baseline_cases = store.evaluation_case_results(baseline['id'])
+    candidate_cases = {c['id']:store.evaluation_case_results(c['result']['evaluation_run_id']) if c['result'].get('evaluation_run_id') else [] for c in evaluated}
+    questions = json.loads(baseline['dataset_snapshot_json']).get('questions', [])
+    case_facts = _round_case_facts(baseline_cases,candidate_cases,questions)
+    causal = experiment['result'].get('causal_evidence') is True
     _, facts = build_agent_prompt([], baseline['config'], evaluated, [], list('ABC'),
-        baseline_cases=store.evaluation_case_results(baseline['id']),
-        candidate_cases={c['id']:store.evaluation_case_results(c['result'].get('evaluation_run_id')) if c['result'].get('evaluation_run_id') else [] for c in evaluated},
-        golden_questions=json.loads(baseline['dataset_snapshot_json']).get('questions', []), causal_evidence=experiment['result'].get('causal_evidence') is True)
+        baseline_cases=baseline_cases, candidate_cases=candidate_cases, golden_questions=questions)
     prompt = {'round':number, 'prior_sandbox_results':facts['prior_sandbox_results'],
+              'case_comparisons':case_facts,
               'predictions':{c['id']:predicted_ids(c) for c in evaluated},
               'skipped_candidates':[c['id'] for c in current if c['status']=='skipped'],
-              'previous_round_conclusions':experiment['result'].get('round_conclusions', {})}
-    system = ('你是RAG优化Agent。只读本实验保存事实，撰写本轮结论，输出JSON。不得编造检索证据或单参数因果关系，记录缺失写未知。'
-              'plans逐一覆盖已跑过的Candidate（跳过的不算已跑过）：candidate_id,fixed_question_ids,new_failure_question_ids均采用正式题号；'
-              'matched_question_ids是实际修好与predictions交集，prediction_match_count为交集数量；unmatched_reason解释预测不符原因；'
-              'parameter_assessment写哪些参数有效/有害/待验证；evidence_reason说明检索位置或耗时依据，多参数写无法单独确定及最可能参数和理由；'
+              'previous_round_conclusions':round_conclusions_for_prompt(store,baseline,experiment['candidates'],
+                  {n:r for n,r in experiment['result'].get('round_conclusions',{}).items() if n!=str(number)})}
+    system = ('你是RAG优化Agent。只读本实验保存事实，撰写解释，输出JSON。case_comparisons是程序事实。'
+              '标准证据在最终资料的位置与辅助查询新增命中是不同的记录。引用时以对应字段为准，缺失写未知。'
+              'plans逐一覆盖已跑过的Candidate（跳过的不算），每项给candidate_id。实际修好、新错、预测命中题号和数量由程序填写。'
+              'unmatched_reason解释预测不符原因；parameter_assessment写哪些参数有效/有害/待验证；'
+              'evidence_reason解释检索或耗时，多参数写无法单独确定及最可能参数和理由；'
               'conclusion总结有效/有害/待验证；lessons为非空字符串数组，写带入下一轮的经验。格式{"plans":[],"lessons":[]}。')
     if final_d:
         winner = next((c for c in experiment['candidates'] if c['id'] == (evaluated[0]['reasoning'].get('winner_id') if evaluated else None)), None)
@@ -154,9 +314,9 @@ def conclude_round(store, runtime, experiment_id, *, final_d=False):
             system += ('D是在已确认Winner上精修：winner_comparison是程序事实，列出D相对Winner只改了哪些参数，以及相对Winner修好/新错的题。'
                        '相对Baseline的多项差异里，除这几项外都是Winner原有的改动，不是D新改的；分析D时不要写成多参数混改。'
                        '相对Winner只改1个参数时，相对Winner的修好/新错可以说与该参数伴随出现，仍不能写成已证明的因果。predictions里的D预测来自改动的目标题。')
-    if experiment['result'].get('causal_evidence'):
-        prompt['case_comparisons'] = facts['case_comparisons']
-        system += ('逐题对比case_comparisons是程序事实。每个plans新增case_reviews数组，逐一覆盖修好、新错、仍错题，每项含question（Q29形式）、state（修好、新错、仍错）、reason（一句中文原因）、attributed_parameter（中文参数名或未知）、assessment（有效、无效、不确定）。'
+    if causal:
+        system += ('每个plans包含case_reviews数组，逐一覆盖修好、新错、仍错题，每项含question（Q29形式）、reason（一句中文原因）、attributed_parameter（中文参数名或未知）、assessment（有效、无效、不确定）。状态由程序填写。'
+                   '如需明确引用程序事实，fact_claims可选，只写引用的case_comparisons字段名及字段原值。'
                    '证据没有变化或未知，不能声称检索参数改变了判定，assessment须无效或不确定。parameter_assessment只写有效、无效、不确定；evidence_reason附逐题依据。多参数写无法单独确定。'
                    '所有业务说明使用中文短句、中文参数名和Q29形式题号，不出现内部编号或英文下划线字段名；机器结构键保留协议。')
     from .optimization_cycle import check_cycle_stop
@@ -181,15 +341,15 @@ def conclude_round(store, runtime, experiment_id, *, final_d=False):
         try:
             response = json.loads(attempt['raw'])
             if experiment['result'].get('causal_evidence'):
-                mapping = {r['题号']:r['题目键'] for rows in facts['case_comparisons'].values() for r in rows}
+                mapping = {r['题号']:r['题目键'] for rows in case_facts.values() for r in rows if r['题号']!='未知'}
                 response = business_output(normalize_question_references(response, mapping), mapping,
                     {c['id']:('方案D' if c['reasoning'].get('candidate_label')=='D' else f"第{c['reasoning'].get('round',1)}轮方案{c['reasoning'].get('candidate_label','')}") for c in evaluated})
-            review = validate_round_conclusion(response, evaluated)
-            if experiment['result'].get('causal_evidence'):
+            review = validate_round_conclusion(_review_with_facts(response,evaluated,case_facts,causal), evaluated)
+            if causal:
                 for plan in review['plans']:
                     candidate = next(c for c in evaluated if c['id'] == plan['candidate_id'])
-                    validate_case_review(plan, facts['case_comparisons'][candidate['id']], candidate['reasoning'].get('changed_parameters', {}))
-            saved.update(status='saved', review=review)
+                    validate_case_review(plan, case_facts[candidate['id']], candidate['reasoning'].get('changed_parameters', {}))
+            saved.update(status='saved', case_facts=case_facts, review=review)
             saved.update(cost_fields(getattr(getattr(runtime.provider,'settings',None),'model',None), [u for a in saved['attempts'] for u in a.get('token_usage', [])]))
             _save(store, experiment_id, number, saved)
             return saved
@@ -200,13 +360,13 @@ def conclude_round(store, runtime, experiment_id, *, final_d=False):
 
 
 def validate_d_mode(suggestion, winner, history, facts=None):
-    """规则总表五.7：≥2个合格→部分合并（D须取用另一个合格方案的参数）；只有1个合格→在它上面至少再加1个参数。
+    """规则总表五.7：≥2个合格→部分合并（D须取用另一个合格方案的参数）；只有1个合格→从Winner出发尝试不同组合。
     优先用验证过的参数；没验证过的参数可以用，但已有可用的验证参数时不能全部用新参数。D 必须生成。"""
     mode = suggestion.get('combination_mode')
     if mode == 'winner_plus_verified':
         mode = suggestion['combination_mode'] = 'winner_plus'
     if mode not in {'partial_fusion','winner_plus'} or not isinstance(suggestion.get('mode_reason'), str) or not suggestion['mode_reason'].strip():
-        raise ValueError('D须选择partial_fusion（部分合并）或winner_plus（在合格方案上加参数），并说明原因')
+        raise ValueError('D须选择partial_fusion（部分合并）或winner_plus（基于唯一合格方案精修），并说明原因')
     if suggestion.get('should_generate_d') is not True:
         raise ValueError('有合格方案时必须生成D（规则总表五.7）')
     qualified = {c['id'] for c in history if c.get('status') == 'evaluated' and c['reasoning'].get('candidate_label') in {'A','B','C'}
@@ -254,20 +414,24 @@ def validate_causal_proposals(response, comparisons):
                 raise ValueError('证据未变，不得归因于检索参数')
 
 
+def _unsupported_retrieval_assessment(review, fact):
+    from .display_summaries import PARAMETER_NAMES
+    retrieval = set(PARAMETER_NAMES) - {'prompt_strategy','generation_thinking'}
+    return (review.get('attributed_parameter') in retrieval | {PARAMETER_NAMES[k] for k in retrieval}
+            and fact['证据变化'] is not True and review.get('assessment') not in {'无效','不确定'})
+
+
 def validate_case_review(plan, rows, changes):
     """Require an explicit, checked cause per changed or still failing case."""
-    facts = {r['题号']:r for r in rows if r['变化'] != '仍对'}
+    facts = {r['题号']:r for r in rows if r['变化'] in REVIEW_STATES}
     reviews = plan.get('case_reviews')
     if not isinstance(reviews,list) or len(reviews) != len(facts) or {r.get('question') for r in reviews} != set(facts):
         raise ValueError('逐题复盘必须覆盖修好、新错、仍错题')
-    from .display_summaries import PARAMETER_NAMES
-    retrieval = set(PARAMETER_NAMES) - {'prompt_strategy','generation_thinking'}
     for row in reviews:
         fact = facts[row['question']]
         if row.get('state') != fact['变化'] or not isinstance(row.get('reason'),str) or not row['reason'].strip():
             raise ValueError('逐题复盘状态或原因缺失')
-        if (row.get('attributed_parameter') in retrieval | {PARAMETER_NAMES[k] for k in retrieval}
-                and fact['证据变化'] is not True and row.get('assessment') not in {'无效','不确定'}):
+        if _unsupported_retrieval_assessment(row,fact):
             raise ValueError('证据未变或未知，不得声称检索参数有效')
     if plan.get('parameter_assessment') not in {'有效','无效','不确定'}:
         raise ValueError('参数判断只能是有效、无效或不确定')

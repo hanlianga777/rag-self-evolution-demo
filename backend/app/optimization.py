@@ -879,11 +879,13 @@ class OptimizationAgent:
                 match=re.search(r'(?:^Q|[-_])(\d{2,3})$',row['question_id'])
                 row['display_question_id']=golden.get('display_id') or golden.get('coverage_slot') or (golden.get('raw') or {}).get('coverage_slot') or (f'Q{int(match[1]):02d}' if match else row['question_id'])
             return rows
+        from .agent_strategy import round_conclusions_for_prompt
+        round_conclusions = round_conclusions_for_prompt(self.store,baseline,prior_candidates,context.get('round_conclusions'))
         system,prompt=build_agent_prompt(failures,base_config,prior_candidates,failed_gates,labels,
             baseline_gates=persisted_gates,evaluation_budget=evaluation_budget,failed_parameter_signatures=audit['failed_parameter_signatures'],
             baseline_result=baseline['result'],baseline_cases=saved_cases(baseline_run_id),
             candidate_cases={c['id']:saved_cases(c.get('result',{}).get('evaluation_run_id')) for c in prior_candidates},
-            golden_questions=list(questions.values()),round_conclusions=context.get('round_conclusions'),round_policy=context.get('round_policy'),causal_evidence=context.get('causal_evidence') is True,round_number=round_number,
+            golden_questions=list(questions.values()),round_conclusions=round_conclusions,round_policy=context.get('round_policy'),causal_evidence=context.get('causal_evidence') is True,round_number=round_number,
             retrieval_preview=load_retrieval_preview(self.store, baseline_run_id))
         audit['causal_evidence'] = context.get('causal_evidence') is True
         audit['case_comparisons'] = prompt.get('case_comparisons', {})

@@ -157,6 +157,81 @@ class ConclusionTests(unittest.TestCase):
         self.assertEqual(conclude_round(GovernanceStore(self.store.database_path,migrate=False),runtime,exp),saved)
         self.assertEqual(provider.calls,2)
 
+    def test_q27_round_facts_survive_a_conflicting_explanation(self):
+        from app.agent_strategy import conclude_round, round_conclusions_for_prompt
+        from app.paid_schedule import set_settings
+        set_settings(self.store,False)
+        exp=self.store.create_experiment('BASE')
+        qid='frozen-27'
+        quote='安装前检查管套和弹簧环'
+        snapshot=self.store.evaluation_run('BASE')['dataset_snapshot_json']
+        snapshot=json.loads(snapshot)
+        snapshot['questions']=[{'id':qid,'evidence':[{'chunk_id':'C-00257','quote':quote}]}]
+        with self.store.connection() as db:
+            db.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps(
+                {'strategy_contract':'agent-strategy-4','causal_evidence':True}),exp))
+            db.execute('UPDATE evaluation_runs SET dataset_snapshot_json=? WHERE id=?',(json.dumps(snapshot),'BASE'))
+        self.store.record_evaluation_case('BASE',qid,{'passed':False,'display_question_id':'Q27',
+            'programmatic_metrics':{'retrieval_trace':{'final':[]}}})
+        self.store.save_candidate(exp,'R1-C',DEFAULT_PIPELINE_CONFIG,{'round':1,'candidate_label':'C','predicted_fixed_question_ids':[qid]})
+        cid=exp+'-R1-C'
+        run=self.store.create_evaluation_run(snapshot,DEFAULT_PIPELINE_CONFIG,{})
+        self.store.record_evaluation_case(run,qid,{'passed':True,'programmatic_metrics':{'retrieval_trace':{
+            'final':[{'chunk_id':'parent','content':quote}],
+            'enhancement':{'new_final_hits':0,'by_method':{'query_decompose':{'new_final_hits':0}}}}}})
+        self.store.finish_candidate(cid,'evaluated',{'evaluation_run_id':run,'all_fixed_question_ids':[qid]})
+        response={'case_facts':{cid:[{'候选判对':False}]},
+            'plans':[{'candidate_id':cid,'unmatched_reason':'预测吻合','parameter_assessment':'不确定',
+                      'evidence_reason':'Q27标准证据C-00257最终仍为未进入','conclusion':'Q27 的修好与检索无关',
+                      'case_reviews':[{'question':'Q27','reason':'标准引文未进入 Final',
+                                      'attributed_parameter':'查询拆解','assessment':'不确定'}]}],
+            'lessons':['Q27 在证据最终位置未变时被修好']}
+        provider=MagicMock(complete=MagicMock(return_value=json.dumps(response)),settings=None)
+        saved=conclude_round(self.store,SimpleNamespace(provider=provider),exp)
+        stored=self.store.experiment(exp)['result']['round_conclusions']['1']
+        self.assertEqual(stored,saved)
+        [fact]=[row for row in stored['case_facts'][cid] if row['题号']=='Q27']
+        self.assertIs(fact['基线判对'],False)
+        self.assertIs(fact['候选判对'],True)
+        self.assertEqual(fact['变化'],'修好')
+        self.assertEqual(fact['候选标准证据位置'][0]['final'],'1（原文在同一父块内，按原文判定）')
+        self.assertEqual(fact['候选增强新增命中']['by_method']['query_decompose']['new_final_hits'],0)
+        plan=stored['review']['plans'][0]
+        self.assertEqual(plan['fixed_question_ids'],[qid])
+        self.assertEqual(plan['case_reviews'][0]['state'],'修好')
+        self.assertEqual(plan['case_reviews'][0]['reason'],'解释与程序事实冲突')
+        self.assertEqual(plan['conclusion'],'解释与程序事实冲突')
+        self.assertEqual(stored['review']['lessons'],['解释与程序事实冲突'])
+        self.assertEqual(json.loads(stored['attempts'][0]['raw']),response)
+        legacy = {'1':{'status':'saved','review':deepcopy(response),'attempts':stored['attempts']}}
+        projection = round_conclusions_for_prompt(self.store,self.store.evaluation_run('BASE'),
+                                                  self.store.experiment(exp)['candidates'],legacy)['1']
+        self.assertEqual(projection['case_facts'],stored['case_facts'])
+        self.assertEqual(projection['review'],stored['review'])
+        self.assertNotIn('attempts',projection)
+        self.assertEqual(legacy['1']['review'],response)
+        clean = {'plans':[deepcopy(response['plans'][0])],'lessons':['检查生成依据']}
+        clean_plan = clean['plans'][0]
+        clean_plan.update(evidence_reason='拆分查询新增 Final 命中为 0，标准引文已进入 Final',conclusion='归因待验证')
+        clean_case = clean_plan['case_reviews'][0]
+        clean_case.update(reason='拆分查询未新增 Final 命中，标准引文已进入 Final',
+                          fact_claims={'候选判对':True,'候选增强新增命中':fact['候选增强新增命中']})
+        legacy['1']['review'] = clean
+        safe = round_conclusions_for_prompt(self.store,self.store.evaluation_run('BASE'),
+                                            self.store.experiment(exp)['candidates'],legacy)['1']['review']
+        self.assertEqual(safe['plans'][0]['case_reviews'][0]['reason'],clean_case['reason'])
+        self.assertEqual(safe['lessons'],clean['lessons'])
+        clean_case['fact_claims']['候选判对'] = False
+        contradicted = round_conclusions_for_prompt(self.store,self.store.evaluation_run('BASE'),
+                                                    self.store.experiment(exp)['candidates'],legacy)['1']['review']
+        self.assertEqual(contradicted['plans'][0]['case_reviews'][0]['reason'],'解释与程序事实冲突')
+        clean_case['fact_claims']['候选判对'] = True
+        clean_case['reason'] = '拆分查询新增 Final 命中为 3'
+        contradicted = round_conclusions_for_prompt(self.store,self.store.evaluation_run('BASE'),
+                                                    self.store.experiment(exp)['candidates'],legacy)['1']['review']
+        self.assertEqual(contradicted['plans'][0]['case_reviews'][0]['reason'],'解释与程序事实冲突')
+        provider.complete.assert_called_once()
+
     def test_d_only_uses_two_authorized_modes_and_verified_changes(self):
         from app.agent_strategy import validate_d_mode
         winner={'id':'A','status':'evaluated','reasoning':{'candidate_label':'A'},'result':{'qualification':{'qualified':True}}}

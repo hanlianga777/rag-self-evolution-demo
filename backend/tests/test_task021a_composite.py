@@ -51,11 +51,27 @@ class RefinementTests(unittest.TestCase):
         self.assertEqual(config,{**self.winner_config,'top_k':6})
         self.assertEqual(records[0]['source_type'],'verified')
 
+    def test_two_edit_winner_can_replace_an_edit(self):
+        from app.composite import parameter_diff
+        self.winner['config'].update(candidate_k=12, hybrid_alpha=0.7, query_decompose=True)
+        self.facts=build_d_facts(self.store,self.store.evaluation_run(self.baseline),self.winner,[self.winner,self.other])
+        value=self.suggestion()
+        value['proposed_config_diff']['query_decompose']=False
+        value['changes'].append({**deepcopy(value['changes'][0]),'parameter':'query_decompose'})
+        config,_=self.validate(value)
+        self.assertEqual(parameter_diff(config,DEFAULT_PIPELINE_CONFIG),{'top_k':6,'hybrid_alpha':0.7})
+        value['proposed_config_diff'].pop('query_decompose')
+        with self.assertRaisesRegex(ValueError,'相对 Baseline 最多改 2'):
+            self.validate(value)
+        value['proposed_config_diff']={'query_decompose':True}
+        with self.assertRaisesRegex(ValueError,'D必须不同于 Winner'):
+            self.validate(value)
+
     def test_rejections(self):
         cases=[]
         v=self.suggestion();v['proposed_config_diff']={'top_k':5};cases.append((v,'Pipeline'))
         v=self.suggestion();v['proposed_config_diff'].update(query_rewrite=True,hyde=True);cases.append((v,'2'))
-        v=self.suggestion();v['proposed_config_diff']={'candidate_k':12};cases.append((v,'Winner'))
+        v=self.suggestion();v['proposed_config_diff']={'candidate_k':24};cases.append((v,'D必须不同于 Winner'))
         v=self.suggestion();del v['changes'][0]['side_effect_check'];cases.append((v,'副作用'))
         v=self.suggestion();v['proposed_config_diff']={'hyde':True};v['changes'][0].update(parameter='hyde',source_type='new_attempt',source_candidates=[]);cases.append((v,'已验证'))
         v=self.suggestion();v['changes'][0]['target_question_ids']=['q3'];cases.append((v,'剩余 Bad Case'))

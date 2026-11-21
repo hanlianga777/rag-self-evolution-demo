@@ -6,7 +6,7 @@ from .agent_inputs import evidence_positions, new_failure_ids
 from . import rules
 from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, FIXED_PIPELINE_PARAMETERS, GATE_DEFINITIONS, PARAMETER_EXPLANATIONS, validate_candidate_config
 
-D_FACTS_VERSION = 'winner-refinement-2'
+D_FACTS_VERSION = 'winner-refinement-3'
 
 
 def retryable_d_decision(previous):
@@ -98,7 +98,7 @@ def build_d_facts(store, baseline, winner, history):
                 description = '；'.join(f"{PARAMETER_EXPLANATIONS[k][0].split('：')[0]}：观察时 {plain(v['observed'])}，Winner {plain(v['winner'])}" for k,v in prerequisites.items())
                 observation.update(winner_config_diff=differences, prerequisite_differences=prerequisites,
                                    premise_label='前提不同：'+description if prerequisites else '前提与 Winner 相同')
-    facts = {'version':D_FACTS_VERSION, 'winner_id':winner['id'], 'winner_config':pipeline_config(winner['config']),
+    facts = {'version':D_FACTS_VERSION, 'baseline_config':base, 'winner_id':winner['id'], 'winner_config':pipeline_config(winner['config']),
         'winner_preserved_diff':parameter_diff(winner['config'],base), 'qualified_candidate_ids':[r['candidate_id'] for r in records if r['qualified']],
         'remaining_failures':[{'question_id':q, 'evidence_positions':positions(winner['id'],q),
             'historical_fixes':[{**r,'evidence_positions':positions(r['candidate_id'],q)} for r in records if cases.get(r['candidate_id'],{}).get(q,{}).get('passed') is True]} for q in remaining],
@@ -115,14 +115,16 @@ def build_d_facts(store, baseline, winner, history):
 
 def usable_repairs(facts):
     """Identify historical repairs supported by saved Winner positions, not predicted gains."""
-    winner = facts['winner_config']; preserved = facts['winner_preserved_diff']; repairs = []
+    base = facts['baseline_config']; winner = facts['winner_config']; repairs = []
+    tunable = set(rules.AGENT['tunable'])
+    limit = rules.AGENT['max_changed_parameters']
     for failure in facts['remaining_failures']:
         positions = failure['evidence_positions']
         if not isinstance(positions,list):continue
         for source in failure['historical_fixes']:
             if failure['question_id'] not in source['fixed_question_ids']:continue
             for key,value in parameter_diff(source['config'],winner).items():
-                if key in preserved or key not in rules.AGENT['tunable']:continue
+                if key not in tunable:continue
                 evidence = []
                 for pos in positions:
                     final,rank,candidate = (pos.get(stage) for stage in ('final','reranked','candidates'))
@@ -138,27 +140,40 @@ def usable_repairs(facts):
                         supported = candidate=='未进入'
                     if supported:evidence.append(pos)
                 if not evidence:continue
-                # A whole historical bundle or a real one-parameter contrast must
-                # remain usable without undoing the Winner or exceeding two edits.
+                # Try the historical bundle first, then an isolated contrast.
+                # Where the cap would be exceeded, restore only enough Winner
+                # parameters to Baseline to fit, keeping the source values intact.
                 bundle = source['parameter_diff']
-                whole = {**winner,**bundle}
+                whole = {**bundle, key:value}
                 contrast_ids = [c['id'] for c in facts['contrasts'] if c['parameter']==key and source['candidate_id'] in c['candidate_ids']]
-                configs = [('verified',whole)] + ([('partial',{**winner,key:value})] if contrast_ids else [])
-                for kind,config in configs:
-                    diff = parameter_diff(config,winner)
-                    if (not diff or set(diff) - set(rules.AGENT['tunable']) or
-                            len(diff.keys() | preserved.keys()) > rules.AGENT['max_changed_parameters'] or
-                            any(k in diff for k in preserved)):
-                        continue
-                    effective = {k:v for k,v in config.items() if k!='hybrid_alpha' or config['hybrid_search'] is not False}
-                    if key not in effective or not validate_candidate_config(effective)['valid']:continue
-                    repairs.append({'question_id':failure['question_id'],'parameter':key,'value':value,
-                        'source_candidate_id':source['candidate_id'],'source_type':kind,
-                        'proposed_config_diff':diff,'contrast_ids':contrast_ids if kind=='partial' else [],
-                        'evidence_basis':'Winner 保存的证据位置支持验证：'+json.dumps(evidence,ensure_ascii=False),
-                        'note':'历史伴随修好，不承诺D修好；副作用必须通过Sandbox验证'})
-                    break
+                bundles = [('verified',whole)] + ([('partial',{key:value})] if contrast_ids else [])
+                for kind,selected in bundles:
+                    before = len(repairs)
+                    config = {**winner,**selected}
+                    delta = parameter_diff(config,base)
+                    excess = max(0,len(delta)-limit)
+                    restorable = sorted((delta.keys() - selected.keys()) & tunable)
+                    for restore in combinations(restorable,excess):
+                        proposal = {**config, **{k:base[k] for k in restore}}
+                        diff = parameter_diff(proposal,winner)
+                        if set(diff) - tunable:continue
+                        effective = effective_d_config(proposal,diff)
+                        if effective is None or key not in effective:continue
+                        repairs.append({'question_id':failure['question_id'],'parameter':key,'value':value,
+                            'source_candidate_id':source['candidate_id'],'source_type':kind,
+                            'proposed_config_diff':diff,'contrast_ids':contrast_ids if kind=='partial' else [],
+                            'evidence_basis':'Winner 保存的证据位置支持验证：'+json.dumps(evidence,ensure_ascii=False),
+                            'note':'历史伴随修好，不承诺D修好；副作用必须通过Sandbox验证'})
+                    if len(repairs)>before:
+                        break
     return repairs
+
+
+def effective_d_config(config, changes):
+    effective = {k:v for k,v in config.items() if k!='hybrid_alpha' or config['hybrid_search'] is not False}
+    if ('hybrid_alpha' in changes and 'hybrid_alpha' not in effective) or not validate_candidate_config(effective)['valid']:
+        return None
+    return effective
 
 
 def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
@@ -169,14 +184,12 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
     base = pipeline_config(baseline_config)
     winner_config = pipeline_config(winner['config'])
     config = pipeline_config({**winner_config, **diff})
-    effective_config = {k:v for k,v in config.items() if k!='hybrid_alpha' or config['hybrid_search'] is not False}
-    if ('hybrid_alpha' in diff and config['hybrid_search'] is False) or not validate_candidate_config(effective_config)['valid']:
+    effective_config = effective_d_config(config,diff)
+    if effective_config is None:
         raise ValueError('取值不在Pipeline ALLOWED_SEARCH_SPACE选项里，hybrid_alpha仅在 Hybrid Search 开启时可选')
     changes = parameter_diff(config,winner_config)
     if len(parameter_diff(config, base)) > rules.AGENT['max_changed_parameters']:
         raise ValueError(f"相对 Baseline 最多改 {rules.AGENT['max_changed_parameters']} 个参数")
-    if any(k not in effective_config or effective_config[k]!=v or type(effective_config[k]) is not type(v) for k,v in parameter_diff(winner_config,base).items()):
-        raise ValueError('不得撤销或改变 Winner 自己的改动')
     if not changes:raise ValueError('D必须不同于 Winner')
     rows = suggestion.get('changes')
     if not isinstance(rows,list) or len(rows)!=len(changes) or any(not isinstance(r,dict) for r in rows) or {r.get('parameter') for r in rows}!=set(changes):

@@ -117,28 +117,52 @@ def baseline_bad_case_rows(store, baseline):
                                             if row['run_id'] == baseline['id']])
 
 
-def case_comparisons(baseline_cases, candidate_cases, questions=None):
+def case_comparisons(baseline_cases, candidate_cases, questions=None, *, include_facts=False):
     """Compare saved evidence as actually rendered, never infer from configuration."""
     import re
     from .ai_service import generation_context
     questions = questions or {}
+    baselines = {c['question_id']:c for c in baseline_cases}
     saved = {c['question_id']:c for c in candidate_cases}
     rows = []
-    for baseline in baseline_cases:
-        key = baseline['question_id']
-        current = saved.get(key)
-        if not current:
+    keys = dict.fromkeys([*baselines,*saved,*questions]) if include_facts else baselines
+
+    def enhancement_hits(trace):
+        effect = trace.get('enhancement')
+        if not effect:
+            return None
+        fields = ('new_candidates','new_final_hits')
+        return {**{k:effect.get(k) for k in fields},
+                'by_method':{method:{k:counts.get(k) for k in fields}
+                             for method,counts in (effect.get('by_method') or {}).items()}}
+
+    for key in keys:
+        baseline = baselines.get(key,{})
+        current = saved.get(key,{})
+        if not current and not include_facts:
             continue
+        question = questions.get(key,{})
         left = (baseline.get('programmatic_metrics') or {}).get('retrieval_trace') or {}
         right = (current.get('programmatic_metrics') or {}).get('retrieval_trace') or {}
         changed = (generation_context(left['final']) != generation_context(right['final'])
                    if isinstance(left.get('final'),list) and isinstance(right.get('final'),list) else None)
         match = re.search(r'(\d{1,3})$', key)
-        display = baseline.get('display_question_id') or (f'Q{int(match[1]):02d}' if match else '未知')
+        display = (baseline.get('display_question_id') or current.get('display_question_id')
+                   or question.get('display_id') or question.get('coverage_slot')
+                   or (f'Q{int(match[1]):02d}' if match else '未知'))
         state = ('修好' if baseline.get('passed') is False and current.get('passed') is True else
                  '新错' if baseline.get('passed') is True and current.get('passed') is False else
                  '仍错' if current.get('passed') is False else '仍对')
-        rows.append({'题号':display, '题目键':key, '变化':state, '证据变化':changed,
-                     '缺少要点':unmet_required_points(current, questions.get(key, {})),
-                     '判分原因':current.get('judge_result',{}).get('reason') or '未知'})
+        row = {'题号':display, '题目键':key, '变化':state, '证据变化':changed,
+               '缺少要点':unmet_required_points(current, question),
+               '判分原因':current.get('judge_result',{}).get('reason') or '未知'}
+        if include_facts:
+            left_passed, right_passed = baseline.get('passed'), current.get('passed')
+            row.update({'基线判对':left_passed if type(left_passed) is bool else None,
+                        '候选判对':right_passed if type(right_passed) is bool else None,
+                        '基线标准证据位置':evidence_positions(question,left), '候选标准证据位置':evidence_positions(question,right),
+                        '基线增强新增命中':enhancement_hits(left), '候选增强新增命中':enhancement_hits(right)})
+            if type(left_passed) is not bool or type(right_passed) is not bool:
+                row['变化'] = '未知'
+        rows.append(row)
     return rows
