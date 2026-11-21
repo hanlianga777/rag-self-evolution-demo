@@ -1176,7 +1176,7 @@ class EvaluationRunner:
         regression['passed'] = regression['passed'] and comparison['comparison_complete']
         regression['status'] = 'NOT_EVALUABLE' if not comparison['comparison_complete'] else 'PASS' if regression['passed'] else 'FAIL'
         qualification = qualify_candidate(run["result"]["gates"], regression, comparison['target_bad_cases_fixed'], len(failed), comparison['bad_case_count'],
-                                          rule_version=CANDIDATE_QUALIFICATION_VERSION if candidate['reasoning'].get('candidate_label') in {'A', 'B', 'C'} else None)
+                                          rule_version=CANDIDATE_QUALIFICATION_VERSION if candidate['reasoning'].get('candidate_label') in {'A', 'B', 'C', 'D'} else None)
         if run['status'] != 'completed':
             qualification = {**qualification, 'qualified': False}
         result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], "error": run.get("error_message"), **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "release_qualification": qualify_release(run["result"]["gates"], regression, len(comparison["all_fixed_question_ids"]), len(failed), comparison['bad_case_count']), "recommendation": None}
@@ -1190,7 +1190,7 @@ class EvaluationRunner:
                                        'blocking_reason': no_effect['reason']}
             result['release_qualification'] = {**result['release_qualification'], 'qualified': False}
         if candidate['reasoning'].get('candidate_label') == 'D':
-            result['qualification'] = result['release_qualification']
+            result['release_qualification'] = result['qualification']
             winner = self.store.candidate(candidate['reasoning']['winner_id'])
             winner_cases = {item['question_id']: item for item in self.store.evaluation_case_results(winner['result']['evaluation_run_id'])}
             newly_failed = [key for key, item in winner_cases.items() if item.get('passed') and not candidate_cases.get(key, {}).get('passed')]

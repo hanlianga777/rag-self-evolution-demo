@@ -103,6 +103,35 @@ def test_qualification_reassessment_preserves_saved_qualification(tmp_path):
     assert saved['qualification'] == old
 
 
+def test_d_with_new_baseline_failure_is_not_qualified(tmp_path):
+    import json
+    from app.evaluation import EvaluationRunner
+    from app.governance import GovernanceStore
+
+    store = GovernanceStore(tmp_path / 'composite-qualification.db')
+    baseline = {'id': 'baseline', 'judge': {'evaluation_identity': 'frozen'}}
+    experiment = store.create_experiment(baseline['id'])
+    winner = f'{experiment}-R1-C'
+    store.save_candidate(experiment, 'R1-C', {}, {'round': 1, 'candidate_label': 'C'})
+    store.finish_candidate(winner, 'evaluated', {'evaluation_run_id': 'winner', 'bad_case_count': 2})
+    store.save_candidate(experiment, 'D', {}, {'candidate_label': 'D', 'winner_id': winner})
+    with store.connection() as db:
+        for run_id, outcomes in [('baseline', (True, False)), ('winner', (False, False)), ('composite', (False, True))]:
+            for question, passed in zip(['Q22', 'Q27'], outcomes):
+                db.execute('INSERT INTO evaluation_case_results(run_id,question_id,result_json) VALUES (?,?,?)',
+                           (run_id, question, json.dumps({'passed': passed})))
+    run = {'id': 'composite', 'status': 'completed', 'judge': baseline['judge'],
+           'result': {'evaluation_complete': True, 'gates': {'passed': True, 'passed_count': 11, 'total': 11}}}
+    candidate = store.candidate(f'{experiment}-D')
+    result = EvaluationRunner(store, None).finalize_saved_candidate(run, candidate, baseline)['result']
+    assert result['new_regression_question_ids'] == ['Q22']
+    assert result['all_fixed_question_ids'] == ['Q27']
+    assert result['qualification']['qualified'] is False
+    assert result['qualification']['rule_version'] == '2026-11-20b'
+    assert result['release_qualification']['qualified'] is False
+    assert result['winner_comparison']['promote'] is False
+
+
 # ---------- 一.6：严重题只看冻结题卷 ----------
 
 def test_protected_question_ignores_dynamic_severity():
