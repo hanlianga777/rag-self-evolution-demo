@@ -11,7 +11,7 @@ from .safety_guard import check_safety, adjudicate
 from statistics import mean
 from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims, validate_business_judgment, business_check_roles, quote_present
 
-from .policy import DEFAULT_PIPELINE_CONFIG, calculate_overall_score, evaluate_gates, evaluate_regression, qualify_candidate, qualify_release, protected_question
+from .policy import CANDIDATE_QUALIFICATION_VERSION, DEFAULT_PIPELINE_CONFIG, calculate_overall_score, evaluate_gates, evaluate_regression, qualify_candidate, qualify_release, protected_question
 
 
 ROOT_CAUSE_BY_TAG = {
@@ -1175,7 +1175,8 @@ class EvaluationRunner:
         regression.update(comparison)
         regression['passed'] = regression['passed'] and comparison['comparison_complete']
         regression['status'] = 'NOT_EVALUABLE' if not comparison['comparison_complete'] else 'PASS' if regression['passed'] else 'FAIL'
-        qualification = qualify_candidate(run["result"]["gates"], regression, comparison['target_bad_cases_fixed'], len(failed), comparison['bad_case_count'])
+        qualification = qualify_candidate(run["result"]["gates"], regression, comparison['target_bad_cases_fixed'], len(failed), comparison['bad_case_count'],
+                                          rule_version=CANDIDATE_QUALIFICATION_VERSION if candidate['reasoning'].get('candidate_label') in {'A', 'B', 'C'} else None)
         if run['status'] != 'completed':
             qualification = {**qualification, 'qualified': False}
         result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], "error": run.get("error_message"), **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "release_qualification": qualify_release(run["result"]["gates"], regression, len(comparison["all_fixed_question_ids"]), len(failed), comparison['bad_case_count']), "recommendation": None}

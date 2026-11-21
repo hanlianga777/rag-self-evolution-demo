@@ -895,6 +895,9 @@ class OptimizationAgent:
         if audit['round_policy'].get('mode') == 'full_rounds':
             prompt['proposal_generation'] = {'round':round_number, 'prior_failed_batches':
                 context.get('optimization_cycle', {}).get('proposal_generation_failures', [])}
+        focus = context.get('round_focus', {}).get(str(round_number))
+        if focus:
+            prompt['user_round_focus'] = focus
         audit['bad_case_groups'] = prompt['bad_case_groups']
         audit['agent_strategy'] = '自主优化'
         audit['baseline_diagnosis_summary'] = prompt['baseline_diagnosis_summary']

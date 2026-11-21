@@ -101,7 +101,10 @@ def protected_question(case, golden=None):
 
 
 
-def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int, baseline_bad_case_count: int, candidate_bad_case_count: int) -> dict:
+CANDIDATE_QUALIFICATION_VERSION = '2026-11-20b'
+
+
+def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int, baseline_bad_case_count: int, candidate_bad_case_count: int, *, rule_version: str | None = None) -> dict:
     counts_valid = all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in (target_bad_cases_fixed, baseline_bad_case_count, candidate_bad_case_count))
     # 规则总表五.5（用户 2026-11-18 改回朋友口径）：11 项门槛全过 + 新增严重题 0 即合格。
     # 错题总数、普通新增题只作记录和排序依据，不作资格条件（朋友按门槛平均分判合格，单题翻转不改变资格）。
@@ -109,8 +112,15 @@ def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int
         "hard_gates": gates.get("passed") is True,
         "regression": regression.get("passed") is True,
     }
+    version = {}
+    if rule_version == CANDIDATE_QUALIFICATION_VERSION:
+        fixed = regression.get('all_fixed_question_ids')
+        checks.update(comparison_complete=regression.get('comparison_complete') is True,
+                      zero_new_failures=regression.get('new_regression_question_ids') == [],
+                      at_least_one_fixed=isinstance(fixed, list) and bool(fixed))
+        version['rule_version'] = rule_version
     qualified = all(checks.values())
-    return {"qualified": qualified, "status": "QUALIFIED" if qualified else "NOT_QUALIFIED", "checks": checks,
+    return {**version, "qualified": qualified, "status": "QUALIFIED" if qualified else "NOT_QUALIFIED", "checks": checks,
             "target_bad_cases_fixed": target_bad_cases_fixed if counts_valid else None,
             "bad_case_reduction": baseline_bad_case_count - candidate_bad_case_count if counts_valid else None}
 

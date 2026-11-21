@@ -3007,6 +3007,10 @@ class GovernanceStore:
 
     def _candidate_result(self, connection, row, *, light=False):
         result=_load(row['result_json'],{})
+        reassessment = result.pop('qualification_reassessment', None)
+        if reassessment is not None:
+            result['old_qualification'] = result['qualification']
+            result['qualification'] = reassessment
         result['regression_review'] = self._regression_review(connection, row, result)
         if light:
             return {key:value for key,value in result.items() if key!='checkpoints'}

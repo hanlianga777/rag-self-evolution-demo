@@ -118,11 +118,26 @@ export function candidateSummary(candidate: any, baseline: Record<string, unknow
 export function CandidateResultSummary({ result }: { result: any }) {
   const fixed = `修好 ${questions(result.all_fixed_question_ids)}`;
   const broken = `新错 ${questions(newFailures(result))}`;
-  const metrics = `${scoreText(result)} · 门槛 ${gatesText(result)} · ${qualification(result)}`;
+  const reasons = qualificationReasons(result);
+  const verdict = reasons ? `未通过（${reasons}）` : qualification(result);
+  const oldVerdict = typeof result.old_qualification?.qualified === 'boolean'
+    ? ` · 旧规则版本：${qualification({ qualification: result.old_qualification })}` : '';
+  const metrics = `${scoreText(result)} · 门槛 ${gatesText(result)} · ${verdict}${oldVerdict}`;
   return <span className="summary-text candidate-result-line" title={`${fixed} · ${broken} · ${metrics}`}>
     <span className="result-fixed">{fixed}</span><span> · </span>
     <span className="result-broken">{broken}</span><span> · </span><span>{metrics}</span>
   </span>;
+}
+
+export function qualificationReasons(result: any): string {
+  const checks = result.qualification?.checks;
+  if (!result.qualification?.rule_version || result.qualification?.qualified || !checks) return '';
+  if (checks.comparison_complete === false) return '逐题对比不完整';
+  return [checks.hard_gates === false && 'Hard Gate 未通过',
+    checks.regression === false && '严重题回退',
+    checks.zero_new_failures === false && `新错 ${questions(newFailures(result))}`,
+    checks.at_least_one_fixed === false && '无修复',
+  ].filter(Boolean).join('、');
 }
 
 function comparisonValues(candidate: any, baseline: any) {

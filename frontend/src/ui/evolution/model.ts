@@ -64,7 +64,7 @@ export function candidateView(candidate: any, baselineConfig: Record<string, unk
     key, label: PARAM_LABELS[key] ?? key, to: paramValue(key, value),
     from: baselineConfig && key in baselineConfig ? paramValue(key, baselineConfig[key]) : undefined,
   })).filter(item => item.from === undefined || item.from !== item.to);
-  const qualification = result.release_qualification ?? result.qualification;
+  const qualification = result.qualification?.rule_version ? result.qualification : result.release_qualification ?? result.qualification;
   const total = typeof result.total_cases === "number" ? result.total_cases : typeof result.case_count === "number" ? result.case_count : 50;
   const bad = typeof result.bad_case_count === "number" ? result.bad_case_count : null;
   return {

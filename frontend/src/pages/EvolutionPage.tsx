@@ -1,6 +1,6 @@
 import { pagePurpose } from "../helpText";
 import { RoundConclusion } from '../components/RoundStrategy';
-import { CandidateOverviewTable, CandidateResultSummary, SummaryText, candidateStrategyName, candidateSummary, evaluatedCandidate } from '../components/AgentStrategySummary';
+import { CandidateOverviewTable, CandidateResultSummary, SummaryText, candidateStrategyName, candidateSummary, evaluatedCandidate, qualificationReasons } from '../components/AgentStrategySummary';
 import { yuanText } from "../components/PipelineFields";
 import { judgePresentation } from "../components/judgePresentation";
 import { agentDisplayText } from "../display";
@@ -454,6 +454,8 @@ function targetRows(candidate: any, rows: any[]): any[] {
 }
 function qualificationExplanation(candidate:any):string {
   if(candidate.status!=="evaluated")return candidate.status==="failed"?"运行失败；部分结果不能代表资格结论。":"实验尚未完成，不预判资格。";
+  const currentReasons = qualificationReasons(candidate.result || {});
+  if (currentReasons) return currentReasons;
   if(candidate.result?.qualification?.qualified===true && candidate.result?.release_qualification?.qualified===false){
     const releaseNames:Record<string,string>={hard_gates:'Hard Gate 未通过',zero_new_failures:'存在新增 Bad Case，不满足零新增的发布条件',at_least_one_fixed:'未修好原问题'};
     return Object.entries(candidate.result.release_qualification.checks || {}).filter(([,passed])=>passed===false).map(([key])=>releaseNames[key] || '其他保存的发布条件未通过').join('；') || '候选合格，但保存的发布资格未通过。';

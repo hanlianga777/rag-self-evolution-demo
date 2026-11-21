@@ -68,6 +68,41 @@ def test_target_fix_is_not_a_condition_anymore():
     assert qualify_candidate(GATES_OK, regression(0, 0), 0, 8, 7)["qualified"]
 
 
+@pytest.mark.parametrize('new,fixed,complete,qualifies', [
+    (['Q22'], ['Q17', 'Q21', 'Q27'], True, False),
+    ([], [], True, False),
+    ([], ['Q05', 'Q21', 'Q27'], True, True),
+    ([], ['Q05'], False, False),
+])
+def test_2026_11_20b_qualification(new, fixed, complete, qualifies):
+    comparison = {**regression(0, len(new)), 'comparison_complete': complete,
+                  'new_regression_question_ids': new, 'all_fixed_question_ids': fixed}
+    assert qualify_candidate(GATES_OK, comparison, 0, 5, 5)['qualified'] is True
+    result = qualify_candidate(GATES_OK, comparison, 0, 5, 5, rule_version='2026-11-20b')
+    assert result['rule_version'] == '2026-11-20b'
+    assert result['qualified'] is qualifies
+
+
+def test_qualification_reassessment_preserves_saved_qualification(tmp_path):
+    import json
+    from app.governance import GovernanceStore
+    from app.optimization_cycle import _qualified_abc
+
+    store = GovernanceStore(tmp_path / 'qualifications.db')
+    experiment = store.create_experiment('baseline')
+    old, new = {'qualified': True}, {'qualified': False, 'rule_version': '2026-11-20b'}
+    store.save_candidate(experiment, 'round-1-a', {}, {'round': 1, 'candidate_label': 'A'})
+    store.finish_candidate(f'{experiment}-round-1-a', 'evaluated', {'qualification': old, 'qualification_reassessment': new})
+    view = store.experiment(experiment, light=True)
+    result = view['candidates'][0]['result']
+    assert result['qualification'] == new
+    assert result['old_qualification'] == old
+    assert _qualified_abc(view) == []
+    with store.connection() as db:
+        saved = json.loads(db.execute('SELECT result_json FROM candidate_configs').fetchone()[0])
+    assert saved['qualification'] == old
+
+
 # ---------- 一.6：严重题只看冻结题卷 ----------
 
 def test_protected_question_ignores_dynamic_severity():

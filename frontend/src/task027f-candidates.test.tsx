@@ -76,6 +76,19 @@ it('027f2 removes redundant card wrappers and the comparison subtitle',async()=>
  await click('进化路线');await click('Round 1');expect([...document.querySelectorAll('h2')].some(e=>e.textContent==='Candidate A / B / C')).toBe(false);
  expect(document.querySelectorAll('.candidate-cards .candidate-card')).toHaveLength(3);
 });
+it('shows the reassessed qualification beside the original result',async()=>{
+ const plans=data.optimization.candidates.filter((c:any)=>c.reasoning.round===1);
+ for(const [index,label] of ['A','B'].entries()){
+  const result=plans.find((c:any)=>c.reasoning.candidate_label===label).result;
+  result.old_qualification={qualified:true};
+  result.qualification={qualified:false,rule_version:'2026-11-20b',checks:{zero_new_failures:index===1,at_least_one_fixed:index===0}};
+  result.new_regression_question_ids=index===0?['Q22']:[];
+ }
+ await mount();await click('进化路线');
+ const cards=Array.from(document.querySelectorAll('.candidate-cards .candidate-card'));
+ expect(cards.find(card=>card.textContent?.includes('Candidate A'))?.textContent).toContain('未通过（新错 Q22） · 旧规则版本：合格');
+ expect(cards.find(card=>card.textContent?.includes('Candidate B'))?.textContent).toContain('未通过（无修复） · 旧规则版本：合格');
+});
 it('027f2 explains regression limits alongside every failed Hard Gate',async()=>{
  const ordinary=data.optimization.candidates.find((c:any)=>c.reasoning.round===2 && c.reasoning.candidate_label==='A');
  const mixed=data.optimization.candidates.find((c:any)=>c.reasoning.round===1 && c.reasoning.candidate_label==='C');
