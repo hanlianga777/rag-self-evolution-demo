@@ -32,7 +32,7 @@ it('keeps candidate summaries uniform and saves full risk prose for the disclosu
  await mount(<EvolutionPage data={{evaluation:{id:'base',config:{top_k:4}},optimization:{id:'exp',candidates}}}/>);
  await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='进化路线')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
  for(const card of document.querySelectorAll('.candidate-card')){
-  expect(card.querySelectorAll('.candidate-summary-row')).toHaveLength(4);
+  expect(card.querySelectorAll('.candidate-summary-row')).toHaveLength(7);
   const details=card.querySelector<HTMLDetailsElement>('details')!;
   expect(details.open).toBe(false);
   const risk=[...details.querySelectorAll('p')].find(p=>p.textContent?.startsWith('风险 ·'))!;

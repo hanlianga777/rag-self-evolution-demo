@@ -25,7 +25,7 @@ export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason,
     <div className="ui-fin-top">
       <div>
         <span className="ui-rel-k"><IconLabel name="recommend">最终推荐</IconLabel></span>
-        <h2>{totalCandidates != null ? `${totalCandidates} 个 Candidate 中只有 ${qualifiedCount ?? 0} 个通过回归检查，最终推荐 ${chosen.name}` : chosen.name}</h2>
+        <h2>{totalCandidates != null ? `${chosen.qualificationVersion || "版本当时未保存"} · ${totalCandidates} 个已判定方案中 ${qualifiedCount ?? 0} 个合格，最终推荐 ${chosen.name}` : chosen.name}</h2>
         <ol className="ui-fin-reason"><li>一、质量：答对 {cnt(chosen)}。{reason}</li><li>二、安全：{chosen.gateFailures.length?chosen.gateFailures.join('；'):chosen.gates?`上线门槛 ${chosen.gates.passed}/${chosen.gates.total}`:'未知'}。</li><li>三、速度：中位耗时 {sec(chosen.p50)}；最慢耗时 {sec(chosen.p99)}。</li><li>四、回归：新增严重 {chosen.regression?.new_critical_failures ?? '未知'}；新增一般 {chosen.regression?.new_ordinary_failures ?? '未知'}。</li></ol>
       </div>
       {onRelease && <button type="button" className="primary" onClick={onRelease}><Icon name="release" size={15} />{releaseLabel}</button>}
@@ -51,7 +51,7 @@ export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason,
 }
 
 const delta = (value: number) => value > 0 ? `+${value}` : String(value);
-const cnt = (item: CandidateView) => item.correct == null ? "未知" : `${item.correct} / ${item.total ?? 50}`;
+const cnt = (item: CandidateView) => item.correct == null ? "未知" : `${item.correct} / ${item.total ?? "未知"}`;
 const sec = (value: number | null) => value == null ? "未知" : `${value.toFixed(1)} 秒`;
 function cmp(a: number | null, b: number | null, better: "higher" | "lower"): "a" | "b" | null {
   if (a == null || b == null || a === b) return null;

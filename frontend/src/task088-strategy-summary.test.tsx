@@ -47,11 +47,9 @@ it.each([
   await mount({ ...saved, agent_strategies: { 1: strategy } }, [candidate]);
   expect([...document.querySelectorAll('.candidate-card-summary .summary-text')].map(line => line.textContent)).toEqual([
     'Candidate A · 扩大召回', 'Candidate K 12 → 24；Top-K 4 → 6', '检索层 2 题：Q16、Q20', basis,
-    '修好 Q16、Q20 · 新错 无 · 43/50 · 门槛 11/11 · 合格',
+    '修好 Q16、Q20 · 新错 无 · 43/50 · 门槛 11/11',
   ]);
-  const thought = document.querySelector<HTMLDetailsElement>('.candidate-card details');
-  expect(thought?.open).toBe(false);
-  expect(thought?.textContent).toContain('检查靠后的证据');
+  expect(document.querySelector('.candidate-card details')?.textContent).toContain('检查靠后的证据');
 });
 
 it('汇总各轮和未运行的方案，只显示完成评测的成绩', async () => {
@@ -71,6 +69,56 @@ it('汇总各轮和未运行的方案，只显示完成评测的成绩', async (
     ['41/50', '43/50', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
     ['—', 'Q16、Q20', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
     ['—', '无', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
-    ['—', '合格', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
+    ['—', '合格规则版本：当时未保存', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
   ]);
+});
+
+it('uses saved reassessments as the main A/B verdict and preserves the former verdict in route and review', async () => {
+  const reassessed = [
+    { label: 'A', checks: { zero_new_failures: false }, fresh: ['Q22'], verdict: '不合格 · 新错 Q22' },
+    { label: 'B', checks: { at_least_one_fixed: false }, fresh: [], verdict: '不合格 · 无修复' },
+  ].map(({ label, checks, fresh }) => ({
+    ...candidate, id: `EXP-R1-${label}`, reasoning: { ...candidate.reasoning, candidate_label: label },
+    result: { ...candidate.result, new_regression_question_ids: fresh, qualification_reassessment: {
+      qualified: false, rule_version: '2026-11-20b', checks,
+    } },
+  }));
+  await mount({}, reassessed);
+  const verdicts = ['不合格 · 新错 Q22', '不合格 · 无修复'];
+  expect([...document.querySelectorAll('.candidate-card-header .badge')].map(node => node.textContent)).toEqual(verdicts);
+  await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '回归与推荐')!.click());
+  const qualificationRow = document.querySelector('[aria-label="跨方案总表"] tbody tr:last-child');
+  expect(qualificationRow?.textContent).toContain('不合格 · 新错 Q22');
+  expect(qualificationRow?.textContent).toContain('不合格 · 无修复');
+  expect([...qualificationRow?.querySelectorAll('small') ?? []].filter(node => node.textContent === '旧规则版本：合格')).toHaveLength(2);
+  expect(document.body.textContent).not.toContain('选择合格 Winner');
+});
+
+it('switches from a new experiment to the read-only archive with its own saved Baseline', async () => {
+  const archive = 'EXP-20261120224619556715';
+  await mount({}, [candidate]);
+  const requests: string[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    expect(init?.method ?? 'GET').toBe('GET');
+    requests.push(url);
+    if (url.includes(`/experiments/${archive}`)) return Response.json({
+      id: archive, baseline_run_id: 'ARCHIVED-BASE', candidates: [{ ...candidate, status: 'generated' }], result: {},
+    });
+    if (url.endsWith('/evaluations/ARCHIVED-BASE')) return Response.json({ ...evaluation, id: 'ARCHIVED-BASE' });
+    if (url.includes('baseline_id=ARCHIVED-BASE')) return Response.json([]);
+    return Response.json({});
+  }));
+  const select = async (value: string) => act(async () => {
+    const input = document.querySelector<HTMLSelectElement>('[aria-label="选择 Agent 实验"]')!;
+    input.value = value;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await select('archive');
+  expect(document.body.textContent).toContain('Baseline ARCHIVED-BASE');
+  expect(requests.some(url => url.includes('baseline_id=ARCHIVED-BASE'))).toBe(true);
+  expect(document.body.textContent).not.toContain('跳过此 Candidate');
+  expect(document.body.textContent).not.toContain('运行本轮 A/B/C Sandbox');
+  await select('current');
+  expect(document.body.textContent).not.toContain('旧实验只读');
+  expect(document.querySelector('.candidate-result-line')?.textContent).toContain('43/50');
 });

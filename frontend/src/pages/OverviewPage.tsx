@@ -1,3 +1,4 @@
+import { currentQualification } from '../candidateQualification';
 import { pagePurpose } from "../helpText";
 import { usePageTab } from "../usePageTab";
 import { IconTile } from "../ui/icons";
@@ -41,26 +42,28 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const expectedCount = summary.expected_count || summary.total || 0;
   const experiment = newKnowledge && !run?.id ? {} : data.optimization?.baseline_run_id && data.optimization.baseline_run_id !== run?.id ? {} : data.optimization || {};
   const candidates: any[] = experiment.candidates || [];
-  const qualified = candidates.filter(candidate => candidate.result?.qualification?.qualified);
-  const recommendation = experiment?.recommendation?.result || experiment?.recommendation || {};
+  const qualified = candidates.filter(candidate => candidate.status === "evaluated" && candidate.result?.evaluation_complete !== false && currentQualification(candidate.result)?.qualified === true);
+  const recommendation = recommendationOf(experiment);
+  const recordedRecommendation = candidates.find(item => item.id === recommendation.recommended_candidate);
+  const invalidRecommendation = currentQualification(recordedRecommendation?.result)?.qualified === false;
+  const finalCandidate = invalidRecommendation ? undefined : recordedRecommendation;
   const frozen = !data.workspace?.requires_new_golden && expectedCount > 0 && (formal != null || goldenId === undefined && summary.approved >= expectedCount);
   const released = production?.provenance === "published";
   const productionLegacy = newKnowledge && !production?.snapshot?.knowledge_identity;
-  const currentReleased = knowledge?.legacy !== true && !productionLegacy && released && !!recommendation.recommended_candidate && production?.snapshot?.candidate_id === recommendation.recommended_candidate;
+  const currentReleased = knowledge?.legacy !== true && !productionLegacy && released && !!finalCandidate && production?.snapshot?.candidate_id === finalCandidate.id;
   const activeRound = Math.max(1, ...candidates.map(candidate => candidate.reasoning?.round || 1));
   const roundCandidates = candidates.filter(candidate => candidate.reasoning?.candidate_label !== "D" && (candidate.reasoning?.round || 1) === activeRound);
   const sandboxIncomplete = roundCandidates.some(candidate => candidate.status !== "evaluated" || candidate.result?.evaluation_complete === false);
   const sandboxPaused = experiment.result?.optimization_cycle?.price_pause?.paused || experiment.result?.price_pause?.paused || roundCandidates.some(candidate => candidate.result?.price_pause?.paused);
   const sandboxRunning = roundCandidates.some(candidate => ["running", "queued"].includes(candidate.status));
-  const next: [string, string, Page] = knowledge?.legacy ? ["建立知识处理 Pipeline", "完成 MinerU 与 Alibaba 连接配置后，在知识库重建真实知识资产。", "knowledge"] : newKnowledge && !frozen ? ["完成 Golden Dataset 重建", "新 Corpus 已激活；完成题目构造、校验与人工确认。", "governance"] : !frozen && needsRegeneration ? [`补齐失败题（${Math.max(0, expectedCount - (summary.total || 0))}）`, "当前 Golden Run 有失败题目，补齐后继续人工确认。", "governance"] : !frozen ? ["确认 Golden Dataset", "完成题目检查与 人工确认。", "governance"] : !run?.id || data.workspace?.requires_new_baseline || data.workspace?.baseline_unavailable_reason ? ["运行 Baseline", "使用已冻结的 Golden Dataset 生成正式诊断报告。", "evaluation"] : run.status !== "completed" ? [run.status === "failed" ? "重试 Baseline" : "等待 Baseline 完成", run.status === "failed" ? "正式评测失败，请查看错误并重试。" : "正式评测尚未完成，完成后才能运行 Agent。", "evaluation"] : !experiment?.id || !candidates.length ? ["运行优化 Agent", "依据真实 Bad Case 生成 A/B/C 优化 Candidate。", "evolution"] : sandboxIncomplete ? [sandboxPaused ? "Sandbox 已暂停" : sandboxRunning ? "等待 Sandbox 完成" : roundCandidates.some(candidate => candidate.status === "failed") ? "查看 Sandbox 中断" : "运行 Sandbox", "本轮 Candidate 尚无完整评测结果，请先查看进度。", "evolution"] : recommendation.status !== "Recommended" ? ["完成调优决策", "查看 Sandbox、人工确认与组合 Candidate D 的结果。", "evolution"] : !currentReleased ? ["人工确认发布", "核对推荐 Candidate 后由人确认发布。", "versions"] : ["查看 Candidate 对比", "比较正式 Baseline 与线上版本 的同题回答。", "verification"];
+  const next: [string, string, Page] = knowledge?.legacy ? ["建立知识处理 Pipeline", "完成 MinerU 与 Alibaba 连接配置后，在知识库重建真实知识资产。", "knowledge"] : newKnowledge && !frozen ? ["完成 Golden Dataset 重建", "新 Corpus 已激活；完成题目构造、校验与人工确认。", "governance"] : !frozen && needsRegeneration ? [`补齐失败题（${Math.max(0, expectedCount - (summary.total || 0))}）`, "当前 Golden Run 有失败题目，补齐后继续人工确认。", "governance"] : !frozen ? ["确认 Golden Dataset", "完成题目检查与 人工确认。", "governance"] : !run?.id || data.workspace?.requires_new_baseline || data.workspace?.baseline_unavailable_reason ? ["运行 Baseline", "使用已冻结的 Golden Dataset 生成正式诊断报告。", "evaluation"] : run.status !== "completed" ? [run.status === "failed" ? "重试 Baseline" : "等待 Baseline 完成", run.status === "failed" ? "正式评测失败，请查看错误并重试。" : "正式评测尚未完成，完成后才能运行 Agent。", "evaluation"] : !experiment?.id || !candidates.length ? ["运行优化 Agent", "依据真实 Bad Case 生成 A/B/C 优化 Candidate。", "evolution"] : sandboxIncomplete ? [sandboxPaused ? "Sandbox 已暂停" : sandboxRunning ? "等待 Sandbox 完成" : roundCandidates.some(candidate => candidate.status === "failed") ? "查看 Sandbox 中断" : "运行 Sandbox", "本轮 Candidate 尚无完整评测结果，请先查看进度。", "evolution"] : recommendation.status !== "Recommended" ? ["完成调优决策", "查看 Sandbox、人工确认与组合 Candidate D 的结果。", "evolution"] : invalidRecommendation ? ["核对正式资格", "保存的推荐方案未通过当前规则，去查看资格与实验结果。", "evolution"] : !currentReleased ? ["人工确认发布", "核对推荐 Candidate 后由人确认发布。", "versions"] : ["查看 Candidate 对比", "比较正式 Baseline 与线上版本 的同题回答。", "verification"];
   const stages: [string, string, Page][] = [
     ["知识库", `${data.documents?.length || 0} 份文档${knowledge?.identity ? "已索引" : "待建立新索引"}`, "knowledge"], ["Pipeline", newKnowledge ? "知识处理与检索已配置" : (production?.config ? "当前线上配置已保存" : "待配置"), "settings"],
     ["Golden Dataset", frozen ? `已冻结 · ${expectedCount} 题` : `待人工确认 · ${summary.approved || 0} / ${expectedCount || "—"} 题`, "governance"], ["Baseline", run?.result?.gates ? `${run.result.gates.passed_count}/${run.result.gates.total} Hard Gate 通过` : "待评测", "evaluation"],
     [displayText("Optimization Agent"), qualified.length ? `${qualified.length} 个合格 Candidate · ${qualified.map(row => schemeName(row)).join(" / ")}` : roundCandidates.length ? `${roundCandidates.filter(candidate => candidate.status === "evaluated" && candidate.result?.evaluation_complete !== false).length}/${roundCandidates.length} 个 Candidate 已评测` : experiment?.id ? "暂无 Candidate，等待生成" : "尚未生成优化 Candidate", "evolution"],
-    [displayText("Release"), currentReleased ? "当前推荐已发布" : recommendation.recommended_candidate ? "当前推荐待发布" : "尚无可发布 Candidate", "versions"],
+    [displayText("Release"), currentReleased ? "当前推荐已发布" : finalCandidate ? "当前推荐待发布" : "尚无可发布 Candidate", "versions"],
   ];
   const metrics = run?.status === "completed" && !run.requires_policy_upgrade && !data.workspace?.requires_policy_upgrade && !data.workspace?.requires_new_golden && !data.workspace?.requires_new_baseline && !data.workspace?.baseline_unavailable_reason && (data.workspace?.current_baseline_id === undefined || data.workspace.current_baseline_id === run.id) ? run.result : null;
-  const finalCandidate=candidates.find(c=>c.id===recommendationOf(experiment).recommended_candidate);
   const evolution = buildEvolutionModel(experiment, run?.config, key => gateNames[key] || key, schemeName);
   const openRoute = () => { location.hash = "evolution?tab=route"; };
   const turns = evolution.rounds.map(round => ({label: `Round ${round.round}`, text: round.round <= 2 && round.lesson ? round.lesson.text : round.summary, key: round.candidates.some(candidate => candidate.winner), onClick: openRoute}));

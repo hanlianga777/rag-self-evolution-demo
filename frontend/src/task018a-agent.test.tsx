@@ -18,7 +18,7 @@ it.each([false,true])("keeps compact progress on overview and saved Sandbox and 
   expect(document.querySelector('details > summary')?.textContent).not.toBe("实验进度");
   for(const button of [...document.querySelectorAll<HTMLButtonElement>(".tabs button")]) {
     await act(async()=>button.click());
-    expect(document.querySelectorAll(".page-shell-header .tabs button")).toHaveLength(4);
+    expect(document.querySelectorAll(".page-shell-header .tabs button")).toHaveLength(3);
     if(button.textContent === "概览")expect(document.querySelector(".ui-agent-stats")?.textContent).toContain("7/50");else expect(document.querySelector(".page-shell-header .ui-agent-stats")).toBeNull();
   }
   const sandbox=[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(button => button.textContent === "进化路线")!;

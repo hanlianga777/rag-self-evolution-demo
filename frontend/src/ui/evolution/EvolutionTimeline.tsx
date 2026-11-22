@@ -1,4 +1,4 @@
-import {RoundStrategy,RoundConclusion} from '../../components/RoundStrategy';
+import {RoundNarrative} from '../../components/RoundStrategy';
 import { Fragment, useEffect, useState } from "react";
 import { storyText } from "../../components/EvolutionStory";
 import { agentDisplayText } from "../../display";
@@ -30,12 +30,12 @@ export function EvolutionTimeline({ model, experiment, sandbox, renderCandidate,
       <button type="button" className="secondary" aria-pressed={selected === "D"} onClick={event => {setSelection("D");const scroll=event.currentTarget.closest<HTMLElement>(".page-content");if(scroll)scroll.scrollTop=0;}}>Candidate D</button>
     </div>
 
-    {!model.rounds.length && <div><RoundStrategy experiment={experiment} round={1}/><p>候选方案尚未生成。</p><RoundConclusion experiment={experiment} round={1}/>{sandbox?.(1)}</div>}
+    {!model.rounds.length && <div><RoundNarrative experiment={experiment} round={1} onOpen={onOpen}/>{sandbox?.(1)}</div>}
     {model.rounds.filter(round => round.round === selected).map(round => <div className="ui-evo-round" key={round.round}>
       <div className="ui-evo-rail" aria-hidden="true"><span className={`ui-evo-dot${round.candidates.some(item => item.winner) ? " win" : ""}`} /></div>
       <div className="ui-evo-body">
-        <RoundStrategy experiment={experiment} round={round.round}/>
-        <div className="ui-evo-cards candidate-cards">{round.candidates.map(item => renderCandidate?<Fragment key={item.id}>{renderCandidate(item.id)}</Fragment>:<CandidateCard key={item.id} item={item} fastest={item.id === round.fastestId} questionText={questionText} onOpen={onOpen}/>)}</div><RoundConclusion experiment={experiment} round={round.round}/>{sandbox?.(round.round)}
+        <RoundNarrative experiment={experiment} round={round.round} onOpen={onOpen}/>
+        <div className="ui-evo-cards candidate-cards">{round.candidates.map(item => renderCandidate?<Fragment key={item.id}>{renderCandidate(item.id)}</Fragment>:<CandidateCard key={item.id} item={item} fastest={item.id === round.fastestId} questionText={questionText} onOpen={onOpen}/>)}</div>{sandbox?.(round.round)}
       </div>
     </div>)}
 
@@ -64,7 +64,7 @@ function CandidateCard({ item, fastest, questionText, onOpen }: { item: Candidat
       <dt>Hard Gate</dt><dd>{item.gateFailures.length ? <span className="ui-evo-fail">{item.gateFailures.join("；")}</span> : item.complete ? <span className="ui-evo-pass">{item.gates ? `${item.gates.passed} / ${item.gates.total}` : '全部通过'}</span> : "评测中"}</dd>
     </dl>
     <footer className="ui-evo-card-foot ui-num">
-      <span>答对 <b>{item.correct ?? "未知"}</b> / {item.total ?? 50}</span>
+      <span>答对 <b>{item.correct ?? "未知"}</b> / {item.total ?? "未知"}</span>
       <span>P50 {fastest ? <b>{fmt(item.p50)}</b> : fmt(item.p50)}　P99 {fmt(item.p99)}</span>
     </footer>
   </article>;

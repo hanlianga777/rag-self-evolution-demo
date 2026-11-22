@@ -40,7 +40,7 @@ it('opens evidence in HoverCard through keyboard focus and shows verified Top-K 
  const node=document.body.appendChild(document.createElement('div')),root=createRoot(node);
  try {
   await act(async()=>root.render(<><EvolutionTimeline model={build(cs)} baseline={{correct:44,total:50,badCases:[]}}/><DStory experiment={experiment(cs)} evaluation={{config:{top_k:4}}}/></>));
-  expect(node.querySelectorAll('.agent-round-strategy ol > li')).toHaveLength(3);expect(node.querySelector('.agent-round-strategy .ui-hover-trigger')).toBeNull();
+  expect(node.querySelectorAll('.round-story-cell')).toHaveLength(6);expect(node.querySelector('.agent-round-strategy .ui-hover-trigger')).toBeNull();
   const chip=node.querySelector<HTMLElement>('.d-param-changes [tabindex]' )!;
   await act(async()=>{chip.focus();await new Promise(r=>setTimeout(r,150));});expect(document.querySelector('[role=tooltip]')?.textContent).toContain('Round 2 · Candidate B 验证过 Top-K 6 能修好 Q04/Q06');
   cs[4].reasoning.changed_parameters={top_k:4};

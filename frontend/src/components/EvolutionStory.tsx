@@ -1,3 +1,4 @@
+import { currentQualification } from '../candidateQualification';
 import { Icon } from '../ui/icons';
 import { judgePresentation } from "./judgePresentation";
 import { ParamChip, QuestionBadge, StatusBadge } from '../ui/Primitives';
@@ -126,7 +127,7 @@ function dLosingReason(experiment:any,selected:any):string {
   const regressions=broken===null ? '新增 Bad Case 记录未知' : broken.length ? `但新弄坏了 ${questionList(broken)}` : '没有新增 Bad Case';
   const delta=typeof result?.bad_case_count==='number' && typeof winner?.result?.bad_case_count==='number' ? result.bad_case_count-winner.result.bad_case_count : null;
   const comparison=delta===null ? '与 Winner 的 Bad Case 数比较未知' : delta===0 ? `Bad Case 数与${name} 相同` : `Bad Case 数比${name} ${delta>0?'多':'少'} ${Math.abs(delta)} 个`;
-  const qualification=result?.release_qualification || result?.qualification;
+  const qualification=result?.release_qualification || currentQualification(result);
   const eligibility=qualification?.checks?.zero_new_failures===false && broken?.length ? '且出现新增 Bad Case，不满足发布条件' : qualification?.qualified===false ? '保存的发布资格未通过' : qualification?.qualified===true ? '发布资格通过，但保存的最终决策未选择 D' : '发布资格未知';
   return `${repairs}，${regressions}；${comparison}，${eligibility}，因此保留${schemeName(selected)}。`;
 }
@@ -261,15 +262,15 @@ export function questionText(id:string,evaluation:any,badCases:any[]=[]):string 
 }
 export function schemeReason(candidate:any):string {
   if(!completeResult(candidate))return candidate?.status==='failed' ? '评测中断，资格未确定' : '等待完整评测';
-  if(candidate.result.qualification?.qualified===true)return '质量、安全与 Regression Check 通过';
+  if(currentQualification(candidate.result)?.qualified===true)return '质量、安全与 Regression Check 通过';
   const labels:Record<string,string>={hard_gates:'Hard Gate 未全过',regression:'Regression Check 未通过',target_bad_case_fixed:'目标题修复不足',total_bad_cases_reduced:'Bad Case 未减少'};
-  return Object.entries(candidate.result.qualification?.checks || {}).filter(([,ok])=>ok===false).map(([key])=>labels[key] || '保存的资格条件未通过').join('；') || '未保存具体资格原因';
+  return Object.entries(currentQualification(candidate.result)?.checks || {}).filter(([,ok])=>ok===false).map(([key])=>labels[key] || '保存的资格条件未通过').join('；') || '未保存具体资格原因';
 }
 
 export function EvolutionRoute({evaluation,experiment,badCases,children,onDetail}:{evaluation:any;experiment:any;badCases:any[];children?:React.ReactNode;onDetail?:(candidate:any)=>void}) {
   const candidates:any[]=experiment?.candidates || [],abc=candidates.filter(c=>['A','B','C'].includes(c.reasoning?.candidate_label));
   const rounds=[...new Set<number>(abc.map(c=>c.reasoning?.round || 1))].sort((a,b)=>a-b);
-  const first=[...abc].sort((a,b)=>(a.reasoning?.round || 1)-(b.reasoning?.round || 1) || a.created_at?.localeCompare(b.created_at || '') || a.reasoning.candidate_label.localeCompare(b.reasoning.candidate_label)).find(c=>completeResult(c) && c.result.qualification?.qualified===true);
+  const first=[...abc].sort((a,b)=>(a.reasoning?.round || 1)-(b.reasoning?.round || 1) || a.created_at?.localeCompare(b.created_at || '') || a.reasoning.candidate_label.localeCompare(b.reasoning.candidate_label)).find(c=>completeResult(c) && currentQualification(c.result)?.qualified===true);
   const recommendation=recommendationOf(experiment),recommended=candidates.find(c=>c.id===recommendation.recommended_candidate);
   const baselineBad=completeResult(evaluation)?.bad_case_count;
   const groups=[['检索层',/检索|Retrieval|Ranking|Context/],['生成层',/生成|Generation/],['安全边界',/安全|Safety|Boundary|Rejection/],['性能',/性能|延迟|Latency|Performance/]] as const;
@@ -284,7 +285,7 @@ export function EvolutionRoute({evaluation,experiment,badCases,children,onDetail
       const lessons=saved?.status==='saved' ? (saved.review?.conclusions || []).map((row:any)=>row.conclusion).filter(Boolean).slice(0,3) : [];
       return <section className="panel route-round" key={round}><h2>Round {round} · A / B / C 探索</h2><div className="route-candidates">{abc.filter(c=>(c.reasoning?.round || 1)===round).map(c=>{
         const result=completeResult(c),delta=result && typeof baselineBad==='number' && typeof result.bad_case_count==='number' ? result.bad_case_count-baselineBad : null;
-        return <article className="route-candidate" key={c.id} data-first-qualified={first?.id===c.id ? true : undefined}><div className="section-head"><h3>Candidate {c.reasoning.candidate_label}</h3><Badge tone={result?.qualification?.qualified ? 'good' : 'neutral'}>{result ? result.qualification?.qualified===true ? '合格' : result.qualification?.qualified===false ? '未通过' : '资格未知' : '待验证'}</Badge></div>{first?.id===c.id && <strong className="first-qualified">首个合格 Candidate</strong>}<div className="route-candidate-impact">{[['修好','all_fixed_question_ids'],['弄坏','new_regression_question_ids']].map(([label,key])=><TruncatedText key={key}>{label}：{idsOf(c,key)?.map(id=>questionText(id,evaluation,badCases)).join('；') || (idsOf(c,key)?.length===0 ? '无' : '未知')}</TruncatedText>)}</div><div className="route-candidate-body"><TruncatedText lines={3}>{agentDisplayText(c.reasoning.core_idea || c.reasoning.direction || c.reasoning.strategy_name || "未保存说明")}</TruncatedText><ChangedParameters before={evaluation.config} after={c.config}/><p>Bad Case {qualityValue(c,'bad')}{delta!=null && ` · 比 Baseline ${delta>0 ? `多 ${delta}` : delta<0 ? `少 ${-delta}` : '相同'}${delta===0?'':' 个'}`}</p><p>Hard Gate 通过 {qualityValue(c,'gates')}</p><TruncatedText lines={3}>{schemeReason(c)}</TruncatedText></div>{onDetail && <button className="text-button" onClick={()=>onDetail(c)}>查看详情</button>}</article>;
+        return <article className="route-candidate" key={c.id} data-first-qualified={first?.id===c.id ? true : undefined}><div className="section-head"><h3>Candidate {c.reasoning.candidate_label}</h3><Badge tone={currentQualification(result)?.qualified ? 'good' : 'neutral'}>{result ? currentQualification(result)?.qualified===true ? '合格' : currentQualification(result)?.qualified===false ? '未通过' : '资格未知' : '待验证'}</Badge></div>{first?.id===c.id && <strong className="first-qualified">首个合格 Candidate</strong>}<div className="route-candidate-impact">{[['修好','all_fixed_question_ids'],['弄坏','new_regression_question_ids']].map(([label,key])=><TruncatedText key={key}>{label}：{idsOf(c,key)?.map(id=>questionText(id,evaluation,badCases)).join('；') || (idsOf(c,key)?.length===0 ? '无' : '未知')}</TruncatedText>)}</div><div className="route-candidate-body"><TruncatedText lines={3}>{agentDisplayText(c.reasoning.core_idea || c.reasoning.direction || c.reasoning.strategy_name || "未保存说明")}</TruncatedText><ChangedParameters before={evaluation.config} after={c.config}/><p>Bad Case {qualityValue(c,'bad')}{delta!=null && ` · 比 Baseline ${delta>0 ? `多 ${delta}` : delta<0 ? `少 ${-delta}` : '相同'}${delta===0?'':' 个'}`}</p><p>Hard Gate 通过 {qualityValue(c,'gates')}</p><TruncatedText lines={3}>{schemeReason(c)}</TruncatedText></div>{onDetail && <button className="text-button" onClick={()=>onDetail(c)}>查看详情</button>}</article>;
       })}</div>{lessons.length>0 && <div className="route-review"><strong>Agent 本轮复盘：学到了什么</strong>{lessons.map((text:string,index:number)=><TruncatedText key={index} lines={3}>{agentDisplayText(text)}</TruncatedText>)}</div>}</section>;
     })}
     <Section title="Candidate D · 融合精修"><DStory experiment={experiment} evaluation={evaluation} badCases={badCases} compact/></Section>
@@ -309,10 +310,10 @@ export function DStory({experiment,evaluation={},badCases=[],compact=false,onRep
     const {fixed,broken}=dResultData(experiment);
     return recommendationOf(experiment).recommended_candidate===d.id && fixed && broken && !broken.length && fixed.length ? `多修好 ${questionList(fixed)}，零新增 Bad Case，推荐 Candidate D` : recommendationReason(experiment);
   })() : '';
-  const status=d?.status==='failed' ? 'stopped' : completeResult(d) ? d.result.qualification?.qualified===true ? 'qualified' : d.result.qualification?.qualified===false ? 'failed' : 'evaluated' : ['running','queued'].includes(d?.status) ? 'running' : 'waiting';
+  const status=d?.status==='failed' ? 'stopped' : completeResult(d) ? currentQualification(d.result)?.qualified===true ? 'qualified' : currentQualification(d.result)?.qualified===false ? 'failed' : 'evaluated' : ['running','queued'].includes(d?.status) ? 'running' : 'waiting';
   const footer=!compact && (onReport || onRecommendation) ? <>{onReport && <button className="secondary" onClick={onReport}><Icon name="report" size={15}/>查看 D 完整报告</button>}{onRecommendation && <button className="secondary" onClick={onRecommendation}><Icon name="recommend" size={15}/>查看最终推荐</button>}</> : null;
   if(state.causal_evidence)return <StructuredD experiment={experiment} evaluation={evaluation} footer={footer}/>;
-  return <article className="d-story"><section className="ui-card d-design"><header className="section-head"><h3>{d ? 'D 的设计' : title}</h3>{d && <StatusBadge kind={status} label={d.status==='failed' ? '评测中断，尚无完整结果' : status==='waiting' ? '等待完整评测' : completeResult(d) && d.result.qualification?.qualified==null ? '资格未知' : undefined}/>}</header>
+  return <article className="d-story"><section className="ui-card d-design"><header className="section-head"><h3>{d ? 'D 的设计' : title}</h3>{d && <StatusBadge kind={status} label={d.status==='failed' ? '评测中断，尚无完整结果' : status==='waiting' ? '等待完整评测' : completeResult(d) && currentQualification(d.result)?.qualified==null ? '资格未知' : undefined}/>}</header>
     {d && <div className="d-param-changes">{Object.entries(suggestion.changed_parameters || suggestion.proposed_config_diff || {}).map(([key, value]) => {
       const chip = <span>{storyParameterNames[key] || '参数'}：{paramValue(key,evaluation.config?.[key])} → {paramValue(key,value)}</span>;
       return key === 'top_k' && value === 6 && topKEvidence ? <HoverCard key={key} content={topKEvidence}><span tabIndex={0}>{chip}</span></HoverCard> : <span key={key}>{chip}</span>;

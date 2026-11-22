@@ -1,6 +1,7 @@
+import { currentQualification } from '../candidateQualification';
 import { pagePurpose } from "../helpText";
 import { RoundConclusion } from '../components/RoundStrategy';
-import { CandidateOverviewTable, CandidateResultSummary, SummaryText, candidateStrategyName, candidateSummary, evaluatedCandidate, qualificationReasons } from '../components/AgentStrategySummary';
+import { CandidateOverviewTable, CandidateResultSummary, SummaryText, candidateStrategyName, candidateSummary, evaluatedCandidate, QualificationVersions, qualificationLabel, qualificationReasons, sandboxBlock, candidateEvidence, candidateValue } from '../components/AgentStrategySummary';
 import { yuanText } from "../components/PipelineFields";
 import { judgePresentation } from "../components/judgePresentation";
 import { agentDisplayText } from "../display";
@@ -39,11 +40,54 @@ import { CaseDetails, gateNames } from "./EvaluationPage";
 
 const rootCause = currentRoot;
 
+const archivedExperimentId = "EXP-20261120224619556715";
+
 export function EvolutionPage({ data }: { data: any }) {
+  const current = data.optimization;
+  const [selection, select] = useState<"current" | "archive" | null>(null);
+  const selected = selection ?? (current?.id === archivedExperimentId ? "archive" : "current");
+  const [archive, setArchive] = useState<any>(null);
+  const [failure, setFailure] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (selected !== "archive" || (current?.id === archivedExperimentId && current.baseline_run_id === data.evaluation?.id)) return;
+    let active = true;
+    setFailure("");
+    void getJson<any>(`/api/experiments/${archivedExperimentId}?light=true`).then(async optimization => {
+      const baseline = encodeURIComponent(optimization.baseline_run_id);
+      const [evaluation, badCases] = await Promise.all([
+        detailJson(`/api/evaluations/${baseline}`),
+        getJson(`/api/bad-cases?light=true&baseline_id=${baseline}`),
+      ]);
+      if (active) setArchive({ optimization, evaluation, badCases });
+    }).catch(reason => { if (active) setFailure(errorMessage(reason)); });
+    return () => { active = false; };
+  }, [selected, current?.id, current?.baseline_run_id, data.evaluation?.id, attempt]);
+
+  const unavailable = selected === "current" && current?.id === archivedExperimentId;
+  const view = selected === "archive" && (current?.id !== archivedExperimentId || current?.baseline_run_id !== data.evaluation?.id)
+    ? archive && { ...data, ...archive }
+    : unavailable ? { ...data, optimization: null } : data;
+  const selector = <label className="agent-experiment-select">实验
+    <select aria-label="选择 Agent 实验" value={selected} onChange={event => select(event.target.value as "current" | "archive")}>
+      <option value="current">{current?.id && current.id !== archivedExperimentId ? `当前实验 · ${current.id}` : "当前实验 · 尚无新记录"}</option>
+      <option value="archive">旧实验 · {archivedExperimentId}（只读）</option>
+    </select>
+  </label>;
+  if (!view) return <PageShell className="page evolution-page" header={<div className="page-title"><h1>Agent 工作台</h1>{selector}</div>}>
+    {failure ? <p role="alert">旧实验读取失败。{failure} <button onClick={() => setAttempt(attempt + 1)}>重试</button></p> : <LoadingSkeleton label="正在读取旧实验及对应 Baseline"/>}
+  </PageShell>;
+  return <EvolutionWorkspace key={`${selected}:${view.optimization?.id ?? ''}`} data={view} selector={selector}
+    readOnly={selected === "archive" || unavailable} archive={selected === "archive"} unavailable={unavailable}/>;
+}
+
+function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: {
+  data: any; selector: React.ReactNode; readOnly: boolean; archive: boolean; unavailable: boolean;
+}) {
   const operation = useOperation();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [savedStage, setStage] = usePageTab("evolution", ["overview", "route", "candidate-comparison", "comparison", "review", "candidates", "sandbox", "regression", "recommendation"] as const, "overview");
-  const stage = ["candidates","sandbox","comparison"].includes(savedStage) ? "route" : savedStage === "regression" || savedStage === "recommendation" ? "review" : savedStage;
+  const stage = ["candidates","sandbox","comparison"].includes(savedStage) ? "route" : ["candidate-comparison","regression","recommendation"].includes(savedStage) ? "review" : savedStage;
   useEffect(() => { if (savedStage !== stage) setStage(stage); }, [savedStage, stage]);
   const openDiagnosis = () => { location.hash = "evaluation?tab=cases"; };
   useEffect(() => {
@@ -110,7 +154,9 @@ export function EvolutionPage({ data }: { data: any }) {
   const displayedCandidates=abc.filter(item=>(item.reasoning?.round || 1)===displayRound);
   const recommendation = experiment?.recommendation?.result || experiment?.recommendation || {};
   const keepBaseline = recommendation.status === "Recommended" && !recommendation.recommended_candidate;
-  const savedRecommended=candidates.find(item=>item.id===recommendation.recommended_candidate);
+  const recordedRecommendation = candidates.find(item => item.id === recommendation.recommended_candidate);
+  const invalidRecommendation = currentQualification(recordedRecommendation?.result)?.qualified === false;
+  const savedRecommended = invalidRecommendation ? undefined : recordedRecommendation;
   const confirmation = experiment?.result?.report_confirmation || recommendation.report_confirmation;
   const composite = experiment?.result?.composite || recommendation.composite;
   const compositeSchedule = experiment?.result?.composite_schedule;
@@ -125,7 +171,7 @@ export function EvolutionPage({ data }: { data: any }) {
   const budgetKnown = Number.isFinite(budget.used) && Number.isFinite(budget.max);
   const latestRound = experiment?.rounds?.at(-1);
   const canContinue = latestRound?.complete && !confirmation && budgetKnown && budget.used <= budget.max - (budget.reserved_for_d ?? budget.reserved_for_d1 ?? 1) - 3;
-  const qualified = candidates.filter(item => ["A", "B", "C"].includes(item.reasoning?.candidate_label) && item.status === "evaluated" && item.result?.qualification?.qualified);
+  const qualified = candidates.filter(item => ["A", "B", "C"].includes(item.reasoning?.candidate_label) && evaluatedCandidate(item) && currentQualification(item.result)?.qualified === true);
   const selectedWinner = qualified.some(item => item.id === winnerId) ? winnerId : recommendation.suggested_winner || qualified[0]?.id || "";
   const batchId = `sandbox-round:${experiment?.id}:${roundNumber}`;
   const batchRunning = operation.operations.some(item => item.id === batchId && item.status === "running");
@@ -145,7 +191,7 @@ export function EvolutionPage({ data }: { data: any }) {
     try { await operation.runCandidateBatch({ experimentId: experiment.id, baselineId: evaluation.id, round: roundNumber, candidateIds: pending.map(item => item.id), identity: data.workspace ? identity : undefined }); await refresh(); }
     catch (reason) { if (currentIdentity.current === captured) { setError(errorMessage(reason)); await refresh(); } }
   };
-  const requestPaid = (title: string, description: string, execute: () => void) => setConfirmationAction({title, description, execute});
+  const requestPaid = (title: string, description: string, execute: () => void) => { if (!readOnly) setConfirmationAction({title, description, execute}); };
   const runBatch = () => requestPaid('运行本轮 A/B/C Sandbox', `Golden ${evaluation.dataset_snapshot?.question_ids?.length ?? evaluation.cases?.length ?? '未采集'} 题，待运行 ${pending.length} 个 Candidate；每题回答+Judge；评测次数 ${budget.used}/${budget.max}，D预留1次。Rewrite/MultiQuery/HyDE 启用时有额外模型调用。`, () => void executeBatch());
   const activeOperation = (candidateId: string) => operation.operations.find(item => item.candidateId === candidateId && item.status === "running");
   const processingCases=agentDiagnosisRows(badCases);
@@ -153,7 +199,7 @@ export function EvolutionPage({ data }: { data: any }) {
   const gateDetails = evaluation.gate_details || [];
   const snapshot = savedSnapshot(evaluation);
   const refresh = async () => { const captured = identity; const value: any = await getJson("/api/optimization?light=true&planning=true"); if (currentIdentity.current === captured && (!value.current_baseline_id || value.current_baseline_id === evaluation.id)) setExperiment(value.id ? value : null); };
-  const polling = hasRunning || experiment?.result?.optimization_cycle?.status === "running";
+  const polling = !readOnly && (hasRunning || experiment?.result?.optimization_cycle?.status === "running");
   useEffect(() => {
     if (!experiment?.id || !polling) return;
     let cancelled = false;
@@ -173,12 +219,14 @@ export function EvolutionPage({ data }: { data: any }) {
 
   useEffect(() => { let cancelled = false; void getJson("/api/pipeline").then(value => { if (!cancelled) setSearchSpace(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, [identity]);
   useEffect(() => {
+    if (readOnly) return;
     for (const item of operation.operations) if (item.candidateId && item.status !== "running" && !refreshed.current.has(item.id)) {
       refreshed.current.add(item.id); void refresh();
     }
-  }, [operation.operations]);
+  }, [operation.operations, readOnly]);
 
   const action = async (title: string, work: () => Promise<unknown>) => {
+    if (readOnly) return;
     const captured = identity;
     setBusy(true); setError("");
     try { await operation.run(title, work); await refresh(); }
@@ -200,7 +248,7 @@ export function EvolutionPage({ data }: { data: any }) {
     () => void action('生成下一轮A/B/C', () => postJson(`/api/experiments/${experiment.id}/continue`)));
   const run = (candidate: any) => candidate.resume_plan?.can_resume === false ? setError(candidate.resume_plan.reason || '当前无法继续，请查看原因') : requestPaid('运行 Candidate Sandbox', '继续完成尚未结束的评测；会产生模型费用。', () => void executeCandidate(candidate));
   const executeCandidate = async (candidate: any) => {
-    if (!["generated", "failed"].includes(candidate.status) || activeOperation(candidate.id)) return;
+    if (readOnly || !["generated", "failed"].includes(candidate.status) || activeOperation(candidate.id)) return;
     const captured = identity;
     setBusy(true); setError("");
     try { await operation.startEvaluation(`${candidateName(candidate)} · Sandbox 评测`, () => postJson(`/api/candidates/${candidate.id}/run`, { authorize_provider: true }), candidate.id); await refresh(); }
@@ -210,7 +258,7 @@ export function EvolutionPage({ data }: { data: any }) {
 
   const evaluatedCount = currentRound.filter(item => item.status === "evaluated").length;
   const roundComplete = !!currentRound.length && currentRound.every(item => item.status === "skipped" || item.status === "evaluated" && item.result?.evaluation_complete !== false);
-  const recommendationTitle=recommendation.status === "Recommended" && !recommendation.recommended_candidate ? "保存推荐：保持 Baseline" : !roundComplete ? currentRound.some(c=>c.status === "failed") ? "本轮实验尚未完成 · 有运行失败" : "本轮实验尚未完成" : recommendation.status==="No Qualified Candidate" ? "保存结论：本轮暂无合格 Candidate" : recommendation.recommended_candidate ? savedRecommended ? `保存推荐：${candidateName(savedRecommended)}` : "已有保存推荐，Candidate 详情未采集" : currentRound.some(item=>typeof item.result?.qualification?.qualified!=="boolean") ? "资格或推荐结论未采集" : qualified.length ? "已有合格 Candidate，等待保存的最终决策" : "推荐结论未采集";
+  const recommendationTitle=invalidRecommendation ? "保存的推荐方案未通过当前资格" : recommendation.status === "Recommended" && !recommendation.recommended_candidate ? "保存推荐：保持 Baseline" : !roundComplete ? currentRound.some(c=>c.status === "failed") ? "本轮实验尚未完成 · 有运行失败" : "本轮实验尚未完成" : recommendation.status==="No Qualified Candidate" ? "保存结论：本轮暂无合格 Candidate" : recommendation.recommended_candidate ? savedRecommended ? `保存推荐：${candidateName(savedRecommended)}` : "已有保存推荐，Candidate 详情未采集" : currentRound.some(item=>typeof currentQualification(item.result)?.qualified !== "boolean") ? "资格或推荐结论未采集" : qualified.length ? "已有合格 Candidate，等待保存的最终决策" : "推荐结论未采集";
   const activeCandidate = currentRound.find(candidate => ["running", "queued"].includes(candidate.status) || candidate.result?.price_pause?.paused);
   const steps = [
     { label: "诊断", state: evaluation.status === "completed" ? "completed" : "blocked", detail: evaluation.status === "completed" ? `${evaluation.result?.bad_case_count ?? badCases.length} 个 Bad Case 已读取` : "等待有效 Baseline", onSelect: openDiagnosis },
@@ -218,12 +266,12 @@ export function EvolutionPage({ data }: { data: any }) {
     { label: "Candidate A/B/C/D", state: planningIncomplete && (!roundComplete || currentRound.length<3) ? "current" : currentRound.length ? "completed" : "pending", detail: `${currentRound.length} 个 Candidate · ${dProgressLabel(experiment)}`, onSelect: () => setStage("route") },
     { label: "Sandbox", state: sandboxPause || hasRunning ? "current" : currentRound.some(candidate => candidate.status === "failed") ? "blocked" : roundComplete ? "completed" : "pending", detail: activeCandidate ? `${activeCandidate.reasoning?.candidate_label} ${candidateProgress(activeCandidate, activeOperation(activeCandidate.id), sandboxPause)}` : sandboxPause ? "已暂停" : currentRound.length ? `${evaluatedCount}/${currentRound.length} 已评测` : "尚无待评测 Candidate", onSelect: () => setStage("route") },
     { label: "Regression Check", state: roundComplete ? "completed" : "pending", detail: roundComplete ? `${evaluatedCount} 个 Candidate 已保存判定` : "等待完整评测", onSelect: () => setStage("review") },
-    { label: "最终推荐", state: recommendation.recommended_candidate && confirmation ? "completed" : roundComplete ? "current" : "pending", detail: recommendation.recommended_candidate && confirmation ? schemeName(savedRecommended,recommendation.recommended_candidate) : confirmation ? "等待组合 Candidate D" : "等待完整报告与人工确认", onSelect: () => setStage("review") },
+    { label: "最终推荐", state: savedRecommended && confirmation ? "completed" : roundComplete ? "current" : "pending", detail: savedRecommended && confirmation ? schemeName(savedRecommended) : confirmation ? "等待组合 Candidate D" : "等待完整报告与人工确认", onSelect: () => setStage("review") },
   ] as const;
   const evolutionModel = buildEvolutionModel(experiment, evaluation.config, metric => gateNames[metric] ?? metric, schemeName);
   const candidateViews = [...evolutionModel.rounds.flatMap(round => round.candidates), ...(evolutionModel.d ? [evolutionModel.d] : [])];
-  const qualifiedViews = candidateViews.filter(candidate => candidate.complete && candidate.qualified);
-  const chosenView = candidateViews.find(candidate => candidate.id === savedRecommended?.id);
+  const qualifiedViews = candidateViews.filter(candidate => candidate.complete && candidate.qualified === true);
+  const chosenView = candidateViews.find(candidate => candidate.id === savedRecommended?.id && candidate.qualified !== false);
   const runnerUpView = candidateViews.find(candidate => candidate.id === evolutionModel.winnerId && candidate.id !== chosenView?.id) || null;
   const production = data.overview?.production || data.versions?.find((item: any) => item.status === "active");
   const productionReleased = production?.provenance === "published" && !!savedRecommended && production.snapshot?.candidate_id === savedRecommended.id;
@@ -265,43 +313,52 @@ export function EvolutionPage({ data }: { data: any }) {
       }),
     })),
   ];
-  const regressionSummary = <section className="panel regression-check"><div className="section-head"><h2>Regression Check · 全部 Candidate</h2></div><div className="table-scroll regression-summary-table"><DataTable><colgroup><col style={{width:'25%'}}/>{[15,15,15,15,15].map((width,index)=><col key={index} style={{width:`${width}%`}}/>)}</colgroup><thead><tr>{["Candidate","修好","新增严重","新增普通","Hard Gate","判定"].map((label,index)=><th key={label} className={index>0 && index<4?"num":undefined}>{label}</th>)}</tr></thead><tbody>{reviewCandidates.map(candidate=>{const review=candidate.result?.regression_review;const view=candidateViews.find(item=>item.id===candidate.id);const complete=view?.complete;return <tr key={candidate.id} className={complete && view.qualified===true ? "qualified" : undefined}><td><button className="regression-candidate" onClick={()=>setSelectedCandidate(candidate)}>{schemeName(candidate)}</button></td><td className="num">{review?.fixed_count ?? "未知"}</td><td className="num">{review?.new_critical_failures ?? "未知"}</td><td className="num">{review?.new_ordinary_failures ?? "未知"}</td><td><TableVerdict value={complete ? candidate.result?.gates?.passed : undefined} pass="通过" fail="未通过"/></td><td><TableVerdict value={complete ? view.qualified : undefined} pass="通过" fail="未通过"/></td></tr>})}{!reviewCandidates.length && <tr><td colSpan={6}>尚无 Candidate Regression 结论</td></tr>}</tbody></DataTable></div><p className="regression-limit-note">新增严重上限 0，普通上限 1；修好的题不能抵消新增 Bad Case。判定沿用保存的最终资格，同时检查 Hard Gate；单独 Regression 结论见 Candidate 详情。</p></section>;
-  const sandboxTable=<Section title={<IconLabel name="target">Sandbox 对比</IconLabel>} action={<button className="text-button" onClick={() => setAdvancedOpen(true)}>查看高级指标</button>}><div className="sandbox-core-table"><CompareTable key={`${experiment?.id}:${displayRound}`} columns={[{ name: "Baseline" }, ...sandboxCandidates.map(candidate => ({ name: schemeName(candidate), status: candidate.id === dWinner?.id ? "winner" as const : candidate.id === savedRecommended?.id ? "recommended" as const : candidate.result?.qualification?.qualified === true ? "qualified" as const : candidate.result?.qualification?.qualified === false ? "failed" as const : ["running", "queued"].includes(candidate.status) ? "running" as const : candidate.status === "skipped" ? "stopped" as const : "waiting" as const, ...(candidate.status === "skipped" ? { statusLabel: "已跳过（未运行）" } : {}) }))]} rows={compareRows} highlight={sandboxCandidates.flatMap((candidate, index) => candidate.id === dWinner?.id || candidate.reasoning?.candidate_label === "D" ? [index + 1] : [])} /></div><HoverCard content="全部原 Bad Case 修好：分母是 Baseline 原有的全部 Bad Case。指定目标修好：分母是该 Candidate 保存的指定目标题数。目标题属于原问题的一部分，两行有重叠，不能相加；D 的指定目标也按保存的 Baseline 比较统计。"><button className="text-button sandbox-denominators" aria-label="修复指标分母说明">ⓘ 修复口径</button></HoverCard>{!d && <p className="muted">组合 Candidate D：{compositeWaiting ? "排队中" : composite?.status === "no_effective_composite" ? "已跳过 · 无有效组合" : "等待 人工确认 与组合决策"}</p>}
+  const regressionSummary = <section className="panel regression-check"><div className="section-head"><h2>Regression Check · 全部 Candidate</h2></div><div className="table-scroll regression-summary-table"><DataTable><colgroup><col style={{width:'25%'}}/>{[15,15,15,15,15].map((width,index)=><col key={index} style={{width:`${width}%`}}/>)}</colgroup><thead><tr>{["Candidate","修好","新增严重","新增普通","Hard Gate","判定"].map((label,index)=><th key={label} className={index>0 && index<4?"num":undefined}>{label}</th>)}</tr></thead><tbody>{reviewCandidates.map(candidate=>{const review=candidate.result?.regression_review;const view=candidateViews.find(item=>item.id===candidate.id);const complete=view?.complete;return <tr key={candidate.id} className={complete && view.qualified===true ? "qualified" : undefined}><td><button className="regression-candidate" onClick={()=>setSelectedCandidate(candidate)}>{schemeName(candidate)}</button></td><td className="num">{review?.fixed_count ?? "未知"}</td><td className="num">{review?.new_critical_failures ?? "未知"}</td><td className="num">{review?.new_ordinary_failures ?? "未知"}</td><td><TableVerdict value={complete ? candidate.result?.gates?.passed : undefined} pass="通过" fail="未通过"/></td><td>{complete ? qualificationLabel(candidate.result) : "未判定"}</td></tr>})}{!reviewCandidates.length && <tr><td colSpan={6}>尚无 Candidate Regression 结论</td></tr>}</tbody></DataTable></div><p className="regression-limit-note">新增严重上限 0，普通上限 1；修好的题不能抵消新增 Bad Case。判定沿用保存的最终资格，同时检查 Hard Gate；单独 Regression 结论见 Candidate 详情。</p></section>;
+  const sandboxTable=<Section title={<IconLabel name="target">Sandbox 对比</IconLabel>} action={<button className="text-button" onClick={() => setAdvancedOpen(true)}>查看高级指标</button>}><div className="sandbox-core-table"><CompareTable key={`${experiment?.id}:${displayRound}`} columns={[{ name: "Baseline" }, ...sandboxCandidates.map(candidate => ({ name: schemeName(candidate), status: currentQualification(candidate.result)?.qualified === false ? "failed" as const : candidate.id === dWinner?.id ? "winner" as const : candidate.id === savedRecommended?.id ? "recommended" as const : currentQualification(candidate.result)?.qualified === true ? "qualified" as const : ["running", "queued"].includes(candidate.status) ? "running" as const : candidate.status === "skipped" ? "stopped" as const : "waiting" as const, ...(candidate.status === "skipped" ? { statusLabel: "已跳过（未运行）" } : evaluatedCandidate(candidate) ? {statusLabel: qualificationLabel(candidate.result)} : {}) }))]} rows={compareRows} highlight={sandboxCandidates.flatMap((candidate, index) => candidate.id === dWinner?.id || candidate.reasoning?.candidate_label === "D" ? [index + 1] : [])} /></div><HoverCard content="全部原 Bad Case 修好：分母是 Baseline 原有的全部 Bad Case。指定目标修好：分母是该 Candidate 保存的指定目标题数。目标题属于原问题的一部分，两行有重叠，不能相加；D 的指定目标也按保存的 Baseline 比较统计。"><button className="text-button sandbox-denominators" aria-label="修复指标分母说明">ⓘ 修复口径</button></HoverCard>{!d && <p className="muted">组合 Candidate D：{compositeWaiting ? "排队中" : composite?.status === "no_effective_composite" ? "已跳过 · 无有效组合" : "等待 人工确认 与组合决策"}</p>}
 
 
     </Section>;
-  return <PageShell className="page evolution-page" header={<><div className="page-title"><div><h1><IconTile name="agent" />Agent 工作台</h1><p className="ui-kicker page-purpose">{pagePurpose.evolution}</p></div><div className="header-actions">{hasRunning && <button className="secondary" onClick={() => setStage("route")}>查看 Sandbox 进度</button>}</div></div></>} tabs={<div className="tabs"><button data-label="概览" aria-pressed={stage === "overview"} className={stage === "overview" ? "active" : ""} onClick={() => setStage("overview")}>概览</button><button data-label="进化路线" aria-pressed={stage === "route"} className={stage === "route" ? "active" : ""} onClick={() => setStage("route")}>进化路线</button><button data-label="Candidates 对比" aria-pressed={stage === "candidate-comparison"} className={stage === "candidate-comparison" ? "active" : ""} onClick={() => setStage("candidate-comparison")}>Candidates 对比</button><button data-label="回归与推荐" aria-pressed={stage === "review"} className={stage === "review" ? "active" : ""} onClick={() => setStage("review")}>回归与推荐</button></div>} resetKey={stage}>
+  return <PageShell className="page evolution-page" header={<><div className="page-title"><div><h1><IconTile name="agent" />Agent 工作台</h1><p className="ui-kicker page-purpose">{pagePurpose.evolution}</p></div><div className="header-actions">{selector}{hasRunning && !readOnly && <button className="secondary" onClick={() => setStage("route")}>查看 Sandbox 进度</button>}</div></div></>} tabs={<div className="tabs"><button data-label="概览" aria-pressed={stage === "overview"} className={stage === "overview" ? "active" : ""} onClick={() => setStage("overview")}>概览</button><button data-label="进化路线" aria-pressed={stage === "route"} className={stage === "route" ? "active" : ""} onClick={() => setStage("route")}>进化路线</button><button data-label="回归与推荐" aria-pressed={stage === "review"} className={stage === "review" ? "active" : ""} onClick={() => setStage("review")}>回归与推荐</button></div>} resetKey={stage}>
+    {archive && <p className="workbench-status">旧实验只读 · {experiment?.id} · Baseline {evaluation.id}</p>}
+    {unavailable && <p className="workbench-status">当前 Baseline 尚无保存的新实验。</p>}
 
 
     <ConfirmDialog open={!!confirmationAction} onOpenChange={open => !open && setConfirmationAction(null)} title={confirmationAction?.title || "确认操作"} onConfirm={() => { const next = confirmationAction; setConfirmationAction(null); next?.execute(); }}><div className="muted-prose"><TruncatedText lines={3}>{confirmationAction?.description}</TruncatedText></div></ConfirmDialog>
-    <PricePauseNotice pause={pricePause} experimentId={experiment?.id} onChanged={refresh} />
-    {candidates.filter(candidate => !pricePause && candidate.result?.price_pause?.paused).map(candidate => <PricePauseNotice key={candidate.id} pause={candidate.result.price_pause} evaluationId={candidate.result.evaluation_run_id} onChanged={refresh} />)}
+    {!readOnly && <PricePauseNotice pause={pricePause} experimentId={experiment?.id} onChanged={refresh} />}
+    {!readOnly && candidates.filter(candidate => !pricePause && candidate.result?.price_pause?.paused).map(candidate => <PricePauseNotice key={candidate.id} pause={candidate.result.price_pause} evaluationId={candidate.result.evaluation_run_id} onChanged={refresh} />)}
     {cycle?.status === "qualified" && !confirmation && <p className="workbench-status" role="status">本轮 A/B/C 已完成，等待人工确认报告与 Winner；确认后才能生成组合 Candidate D。</p>}
     {cycle?.status === "budget_exhausted" && <p className="workbench-status" role="status">优化循环已停止：已评测 {budget.used} / {budget.max} 次，剩余 {Math.max(0, budget.max - budget.used)} 次（其中 1 次留给 D）。剩余次数不足以运行完整 A/B/C；只有合格 Winner 经人工确认后才能进入 D。</p>}
     {policyBlocked && <p className="error-notice">当前 Baseline 评测版本身份与运行代码不兼容，真实 Agent 启动已阻断，旧实验只读。全部 Bad Case 保留在优化规划中；请先到 Baseline 查看身份预检，核对历史评测与当前规则的兼容性；需要新版评分时使用保存回答判分，不自动重新生成。</p>}
-<div className="header-actions agent-secondary-actions">{triedSandbox ? null : planningBlocked && !published ? <button className={stage === "review" ? "secondary" : "primary"} disabled={busy || policyBlocked || hasRunning || !!confirmation} onClick={completePlan}>补齐本轮规划（不收费）</button> : pending.length ? <button className={stage === "review" ? "secondary" : "primary"} disabled={busy || !canBatch} onClick={() => void runBatch()}><Play size={15} />{batchRunning ? "本轮 Sandbox 运行中" : "运行本轮 A/B/C Sandbox"}</button> : <button className={stage === "review" ? "secondary" : "primary"} disabled={policyBlocked || busy || hasRunning || evaluation.status !== "completed" || (!!abc.length && !canContinue) || (!badCases.length && !experiment?.result?.monitoring_context)} onClick={() => void (canContinue ? continueRound() : generate())}><Play size={15} />{busy ? "处理中…" : canContinue ? "继续优化下一轮" : abc.length ? "本轮 Candidate 已生成" : "生成 A / B / C"}</button>}{!published && planningIncomplete && triedSandbox && <button className="secondary" disabled={busy || policyBlocked || hasRunning || !!confirmation} onClick={completePlan}>补齐本轮规划（不收费）</button>}{canBatch && triedSandbox && <button className="secondary" disabled={busy} onClick={() => void runBatch()}>运行本轮 A/B/C Sandbox</button>}{triedSandbox && canContinue && !pending.length && <button className="primary" disabled={policyBlocked || busy || hasRunning || evaluation.status !== "completed"} onClick={() => continueRound()}><Play size={15} />{busy ? "处理中…" : "继续优化下一轮"}</button>}</div>
-    <Drawer className="workbench-drawer" open={historyOpen} onOpenChange={setHistoryOpen} title="历史实验 · 原 Candidate 与结果只读"><div className="drawer-body"><div className="candidate-cards">{abc.filter(item => (item.reasoning?.round || 1) < roundNumber).map(candidate => <CandidateCard key={candidate.id} experiment={experiment} candidate={candidate} includeRound baseline={evaluation.config || {}} busy={true} onDetail={()=>{setHistoryOpen(false);setSelectedCandidate(candidate);}} targets={targetRows(candidate,badCases)} onTargets={()=>{setHistoryOpen(false);setTargetCandidate(candidate);}} onRun={()=>void run(candidate)} />)}</div></div></Drawer>
+{!readOnly && <div className="header-actions agent-secondary-actions">{triedSandbox ? null : planningBlocked && !published ? <button className={stage === "review" ? "secondary" : "primary"} disabled={busy || policyBlocked || hasRunning || !!confirmation} onClick={completePlan}>补齐本轮规划（不收费）</button> : pending.length ? <button className={stage === "review" ? "secondary" : "primary"} disabled={busy || !canBatch} onClick={() => void runBatch()}><Play size={15} />{batchRunning ? "本轮 Sandbox 运行中" : "运行本轮 A/B/C Sandbox"}</button> : <button className={stage === "review" ? "secondary" : "primary"} disabled={policyBlocked || busy || hasRunning || evaluation.status !== "completed" || (!!abc.length && !canContinue) || (!badCases.length && !experiment?.result?.monitoring_context)} onClick={() => void (canContinue ? continueRound() : generate())}><Play size={15} />{busy ? "处理中…" : canContinue ? "继续优化下一轮" : abc.length ? "本轮 Candidate 已生成" : "生成 A / B / C"}</button>}{!published && planningIncomplete && triedSandbox && <button className="secondary" disabled={busy || policyBlocked || hasRunning || !!confirmation} onClick={completePlan}>补齐本轮规划（不收费）</button>}{canBatch && triedSandbox && <button className="secondary" disabled={busy} onClick={() => void runBatch()}>运行本轮 A/B/C Sandbox</button>}{triedSandbox && canContinue && !pending.length && <button className="primary" disabled={policyBlocked || busy || hasRunning || evaluation.status !== "completed"} onClick={() => continueRound()}><Play size={15} />{busy ? "处理中…" : "继续优化下一轮"}</button>}</div>}
+    <Drawer className="workbench-drawer" open={historyOpen} onOpenChange={setHistoryOpen} title="历史实验 · 原 Candidate 与结果只读"><div className="drawer-body"><div className="candidate-cards">{abc.filter(item => (item.reasoning?.round || 1) < roundNumber).map(candidate => <CandidateCard key={candidate.id} experiment={experiment} candidate={candidate} includeRound readOnly baseline={evaluation.config || {}} busy={true} onDetail={()=>{setHistoryOpen(false);setSelectedCandidate(candidate);}} targets={targetRows(candidate,badCases)} onTargets={()=>{setHistoryOpen(false);setTargetCandidate(candidate);}} onRun={()=>void run(candidate)} />)}</div></div></Drawer>
     {error && <p ref={errorRef} tabIndex={-1} className="error-notice" role="alert">{error}</p>}
 
     {experiment?.result?.generation_status==='no_candidates' && <p className="workbench-status" role="status">本轮没有合法 Candidate，不能运行 Sandbox；未生成不代表优化成功。</p>}
     {experiment?.result?.rejected_candidates?.length>0 && <><p className="workbench-status">本轮保留 {currentRound.length} 个合法 Candidate，拒绝 {experiment.result.rejected_candidates.length} 个 Candidate；拒绝项不会进入 Sandbox。</p></>}
     {experiment?.result?.generation_status==='insufficient_evidence' && <p className="workbench-status" role="status">Candidate 依据不足：{experiment.result.insufficient_evidence || '暂无足够依据生成合格优化假设；待核实原始证据，不补造A/B/C。'}</p>}
     {data.workspace?.baseline_unavailable_reason && <p className="error-notice">{data.workspace.baseline_unavailable_reason}</p>}
-    <p className="agent-identity sr-only">{evaluation.id ? `当前 Baseline：${baselineName(evaluation)}` : "当前有效 Baseline 尚未就绪。"}</p>
+    <p className="agent-identity sr-only">{evaluation.id ? `${archive ? "关联" : "当前"} Baseline：${baselineName(evaluation)}` : "当前有效 Baseline 尚未就绪。"}</p>
 
-    {stage === "overview" && <AgentOverview experiment={experiment || data.optimization} model={{...evolutionModel, budget: budgetKnown ? budget : null}} evaluation={evaluation} chosenId={savedRecommended?.id} released={productionReleased} status={agentStatus} cases={processingCases} onCase={setSelectedBadCase}/>}
-    {stage === "route" && <div className="route-timeline"><EvolutionTimeline key={experiment?.id} model={evolutionModel} experiment={experiment} onRoundChange={setRoundSelection} renderCandidate={id=>{const candidate=candidates.find(c=>c.id===id);return <CandidateCard key={id} experiment={experiment} route routeWinner={id===evolutionModel.winnerId} candidate={candidate} primaryRun={id===displayedCandidates.find(item=>['generated','failed'].includes(item.status))?.id} baseline={evaluation.config || {}} onDetail={()=>setSelectedCandidate(candidate)} onSkip={()=>void action('跳过未运行 Candidate',()=>postJson(`/api/candidates/${id}/skip`,{actor:'当前用户'}))} running={activeOperation(id)} busy={busy || planningBlocked || policyBlocked || hasRunning || !!confirmation} targets={targetRows(candidate,badCases)} onTargets={()=>setTargetCandidate(candidate)} onRun={()=>void run(candidate)}/>;}} sandbox={()=>sandboxTable}
+    {stage === "overview" && <AgentOverview experiment={experiment || data.optimization} model={{...evolutionModel, budget: budgetKnown ? budget : null}} evaluation={evaluation} chosenId={chosenView?.id} released={productionReleased} status={agentStatus} cases={processingCases} onCase={setSelectedBadCase}/>}
+    {stage === "route" && <div className="route-timeline"><EvolutionTimeline key={experiment?.id} model={evolutionModel} experiment={experiment} onRoundChange={setRoundSelection} renderCandidate={id=>{const candidate=candidates.find(c=>c.id===id);return <CandidateCard key={id} experiment={experiment} route routeWinner={id===evolutionModel.winnerId && currentQualification(candidate.result)?.qualified !== false} candidate={candidate} readOnly={readOnly} primaryRun={id===displayedCandidates.find(item=>['generated','failed'].includes(item.status))?.id} baseline={evaluation.config || {}} onDetail={()=>setSelectedCandidate(candidate)} onSkip={()=>void action('跳过未运行 Candidate',()=>postJson(`/api/candidates/${id}/skip`,{actor:'当前用户'}))} running={activeOperation(id)} busy={busy || planningBlocked || policyBlocked || hasRunning || !!confirmation} targets={targetRows(candidate,badCases)} onTargets={()=>setTargetCandidate(candidate)} onRun={()=>void run(candidate)}/>;}} sandbox={()=>sandboxTable}
       questionText={id => questionText(id, evaluation, badCases)} onOpen={id => setSelectedCandidate(candidates.find(candidate => candidate.id === id))} >
-      <section className="d-timeline" aria-label="Candidate D 决策"><DStory experiment={experiment} evaluation={evaluation} badCases={badCases} onReport={d ? ()=>setSelectedCandidate(d) : undefined} onRecommendation={()=>setStage("review")}/>{d?.status === "evaluated" && experiment?.result?.round_conclusions?.D && <RoundConclusion experiment={experiment} round="D"/>}{d && d.status !== "evaluated" && <CandidateAction primary candidate={d} running={activeOperation(d.id)} busy={busy || policyBlocked || hasRunning} onRun={()=>void run(d)}/>}</section>
+      <section className="d-timeline" aria-label="Candidate D 决策">{evaluatedCandidate(d) && <Section title="组合方案 D 的四层结论">
+        <dl className="candidate-four-layers">
+          <div><dt>正式资格</dt><dd><QualificationVersions result={d.result}/></dd></div>
+          <div><dt>实验效果</dt><dd><CandidateResultSummary result={d.result}/></dd></div>
+          <div><dt>证据可信度</dt><dd>{candidateEvidence(d, experiment)}</dd></div>
+          <div><dt>推荐价值</dt><dd>{candidateValue(d, experiment)}</dd></div>
+        </dl>
+      </Section>}<DStory experiment={experiment} evaluation={evaluation} badCases={badCases} onReport={d ? ()=>setSelectedCandidate(d) : undefined} onRecommendation={()=>setStage("review")}/>{d?.status === "evaluated" && experiment?.result?.round_conclusions?.D && <RoundConclusion experiment={experiment} round="D"/>}{!readOnly && d && d.status !== "evaluated" && <CandidateAction primary candidate={d} running={activeOperation(d.id)} busy={busy || policyBlocked || hasRunning} onRun={()=>void run(d)}/>}</section>
     </EvolutionTimeline></div>}
 
-    {stage === "candidate-comparison" && <CandidateOverviewTable evaluation={evaluation} candidates={reviewCandidates} rounds={experiment?.rounds || []}/>}
-
     {stage === "review" && <>
+      <CandidateOverviewTable evaluation={evaluation} candidates={reviewCandidates} rounds={experiment?.rounds || []}/>
       {chosenView ? <><FinalRecommendation chosen={chosenView} runnerUp={runnerUpView}
         baselineCorrect={typeof evaluation.result?.total === "number" && typeof evaluation.result?.bad_case_count === "number" ? evaluation.result.total - evaluation.result.bad_case_count : null}
         reason={recommendationTradeoff(experiment)}
-        totalCandidates={candidateViews.length} qualifiedCount={qualifiedViews.length}
+        totalCandidates={candidateViews.filter(candidate => candidate.complete && candidate.qualified !== null && candidate.qualificationVersion === chosenView.qualificationVersion).length}
+        qualifiedCount={qualifiedViews.filter(candidate => candidate.qualificationVersion === chosenView.qualificationVersion).length}
         regressionSummary={regressionSummary}
         others={candidateViews.filter(item=>item.id!==chosenView.id && item.id!==runnerUpView?.id)}
         questionText={id => questionText(id, evaluation, badCases)}
@@ -314,8 +371,8 @@ export function EvolutionPage({ data }: { data: any }) {
         <li>三、速度：Baseline 中位耗时 {metricText(evaluation.result,'latency_p50_seconds')}；最慢耗时 {metricText(evaluation.result,'latency_p99_seconds')}。</li>
         <li>四、回归：候选修好和新增问题见下表；修好不能抵消新增 Bad Case，本轮不推荐 Candidate。</li>
       </ol> : <div className="muted-prose"><TruncatedText lines={3}>{storyText(recommendationReason(experiment))}</TruncatedText></div>}</Section>{regressionSummary}{keepBaseline && <Section title="落选原因"><div className="candidate-rejections">{reviewCandidates.map(candidate=><button type="button" key={candidate.id} onClick={()=>setSelectedCandidate(candidate)}><strong>{schemeName(candidate)}</strong><span>{qualificationExplanation(candidate)}</span><Icon name="go" size={14}/></button>)}</div></Section>}</>}
-{!chosenView && confirmation && <p>人工报告确认已完成。</p>}{confirmation && !d && (!composite || composite.status === 'failed') && !compositeWaiting && <button className="secondary" disabled={busy || policyBlocked || hasRunning} onClick={()=>requestPaid("生成智能组合建议","在 Winner 基础上融合",()=>void action("生成智能组合建议",()=>postJson(`/api/experiments/${experiment.id}/composite`,{authorize_provider:true})))}>{composite?.status === 'failed' ? '重新生成 Candidate D' : '生成智能组合建议'}</button>}
-{!confirmation && qualified.length > 0 && abc.every(item => item.status === "skipped" || item.status === "evaluated" && item.result?.evaluation_complete !== false) && <div className="review-batch"><label>人工确认 · 确认 A/B/C 报告并选择合格 Winner<FilterButtons label="选择合格 Winner" value={selectedWinner} onChange={setWinnerId} options={qualified.map(candidate=>({value:candidate.id,label:candidateName(candidate)}))} /></label><button className="primary" disabled={busy || policyBlocked} onClick={() => requestPaid("确认报告与 Winner", "确认已保存的 A/B/C 报告并记录人工选择。", () => void action("确认 A/B/C 报告", () => postJson(`/api/experiments/${experiment.id}/recommendation`, { candidate_id: selectedWinner, actor: "human" })))}>确认报告与 Winner</button></div>}
+{!chosenView && confirmation && <p>人工报告确认已完成。</p>}{!readOnly && confirmation && !d && (!composite || composite.status === 'failed') && !compositeWaiting && <button className="secondary" disabled={busy || policyBlocked || hasRunning} onClick={()=>requestPaid("生成智能组合建议","在 Winner 基础上融合",()=>void action("生成智能组合建议",()=>postJson(`/api/experiments/${experiment.id}/composite`,{authorize_provider:true})))}>{composite?.status === 'failed' ? '重新生成 Candidate D' : '生成智能组合建议'}</button>}
+{!readOnly && !confirmation && qualified.length > 0 && abc.every(item => item.status === "skipped" || item.status === "evaluated" && item.result?.evaluation_complete !== false) && <div className="review-batch"><label>人工确认 · 确认 A/B/C 报告并选择合格 Winner<FilterButtons label="选择合格 Winner" value={selectedWinner} onChange={setWinnerId} options={qualified.map(candidate=>({value:candidate.id,label:candidateName(candidate)}))} /></label><button className="primary" disabled={busy || policyBlocked} onClick={() => requestPaid("确认报告与 Winner", "确认已保存的 A/B/C 报告并记录人工选择。", () => void action("确认 A/B/C 报告", () => postJson(`/api/experiments/${experiment.id}/recommendation`, { candidate_id: selectedWinner, actor: "human" })))}>确认报告与 Winner</button></div>}
 </>}
     <Drawer className="workbench-drawer" open={!!comparisonCase} onOpenChange={open=>!open && setComparisonCase(null)} title="Regression Check · 前后对比"><div className="drawer-body bad-case-details">{comparisonCase && <><section className="candidate-card drawer-section"><h3>业务问题与 Regression 结论</h3><CaseAnswer text={comparisonCase.question || "历史未保存问题"}/><p>Baseline {comparisonCase.before?.passed===true?"通过":comparisonCase.before?.passed===false?"未通过":"未采集"} → Candidate {comparisonCase.after?.passed===true?"通过":comparisonCase.after?.passed===false?"未通过":"未采集"} · {comparisonCase.after?.severity==="critical"?"严重":comparisonCase.after?.severity==="ordinary"?"普通":"严重程度未采集"}</p></section><section className="candidate-card drawer-section"><h3>Baseline 回答</h3><CaseAnswer text={comparisonCase.before?.model_answer || "历史未保存回答"} final={comparisonCase.before?.programmatic_metrics?.retrieval_trace?.final ?? comparisonCase.before?.retrieved_chunks ?? []}/><p>{coreEvidence(comparisonCase.before || {})}</p></section><section className="candidate-card drawer-section"><h3>Candidate 回答</h3><CaseAnswer text={comparisonCase.after?.model_answer || "历史未保存回答"} final={comparisonCase.after?.programmatic_metrics?.retrieval_trace?.final ?? comparisonCase.after?.retrieved_chunks ?? []}/><p>{coreEvidence(comparisonCase.after || {})}</p></section>{[["Baseline",comparisonCase.before,comparisonCase.baseline],["Candidate",comparisonCase.after,comparisonCase.current]].map(([label,item,run])=><StoryDisclosure className="candidate-card drawer-section" key={label} label={<>{label} · 逐题证据</>}><CaseDetails item={item || {}} snapshot={run?.dataset_snapshot || {}} config={run?.config || {}} gates={run?.gate_details || []}/></StoryDisclosure>)}</>}</div></Drawer>
     <Drawer className="workbench-drawer" open={advancedOpen} onOpenChange={setAdvancedOpen} title="Sandbox · 高级指标"><div className="drawer-body"><p>诊断与比较指标不替代 Hard Gate / Regression Check 资格判定。</p><div className="table-scroll"><DataTable><thead><tr><th>指标</th><th className="num">Baseline</th>{orderedCandidates.map(candidate => <th className="num" key={candidate.id}>{schemeName(candidate)}</th>)}</tr></thead><tbody>{[["Positive", "positive_correctness"], ["Ablation", "ablation_correctness"], ["综合分", "overall_score"], ["TTFT", "ttft_seconds"], ["Input Tokens", "input_tokens"], ["Output Tokens", "output_tokens"], ["Recall@K", "recall_at_k"], ["Precision@K", "precision_at_k"], ["MRR", "mrr"], ...( [evaluation,...orderedCandidates].some(source=>billedCostText(source.result?.comparison_metrics).startsWith("¥ ")) ? [["费用（保存估算）","token_cost"]] : [])].filter(([,key])=>[evaluation,...orderedCandidates].some(source=>{const result=source.result;return key==='token_cost' || typeof (result?.comparison_metrics?.[key] ?? result?.metrics?.[key] ?? result?.[key])==='number';})).map(([label, key]) => <tr key={key}><td>{label}</td><td className="num">{key==="token_cost" && !metricText(evaluation.result,key).startsWith("¥ ") ? "—" : metricText(evaluation.result, key)}</td>{orderedCandidates.map(candidate => <td className="num" key={candidate.id}>{key==="token_cost" && !metricText(candidate.result,key).startsWith("¥ ") ? "—" : metricText(candidate.result, key)}</td>)}</tr>)}</tbody></DataTable></div></div></Drawer>
@@ -326,9 +383,9 @@ export function EvolutionPage({ data }: { data: any }) {
       {reportError && <p role="alert">逐题结果读取失败：{reportError}</p>}
       {selectedCandidate.status==='evaluated' && selectedCandidate.result?.evaluation_run_id && !candidateReport && !reportError && <LoadingSkeleton label="正在读取保存的逐题结果"/>}
       {candidateReport?.cases?.length>0 && <Section title="逐题结果"><div className="table-scroll candidate-saved-cases"><DataTable><thead><tr><th>问题</th><th>判定</th><th>诊断</th></tr></thead><tbody>{candidateReport.cases.map((row:any)=><tr key={row.question_id} role="button" tabIndex={0} onClick={()=>setSelectedBadCase({question_id:row.question_id,result:row,dataset_snapshot:candidateReport.dataset_snapshot})} onKeyDown={event=>{if(event.key==='Enter')setSelectedBadCase({question_id:row.question_id,result:row,dataset_snapshot:candidateReport.dataset_snapshot});}}><td><TruncatedText lines={1}>{row.question}</TruncatedText></td><td><TableVerdict value={row.passed}/></td><td>{row.diagnostic_view?.diagnosis_category || '未知'}</td></tr>)}</tbody></DataTable></div></Section>}
-      <Section title="Candidate 内容"><StrategyPresentation reasoning={selectedCandidate.reasoning}/>{selectedCandidate.reasoning?.proposal && <p>{storyText(selectedCandidate.reasoning.proposal)}</p>}{selectedCandidate.reasoning?.why && <p>{storyText(selectedCandidate.reasoning.why)}</p>}{selectedCandidate.reasoning?.expected_improvement && <p>{storyText(selectedCandidate.reasoning.expected_improvement)}</p>}{selectedCandidate.reasoning?.evidence_assertions?.map((row:any,i:number)=><p key={i}>{storyText(row.observation)}</p>)}</Section>
+      <Section title="Candidate 内容"><p>{storyText(selectedCandidate.reasoning?.core_idea || selectedCandidate.reasoning?.hypothesis)}</p><StrategyPresentation reasoning={selectedCandidate.reasoning}/>{selectedCandidate.reasoning?.proposal && <p>{storyText(selectedCandidate.reasoning.proposal)}</p>}{selectedCandidate.reasoning?.why && <p>{storyText(selectedCandidate.reasoning.why)}</p>}{selectedCandidate.reasoning?.expected_improvement && <p>{storyText(selectedCandidate.reasoning.expected_improvement)}</p>}{selectedCandidate.reasoning?.evidence_assertions?.map((row:any,i:number)=><p key={i}>{storyText(row.observation)}</p>)}</Section>
       <Section title="参数差异" action={<button className="secondary" onClick={() => setSearchOpen(true)}>查看可调参数</button>}><ConfigDiff base={evaluation.config || {}} candidate={selectedCandidate}/></Section>
-      <Section title="真实实验结果"><p>{storyText(qualificationExplanation(selectedCandidate))}</p><p>{selectedCandidate.status === "evaluated" ? regressionText(selectedCandidate.result) : "没有完整 Sandbox，Regression 结论未判定。"}</p><p>Regression Check：{metricText(selectedCandidate.result,"regression")} · 目标修复 {metricText(selectedCandidate.result,"target_bad_cases_fixed")} · 净改善 {metricText(selectedCandidate.result,"net_improvement")}</p>{selectedCandidate.result?.evaluation_complete !== false && selectedCandidate.result?.regression_interpretation && <p>{selectedCandidate.result.regression_review ? "严重新增上限 0、普通新增上限 1；修好的题不能抵消新增的 Bad Case" : selectedCandidate.result.regression_interpretation}</p>}{selectedCandidate.result?.evaluation_complete === false ? <p>完整50题后判定修复与退化；历史部分比较保留在高级审计。</p> : <p>已修复：{(selectedCandidate.result?.all_fixed_question_ids || []).map(questionLabel).join("、") || "未采集"} · 新增 Bad Case：{(selectedCandidate.result?.new_regression_question_ids || []).map(questionLabel).join("、") || "未采集"}</p>}</Section>
+      <Section title="真实实验结果"><QualificationVersions result={selectedCandidate.result}/><p>{storyText(qualificationExplanation(selectedCandidate))}</p><p>{selectedCandidate.status === "evaluated" ? regressionText(selectedCandidate.result) : "没有完整 Sandbox，Regression 结论未判定。"}</p><p>Regression Check：{metricText(selectedCandidate.result,"regression")} · 目标修复 {metricText(selectedCandidate.result,"target_bad_cases_fixed")} · 净改善 {metricText(selectedCandidate.result,"net_improvement")}</p>{selectedCandidate.result?.evaluation_complete !== false && selectedCandidate.result?.regression_interpretation && <p>{selectedCandidate.result.regression_review ? "严重新增上限 0、普通新增上限 1；修好的题不能抵消新增的 Bad Case" : selectedCandidate.result.regression_interpretation}</p>}{selectedCandidate.result?.evaluation_complete === false ? <p>完整评测后判定修复与退化；历史部分比较保留在高级审计。</p> : <p>已修复：{(selectedCandidate.result?.all_fixed_question_ids || []).map(questionLabel).join("、") || "未采集"} · 新增 Bad Case：{(selectedCandidate.result?.new_regression_question_ids || []).map(questionLabel).join("、") || "未采集"}</p>}</Section>
       {selectedCandidate.reasoning?.candidate_label === "D" && <Section title="组合来源与冲突"><div className="muted-prose"><TruncatedText lines={3}>基础 Winner：{candidateName(candidates.find(item=>item.id === selectedCandidate.reasoning.winner_id))}</TruncatedText></div>{(selectedCandidate.reasoning.sources || []).map((source:any,index:number)=><p key={source.candidate_id || index}>{(source.source_candidates || [source.candidate_id]).filter(Boolean).map((id:string)=>schemeName(candidates.find(item=>item.id===id),id)).join("、") || "来源 Candidate 待核对"} · <StoryText value={source.why_merge || source.reason}/></p>)}<div className="muted-prose"><TruncatedText lines={3}>冲突：{selectedCandidate.reasoning.conflicts ? Object.keys(selectedCandidate.reasoning.conflicts).join("、") || "无冲突" : "未采集"}</TruncatedText></div></Section>}
       {selectedCandidate.reasoning?.candidate_label==='D' && <Section title="副作用检查"><DSideEffects changes={selectedCandidate.reasoning.changes || []}/></Section>}
 
@@ -353,7 +410,7 @@ function candidateState(candidate:any, running=false):{label:string;tone:'neutra
   if (candidate.status === 'skipped') return {label:'已跳过（未运行）',tone:'neutral'};
   if (candidate.status === 'failed') return candidate.product_interruption === true ? {label:'评测中断',tone:'warning'} : {label:'评测停止',tone:'warning'};
   if (candidate.status === 'evaluated' && candidate.result?.evaluation_complete === false) return {label:'评测未完成',tone:'warning'};
-  if (candidate.status === 'evaluated') return candidate.result?.qualification?.qualified === true ? {label:'合格',tone:'good'} : candidate.result?.qualification?.qualified === false ? {label:'未通过',tone:'bad'} : {label:'已评测，资格未知',tone:'neutral'};
+  if (candidate.status === 'evaluated') return currentQualification(candidate.result)?.qualified === true ? {label:qualificationLabel(candidate.result),tone:'good'} : currentQualification(candidate.result)?.qualified === false ? {label:qualificationLabel(candidate.result),tone:'bad'} : {label:'已评测，资格未知',tone:'neutral'};
   return {label:'待评测',tone:'neutral'};
 }
 
@@ -369,15 +426,16 @@ function candidateProgress(candidate:any, running?:{current?:number;total?:numbe
   return candidateState(candidate).label;
 }
 
-function CandidateCard({ candidate, experiment, baseline, onDetail, targets, onTargets, running, busy, onRun, onSkip, includeRound = false, primaryRun = false, route = false, routeWinner = false }: {
+function CandidateCard({ candidate, experiment, baseline, onDetail, targets, onTargets, running, busy, onRun, onSkip, includeRound = false, primaryRun = false, route = false, routeWinner = false, readOnly = false }: {
   candidate: any; experiment: any; baseline: Record<string, unknown>; onDetail: () => void; targets: any[];
   onTargets: () => void; running?: { current?: number; total?: number; stage?: string }; busy: boolean;
-  onRun: () => void; onSkip?: () => void; includeRound?: boolean; primaryRun?: boolean; route?: boolean; routeWinner?: boolean;
+  onRun: () => void; readOnly?: boolean; onSkip?: () => void; includeRound?: boolean; primaryRun?: boolean; route?: boolean; routeWinner?: boolean;
 }) {
   const reasoning = candidate.reasoning || {}, result = candidate.result;
   const evaluated = evaluatedCandidate(candidate);
   const interrupted = candidate.status === "failed" && candidate.product_interruption === true;
   const state = candidateState(candidate, !!running);
+  const blocked = evaluated && sandboxBlock(result);
   const inherited = reasoning.inherited_parameters || {};
   const risks = Array.isArray(reasoning.risks) && reasoning.risks.length
     ? reasoning.risks.map((risk: any) => risk.reason || '暂无') : [reasoning.risk || '暂无'];
@@ -385,18 +443,24 @@ function CandidateCard({ candidate, experiment, baseline, onDetail, targets, onT
     reasoning.direction || (reasoning.intervention_direction ? optimizationDirection(reasoning.intervention_direction) : ''),
     reasoning.strategy_name, reasoning.core_idea || reasoning.hypothesis || '暂无',
   ].filter(Boolean).join(' · '));
-  return <article className={`candidate-card candidate-summary-card drawer-section${route ? " ui-evo-card" : ""}${routeWinner ? " winner" : ""}`}
+  return <article className={`candidate-card candidate-summary-card drawer-section${route ? " ui-evo-card" : ""}${routeWinner ? " winner" : ""}${blocked ? " sandbox-blocked" : ""}`}
     onClick={event => { if (route && !(event.target as HTMLElement).closest("button,details")) onDetail(); }}>
     <div className="candidate-card-summary">
       <div className="candidate-card-header">
         <h3><SummaryText text={`${schemeName(candidate, undefined, includeRound)} · ${candidateStrategyName(candidate)}`}/></h3>
-        <Badge tone={result?.price_pause?.paused ? "warning" : state.tone}>{result?.price_pause?.paused ? "已暂停" : state.label}</Badge>
+        <Badge tone={state.tone}>{state.label}</Badge>
       </div>
+      {blocked && <p className="sandbox-block-message">{blocked}</p>}
       <dl>
         {candidateSummary(candidate, baseline, experiment, targets).map(([label, value]) => <div key={label} className="candidate-summary-row">
           <dt>{label}</dt><dd><SummaryText text={value}/></dd>
         </div>)}
-        {evaluated && <div className="candidate-summary-row"><dt>结果</dt><dd><CandidateResultSummary result={result}/></dd></div>}
+        {evaluated && <div className="candidate-summary-row"><dt>实验效果</dt><dd><CandidateResultSummary result={result}/></dd></div>}
+        {evaluated && <div className="candidate-summary-row"><dt>正式资格</dt><dd><QualificationVersions result={result} showVerdict={false}/></dd></div>}
+        {evaluated && <>
+          <div className="candidate-summary-row"><dt>证据可信度</dt><dd>{candidateEvidence(candidate, experiment)}</dd></div>
+          <div className="candidate-summary-row"><dt>推荐价值</dt><dd>{candidateValue(candidate, experiment)}</dd></div>
+        </>}
       </dl>
     </div>
     <div className="candidate-card-body" role="region" aria-label={`Candidate ${reasoning.candidate_label} 正文`}>
@@ -418,8 +482,8 @@ function CandidateCard({ candidate, experiment, baseline, onDetail, targets, onT
     <div className="candidate-card-footer">
       {targets.length > 0 && <button className="secondary small" onClick={onTargets}><Icon name="target" size={14}/>查看目标 {targets.length} 题</button>}
       <button className="secondary small" onClick={event => { event.currentTarget.focus(); onDetail(); }}><Icon name="report" size={14}/>查看 Candidate 与完整报告</button>
-      {candidate.status === "generated" && onSkip && <button className="text-button" disabled={busy || !!running} onClick={onSkip}>跳过此 Candidate</button>}
-      {candidate.status !== "evaluated" && <CandidateAction primary={primaryRun} candidate={candidate} running={running} busy={busy} onRun={onRun}/>}
+      {!readOnly && candidate.status === "generated" && onSkip && <button className="text-button" disabled={busy || !!running} onClick={onSkip}>跳过此 Candidate</button>}
+      {!readOnly && candidate.status !== "evaluated" && <CandidateAction primary={primaryRun} candidate={candidate} running={running} busy={busy} onRun={onRun}/>}
     </div>
   </article>;
 }
@@ -431,7 +495,7 @@ function ConfigDiff({ base, candidate }: { base: Record<string, any>; candidate:
   return <div className="candidate-config-diff"><ParameterDiff before={Object.fromEntries(keys.map(key=>[key,base[key]]))} after={Object.fromEntries(keys.map(key=>[key,after[key]]))}/>{keys.length<Object.keys(parameterNames).length && <p className="muted">部分参数缺少前后记录，未纳入比较；完整配置保留在接口。</p>}</div>;
 }
 
-function CandidateAction({ candidate, running, busy, onRun, primary = false }: { primary?: boolean; candidate: any; running?: { current?: number; total?: number }; busy: boolean; onRun: () => void; onSkip?: () => void }) {
+function CandidateAction({ candidate, running, busy, onRun, primary = false }: { primary?: boolean; candidate: any; running?: { current?: number; total?: number }; busy: boolean; onRun: () => void }) {
   return <div className="candidate-card-action"><button className={primary ? "primary" : "secondary"} disabled={busy || !!running || !["generated", "failed"].includes(candidate.status)} onClick={onRun}>{running ? "Sandbox 运行中" : candidate.status === "skipped" ? "已跳过（未运行）" : candidate.status === "evaluated" ? "已评测" : candidate.status === "failed" ? "继续 Sandbox" : "运行 Sandbox"}</button>{running && running.current != null && running.total != null && <span>{running.current} / {running.total}</span>}</div>;
 }
 
@@ -444,8 +508,8 @@ function metricText(result: any, key: string) {
   if (key === "new_failures") { const r = result.regression_review || result.regression; return r && r.new_critical_failures != null && r.new_ordinary_failures != null ? `${!result.regression_review && Array.isArray(result.formal_blocking_question_ids)?"正式阻断 · ":""}严重 ${r.new_critical_failures} / 普通 ${r.new_ordinary_failures}` : "未采集"; }
   if (key === "gates") return result.gates?.passed_count!=null && result.gates?.total!=null ? `${result.gates.passed_count} / ${result.gates.total}` : "未采集";
   if (key === "regression") return result.regression_review || result.regression ? displayText((result.regression_review || result.regression).status || "未采集") : "未判定";
-  if (key === "release_qualification") return result.release_qualification?.qualified === true ? "可发布" : result.release_qualification?.qualified === false ? "不可发布" : "未判定";
-  if (key === "qualification") return typeof result.qualification?.qualified === "boolean" ? result.qualification.qualified ? "合格" : "不合格" : "未判定";
+  if (key === "release_qualification") return currentQualification(result)?.qualified === false ? "不可发布" : result.release_qualification?.qualified === true ? "可发布" : result.release_qualification?.qualified === false ? "不可发布" : "未判定";
+  if (key === "qualification") return qualificationLabel(result);
   if (key === "token_cost") return billedCostText(result.comparison_metrics);
   const value = result.comparison_metrics?.[key] ?? result.metrics?.[key] ?? result[key];
   if (["bad_case_count", "target_bad_cases_fixed", "incidental_fixes", "net_improvement", "input_tokens", "output_tokens"].includes(key) && typeof value === "number") return String(value);
@@ -461,13 +525,13 @@ function qualificationExplanation(candidate:any):string {
   if(candidate.status!=="evaluated")return candidate.status==="failed"?"运行失败；部分结果不能代表资格结论。":"实验尚未完成，不预判资格。";
   const currentReasons = qualificationReasons(candidate.result || {});
   if (currentReasons) return currentReasons;
-  if(candidate.result?.qualification?.qualified===true && candidate.result?.release_qualification?.qualified===false){
+  if(currentQualification(candidate.result)?.qualified===true && candidate.result?.release_qualification?.qualified===false){
     const releaseNames:Record<string,string>={hard_gates:'Hard Gate 未通过',zero_new_failures:'存在新增 Bad Case，不满足零新增的发布条件',at_least_one_fixed:'未修好原问题'};
     return Object.entries(candidate.result.release_qualification.checks || {}).filter(([,passed])=>passed===false).map(([key])=>releaseNames[key] || '其他保存的发布条件未通过').join('；') || '候选合格，但保存的发布资格未通过。';
   }
   const names:Record<string,string>={hard_gates:"Hard Gate 未通过",regression:"Regression Check 未通过",target_bad_case_fixed:"未满足目标修复条件",total_bad_cases_reduced:"未满足失败总数减少条件"};
-  const failed=Object.entries(candidate.result?.qualification?.checks || {}).filter(([,passed])=>passed===false).map(([key])=>names[key] || "其他保存的资格条件未通过");
-  return failed.join("；") || (candidate.result?.qualification?.qualified===true?"保存的质量、安全与 Regression 资格通过；正式推荐以已保存决策为准。":"历史未保存具体未通过原因。");
+  const failed=Object.entries(currentQualification(candidate.result)?.checks || {}).filter(([,passed])=>passed===false).map(([key])=>names[key] || "其他保存的资格条件未通过");
+  return failed.join("；") || (currentQualification(candidate.result)?.qualified===true?"保存的质量、安全与 Regression 资格通过；正式推荐以已保存决策为准。":"历史未保存具体未通过原因。");
 }
 
 function regressionText(result: any): string {

@@ -46,7 +46,7 @@ it('never guesses highlights or missing metrics, and derives the critical parame
  expect(citationText('按《操作_说明.pdf》“存放”（第8页），原文。',[source]).text).toContain('按');
 });
 it('counts qualified D alongside the qualified saved round candidate',async()=>{
- await mount(<OverviewPage data={{optimization:{candidates:[{id:'C',reasoning:{round:3,candidate_label:'C'},result:{qualification:{qualified:true}}},{id:'D',reasoning:{candidate_label:'D'},result:{qualification:{qualified:true}}}]}}} navigate={()=>{}}/>);
+ await mount(<OverviewPage data={{optimization:{candidates:[{id:'C',status:'evaluated',reasoning:{round:3,candidate_label:'C'},result:{qualification:{qualified:true}}},{id:'D',status:'evaluated',reasoning:{candidate_label:'D'},result:{qualification:{qualified:true}}}]}}} navigate={()=>{}}/>);
  await act(async()=>document.querySelector<HTMLButtonElement>('.ui-ov-step-wrap:nth-child(4) button')!.focus()); expect(document.body.textContent).toContain('2 个合格 Candidate');
 });
 it('handles repeated chapters, alternate document titles and multiple page references without deleting surrounding prose',()=>{

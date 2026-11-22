@@ -4,6 +4,7 @@
  * 输出：页面直接渲染用的轮次 / Candidate 模型。所有文字都由保存数据生成，不编。
  */
 
+import { currentQualification } from "../../candidateQualification";
 import { parameterNames, pipelineValue } from "../../display";
 
 export type ParamChange = { key: string; label: string; from?: string; to: string };
@@ -11,7 +12,7 @@ export type CandidateView = {
   id: string; label: string; round: number; name: string; direction: string; efficiency: boolean;
   intent?: string;
   params: ParamChange[]; fixed: string[]; broken: string[]; gateFailures: string[];
-  qualified: boolean | null; winner: boolean; correct: number | null; total: number | null;
+  qualified: boolean | null; qualificationVersion?: string; winner: boolean; correct: number | null; total: number | null;
   p50: number | null; p99: number | null; complete: boolean;
   gates?: { passed: number; total: number }; newFailures?: number;
   regression?: { new_critical_failures: number; new_ordinary_failures: number; limits?: { critical: number; ordinary: number | null } };
@@ -64,8 +65,8 @@ export function candidateView(candidate: any, baselineConfig: Record<string, unk
     key, label: PARAM_LABELS[key] ?? key, to: paramValue(key, value),
     from: baselineConfig && key in baselineConfig ? paramValue(key, baselineConfig[key]) : undefined,
   })).filter(item => item.from === undefined || item.from !== item.to);
-  const qualification = result.qualification?.rule_version ? result.qualification : result.release_qualification ?? result.qualification;
-  const total = typeof result.total_cases === "number" ? result.total_cases : typeof result.case_count === "number" ? result.case_count : 50;
+  const qualification = currentQualification(result);
+  const total = result.total ?? result.total_cases ?? result.case_count ?? null;
   const bad = typeof result.bad_case_count === "number" ? result.bad_case_count : null;
   return {
     id: candidate.id, label: reasoning.candidate_label || candidate.id.slice(-1), round: reasoning.round || 1, name: nameOf(candidate),
@@ -79,8 +80,9 @@ export function candidateView(candidate: any, baselineConfig: Record<string, unk
     regression: result.regression_review,
     gates: typeof result.gates?.passed_count === 'number' && typeof result.gates?.total === 'number' ? { passed: result.gates.passed_count, total: result.gates.total } : undefined,
     qualified: typeof qualification?.qualified === "boolean" ? qualification.qualified : null,
-    winner: candidate.id === winnerId,
-    correct: bad === null ? null : total - bad, total,
+    qualificationVersion: qualification?.rule_version,
+    winner: candidate.id === winnerId && qualification?.qualified !== false,
+    correct: bad === null || total === null ? null : total - bad, total,
     p50: latency(result, "latency_p50_seconds"), p99: latency(result, "latency_p99_seconds"),
     complete: complete(candidate),
   };
@@ -89,8 +91,8 @@ export function candidateView(candidate: any, baselineConfig: Record<string, unk
 export function roundSummary(candidates: CandidateView[]): string {
   const done = candidates.filter(item => item.complete);
   if (!done.length) return "本轮评测尚未完成";
-  const winner = done.find(item => item.winner) || done.find(item => item.qualified);
-  if (winner) return `${winner.name.replace(/^Round \d+ · /, "")} 零新增 Bad Case、Hard Gate 全过，成为 Winner`;
+  const qualified = done.filter(item => item.qualified === true);
+  if (qualified.length) return `本轮 ${qualified.length} 个方案合格`;
   const broke = done.filter(item => item.broken.length).length;
   const gates = done.filter(item => item.gateFailures.length).length;
   const parts = [broke ? `${broke} 个新增了 Bad Case` : "", gates ? `${gates} 个没过 Hard Gate` : ""].filter(Boolean);
@@ -139,7 +141,7 @@ export function buildEvolutionModel(experiment: any, baselineConfig: Record<stri
   const dRaw = candidates.find(item => item.reasoning?.candidate_label === "D");
   const winnerId: string | null = dRaw?.reasoning?.winner_id || state.d_facts?.winner_id || state.report_confirmation?.winner_id || rec.winner_id || null;
   const views = candidates.filter(item => ["A", "B", "C"].includes(item.reasoning?.candidate_label)).map(item => candidateView(item, baselineConfig, winnerId, gateLabel, nameOf));
-  const roundNumbers = Array.from(new Set(views.map(item => item.round))).sort((a, b) => a - b);
+  const roundNumbers = [...new Set<number>([...views.map(item => item.round), ...(experiment?.rounds || []).map((item: any) => item.round), state.round])].filter(round => Number.isInteger(round) && round > 0).sort((a, b) => a - b);
   const rounds = roundNumbers.map(round => {
     const items = views.filter(item => item.round === round).sort((a, b) => a.label.localeCompare(b.label));
     const timed = items.filter(item => item.p50 !== null);

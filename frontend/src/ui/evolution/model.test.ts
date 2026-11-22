@@ -38,6 +38,6 @@ it("marks the fastest candidate of each round (the efficiency direction in this 
 it("writes round summaries only from saved facts", () => {
   expect(model.rounds[0].summary).toBe("本轮没有合格 Candidate：3 个新增了 Bad Case，3 个没过 Hard Gate");
   expect(model.rounds[1].summary).toBe("本轮没有合格 Candidate：3 个新增了 Bad Case，1 个没过 Hard Gate");
-  expect(model.rounds[2].summary).toBe("Candidate C 零新增 Bad Case、Hard Gate 全过，成为 Winner");
+  expect(model.rounds[2].summary).toBe("本轮 1 个方案合格");
   expect(roundSummary([])).toBe("本轮评测尚未完成");
 });

@@ -52,7 +52,7 @@ it('shows saved D design, open issue cards and ranking without old disclosures',
 });
 it('shows all ten saved checks between conclusion and tradeoff, with rejection details always open',async()=>{
  await mount();await click('回归与推荐');
- expect(document.querySelector('.story-round-switch')).toBeNull();expect(document.querySelector('.ui-fin-top h2')?.textContent).toContain('10 个 Candidate 中只有 2 个通过回归检查');
+ expect(document.querySelector('.story-round-switch')).toBeNull();expect(document.querySelector('.ui-fin-top h2')?.textContent).toContain('10 个已判定方案中 2 个合格');
  const table=document.querySelector('.regression-summary-table')!;expect(table.querySelectorAll('tbody tr')).toHaveLength(10);expect(table.querySelectorAll('tbody tr.qualified')).toHaveLength(2);
  expect(table.querySelector('thead')?.textContent).toBe('Candidate修好新增严重新增普通Hard Gate判定');expect(table.querySelector('tbody tr')?.textContent).toContain('R1-A');
  const fin=document.querySelector('.ui-fin')!;expect([...fin.children].map(e=>e.className)).toEqual(['ui-fin-top','panel regression-check','ui-fin-compare','ui-fin-others']);
@@ -86,8 +86,12 @@ it('shows the reassessed qualification beside the original result',async()=>{
  }
  await mount();await click('进化路线');
  const cards=Array.from(document.querySelectorAll('.candidate-cards .candidate-card'));
- expect(cards.find(card=>card.textContent?.includes('Candidate A'))?.textContent).toContain('未通过（新错 Q22） · 旧规则版本：合格');
- expect(cards.find(card=>card.textContent?.includes('Candidate B'))?.textContent).toContain('未通过（无修复） · 旧规则版本：合格');
+ const a = cards.find(card=>card.textContent?.includes('Candidate A'));
+ expect(a?.querySelector('.candidate-card-header .badge')?.textContent).toBe('不合格 · 新错 Q22');
+ expect(a?.querySelector('.qualification-versions')?.textContent).toContain('旧规则版本：合格');
+ const b = cards.find(card=>card.textContent?.includes('Candidate B'));
+ expect(b?.querySelector('.candidate-card-header .badge')?.textContent).toBe('不合格 · 无修复');
+ expect(b?.querySelector('.qualification-versions')?.textContent).toContain('旧规则版本：合格');
 });
 it('027f2 explains regression limits alongside every failed Hard Gate',async()=>{
  const ordinary=data.optimization.candidates.find((c:any)=>c.reasoning.round===2 && c.reasoning.candidate_label==='A');

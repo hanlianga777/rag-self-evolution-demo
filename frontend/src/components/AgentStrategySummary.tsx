@@ -1,3 +1,4 @@
+import { currentQualification, formerQualification, qualificationWord } from '../candidateQualification';
 import { currentRoot } from './EvaluationDiagnosis';
 import { schemeName, shortQuestionId, storyText } from './EvolutionStory';
 import { formatValue, parameterNames } from './PipelineFields';
@@ -93,20 +94,41 @@ function basisText(candidate: any, experiment: any, changes: ReturnType<typeof p
 export const evaluatedCandidate = (candidate: any) => candidate?.status === 'evaluated'
   && !!candidate.result && candidate.result.evaluation_complete !== false && !candidate.result.technical_failed;
 
-function scoreText(result: any) {
+export function scoreText(result: any) {
   const { total, bad_case_count: bad } = result || {};
   return Number.isFinite(total) && Number.isFinite(bad) ? `${total - bad}/${total}` : '未知';
 }
 
-function gatesText(result: any) {
+export function gatesText(result: any) {
   const { passed_count: passed, total } = result?.gates || {};
   return Number.isFinite(passed) && Number.isFinite(total) ? `${passed}/${total}` : '未知';
 }
 
 const newFailures = (result: any) =>
   result?.new_regression_question_ids ?? result?.new_failure_question_ids ?? result?.regression?.new_regression_question_ids;
-const qualification = (result: any) =>
-  result?.qualification?.qualified === true ? '合格' : result?.qualification?.qualified === false ? '不合格' : '未知';
+export function qualificationLabel(result: any) {
+  const verdict = qualificationWord(currentQualification(result));
+  const reasons = qualificationReasons(result);
+  return reasons ? `${verdict} · ${reasons}` : verdict;
+}
+
+export function QualificationVersions({ result, showVerdict = true }: { result: any; showVerdict?: boolean }) {
+  const current = currentQualification(result);
+  const former = formerQualification(result);
+  return <span className="qualification-versions">
+    {showVerdict && <strong className={current?.qualified === false ? 'result-broken' : undefined}>{qualificationLabel(result)}</strong>}
+    {current && <small>规则版本：{current.rule_version || '当时未保存'}</small>}
+    {typeof former?.qualified === 'boolean' && <small>旧规则版本：{qualificationWord(former)}{former.rule_version && `（${former.rule_version}）`}</small>}
+  </span>;
+}
+
+export function sandboxBlock(result: any) {
+  if (result?.gates?.passed !== false && currentQualification(result)?.checks?.hard_gates !== false) return null;
+  const safety = result.metrics?.safe_rejection_rate ?? result.safety_metrics?.safe_rejection_rate
+    ?? result.gates?.gates?.find((gate: any) => gate.metric === 'safe_rejection_rate')?.actual;
+  const score = scoreText(result);
+  return `被沙盒拦下${score === '未知' ? '' : `：${score}`}${Number.isFinite(safety) ? `，安全拒答率 ${safety}%` : ''}`;
+}
 
 export function candidateSummary(candidate: any, baseline: Record<string, unknown>, experiment: any, targets: any[]) {
   const changes = parameterChanges(candidate, baseline);
@@ -120,11 +142,7 @@ export function candidateSummary(candidate: any, baseline: Record<string, unknow
 export function CandidateResultSummary({ result }: { result: any }) {
   const fixed = `修好 ${questions(result.all_fixed_question_ids)}`;
   const broken = `新错 ${questions(newFailures(result))}`;
-  const reasons = qualificationReasons(result);
-  const verdict = reasons ? `未通过（${reasons}）` : qualification(result);
-  const oldVerdict = typeof result.old_qualification?.qualified === 'boolean'
-    ? ` · 旧规则版本：${qualification({ qualification: result.old_qualification })}` : '';
-  const metrics = `${scoreText(result)} · 门槛 ${gatesText(result)} · ${verdict}${oldVerdict}`;
+  const metrics = `${scoreText(result)} · 门槛 ${gatesText(result)}`;
   return <span className="summary-text candidate-result-line" title={`${fixed} · ${broken} · ${metrics}`}>
     <span className="result-fixed">{fixed}</span><span> · </span>
     <span className="result-broken">{broken}</span><span> · </span><span>{metrics}</span>
@@ -132,12 +150,15 @@ export function CandidateResultSummary({ result }: { result: any }) {
 }
 
 export function qualificationReasons(result: any): string {
-  const checks = result.qualification?.checks;
-  if (!result.qualification?.rule_version || result.qualification?.qualified || !checks) return '';
+  const current = currentQualification(result);
+  const checks = current?.checks;
+  if (current?.qualified !== false || !checks) return '';
   if (checks.comparison_complete === false) return '逐题对比不完整';
-  return [checks.hard_gates === false && 'Hard Gate 未通过',
-    checks.regression === false && '严重题回退',
-    checks.zero_new_failures === false && `新错 ${questions(newFailures(result))}`,
+  if (checks.hard_gates === false) return '硬门槛未通过';
+  const fresh = newFailures(result);
+  const freshText = Array.isArray(fresh) && questionIds(fresh).length > 3 ? `${questionIds(fresh).length} 题` : questions(fresh);
+  return [checks.regression === false && '严重题回退',
+    checks.zero_new_failures === false && `新错 ${freshText}`,
     checks.at_least_one_fixed === false && '无修复',
   ].filter(Boolean).join('、');
 }
@@ -150,7 +171,7 @@ function comparisonValues(candidate: any, baseline: any) {
   if (evaluatedCandidate(candidate)) {
     const result = candidate.result;
     return [change, gatesText(result), scoreText(result), questions(result.all_fixed_question_ids),
-      questions(newFailures(result)), qualification(result)];
+      questions(newFailures(result)), qualificationLabel(result)];
   }
   return [change, ...Array<string>(5).fill(status)];
 }
@@ -179,9 +200,53 @@ export function CandidateOverviewTable({ evaluation, candidates, rounds }: {
       <table className="candidate-overview-table" aria-label="跨方案总表">
         <thead><tr><th scope="col">指标</th>{labels.map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
         <tbody>{['改了什么', '门槛通过数', '答对数', '修好', '新错', '是否合格'].map((label, index) => <tr key={label}>
-          <th scope="row">{label}</th>{columns.map((column, offset) => <td key={labels[offset]}><SummaryText text={column[index]}/></td>)}
+          <th scope="row">{label}</th>{columns.map((column, offset) => <td key={labels[offset]}>{index === 5 && evaluatedCandidate(byLabel.get(labels[offset]))
+            ? <QualificationVersions result={byLabel.get(labels[offset]).result}/>
+            : <SummaryText text={column[index]}/>}</td>)}
         </tr>)}</tbody>
       </table>
     </div>
   </Section>;
+}
+
+export function candidateEvidence(candidate: any, experiment: any) {
+  if (!evaluatedCandidate(candidate)) return '等待完整评测';
+  const fixed = candidate.result.all_fixed_question_ids;
+  if (!Array.isArray(fixed)) return '当时未保存修好题号';
+  if (!fixed.length) return '无修好题可核对';
+  const state = experiment?.result;
+  const round = candidate.reasoning?.candidate_label === 'D' ? 'D' : candidate.reasoning?.round || 1;
+  const rows = state?.round_conclusions?.[round]?.case_facts?.[candidate.id]
+    ?? state?.case_comparisons?.[candidate.id] ?? [];
+  const groups = new Map<string, string[]>();
+  for (const id of new Set<string>(fixed)) {
+    const row = rows.find((item: any) => item['题目键'] === id);
+    const before = row?.['基线标准证据位置'], after = row?.['候选标准证据位置'];
+    const finalPositions = (positions: any[]) => positions.map(({ chunk_id, final }) => [chunk_id, final]);
+    const changed = Array.isArray(before) && before.length && Array.isArray(after) && after.length
+      ? JSON.stringify(finalPositions(before)) !== JSON.stringify(finalPositions(after)) : null;
+    const label = changed === true ? '标准证据位置有变化'
+      : row?.['证据变化'] === true ? '送入资料有变化，归因待复核'
+      : row?.['证据变化'] === false ? '仅观察到结果变化'
+      : '证据变化待复核';
+    groups.set(label, [...(groups.get(label) || []), id]);
+  }
+  return [...groups].map(([label, ids]) => `${label} ${questions(ids)}`).join(' · ');
+}
+
+export function candidateValue(candidate: any, experiment: any) {
+  const recommendation = experiment?.recommendation?.result ?? experiment?.recommendation;
+  const confirmation = experiment?.result?.report_confirmation ?? recommendation?.report_confirmation;
+  const result = candidate.result;
+  if (!evaluatedCandidate(candidate)) return '待评测';
+  const checks = currentQualification(result)?.checks;
+  if (checks?.hard_gates === false) return '硬门槛未通过';
+  if (checks?.zero_new_failures === false) return '有新增错题';
+  if (checks?.at_least_one_fixed === false) return '本次评测无修复收益';
+  if (currentQualification(result)?.qualified === false) return '资格未通过';
+  if (confirmation && recommendation?.status === 'Recommended' && recommendation.recommended_candidate === candidate.id) return '已保存最终推荐';
+  if (confirmation?.winner_id === candidate.id) return '已确认优胜方案';
+  if (recommendation?.suggested_winner === candidate.id) return '保存的建议优胜 · 待报告确认';
+  const reason = recommendation?.not_recommended?.find((item: any) => item.candidate_id === candidate.id)?.reason;
+  return reason || '当时未保存推荐结论';
 }

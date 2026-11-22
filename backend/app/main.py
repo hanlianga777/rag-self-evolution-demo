@@ -1621,8 +1621,8 @@ def case_list_row(row, *, light=False):
 
 @app.get("/api/bad-cases")
 @read_view()
-def bad_cases(light: bool = False):
-    current=store.current_baseline_identity()['current_baseline_id']
+def bad_cases(light: bool = False, baseline_id: str | None = None):
+    current=baseline_id or store.current_baseline_identity()['current_baseline_id']
     from .agent_inputs import baseline_bad_case_rows
     return [case_list_row(row,light=light) for row in baseline_bad_case_rows(store, store.evaluation_run(current) if current else None)]
 
@@ -1804,10 +1804,26 @@ def experiment(run_id: str, light: bool = False):
     result = store.experiment(run_id,light=light)
     if result is None:
         raise HTTPException(status_code=404, detail="Experiment not found")
-    result = store.with_agent_trace_strategies(result)
+    result = {**store.with_agent_trace_strategies(result), 'recommendation': store.recommendation(run_id)}
     if light:
-        return {key:value for key,value in light_value(result).items() if key in {'id','status','baseline_run_id','result','candidates','evaluation_budget','rounds'}}
+        return {key:value for key,value in light_value(result).items() if key in {'id','status','baseline_run_id','result','candidates','evaluation_budget','rounds','recommendation'}}
     return result
+
+
+@app.get("/api/experiments/{run_id}/round-trace/{round_number}")
+@read_view()
+def experiment_round_trace(run_id: str, round_number: int):
+    with store.connection() as connection:
+        saved = connection.execute("""
+            SELECT id, created_at, result_json FROM agent_traces
+            WHERE experiment_id=? AND status='completed' AND json_valid(result_json)
+              AND json_extract(result_json, '$.round')=?
+            ORDER BY id DESC LIMIT 1
+        """, (run_id, round_number)).fetchone()
+    if saved is None:
+        return {"status": "not_saved"}
+    return {"status": "saved", "id": saved["id"], "created_at": saved["created_at"],
+            "result": json.loads(saved["result_json"])}
 
 
 class CoveragePlanRequest(BaseModel):

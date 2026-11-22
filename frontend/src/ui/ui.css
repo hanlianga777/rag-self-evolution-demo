@@ -245,6 +245,15 @@ td { border-bottom-color: var(--ui-rule-2); }
 .ui-ov-step-text small { font-size: 12px; color: var(--ui-muted); line-height: 1.45; }
 .ui-ov-arrow { position: absolute; right: -4px; top: 50%; width: 8px; height: 8px; border-top: 1.5px solid var(--ui-faint); border-right: 1.5px solid var(--ui-faint); transform: translateY(-50%) rotate(45deg); }
 @media (max-width: 1320px) { .ui-ov-big { font-size: 48px; } .ui-ov-flow { grid-template-columns: repeat(3, minmax(0, 1fr)); } .ui-ov-step-wrap:nth-child(3) .ui-ov-arrow { display: none; } }
+@media (max-width: 600px) {
+  .ui-ov-hero { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 12px; }
+  .ui-ov-big { font-size: 36px; }
+  .ui-ov-side { grid-template-columns: repeat(2, minmax(0, 1fr)); border-left: 0; padding-left: 0; }
+  .ui-ov-side dd { font-size: 16px; }
+  .ui-ov-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ui-ov-step-wrap .ui-ov-arrow { display: none; }
+}
+
 
 /* —— Agent 顶部统计 —— */
 .ui-agent-stats { display: flex; align-items: stretch; gap: 0; margin: 0 0 4px; background: var(--ui-surface); border-radius: var(--ui-r-card); box-shadow: var(--ui-shadow-1); padding: 12px 8px; }

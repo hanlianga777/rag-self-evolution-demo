@@ -17,16 +17,16 @@ beforeEach(()=>{
 afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();});
 async function mount(){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<EvolutionPage data={data}/>));}
 async function click(text:string){await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===text)!.click());}
-it('shows only round and saved lesson above route cards',async()=>{
+it('shows the six-part summary above route cards',async()=>{
  await mount();await click('进化路线');expect(document.querySelectorAll('.ui-evo-round-head p')).toHaveLength(0);
- expect(document.querySelectorAll('.agent-round-strategy ol > li')).toHaveLength(3);expect(document.querySelector('.agent-round-strategy .ui-hover-trigger')).toBeNull();
+ expect(document.querySelectorAll('.round-story-cell')).toHaveLength(6);expect(document.querySelector('.agent-round-strategy .ui-hover-trigger')).toBeNull();
  expect(document.body.textContent).not.toContain('本轮没有合格 Candidate：');
 });
 it('keeps complete fixed IDs on cards and moves target counts to the target drawer',async()=>{
  await mount();await click('进化路线');await click('Round 3');
  const cards=[...document.querySelectorAll('.candidate-cards .candidate-card')];const c=cards[2];
- expect(c.querySelector('small')).toBeNull();expect(cards.map(c=>c.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['未通过','未通过','合格']);
- const result=c.querySelector('.candidate-summary-row:last-child')!;
+ expect(c.querySelector('.qualification-versions small')?.textContent).toBe('规则版本：当时未保存');expect(cards.map(c=>c.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['不合格','不合格','合格']);
+ const result=c.querySelector('.candidate-result-line')!;
  expect(result.textContent).toContain('47/50');expect(result.textContent).toContain('修好 Q24、Q29、Q38');expect(result.textContent).toContain('新错 无');
  for(const label of ['修复原问题','Regression Check','Hard Gate','P50','P99','可发布'])expect(result.textContent).not.toContain(label);
  expect(c.querySelectorAll('.candidate-summary-row')[1].textContent).toContain('1 题：Q29');
@@ -37,7 +37,7 @@ it('keeps complete fixed IDs on cards and moves target counts to the target draw
 });
 it('summarizes actual qualifiers and links to the recommendation without repeating baseline rows',async()=>{
  await mount();await click('回归与推荐');
- const summary=document.querySelector('.ui-fin-top h2')!;expect(summary?.textContent).toBe('10 个 Candidate 中只有 2 个通过回归检查，最终推荐 Candidate D');
+ const summary=document.querySelector('.ui-fin-top h2')!;expect(summary?.textContent).toBe('版本当时未保存 · 10 个已判定方案中 2 个合格，最终推荐 Candidate D');
  expect(document.querySelector('.ui-fin-compare')?.textContent).toContain('R3-C');
  const table=document.querySelector('.regression-summary-table')!;
  expect(table.closest('details')).toBeNull();expect(table.textContent).not.toContain('Round 3');expect(table.textContent).not.toContain('上限');expect(table.textContent).not.toContain('Regression 判定');
@@ -46,5 +46,5 @@ it('summarizes actual qualifiers and links to the recommendation without repeati
  expect(document.querySelector('.ui-fin-others h3')?.textContent).toContain('（8）');expect(document.querySelectorAll('.candidate-rejections > button')).toHaveLength(8);
  data.optimization.candidates.at(-1).result.qualification.qualified=false;
  await act(async()=>root.render(<EvolutionPage data={{...data,optimization:{...data.optimization}}}/>));
- expect(document.querySelector('.ui-fin-top h2')?.textContent).toContain('只有 1 个通过回归检查');
+ expect(document.querySelector('.ui-fin-top h2')?.textContent).toContain('10 个已判定方案中 1 个合格');
 });

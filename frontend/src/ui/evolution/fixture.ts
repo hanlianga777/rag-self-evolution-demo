@@ -13,7 +13,7 @@ const q = (...n: number[]) => n.map(x => `CSV-20261101100758945425-${String(x).p
 
 function candidate(round: number, label: string, direction: string, changed: Record<string, unknown>, fixed: number[], broken: number[], p50: number, p99: number, safe: number, bad: number, qualified: boolean) {
   return { id: id(round, label), status: "evaluated", reasoning: { round, candidate_label: label, direction, changed_parameters: changed },
-    result: { evaluation_complete: true, bad_case_count: bad, all_fixed_question_ids: q(...fixed), new_regression_question_ids: q(...broken), gates: gates(p50, p99, safe), qualification: { qualified } } };
+    result: { evaluation_complete: true, total: 50, bad_case_count: bad, all_fixed_question_ids: q(...fixed), new_regression_question_ids: q(...broken), gates: gates(p50, p99, safe), qualification: { qualified } } };
 }
 
 export const sampleBaselineConfig = { candidate_k: 12, top_k: 4, generation_thinking: "max", multi_query: false, query_rewrite: false, hybrid_alpha: 0.5, prompt_strategy: "Grounded" };
@@ -23,7 +23,7 @@ export const sampleExperiment = {
   result: { report_confirmation: { winner_id: id(3, "C") } },
   candidates: [
     { id: "EXP-20261105143048349606-D", status: "evaluated", reasoning: { candidate_label: "D", winner_id: id(3, "C"), changed_parameters: { candidate_k: 24, generation_thinking: "high", top_k: 6 } },
-      result: { evaluation_complete: true, bad_case_count: 2, all_fixed_question_ids: q(4, 24, 29, 38), new_regression_question_ids: [], gates: gates(8.105, 36.735, 100), qualification: { qualified: true } } },
+      result: { evaluation_complete: true, total: 50, bad_case_count: 2, all_fixed_question_ids: q(4, 24, 29, 38), new_regression_question_ids: [], gates: gates(8.105, 36.735, 100), qualification: { qualified: true } } },
     candidate(1, "A", "检索召回增强", { candidate_k: 24, multi_query: 2 }, [24, 29, 38], [7], 19.427, 86.548, 100, 4, false),
     candidate(1, "B", "排序与过滤", { hybrid_alpha: 0.3 }, [38], [1, 7, 17, 20, 23, 37, 41], 14.944, 65.614, 90, 12, false),
     candidate(1, "C", "效率（降档 + 检索补偿）", { generation_thinking: "high", top_k: 6 }, [4, 6], [15, 17, 43], 7.568, 29.989, 90, 7, false),

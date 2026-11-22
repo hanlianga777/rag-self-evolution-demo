@@ -11,19 +11,19 @@ import type { Pair } from "../overview/OverviewSummary";
 export type ReleaseParam = { label: string; value: string };
 export type ReleaseChange = { key: string; label: string; from?: string; to: string };
 
-export function ReleasePanel({ online, candidate, changes, results, steps, canRelease, onRelease, onReport, onSnapshot }: {
+export function ReleasePanel({ online, candidate, changes, results, steps, canRelease, formalDisqualified = false, onRelease, onReport, onSnapshot }: {
   online: { name: string; params: ReleaseParam[] };
   candidate: { name: string; params: ReleaseParam[] } | null;
   changes: ReleaseChange[];
-  results: { correct: Pair; total: number; newBad: number | null; gates: { passed: number; total: number } | null; p99: Pair } | null;
+  results: { correct: Pair; total: number | null; newBad: number | null; gates: { passed: number; total: number } | null; p99: Pair } | null;
   steps: { reportConfirmed: boolean; eligible: { ok: boolean; items: string[] }; released: { ok: boolean; at?: string } };
-  canRelease: boolean; onRelease?: () => void; onReport?: () => void; onSnapshot?: () => void;
+  canRelease: boolean; formalDisqualified?: boolean; onRelease?: () => void; onReport?: () => void; onSnapshot?: () => void;
 }) {
   const released = steps.released.ok;
   return <section className="ui-rel" aria-label={released ? "已发布 Candidate" : "待发布 Candidate"}>
     <header className="ui-rel-head">
       <h2>{released ? "已发布 Candidate" : "待发布 Candidate"}</h2>
-      <StatusBadge kind={released ? "released" : candidate ? "pending_release" : "evaluated"} label={released ? "已发布" : candidate ? "待发布" : "暂无推荐"} />
+      <StatusBadge kind={released ? "released" : formalDisqualified ? "failed" : candidate ? "pending_release" : "evaluated"} label={released ? "已发布" : formalDisqualified ? "正式资格未通过" : candidate ? "待发布" : "暂无推荐"} />
     </header>
 
     {candidate ? <>
@@ -35,7 +35,7 @@ export function ReleasePanel({ online, candidate, changes, results, steps, canRe
         </div>
         <span className="ui-rel-arrow" aria-hidden="true" />
         <div className="ui-rel-side to">
-          <span className="ui-rel-k">{released ? "当前线上" : "待发布"}</span>
+          <span className="ui-rel-k">{released ? "当前线上" : formalDisqualified ? "保存的推荐方案" : "待发布"}</span>
           <strong>{candidate.name}</strong>
           <dl>{candidate.params.map(item => <div key={item.label}><dt>{item.label}</dt><dd className="ui-num">{item.value}</dd></div>)}</dl>
         </div>
@@ -44,7 +44,7 @@ export function ReleasePanel({ online, candidate, changes, results, steps, canRe
       <section className="release-diff"><h3>配置差异</h3>{changes.length?<table><thead><tr><th>当前配置</th><th>推荐配置</th></tr></thead><tbody>{changes.map(item=><tr key={item.key}><td>{item.label}：{item.from ?? '未知'}</td><td>{item.label}：{item.to}</td></tr>)}</tbody></table>:<p>无差异</p>}</section>
 
       {results && <div className="ui-rel-results">
-        <div><span className="ui-rel-k"><IconLabel name="correct">答对</IconLabel></span><StatTransition from={results.correct.from} to={results.correct.to} unit={` / ${results.total}`} /></div>
+        <div><span className="ui-rel-k"><IconLabel name="correct">答对</IconLabel></span><StatTransition from={results.correct.from} to={results.correct.to} unit={results.total == null ? undefined : ` / ${results.total}`} /></div>
         <div><span className="ui-rel-k"><IconLabel name="bad">新增 Bad Case</IconLabel></span><b className="ui-num">{results.newBad ?? "未知"}</b></div>
         <div><span className="ui-rel-k"><IconLabel name="gate">Hard Gate</IconLabel></span><b className="ui-num">{results.gates ? `${results.gates.passed} / ${results.gates.total}` : "未知"}</b></div>
         <div><span className="ui-rel-k"><IconLabel name="p99">P99</IconLabel></span><StatTransition from={results.p99.from} to={results.p99.to} unit=" 秒" better="lower" digits={1} /></div>
@@ -59,7 +59,7 @@ export function ReleasePanel({ online, candidate, changes, results, steps, canRe
        ['Gate 3 · 发布确认','红线有没有被踩、抽样回归是否正常，确认后保存快照上线','不追求把所有情况都测完'],
       ].map(([title,look,ignore])=><article key={title}><h3>{title}</h3><p>人看什么：{look}</p><p className="muted">不看什么：{ignore}</p></article>)}</section>
       <footer className="ui-rel-actions">
-        {candidate && !released && <button type="button" className="primary" disabled={!canRelease} onClick={onRelease}><Icon name="release" size={15} />确认发布</button>}
+        {candidate && !released && !formalDisqualified && <button type="button" className="primary" disabled={!canRelease} onClick={onRelease}><Icon name="release" size={15} />确认发布</button>}
         {onReport && <button type="button" className="secondary" onClick={onReport}><Icon name="doc" size={15} />查看评测报告</button>}
         {onSnapshot && <button type="button" className="secondary" onClick={onSnapshot}><Icon name="doc" size={15} />查看发布快照</button>}
       </footer>

@@ -58,7 +58,7 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   const input = { evaluation: run, badCases: [bad], optimization: { id: "EXP-stored", candidates, evaluation_budget: { used: 3, max: 12, reserved_for_d: 1 }, result: { root_cause_cluster: "保存的诊断" } } }, frozen = JSON.stringify(input);
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space }))));
   await render(<EvolutionPage data={input} />);
-  expect(document.querySelectorAll(".tabs button")).toHaveLength(4);
+  expect(document.querySelectorAll(".tabs button")).toHaveLength(3);
   expect(document.querySelector('.agent-case-destinations')).toBeNull();
   expect(document.querySelector(".agent-case-destinations")).toBeNull();
   expect(document.querySelector(".agent-case-destinations")).toBeNull();
@@ -70,7 +70,7 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
 
   await click("进化路线");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(3);
-  expect([...document.querySelectorAll(".candidate-card:first-child .candidate-summary-row dt")].map(label => label.textContent)).toEqual(["改了什么","针对","依据","结果"]);
+  expect([...document.querySelectorAll(".candidate-card:first-child .candidate-summary-row dt")].map(label => label.textContent)).toEqual(["改了什么","针对","依据","实验效果","正式资格","证据可信度","推荐价值"]);
   expect(document.querySelector(".candidate-card")?.textContent).toContain("Q-stored");
   const details=document.querySelector<HTMLDetailsElement>('.candidate-card details')!;
   expect(details.open).toBe(false);
