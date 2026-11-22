@@ -3,7 +3,8 @@ import { ConfirmDialog } from "../components/Dialog";
 import { readableSourceName } from "../components/ComparisonAnswer";
 import { Badge, DrawerSection, TruncatedText } from "../components/Primitives";
 import { displayText, presentationText } from "../display";
-import { answerMarkup } from "../components/CaseAnswer";
+import { CaseAnswer } from "../components/CaseAnswer";
+import { answerPageLocation } from "../components/StructuredAnswer";
 
 type Candidate = Record<string, any>;
 const behaviorText: Record<string, string> = {
@@ -14,7 +15,12 @@ const behaviorText: Record<string, string> = {
 };
 export const goldenScore = (value: unknown) => typeof value === "number" ? value.toLocaleString("zh-CN", { maximumFractionDigits: 1 }) : "暂无";
 export const shortSourceName = (name: string) => readableSourceName(name).replace("KIRA B 50 操作说明", "KIRA 操作说明").replace("B2 电池与充电器使用说明", "B2 电池说明").replace("B2 遥控器使用说明", "B2 遥控器说明");
-export const sourceLabel = (source: Candidate) => source.document_name ? `${shortSourceName(source.document_name)} · ${source.page_start != null ? `p${source.page_start}${source.page_end != null && source.page_end !== source.page_start ? `–${source.page_end}` : ""}` : "页码暂无"}` : "暂无";
+export const sourceLabel = (source: Candidate) => {
+  if (!source.document_name) return "暂无";
+  const start = answerPageLocation(source.document_name, source.page_start).book;
+  const end = answerPageLocation(source.document_name, source.page_end).book;
+  return `${shortSourceName(source.document_name)} · ${start != null ? `p${start}${end != null && end !== start ? `–${end}` : ""}` : "页码暂无"}`;
+};
 export const questionSources = (row: Candidate) => [...new Set([...(row.business_requirements?.sources || row.raw?.business_requirements?.sources || []), ...(row.evidence_details || []).flatMap((source: Candidate) => source.chunks || [])].filter((source: Candidate) => source.document_name).map(sourceLabel))].join("；") || (row.test_category === "negative" ? "不适用 · 无标准证据" : "保存记录缺少来源");
 export function goldenQuality(row: Candidate, kind: "probe" | "qc") {
   const result = row[kind], details = result?.probe_details;
@@ -75,7 +81,7 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true,
     {showSource && row.raw?.source === "reviewed_csv_machine_checks" && <p className="muted">来源：人工审核</p>}
     {scenario && scenario !== "暂无" && <DrawerSection title="业务场景"><div className="muted-prose"><TruncatedText lines={3}>{scenario}</TruncatedText></div></DrawerSection>}
     <DrawerSection title="问题"><p>{presentationText(row.question || "")}</p><p className="muted">出处：{questionSources(row)}</p></DrawerSection>
-    <DrawerSection title="参考答案"><div className="golden-answer-list candidate-answer">{answerMarkup(String(answer))}</div>{row.test_category === "negative" && <small className="muted">按预期行为检查回答边界</small>}</DrawerSection>
+    <DrawerSection title="参考答案"><div className="golden-answer-list candidate-answer"><CaseAnswer text={String(answer)} reference final={evidence}/></div>{row.test_category === "negative" && <small className="muted">按预期行为检查回答边界</small>}</DrawerSection>
     {evidenceSections.map(([title, entries]) => entries.length > 0 && <DrawerSection key={title} title={title}>
       <div className="golden-evidence-scroll">{entries.map(({ chunk, count }, index) => <div className="golden-evidence" key={index}>
         <strong>{sourceLabel(chunk)}{title === "辅助引用" && ` · ${chunk.business_topic}`}{count > 1 && ` · 命中 ${count} 处`}</strong>

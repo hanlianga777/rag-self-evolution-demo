@@ -19,8 +19,11 @@ export type Citation = {
   document: string;
   chunk_id: string;
   section_path: string;
-  page_start: number;
-  page_end: number;
+  page_start?: number;
+  page_end?: number;
+  book_page_start?: number;
+  book_page_end?: number;
+  savedEvidence?: boolean;
   score: number;
   content_preview: string;
 };

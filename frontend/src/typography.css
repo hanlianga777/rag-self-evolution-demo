@@ -5,12 +5,12 @@
   font-weight: 400;
   color: var(--ui-ink-2);
 }
-:is(.page-shell, .drawer, .confirm-dialog) :is(p, blockquote, .muted-prose, .clamp-text-host, .truncated-text):not(:where([class^="ui-"], [class*=" ui-"], .saved-answer-comparison, table) *) {
+:is(.page-shell, .drawer, .confirm-dialog) :is(p, blockquote, .muted-prose, .clamp-text-host, .truncated-text):not(:where([class^="ui-"], [class*=" ui-"], .saved-answer-comparison, .structured-answer, table) *) {
   font-size: var(--ui-fs-body);
   font-weight: 400;
   color: var(--ui-muted);
 }
-:is(.page-shell, .drawer, .confirm-dialog) :is(dd, li, label, strong, b, button):not(:where([class^="ui-"], [class*=" ui-"], .saved-answer-comparison, table) *):not([class^="ui-"]):not([class*=" ui-"]) {
+:is(.page-shell, .drawer, .confirm-dialog) :is(dd, li, label, strong, b, button):not(:where([class^="ui-"], [class*=" ui-"], .saved-answer-comparison, .structured-answer, table) *):not([class^="ui-"]):not([class*=" ui-"]) {
   font-size: var(--ui-fs-body);
   font-weight: 400;
 }
@@ -24,7 +24,7 @@
   font-weight: 600;
   color: var(--ui-ink);
 }
-:is(.page-shell, .drawer, .confirm-dialog) :is(h4, h5, .chat-header strong):not(:where([class^="ui-"], [class*=" ui-"], .saved-answer-comparison, table) *) {
+:is(.page-shell, .drawer, .confirm-dialog) :is(h4, h5, .chat-header strong):not(:where([class^="ui-"], [class*=" ui-"], .saved-answer-comparison, .structured-answer, table) *) {
   font-size: var(--ui-fs-sub);
   font-weight: 600;
   color: var(--ui-ink);
@@ -35,7 +35,7 @@
   font-weight: 600;
   color: var(--ui-ink);
 }
-:is(.page-shell, .drawer, .confirm-dialog) :is(p, blockquote, li, td, dd) :is(strong, b):not(:where([class^="ui-"], [class*=" ui-"], .saved-answer-comparison, table) *) {
+:is(.page-shell, .drawer, .confirm-dialog) :is(p, blockquote, li, td, dd) :is(strong, b):not(:where([class^="ui-"], [class*=" ui-"], .saved-answer-comparison, .structured-answer, table) *) {
   font-size: inherit;
   font-weight: 400;
   color: inherit;

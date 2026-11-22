@@ -47,8 +47,9 @@ it('formats mixed HTML and markdown lists and turns behavior enums into the save
   const stack = document.querySelector('.case-answer-stack')!;
   expect(stack.textContent).toContain('拒绝高压水枪；按说明书清洁。');
   expect(stack.textContent).not.toContain('safe_rejection');
-  expect(stack.querySelector('ol')?.children).toHaveLength(2);
-  expect(stack.querySelector('strong')?.textContent).toBe('停止使用');
+  const actual = stack.querySelector('.comparison-body:not(:has(.answer-points))')!;
+  expect(actual.querySelector('ol')?.children).toHaveLength(2);
+  expect(actual.querySelector('strong')?.textContent).toBe('停止使用');
   expect(stack.textContent).toContain('第4.2章节和第40页 [C115]');
 });
 it('preserves HTML citation URLs and meaningful image descriptions as inert text', () => {

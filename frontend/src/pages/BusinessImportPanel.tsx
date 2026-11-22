@@ -1,3 +1,4 @@
+import { CaseAnswer } from "../components/CaseAnswer";
 import {qualityHelp,questionClassification} from '../components/QuestionClassification';
 import { goldenQuality } from "./FrozenQuestionDetails";
 import { Icon } from "../ui/icons";
@@ -98,7 +99,7 @@ export function BusinessImportPanel({ items, onCreated, profiles = {}, onDetail,
   </Section>
   {!readOnly && <input ref={fileInput} className="sr-only" aria-label="业务测试集文件" type="file" accept=".csv,.xlsx" disabled={busy} onChange={event => { const chosen = event.target.files?.[0]; event.target.value = ""; if (!chosen) return; setFile(chosen); setPreview(null); setNotice(""); setImportOpen(true); void upload(chosen); }} />}
   <ConfirmDialog open={importOpen} onOpenChange={setImportOpen} title="确认添加业务用例" busy={busy} disabled={!preview?.valid_count || !!error} confirmLabel={preview?.error_count ? `仅添加${preview.valid_count}个有效行` : "确认添加"} onConfirm={() => file && void upload(file,true)}><p>{file?.name}</p>{preview && <><p>识别{preview.recognized_count}题 · 可添加{preview.valid_count}题 · 错误{preview.error_count}题</p><p>添加后进入候选池待治理；处理经验为待核验材料。</p>{preview.error_count > 0 && <div className="business-import-errors"><p>确认后仅添加有效行；以下异常行不会添加，错误记录保留。</p>{preview.rows.filter((row: any) => row.errors.length).map((row: any) => <p key={row.row}>Excel第{row.row}行：{row.errors.join("；")}</p>)}</div>}</>}{error && <p className="error-notice" role="alert">{error}</p>}</ConfirmDialog>
-  <Drawer showCloseFooter={false} open={!!detail} onOpenChange={open => !open && setDetail(null)} title="候选池题目详情"><div className="drawer-body"><section className="drawer-section"><h3>{presentationText(detail?.question || "")}</h3><div className="muted-prose"><TruncatedText lines={3}>{detail?.reference_answer || detail?.expected_behavior || "未记录"}</TruncatedText></div></section></div></Drawer></>;
+  <Drawer showCloseFooter={false} open={!!detail} onOpenChange={open => !open && setDetail(null)} title="候选池题目详情"><div className="drawer-body"><section className="drawer-section"><h3>{presentationText(detail?.question || "")}</h3><CaseAnswer text={detail?.reference_answer || detail?.expected_behavior || "未记录"} reference /></section></div></Drawer></>;
 }
 
 export function CoverageSummary({ run, questions, documents, persistedPlan }: { run: any; questions: any[]; documents: any[]; persistedPlan?: any }) {
