@@ -360,6 +360,12 @@ def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fin
     wrong_denial, text_refusal = _document_denial(case['model_answer'], entries['final'])
     saved_refusal = ('Over Refusal' in tags or judge.get('over_refusal') is True
                      or judge.get('answer_behavior') in {'refusal', 'abstention'})
+    if table_evidence and not judge.get('issues') and not (saved_refusal or text_refusal):
+        reason = _CITATION.sub('', judge.get('reason') or '')
+        if (re.search(r'(?:\d+(?:[.．]\d+)?|[零〇一二两三四五六七八九十百千万]+)\s*(?:(?:个\s*)?月|年|周|天|小时|分钟|项|个|条|类|种|组|次)', reason)
+                and re.search(r'算进|算入|归入|归到|计入|列入|[多少漏错]列|[多少漏错]算|(?:归类|计数|数量)(?:错误|有误|不对)', reason)):
+            result['subfeature'] = TABLE_ERROR
+            return conclude('回答问题', 'Generation', '标准证据含表格行，保存的 Judge 理由指出周期或数量的归类或计数错误。')
     if wrong_denial and judge.get('answer_behavior') not in {'refusal', 'abstention'}:
         result['subfeature'] = WRONG_DENIAL
         return conclude('回答问题', 'Generation', '回答给出了实质内容，但声称资料缺少的对象可以在保存的 Final 中定位。')

@@ -88,6 +88,7 @@ def generation_case(answer, evidence, *, final=None, judge=None, **question):
     ('每12个月检查密封圈', 'contradiction', '维护周期填成36个月', '答案出现幻觉'),
     ('项目=检查密封圈；周期=12个月', None, '维护周期填成36个月', '答案出现幻觉'),
     ('项目=检查密封圈；周期=12个月', 'contradiction', '答成润滑密封圈 [1]', '答案出现幻觉'),
+    ('项目=检查密封圈；周期=12个月', 'omission', '将36个月的项目归入12个月', '答案出现幻觉'),
 ])
 def test_table_issue_requires_table_evidence_and_a_quantitative_issue(quote, kind, description, expected):
     answer = '请润滑密封圈 [1]。'
@@ -99,6 +100,32 @@ def test_table_issue_requires_table_evidence_and_a_quantitative_issue(quote, kin
         assert view['display_subtype'] == expected
         assert view['tuning_directions'] == ['TableCheck']
         assert 'TableCheck' in view['repair_hint']
+
+
+@pytest.mark.parametrize('quote, reason, expected', [
+    ('项目=更换密封圈；周期=36个月', '把每 36 个月的更换项目算进了每 12 个月的清单。', '表格读取或归类错误'),
+    ('检查密封圈 | 12个月', '维护清单多列了四项。', '表格读取或归类错误'),
+    ('每36个月更换密封圈', '把每36个月的更换项目算进了每12个月的清单。', '答案出现幻觉'),
+    ('项目=更换密封圈；周期=36个月', '更换周期错写成12个月。', '答案出现幻觉'),
+    ('检查密封圈 | 12个月', '多列了润滑步骤 13 [1]。', '答案出现幻觉'),
+])
+def test_table_reason_fallback_requires_table_quantity_and_classification(quote, reason, expected):
+    judge = {'hallucination': True, 'reason': reason, 'issues': []}
+    view = diagnostic_view(generation_case('请润滑密封圈 [1]。', quote, judge=judge))
+    assert view['subfeature'] == expected
+    if expected == '表格读取或归类错误':
+        assert view['display_subtype'] == expected
+        assert view['tuning_directions'] == ['TableCheck']
+
+
+@pytest.mark.parametrize('answer, judge_behavior', [
+    ('无法确认维护清单。', None),
+    ('资料不足。', 'refusal'),
+])
+def test_table_reason_fallback_preserves_refusal(answer, judge_behavior):
+    judge = {'reason': '维护清单少列了4项。', 'issues': [], 'answer_behavior': judge_behavior}
+    view = diagnostic_view(generation_case(answer, '检查密封圈 | 12个月', judge=judge))
+    assert view['subfeature'] == '模型过度拒绝（已检索到相关切片仍拒答）'
 
 
 @pytest.mark.parametrize('answer, expected', [
