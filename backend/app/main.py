@@ -264,9 +264,15 @@ class ExperimentRequest(BaseModel):
     trigger_id: str | None = None
 
 
+class Gate2DelegatedReview(BaseModel):
+    claude: str = Field(min_length=1, max_length=1000)
+    gpt: str = Field(min_length=1, max_length=1000)
+
+
 class RecommendationRequest(BaseModel):
     candidate_id: str = Field(min_length=1, max_length=120)
     actor: str = Field(default="local_user", min_length=1, max_length=80)
+    delegated_review: Gate2DelegatedReview | None = None
 
 
 class AliasRequest(BaseModel):
@@ -1660,6 +1666,7 @@ def optimization(light: bool = False, planning: bool = False):
         from .policy import MAX_EVALS
         budget = {'used': 0, 'max': MAX_EVALS, 'reserved_for_d': 1, 'remaining': MAX_EVALS, 'remaining_for_abc': MAX_EVALS - 1}
         return {"status": "not_run", 'evaluation_budget': budget, **({"bad_cases":bad_cases(light=True)} if planning else {}), "data_source": "real", "message": identity["baseline_unavailable_reason"] or "当前 Baseline 尚未运行 Optimization Agent", **identity}
+    experiment = store.with_agent_trace_strategies(experiment)
     if light:
         result = light_value({**(experiment_resume_view(experiment) if planning else experiment),
             'data_source':'real','recommendation':store.recommendation(experiment['id']),**identity})
@@ -1797,6 +1804,7 @@ def experiment(run_id: str, light: bool = False):
     result = store.experiment(run_id,light=light)
     if result is None:
         raise HTTPException(status_code=404, detail="Experiment not found")
+    result = store.with_agent_trace_strategies(result)
     if light:
         return {key:value for key,value in light_value(result).items() if key in {'id','status','baseline_run_id','result','candidates','evaluation_budget','rounds'}}
     return result
@@ -1837,7 +1845,8 @@ def select_recommendation(run_id: str, payload: RecommendationRequest):
     require_current_baseline(experiment["baseline_run_id"])
     require_idle_cycle(experiment)
     try:
-        return store.select_recommendation(run_id, payload.candidate_id, payload.actor)
+        return store.select_recommendation(run_id, payload.candidate_id, payload.actor,
+            delegated_review=payload.delegated_review.model_dump() if payload.delegated_review else None)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 

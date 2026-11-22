@@ -2799,12 +2799,16 @@ class GovernanceStore:
                 for name,rule in search_space_contract().items()]
 
     def create_experiment(self, baseline_run_id: str, status: str = "analyzing"):
+        from .agent_strategy import NEW_EXPERIMENT_STRATEGY
+
         experiment_id = f"EXP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        context = {} if status == 'direct_release' else NEW_EXPERIMENT_STRATEGY
         with self.connection() as connection:
-            connection.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline_run_id, status, _json({}), _now()))
+            connection.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline_run_id, status, _json(context), _now()))
         return experiment_id
 
     def claim_agent_generation(self, baseline_run_id, trigger_id=None, experiment_id=None):
+        from .agent_strategy import NEW_EXPERIMENT_STRATEGY
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK, self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -2822,6 +2826,11 @@ class GovernanceStore:
             existing = self.experiment(experiment_id,light=True) if experiment_id else None
             if experiment_id and (existing is None or existing["baseline_run_id"] != baseline_run_id):
                 raise ValueError("Optimization Run 不存在或不属于该 Baseline")
+            context = existing['result'] if existing else dict(NEW_EXPERIMENT_STRATEGY)
+            strict = context.get('decision_contract_version') == '109c'
+            compatible_contracts = {'agent-strategy-4'} if strict else {'agent-strategy-3', 'agent-strategy-4'}
+            if context.get('strategy_contract') not in compatible_contracts:
+                raise ValueError('strategy_contract 无效：新实验必须保存 agent-strategy-4')
             if existing and existing["status"] == "generating":
                 pid=existing['result'].get('agent_generation',{}).get('owner_pid')
                 alive=False
@@ -2838,8 +2847,14 @@ class GovernanceStore:
                 raise ValueError("历史 Candidate 缺少有效 Round，无法继续优化")
             current_round = max(rounds, default=0)
             current = [item for item in candidates if item["reasoning"].get("round") == current_round]
-            if current and any(item["status"] not in {"evaluated", "failed"} for item in current):
+            finished = {'evaluated', 'skipped'} if strict else {'evaluated', 'failed'}
+            if current and any(item["status"] not in finished for item in current):
                 raise ValueError("上一轮 A/B/C 必须全部完成 Sandbox 后才能继续优化")
+            if strict and current_round:
+                previous = context.get('round_conclusions', {}).get(str(current_round), {})
+                if (previous.get('status') != 'saved' or not previous.get('review', {}).get('lessons')
+                        or not isinstance(previous.get('parameter_findings'), list)):
+                    raise ValueError('上一轮复盘尚未保存完整 lesson 和参数判断，请先完成本轮复盘')
             full_rounds = existing and existing['result'].get('round_policy',{}).get('mode') == 'full_rounds'
             if not full_rounds and any(item["result"].get("qualification",{}).get("qualified") and item["result"].get("bad_case_count")==0 for item in current):
                 raise ValueError("本轮完整评测已无剩余业务问题")
@@ -2852,7 +2867,6 @@ class GovernanceStore:
                 connection.execute("INSERT INTO experiments (id, baseline_run_id, status, result_json, created_at) VALUES (?, ?, 'generating', '{}', ?)", (experiment_id, baseline_run_id, _now()))
             else:
                 connection.execute("UPDATE experiments SET status='generating' WHERE id=?", (experiment_id,))
-            context = existing['result'] if existing else {}
             from .paid_policy import current_binding
             if current_binding():context['paid_run']=current_binding()
             claim = {'token': uuid.uuid4().hex, 'owner_pid': os.getpid(), 'started_at': _now()}
@@ -2878,7 +2892,8 @@ class GovernanceStore:
                 reviews[str(result['round'])] = {'status':'saved', 'review':result['prior_round_review'], 'source':'save_agent_round'}
             strategies = dict(persisted.get('agent_strategies', {}))
             if result.get('strategy_contract') in {'agent-strategy-3','agent-strategy-4'} and type(result.get('round')) is int:
-                strategies[str(result['round'])] = {key:result.get(key) for key in ('prior_round_review','bad_case_summary','agent_strategy')}
+                strategies[str(result['round'])] = {key:result[key] for key in
+                    ('prior_round_review','bad_case_summary','agent_strategy','history_decisions') if key in result}
             connection.execute("UPDATE experiments SET status='completed', result_json=? WHERE id=?", (_json({**persisted, **result, 'prior_round_reviews':reviews, 'agent_strategies':strategies}), experiment_id))
 
     def restore_round_reviews(self, experiment_id):
@@ -3131,7 +3146,7 @@ class GovernanceStore:
             connection.execute("UPDATE candidate_configs SET status='running', reasoning_json=? WHERE id=?", (_json({**candidate['reasoning'], 'sandbox_attempts': attempts}), candidate_id))
         return {**candidate, 'status':'running', 'reasoning':{**candidate['reasoning'], 'sandbox_attempts':attempts}}
 
-    def confirm_experiment_report(self, experiment_id: str, winner_id: str, actor: str, *, audit_note=None):
+    def confirm_experiment_report(self, experiment_id: str, winner_id: str, actor: str, *, audit_note=None, delegated_review=None):
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
             experiment = self.experiment(experiment_id,light=True)
@@ -3139,6 +3154,14 @@ class GovernanceStore:
                 raise ValueError('Experiment 不存在')
             if experiment['result'].get('report_confirmation'):
                 raise ValueError('报告已确认')
+            strict = experiment['result'].get('decision_contract_version') == '109c'
+            if strict and (audit_note or actor == '总指挥') and delegated_review is None:
+                raise ValueError('新实验 Gate 2 代确认须提交 Claude 和 GPT 双审依据')
+            if delegated_review is not None:
+                if (not strict or actor != '总指挥' or not isinstance(delegated_review, dict)
+                        or set(delegated_review) != {'claude', 'gpt'}
+                        or any(not isinstance(ref, str) or not ref.strip() for ref in delegated_review.values())):
+                    raise ValueError('Gate 2 预授权代确认须由总指挥提交 Claude 和 GPT 均通过的依据')
             self.require_current_baseline(experiment['baseline_run_id'], connection)
             candidates = experiment['candidates']
             if any(item['status'] not in {'evaluated','skipped'} or item['status']!='skipped' and item['result'].get('evaluation_complete') is False for item in candidates if item['reasoning'].get('candidate_label')!='D'):
@@ -3158,6 +3181,9 @@ class GovernanceStore:
             confirmation = {'winner_id': winner_id, 'actor': actor, 'confirmed_at': _now(), 'candidates': [{'id': item['id'], 'status': item['status'], 'result': item['result'], 'config': item['config']} for item in candidates]}
             if audit_note:
                 confirmation['audit_note'] = audit_note
+            if delegated_review is not None:
+                confirmation.update(authorizer='用户', executed_by='总指挥', review_method='预授权代确认',
+                                    review_evidence={key:ref.strip() for key,ref in delegated_review.items()})
             result = {**experiment['result'], 'report_confirmation': confirmation}
             connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (_json(result), experiment_id))
             connection.execute('INSERT INTO approvals(gate,target_id,decision,actor,created_at) VALUES (?,?,?,?,?)', ('experiment_report', experiment_id, 'approved', actor, _now()))
@@ -3227,9 +3253,15 @@ class GovernanceStore:
             self.refresh_recommendation(experiment_id)
             return decision
         claim = json.loads(_json(decision))
-        from .agent_strategy import round_conclusions_for_prompt
+        from .agent_strategy import (bad_case_conclusion_ids, bad_case_groups,
+                                     round_conclusions_for_prompt, validate_bad_case_references)
         prior_conclusions = round_conclusions_for_prompt(self,baseline,experiment['candidates'],
                                                         experiment['result'].get('round_conclusions'))
+        strict = experiment['result'].get('decision_contract_version') == '109c'
+        d_groups = []
+        if strict:
+            frozen_questions = {q['id']:q for q in _load(baseline['dataset_snapshot_json'], {}).get('questions', [])}
+            d_groups = bad_case_groups(self.evaluation_case_results(winner['result']['evaluation_run_id']), questions=frozen_questions)
         from .agent_inputs import prepare_baseline_rows, is_optimization_target
         reviewed = prepare_baseline_rows(baseline, self.bad_case_rows(baseline['id']))
         bad_cases = [row for row in reviewed if is_optimization_target(row)]
@@ -3269,11 +3301,14 @@ class GovernanceStore:
                         '返回action_name,should_generate_d(bool),root_cause_alignment,complementary_capabilities,proposed_config_diff(平铺参数到值，列出所有相对Winner的变化，含恢复Baseline取值的参数),expected_improvement,risks,explanation,hypothesis,root_cause,intervention_direction,evidence_assertions:[{target_id,observation}],parameter_dependencies。依据/收益/风险/解释均为非空字符串。'
                         'should_generate_d=true时每个改动必须在changes数组给一条：{parameter,source_type:verified或partial或new_attempt,source_candidates:[完整历史ID],reason,target_question_ids:[剩余错题的正式ID],evidence_basis:事实表证据位置说明,side_effect_check:{historical_effects:历史伴随的新错题及门槛/P99变化,protected_overlap:[受保护题正式ID，与该取值档案的新错题交集必须全覆盖],winner_fixed_risk:检查Winner已经修好的题,gate_risk:检查临界门槛余量,mitigation:规避办法,same_premise_evidence:字符串或字符串数组均可，前提相同的历史证据，没有证据写\'未观察到\',different_premise_evidence:字符串或字符串数组均可，前提不同的来源及差异，没有证据写\'未观察到\',risk_checklist:字符串或字符串数组均可，重点盯哪些受保护题和临界门槛，没有证据写\'未观察到\'},expected_fixed_count:非负整数,possible_broken_count:非负整数}。'
                         'verified引用历史来源和修好题/证据位置，多参数来源整组取用；只取多参数来源中的一部分时写partial，有拆分对照就给contrast_ids:[d_facts.contrasts里的真实对照ID]，没有对照也可以，但要在reason里说明为什么只取这部分。new_attempt须是本实验未用过的取值，额外给why_not_verified说明为什么已验证参数不能解决或副作用不可接受。新尝试来源可为空，不要求两个来源。'
-                        '副作用检查不能只想剩余错题，要逐一检查历史翻错的保护题、Winner修好题、所有门槛。should_generate_d必须为true；风险大小不能作为不生成理由。',
+                        '副作用检查不能只想剩余错题，要逐一检查历史翻错的保护题、Winner修好题、所有门槛。should_generate_d必须为true；风险大小不能作为不生成理由。'
+                        + ('bad_case_summary须逐字采用bad_case_groups，给出focus和conclusions:[{id,conclusion}]。'
+                           'bad_case_conclusion_ids须引用这些结论。changes.target_question_ids是预计修好的正式题号。' if strict else ''),
                         _json({'baseline':{key:baseline[key] for key in ('id','config','judge','dataset_version_id')},
                             'winner':strategy_candidate(winner), 'sources':[strategy_candidate(c) for c in eligible if c['id']!=winner['id']],
                             'd_facts':facts, 'bad_cases':prompt_cases, 'search_space':{key: value for key, value in search_space_contract().items() if key in rules.AGENT['tunable']},
                             'strategy_contract':experiment['result'].get('strategy_contract'), 'round_conclusions':prior_conclusions,
+                            **({'bad_case_groups':d_groups} if strict else {}),
                             **({'validation_rejection':{'reason':decision['attempts'][-2]['validation_error'], 'instruction':'根据原因重出完整建议；usable_repairs非空时必须生成D，只能在为空时有依据地不生成'}} if attempt else {})}), json_mode=True)
                 audit['provider_raw_text'] = content
                 decision['token_usage'].extend(usage)
@@ -3333,6 +3368,8 @@ class GovernanceStore:
                     raise ValueError('D建议缺少依据/收益/风险：root_cause_alignment和complementary_capabilities须非空；expected_improvement、risks、explanation须非空字符串，不要数组或对象')
                 if not suggestion['should_generate_d']:
                     raise ValueError('有合格方案且有预算时必须生成D；预测副作用不能作为放弃理由')
+                if strict:
+                    validate_bad_case_references(suggestion, bad_case_conclusion_ids(suggestion.get('bad_case_summary'), d_groups))
                 if experiment['result'].get('strategy_contract') in {'agent-strategy-3','agent-strategy-4'}:
                     from .agent_strategy import validate_d_mode
                     validate_d_mode(suggestion, winner, eligible, facts)
@@ -3378,9 +3415,15 @@ class GovernanceStore:
                     candidate_id = f'{experiment_id}-D'
                     references = sorted({q for row in source_records for q in row['target_question_ids']})
                     reasoning = {'combination_mode':suggestion.get('combination_mode'), 'mode_reason':suggestion.get('mode_reason'), 'action_name':suggestion.get('action_name') or '合并已验证方案', 'intervention_contract_version':'winner-refinement-1','experiment_kind':'composite','candidate_label': 'D', 'winner_id': winner['id'], 'hypothesis': suggestion['hypothesis'], 'root_cause':suggestion['root_cause'], 'root_cause_evidence':references, 'intervention_direction':suggestion['intervention_direction'], 'evidence_assertions':suggestion['evidence_assertions'], 'parameter_dependencies':suggestion.get('parameter_dependencies',[]), 'expected_improvement':suggestion['expected_improvement'], 'target_diagnosis':[row for row in bad_cases if row['id'] in references or row['question_id'] in references], 'proposal': suggestion['explanation'], 'risk': suggestion['risks'], 'observed_evidence': references, 'sources': source_records, 'changes':source_records, 'winner_config_diff':parameter_diff(config,pipeline_config(winner['config'])), 'changed_parameters': full_diff}
+                    if strict:
+                        reasoning.update(bad_case_conclusion_ids=suggestion['bad_case_conclusion_ids'],
+                                         predicted_fixed_question_ids=references)
                     connection.execute('INSERT INTO candidate_configs VALUES (?,?,?,?,?,?,?)', (candidate_id, experiment_id, 'generated', _json(config), _json(reasoning), '{}', _now()))
                     decision['candidate_id'] = candidate_id
-            connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (_json({**current['result'], 'composite': decision}), experiment_id))
+            state = {**current['result'], 'composite': decision}
+            if strict and decision.get('candidate_id'):
+                state.setdefault('agent_strategies', {})['D'] = {'bad_case_summary':suggestion['bad_case_summary']}
+            connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (_json(state), experiment_id))
         self.refresh_recommendation(experiment_id)
         return self.candidate(decision['candidate_id']) if decision.get('candidate_id') else decision
 
@@ -3426,8 +3469,8 @@ class GovernanceStore:
             connection.execute('INSERT OR REPLACE INTO recommendations VALUES (?, ?, ?, ?, ?)', (experiment_id, selected, status, _json(result), _now()))
             return result
 
-    def select_recommendation(self, experiment_id: str, candidate_id: str, actor: str):
-        self.confirm_experiment_report(experiment_id, candidate_id, actor)
+    def select_recommendation(self, experiment_id: str, candidate_id: str, actor: str, *, delegated_review=None):
+        self.confirm_experiment_report(experiment_id, candidate_id, actor, delegated_review=delegated_review)
         return self.refresh_recommendation(experiment_id)
 
     def recommendation(self, experiment_id: str):
@@ -3630,6 +3673,7 @@ class GovernanceStore:
         return dict(row) if row else None
 
     def confirm_optimization_trigger(self, trigger_id: str, actor: str):
+        from .agent_strategy import NEW_EXPERIMENT_STRATEGY
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK, self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -3643,7 +3687,7 @@ class GovernanceStore:
             baseline = self.require_current_baseline(connection=connection)
             experiment_id = f"EXP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
             event = connection.execute("SELECT * FROM monitoring_events WHERE id=?", (row["event_id"],)).fetchone()
-            context = {"trigger_id": trigger_id, "round": 0, "baseline_id": baseline["id"], "golden_id": baseline["dataset_version_id"], "corpus_fingerprint": _load(baseline["dataset_snapshot_json"], {}).get("corpus_fingerprint"), "baseline_config": baseline["config"], "monitoring_event": {**dict(event), "source": _load(event["source_json"], {}), "metrics": _load(event["metrics_json"], None)} if event else None}
+            context = {**NEW_EXPERIMENT_STRATEGY, "trigger_id": trigger_id, "round": 0, "baseline_id": baseline["id"], "golden_id": baseline["dataset_version_id"], "corpus_fingerprint": _load(baseline["dataset_snapshot_json"], {}).get("corpus_fingerprint"), "baseline_config": baseline["config"], "monitoring_event": {**dict(event), "source": _load(event["source_json"], {}), "metrics": _load(event["metrics_json"], None)} if event else None}
             connection.execute("INSERT INTO experiments (id, baseline_run_id, status, result_json, created_at) VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline["id"], "pending_agent", _json(context), _now()))
             connection.execute("UPDATE optimization_triggers SET status = ?, actor = ?, confirmed_at = ?, optimization_run_id = ? WHERE id = ?", ("human_confirmed", actor, _now(), experiment_id, trigger_id))
             connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("monitoring_trigger", trigger_id, "approved", actor, _now()))
@@ -3667,3 +3711,34 @@ class GovernanceStore:
         with self.connection() as connection:
             row = connection.execute("SELECT id FROM experiments ORDER BY created_at DESC LIMIT 1").fetchone()
         return self.experiment(row["id"]) if row else None
+
+    def with_agent_trace_strategies(self, experiment):
+        """Project original round summaries only for rounds missing the saved strategy."""
+        result = experiment['result']
+        saved = result.get('agent_strategies') or {}
+        numbers = {str(r['round']) for r in experiment['rounds']}
+        if type(result.get('round')) is int:
+            numbers.add(str(result['round']))
+        missing = {n for n in numbers if not (saved.get(n) or {}).get('bad_case_summary')}
+        if not missing:
+            return experiment
+        strategies = {}
+        with self.connection() as db:
+            traces = db.execute("""
+                SELECT id, json_extract(result_json, '$.round') AS round,
+                       json_extract(result_json, '$.bad_case_summary') AS summary,
+                       json_extract(result_json, '$.prior_round_review') AS review
+                FROM agent_traces WHERE experiment_id=? AND status='completed'
+                AND json_valid(result_json) ORDER BY id DESC
+            """, (experiment['id'],))
+            for trace in traces:
+                number = str(trace['round'])
+                if number not in missing or number in strategies:
+                    continue
+                summary = _load(trace['summary'], {})
+                if isinstance(summary, dict) and isinstance(summary.get('groups'), list) and summary.get('focus'):
+                    strategies[number] = {'trace_id':trace['id'], 'bad_case_summary':summary,
+                                          'prior_round_review':_load(trace['review'], None)}
+        if not strategies:
+            return experiment
+        return {**experiment, 'result':{**result, 'agent_trace_strategies':strategies}}

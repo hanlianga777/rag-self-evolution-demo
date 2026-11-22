@@ -1,7 +1,7 @@
 """031d strategy contract and saved-result round retrospectives."""
 import json
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 from . import rules
 from .agent_inputs import case_comparisons, new_failure_ids
@@ -9,14 +9,25 @@ from .paid_run import provider_task
 from .telemetry import collect_usage, cost_fields
 
 
-def bad_case_groups(cases):
+NEW_EXPERIMENT_STRATEGY = {'strategy_contract': 'agent-strategy-4', 'decision_contract_version': '109c'}
+PREDICTION_NOTE = '已知题上的预测；同一题可能重复计入'
+GENERATION_PARAMETERS = {'prompt_strategy', 'generation_thinking'}
+
+
+def bad_case_groups(cases, *, questions=None, diagnoses=None):
+    from .diagnostics import diagnostic_view
+
+    questions = questions or {}
+    diagnoses = diagnoses or {}
     groups = defaultdict(list)
     for case in cases:
         if case.get('passed') is not False:
             continue
-        from .diagnostics import diagnostic_view
-        view = diagnostic_view(case)
-        groups[(view.get('diagnosis_category') or '未知', view.get('subfeature') or '未知')].append(case['question_id'])
+        question_id = case['question_id']
+        view = diagnoses.get(question_id) or diagnostic_view(case, golden_item=questions.get(question_id))
+        layer = view.get('diagnosis_category') or '记录缺失'
+        subtype = view.get('subfeature') or view.get('analysis_reason') or '缺少细分错因记录'
+        groups[(layer, subtype)].append(question_id)
     return [{'layer':layer, 'subtype':subtype, 'question_ids':sorted(ids), 'count':len(ids)}
             for (layer, subtype), ids in sorted(groups.items())]
 
@@ -32,25 +43,35 @@ def validate_strategy(response, prior, audit, targets):
         if len(previous.get('reasoning', {}).get('changed_parameters_vs_baseline', previous.get('reasoning', {}).get('changed_parameters', {}))) > 1:
             if any(not isinstance(plan.get(k), str) or not plan[k].strip() for k in ('most_likely_parameter', 'attribution_reason')):
                 raise ValueError('多参数复盘须说明无法单独确定、最可能参数及理由')
-    summary = response.get('bad_case_summary')
-    if (not isinstance(summary, dict) or summary.get('groups') != audit['bad_case_groups']
+    ids = bad_case_conclusion_ids(response.get('bad_case_summary'), audit['bad_case_groups'])
+    for candidate in response['candidates']:
+        if not isinstance(candidate.get('adjustments'), list) or not candidate['adjustments'] or not isinstance(candidate.get('risks'), list) or not candidate['risks']:
+            raise ValueError('Candidate须由Agent明确写出参数调整、预期题号和风险，不能自动补写')
+        validate_bad_case_references(candidate, ids)
+        predicted = candidate.get('predicted_fixed_question_ids')
+        if not isinstance(predicted, list) or not predicted or any(not isinstance(q, str) or q not in targets for q in predicted) or len(set(predicted)) != len(predicted):
+            raise ValueError('每个Candidate必须写预计修好题号predicted_fixed_question_ids，引用当前保存题号')
+
+
+def bad_case_conclusion_ids(summary, groups):
+    if (not isinstance(summary, dict) or summary.get('groups') != groups
             or not isinstance(summary.get('focus'), str) or not summary['focus'].strip()):
         raise ValueError('Bad Case总结必须按保存事实逐层/细分类型统计并指出最集中问题；groups须与输入一致')
     conclusions = summary.get('conclusions')
-    if not isinstance(conclusions, list) or not conclusions or any(not isinstance(c, dict) or not c.get('id') or not isinstance(c.get('conclusion'), str) or not c['conclusion'].strip() for c in conclusions):
+    if not isinstance(conclusions, list) or not conclusions or any(
+            not isinstance(c, dict) or not isinstance(c.get('id'), str) or not c['id'].strip()
+            or not isinstance(c.get('conclusion'), str) or not c['conclusion'].strip() for c in conclusions):
         raise ValueError('Bad Case总结缺少可引用结论')
     ids = {c['id'] for c in conclusions}
     if len(ids) != len(conclusions):
         raise ValueError('Bad Case结论ID重复')
-    for candidate in response['candidates']:
-        if not isinstance(candidate.get('adjustments'), list) or not candidate['adjustments'] or not isinstance(candidate.get('risks'), list) or not candidate['risks']:
-            raise ValueError('Candidate须由Agent明确写出参数调整、预期题号和风险，不能自动补写')
-        refs = candidate.get('bad_case_conclusion_ids')
-        predicted = candidate.get('predicted_fixed_question_ids')
-        if not isinstance(refs, list) or not refs or any(r not in ids for r in refs):
-            raise ValueError('每个Candidate必须引用Bad Case总结结论')
-        if not isinstance(predicted, list) or not predicted or any(not isinstance(q, str) or q not in targets for q in predicted) or len(set(predicted)) != len(predicted):
-            raise ValueError('每个Candidate必须写预计修好题号predicted_fixed_question_ids，引用当前保存题号')
+    return ids
+
+
+def validate_bad_case_references(candidate, ids):
+    refs = candidate.get('bad_case_conclusion_ids')
+    if not isinstance(refs, list) or not refs or any(not isinstance(ref, str) or ref not in ids for ref in refs):
+        raise ValueError('每个Candidate必须引用Bad Case总结结论')
 
 
 def predicted_ids(candidate):
@@ -59,6 +80,102 @@ def predicted_ids(candidate):
     if reasoning.get('candidate_label') == 'D' and not reasoning.get('predicted_fixed_question_ids'):
         return sorted({q for row in reasoning.get('changes') or [] if isinstance(row, dict) for q in row.get('target_question_ids') or []})
     return list(reasoning.get('predicted_fixed_question_ids', []))
+
+
+def validate_history_decisions(response, lessons, findings, baseline):
+    decisions = response.get('history_decisions')
+    labels = {candidate['id'] for candidate in response['candidates']}
+    if not isinstance(decisions, list) or any(
+            not isinstance(row, dict) or not isinstance(row.get('lesson'), str) for row in decisions
+    ) or Counter(row['lesson'] for row in decisions) != Counter(lessons):
+        raise ValueError('history_decisions 必须逐条按原文完整覆盖上一轮 lesson')
+    exceptions = set()
+    for row in decisions:
+        affected = row.get('affected_candidates')
+        reason = row.get('reason')
+        decision = row.get('decision')
+        if (decision not in ('采纳', '拒绝', '例外探索') or not isinstance(reason, str) or not reason.strip()
+                or not isinstance(affected, list) or any(not isinstance(label, str) or label not in labels for label in affected)
+                or len(set(affected)) != len(affected)):
+            raise ValueError('history_decisions 需要有效的决定、理由及本轮方案标签')
+        if decision == '例外探索':
+            parts = re.fullmatch(r'上次[：:]\s*(.+?)[；;]\s*这次[：:]\s*(.+)', reason.strip(), re.S)
+            if not affected or not parts or not all(part.strip() for part in parts.groups()) or parts[1].strip() == parts[2].strip():
+                raise ValueError('例外探索必须指定方案，并写清不同前提（上次：…；这次：…）')
+            exceptions.update((row['lesson'], label) for label in affected)
+    for candidate in response['candidates']:
+        changes = {**candidate.get('inherited_parameters', {}), **candidate['config_diff']}
+        for finding in findings:
+            key = finding['parameter']
+            if (key in changes and parameter_direction(baseline.get(key), changes[key]) == finding['direction']
+                    and (finding['lesson'], candidate['id']) not in exceptions):
+                raise ValueError(f"方案 {candidate['id']} 重复 {finding['assessment']} 的 {key} 参数方向，须对对应 lesson 写明例外探索")
+
+
+def parameter_direction(original, value):
+    if type(original) in (int, float) and type(value) in (int, float):
+        return '调高' if value > original else '调低' if value < original else '未改'
+    if type(original) is bool and type(value) in (int, float):
+        return '启用'
+    return json.dumps(value, ensure_ascii=False)
+
+
+def save_parameter_lessons(review, candidates, baseline):
+    from .display_summaries import PARAMETER_NAMES
+    from .optimization import gate_harming_changes
+
+    baseline_gates = (baseline['result'].get('gates') or {}).get('gates')
+    harmed = {row['candidate_id'] for row in gate_harming_changes(candidates, baseline_gates)}
+    plans = {p['candidate_id']: p for p in review['plans']}
+    findings = []
+    for candidate in candidates:
+        cid = candidate['id']
+        plan = plans[cid]
+        assessed = plan['parameter_assessment']
+        result = candidate['result']
+        if new_failure_ids(result) or cid in harmed or assessed in {'有害', '有副作用'}:
+            assessment = '有副作用'
+        elif assessed == '无效' or result.get('no_effect') or result.get('all_fixed_question_ids') == []:
+            assessment = '无效'
+        else:
+            continue
+        reasoning = candidate['reasoning']
+        changes = reasoning.get('changed_parameters_vs_baseline', reasoning.get('changed_parameters', {}))
+        label = reasoning.get('candidate_label', '')
+        for key, value in changes.items():
+            direction = parameter_direction(baseline['config'].get(key), value)
+            caveat = '（与其他参数一起试过，无法单独归因）' if len(changes) > 1 else ''
+            lesson = f'方案{label}的{PARAMETER_NAMES.get(key, key)}方向 {direction} 在原配置下{assessment}{caveat}。'
+            if lesson not in review['lessons']:
+                review['lessons'].append(lesson)
+            findings.append({'lesson':lesson, 'candidate_id':cid, 'parameter':key, 'direction':direction,
+                             'tested_value':value, 'assessment':assessment})
+    return findings
+
+
+def prediction_comparison(review, candidates, winner_facts=None):
+    plans = {plan['candidate_id']: plan for plan in review['plans']}
+    totals = {direction:{'hits':0, 'predictions':0} for direction in ('检索方向', '生成方向')}
+    rows = []
+    for candidate in candidates:
+        reasoning = candidate['reasoning']
+        if reasoning.get('candidate_label') == 'D':
+            keys = set(reasoning.get('winner_config_diff', {}))
+        else:
+            keys = set(reasoning.get('changed_parameters', {}))
+        directions = (['检索方向'] if keys - GENERATION_PARAMETERS else []) + (['生成方向'] if keys & GENERATION_PARAMETERS else [])
+        predicted = sorted(set(predicted_ids(candidate)))
+        plan = plans[candidate['id']]
+        winner = (winner_facts or {}).get(candidate['id'])
+        actual = winner['fixed_vs_winner'] if winner is not None else plan['fixed_question_ids']
+        matched = sorted(set(predicted) & set(actual))
+        for direction in directions:
+            totals[direction]['hits'] += len(matched)
+            totals[direction]['predictions'] += len(predicted)
+        rows.append({'candidate_id':candidate['id'], 'directions':directions, 'predicted_fixed_question_ids':predicted,
+                     'actual_fixed_question_ids':actual, 'matched_question_ids':matched,
+                     'unmatched_reason':plan['unmatched_reason']})
+    return {'rows':rows, 'by_direction':totals, 'note':PREDICTION_NOTE}
 
 
 def winner_comparison(store, d, winner):
@@ -237,7 +354,7 @@ def round_conclusions_for_prompt(store, baseline, candidates, conclusions):
     for number,saved in (conclusions or {}).items():
         if saved.get('status')!='saved':
             continue
-        item = {k:saved[k] for k in ('status','review','case_facts') if k in saved}
+        item = {k:saved[k] for k in ('status','review','case_facts','parameter_findings') if k in saved}
         projected[number] = item
         if 'case_facts' in item or 'review' not in item:
             continue
@@ -349,6 +466,10 @@ def conclude_round(store, runtime, experiment_id, *, final_d=False):
                 for plan in review['plans']:
                     candidate = next(c for c in evaluated if c['id'] == plan['candidate_id'])
                     validate_case_review(plan, case_facts[candidate['id']], candidate['reasoning'].get('changed_parameters', {}))
+            if experiment['result'].get('decision_contract_version') == '109c':
+                saved['prediction_comparison'] = prediction_comparison(review, evaluated, prompt.get('winner_comparison'))
+                if not final_d:
+                    saved['parameter_findings'] = save_parameter_lessons(review, evaluated, baseline)
             saved.update(status='saved', case_facts=case_facts, review=review)
             saved.update(cost_fields(getattr(getattr(runtime.provider,'settings',None),'model',None), [u for a in saved['attempts'] for u in a.get('token_usage', [])]))
             _save(store, experiment_id, number, saved)

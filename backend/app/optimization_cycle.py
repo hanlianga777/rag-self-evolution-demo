@@ -110,6 +110,7 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
 
     def advance_qualified(experiment, qualified):
         confirmation = experiment['result'].get('report_confirmation')
+        dual_review = experiment['result'].get('decision_contract_version') == '109c'
         authorization = unattended_authorization(store)
         if not confirmation:
             for candidate in experiment['candidates']:
@@ -117,12 +118,12 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                     store.skip_candidate(candidate['id'], '自动循环', '出现合格方案，已跳过（未运行）', automatic=True)
             from .agent_strategy import conclude_round
             conclude_round(store,runtime,experiment_id)
-            if not authorization.get('enabled'):
+            if dual_review or not authorization.get('enabled'):
                 return save('qualified', 'review')
             winner = min(qualified, key=candidate_rank)
             store.confirm_experiment_report(experiment_id, winner['id'], authorization['actor'],
                                             audit_note='用户 2026-11-16 预先授权')
-        if not authorization.get('enabled'):
+        if not dual_review and not authorization.get('enabled'):
             return save('qualified', 'review')
         check_cycle_stop(store,experiment_id)
         save('running', 'composite')

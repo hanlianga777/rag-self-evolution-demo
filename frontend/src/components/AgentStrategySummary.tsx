@@ -12,9 +12,11 @@ export const diagnosisLayer = (layer?: string) => layerNames[layer?.replace(/问
 
 export function roundStrategy(experiment: any, round: number) {
   const result = experiment?.result;
-  return result?.agent_strategies?.[String(round)] ?? (
-    (result?.round ?? 1) === round ? result : undefined
-  );
+  const saved = result?.agent_strategies?.[String(round)];
+  const trace = result?.agent_trace_strategies?.[String(round)];
+  if (saved?.bad_case_summary) return saved;
+  if (trace) return { ...trace, ...saved, bad_case_summary: trace.bad_case_summary, trace_id: trace.trace_id };
+  return saved ?? ((result?.round ?? 1) === round ? result : undefined);
 }
 
 export const questionIds = (ids: string[]) => [...new Set(ids.map(shortQuestionId))];

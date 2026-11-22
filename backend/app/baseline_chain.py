@@ -86,7 +86,8 @@ def advance_chain(store, runtime):
             state = chain_status(store)
             if not state.get('experiment_id'):
                 experiment_id = 'EXP-' + datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')
-                context = {'strategy_contract':'agent-strategy-4' if state.get('round_policy') else 'agent-strategy-3', 'chain_baseline_id':run['id'], 'audit_note':state['audit_note']}
+                from .agent_strategy import NEW_EXPERIMENT_STRATEGY
+                context = {**NEW_EXPERIMENT_STRATEGY, 'chain_baseline_id':run['id'], 'audit_note':state['audit_note']}
                 context.update({k:state[k] for k in ('round_policy','paid_run','causal_evidence') if k in state})
                 db.execute('INSERT INTO experiments VALUES (?,?,?,?,?)', (experiment_id,run['id'],'analyzing',json.dumps(context,ensure_ascii=False),datetime.now(timezone.utc).isoformat()))
                 state['experiment_id'] = experiment_id

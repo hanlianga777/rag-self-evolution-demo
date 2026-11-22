@@ -154,7 +154,7 @@ def validate_round_contract(candidates, baseline, prior_candidates, baseline_gat
             raise ValueError('每个方案相对底座最多改两个参数（含继承）')
         for previous in gate_harming_changes(prior_candidates,baseline_gates):
             harmed=previous['config_diff']
-            if harmed and diff == harmed:
+            if harmed and {**candidate.get('inherited_parameters', {}), **diff} == harmed:
                 raise ValueError('不得照搬已证明伤害 Hard Gate 的相同改动')
 
 
@@ -445,7 +445,9 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
                    '预演不覆盖生成层和负向题，这类题的预测要说明依据。')
     from .agent_strategy import bad_case_groups
     latest = next((c for c in reversed(prior_candidates) if c['status']=='evaluated' and (candidate_cases or {}).get(c['id'])), None)
-    prompt['bad_case_groups'] = bad_case_groups((candidate_cases or {})[latest['id']] if latest else [row['result'] | {'question_id':row['question_id']} for row in bad_cases])
+    prompt['bad_case_groups'] = bad_case_groups(
+        (candidate_cases or {})[latest['id']] if latest else [row['result'] | {'question_id':row['question_id']} for row in bad_cases],
+        questions=questions, diagnoses={row['question_id']:row.get('diagnostic_view') for row in bad_cases} if not latest else None)
     prompt['bad_case_scope'] = latest['id'] if latest else 'Baseline'
     if (round_policy or {}).get('mode') == 'full_rounds':
         from .policy import candidate_rank
@@ -471,7 +473,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
                 hard_gates.append({**gate,'margin':margin})
             metrics = result.get('metrics',{})
             prompt['best_qualified_candidate'] = {'candidate_id':winner['id'],'configuration':winner['config'],
-                'remaining_bad_cases':bad_case_groups((candidate_cases or {}).get(winner['id'],[])), 'hard_gates':hard_gates,
+                'remaining_bad_cases':bad_case_groups((candidate_cases or {}).get(winner['id'],[]), questions=questions), 'hard_gates':hard_gates,
                 **{key:metrics.get(key,result.get(key)) for key in ('latency_p50_seconds','latency_p99_seconds')}}
     if causal_evidence:
         from .agent_inputs import case_comparisons
@@ -615,11 +617,15 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
         result = business_output(result, mapping, {c['id']:f"第{c.get('reasoning',{}).get('round',1)}轮方案{c.get('reasoning',{}).get('candidate_label','')}" for c in prior_candidates})
         candidates = result['candidates']
     audit['prior_round_review'] = validate_prior_round_review(result, prior_candidates)
+    history_required = audit.get('decision_contract_version') == '109c' and round_number > 1
     validate_round_contract(candidates,base_config,prior_candidates,(audit.get('baseline_gate_results') or {}).get('gates'),completed=completed,
                             labels=labels if audit.get('strategy_contract') == 'agent-strategy-4' else None, round_number=round_number)
     if audit.get('strategy_contract') in {'agent-strategy-3','agent-strategy-4'}:
         from .agent_strategy import validate_strategy
         validate_strategy(result, prior_candidates, audit, {item['question_id'] for item in bad_cases})
+    if history_required:
+        from .agent_strategy import validate_history_decisions
+        validate_history_decisions(result, audit['history_lessons'], audit['prior_parameter_findings'], base_config)
     if audit.get('causal_evidence'):
         from .agent_strategy import validate_causal_proposals
         validate_causal_proposals(result, audit.get('case_comparisons', {}))
@@ -870,7 +876,6 @@ class OptimizationAgent:
         labels = ROUND_LABELS
         if context.get('round_policy',{}).get('mode') == 'full_rounds':
             labels = labels[:evaluation_budget['remaining_for_abc']]
-            context['strategy_contract'] = 'agent-strategy-4'
         audit = {"optimization_run_id": experiment_id, "baseline_id": baseline_run_id, "timestamp": datetime.now(timezone.utc).isoformat(), "provider_raw_text": None, "parsed_json": None, "parsed_candidates": None, "validation_stage": "provider", "failed_candidate_id": None, "failed_field": None, "actual_value": None, "expected_type": None, "allowed_values": None, "validation_issues": [], "diagnostic_tasks":diagnostic_tasks, "processing_progress":processing_progress, "all_bad_case_audit": [{k:v for k,v in row.items() if k!='result_json'} for row in audited_cases], "root_cause_counts": dict(Counter(item['diagnostic_view']['primary_root_cause'] for item in bad_cases)), "source_bad_case_ids": [item["id"] for item in bad_cases], "monitoring_context": monitoring_context, "monitoring_target_event_ids": monitoring_target_event_ids, "target_reference_map": target_reference_map, "evaluation_budget": evaluation_budget, "baseline_gate_results": gate_results, "failed_gates": failed_gates}
         failed_signatures = set(context.get('failed_parameter_signatures') or [])
         failed_signatures.update(parameter_signature(base_config,{key:value for key,value in c['config'].items() if value!=base_config.get(key)})
@@ -897,6 +902,17 @@ class OptimizationAgent:
         audit['case_comparisons'] = prompt.get('case_comparisons', {})
         audit['best_case_comparison'] = prompt.get('best_case_comparison', [])
         audit['strategy_contract'] = context.get('strategy_contract')
+        audit['decision_contract_version'] = context.get('decision_contract_version')
+        if audit['decision_contract_version'] == '109c' and round_number > 1:
+            previous_round = round_conclusions[str(round_number - 1)]
+            for key, value in {'history_lessons':previous_round['review']['lessons'],
+                               'prior_parameter_findings':previous_round['parameter_findings']}.items():
+                audit[key] = prompt[key] = value
+            system += ('history_decisions必须逐字覆盖history_lessons，每条输出{lesson,decision,reason,affected_candidates}；'
+                       'decision只用采纳、拒绝、例外探索，affected_candidates用本轮A/B/C标签，可以为空。'
+                       '若重复prior_parameter_findings中标记无效或有副作用的参数方向，须对对应的lesson选择例外探索，'
+                       '列出受影响方案，reason写成“上次：…；这次：…”，对照保存条件说明这次凭什么不同。'
+                       '数值参数在Baseline同一侧视为同方向，分类参数同一取值视为同方向；继承的改动也检查。')
         audit['round_policy'] = context.get('round_policy', {})
         if audit['round_policy'].get('mode') == 'full_rounds':
             prompt['proposal_generation'] = {'round':round_number, 'prior_failed_batches':

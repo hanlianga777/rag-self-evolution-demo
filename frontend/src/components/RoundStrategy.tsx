@@ -22,13 +22,15 @@ export function RoundStrategy({experiment,round}:{experiment:any;round:number}) 
   </p>
   <details className="agent-strategy-details"><summary>展开详细分析</summary><ol>
   <li><strong>上一轮结果</strong><p>{round===1 && (!review?.summary || review.summary==='无') ? '第 1 轮没有上一轮，直接从 Baseline 的 Bad Case 出发。' : storyText(review?.summary || '本轮策略尚未保存')}</p>{review?.plans?.map((plan:any)=><p key={plan.candidate_id}>{name(experiment,plan.candidate_id)}：修好 {questions(plan.fixed_question_ids)}；新错 {questions(plan.new_failure_question_ids)}。{storyText(plan.evidence_reason)}</p>)}{review?.baseline_remaining_assessment && <p>{storyText(review.baseline_remaining_assessment)}</p>}</li>
-  <li><strong>Bad Case 分布</strong>{summary?.groups?.map((g:any,i:number)=><p key={i}>{storyText(g.layer)} · {storyText(g.subtype)}：{g.count} 题</p>)}<p>{storyText(summary?.focus || '分布与重点尚未保存')}</p></li>
+  <li><strong>Bad Case 分布</strong>{saved?.trace_id && <p>来自原始 Agent 记录</p>}{summary?.groups?.map((g:any,i:number)=><p key={i}>{storyText(g.layer)} · {storyText(g.subtype)}：{g.count} 题</p>)}<p>{saved?.trace_id ? summary.focus : storyText(summary?.focus || '分布与重点尚未保存')}</p></li>
+  {saved?.history_decisions?.length > 0 && <li><strong>历史经验采纳表</strong>{saved.history_decisions.map((row:any,i:number)=><p key={i}>{row.lesson} · {row.decision} · {row.reason}{row.affected_candidates.length > 0 && `（方案 ${row.affected_candidates.join('、')}）`}</p>)}</li>}
   <li><strong>本轮候选方案与事先预测</strong>{candidates.map((candidate:any)=>{const r=candidate.reasoning || {};return <article key={candidate.id}><h4>{name(experiment,candidate.id)}</h4><p>{storyText(r.core_idea || r.hypothesis)}</p>{r.adjustments?.map((a:any,i:number)=><p key={i}>{parameterNames[a.parameter] || '参数'}：{formatValue(a.baseline_value, a.parameter)} → {formatValue(a.candidate_value, a.parameter)}。{storyText(a.expected_impact)}</p>)}<p>预计修好：{questions(r.predicted_fixed_question_ids)}</p><p>风险：{storyText(r.risk || r.risks?.map((risk:any)=>risk.reason).join('；'))}</p></article>;})}{!candidates.length && <p>候选方案尚未生成。</p>}</li>
  </ol></details></section>;
 }
 export function RoundConclusion({experiment,round}:{experiment:any;round:number|'D'}) {
  const saved=experiment?.result?.round_conclusions?.[String(round)];
  const plans = saved?.status === 'saved' ? saved.review?.plans : undefined;
+ const comparison = saved?.prediction_comparison;
  return <section className="panel agent-round-conclusion" aria-label="本轮结论"><h3>本轮结论</h3>{plans ? <>
   {plans.map((plan: any) => {
     const candidate = experiment?.candidates?.find((item: any) => item.id === plan.candidate_id);
@@ -44,7 +46,17 @@ export function RoundConclusion({experiment,round}:{experiment:any;round:number|
   })}
   <details className="agent-strategy-details"><summary>展开详细分析</summary><ol>
     <li><strong>实际修复与新增问题</strong>{plans.map((plan:any)=><article key={plan.candidate_id}><h4>{name(experiment,plan.candidate_id)} · {storyText(plan.conclusion)}</h4>{plan.case_reviews?.map((row:any,i:number)=><p key={i}>{shortQuestionId(row.question || row.question_id || '')} · {row.state}：{storyText(row.reason)}</p>)}{!plan.case_reviews?.length && <p>修好 {questions(plan.fixed_question_ids)}；新错 {questions(plan.new_failure_question_ids)}。{storyText(plan.evidence_reason)}</p>}</article>)}</li>
-    <li><strong>预测对账与参数判断</strong>{plans.map((plan:any)=><p key={plan.candidate_id}>{name(experiment,plan.candidate_id)}：预测吻合 {plan.prediction_match_count ?? '未知'} 题。{storyText(plan.unmatched_reason)} {storyText(plan.parameter_assessment)}</p>)}</li>
+    <li><strong>预测对账与参数判断</strong>{comparison ? <>
+      <p>{comparison.note}{round === 'D' && '。实际修好按 Winner 对比'}</p>
+      <p>{Object.entries<{hits:number;predictions:number}>(comparison.by_direction).map(([direction, total]) => `${direction} ${total.hits}/${total.predictions} 次`).join('、')}</p>
+      <div className="table-scroll"><table aria-label="预测与实测对照">
+        <thead><tr>{['方案','预测修好','实际修好','命中','未命中原因'].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+        <tbody>{comparison.rows.map((row:any) => <tr key={row.candidate_id}>
+          <th scope="row">{name(experiment,row.candidate_id)}</th><td>{questions(row.predicted_fixed_question_ids)}</td>
+          <td>{questions(row.actual_fixed_question_ids)}</td><td>{questions(row.matched_question_ids)}</td><td>{storyText(row.unmatched_reason)}</td>
+        </tr>)}</tbody>
+      </table></div>
+    </> : plans.map((plan:any)=><p key={plan.candidate_id}>{name(experiment,plan.candidate_id)}：预测吻合 {plan.prediction_match_count ?? '未知'} 题。{storyText(plan.unmatched_reason)} {storyText(plan.parameter_assessment)}</p>)}</li>
     <li><strong>带入下一轮的经验</strong>{saved.review.lessons?.map((lesson:string,i:number)=><p key={i}>{storyText(lesson)}</p>)}</li>
   </ol></details>
  </> : <p>等待 Agent 保存本轮结论。</p>}</section>;
