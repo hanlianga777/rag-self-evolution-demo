@@ -1,7 +1,10 @@
 """Read-only explanation of saved evidence; never rescore or rewrite a Run."""
+import re
+
 from .evaluation_contract import normalize
 from .read_view import memoized_view, read_once
-from .diagnostic_categories import DIAGNOSTIC_CATEGORIES, category_definition
+from .diagnostic_categories import (DIAGNOSTIC_CATEGORIES, GENERATION_REPAIRS, MISSED_SUBQUESTION,
+                                    TABLE_ERROR, WRONG_DENIAL, category_definition)
 
 TYPICAL = tuple(row['label'] for row in DIAGNOSTIC_CATEGORIES)
 @memoized_view
@@ -100,6 +103,65 @@ def unmet_required_points(case, question=None):
         return '记录缺失：必答要点与判分文字无法对应，且没有完整的原子编号判分'
     return [c['requirement'] for c in checks if c['met'] is False and
             (c['requirement'] in names if names is not None else c.get('check_type') not in {'auxiliary', 'optional'})]
+
+
+_SOURCE_DENIAL = re.compile(
+    r'(?:说明书|资料|材料|文档|手册|上下文).{0,12}?'
+    r'(?:没有(?:给出|提供|说明|提到|提及|列出|包含|找到|记录)?'
+    r'|未(?:给出|提供|说明|提到|提及|列出|包含|找到|记录)|没(?:给出|提到))\s*(?P<object>.*)'
+)
+_REFUSAL = re.compile(r'无法确认|不能确认|不能回答|无法回答|无法提供|无法确定')
+_CITATION = re.compile(r'\[\d+(?:\s*[,，、]\s*\d+)*\]')
+_LIST_PREFIX = re.compile(r'^\s*(?:[-*•#]+\s*|\d+[.、)）]\s*)')
+
+
+def _document_denial(answer, final_texts):
+    """Distinguish a denial in an otherwise substantive answer from a refusal."""
+    clauses = [_LIST_PREFIX.sub('', clause.strip()).strip() for clause in
+               re.split(r'[。！？!?；;，,\n]+', _CITATION.sub('', answer))
+               if not re.match(r'\s*#{1,6}\s', clause)
+               and not re.fullmatch(r'\s*\*\*.+?\*\*\s*[:：]?\s*', clause)]
+    denials = [match for clause in clauses if (match := _SOURCE_DENIAL.search(clause))]
+    if not denials:
+        return False, bool(_REFUSAL.search(_text(answer)))
+    substantive = any(_text(clause) and not clause.endswith((':', '：')) and clause not in {'您好', '你好'}
+                      and not _SOURCE_DENIAL.search(clause) and not _REFUSAL.search(_text(clause))
+                      and not re.match(r'^(?:建议|请|可)[您先]*(?:联系|咨询|询问|查阅|参阅)|^抱歉', clause)
+                      for clause in clauses)
+    if not substantive:
+        return False, True
+    for match in denials:
+        denied = match['object'].strip(' *:：')
+        quoted = re.match(r'[“「『"]([^”」』"]+)[”」』"]', denied)
+        subject = _text(quoted[1] if quoted else re.sub(
+            r'(?:的(?:具体|详细|相关)?(?:操作步骤|操作方法|步骤|方法|流程|说明|信息|数据|数值|参数|要求|规定))$', '', denied))
+        if len(subject) >= 2 and any(subject in text for text in final_texts):
+            return True, False
+    return False, False
+
+
+def _has_required_omission(case, golden, judge):
+    reference = case.get('reference_answer') or golden.get('reference_answer') or (golden.get('raw') or {}).get('reference_answer') or ''
+    points = [_LIST_PREFIX.sub('', line).strip() for line in reference.splitlines()]
+    optional = [_text(point) for point in points if point.startswith(('（补充）', '(补充)'))]
+    missing = unmet_required_points(case, golden)
+    if isinstance(missing, list):
+        answered_checks = {_text(c.get('requirement')) for c in judge.get('checks') or []
+                           if isinstance(c, dict) and c.get('met') is False and c.get('answer_quotes')}
+        return any(point and point not in answered_checks and not point.startswith('补充')
+                   and not any(point in extra for extra in optional) for point in map(_text, missing))
+    # Rubric records may have no structured check. Require an explicit omission
+    # that can be located in a required reference point.
+    required = [_text(point) for point in points if _text(point) and _text(point) not in optional]
+    reason = judge.get('completeness_reason') or judge.get('reason') or ''
+    for detail in re.findall(r'(?:遗漏|漏答|漏掉|未回答|未提及|未列出|未覆盖)了?([^。；;]+)', reason):
+        mentions = re.findall(r'[“「『"]([^”」』"]+)[”」』"]', detail)
+        if any(_text(point) and any(_text(point) in item for item in required)
+               and not any(_text(point) in extra for extra in optional) for point in mentions):
+            return True
+        if any(point in _text(detail) and not any(point in extra for extra in optional) for point in required):
+            return True
+    return False
 
 
 def _saved_verdict(case):
@@ -233,8 +295,10 @@ def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fin
         # 规则总表四.2：严重度看冻结题卷的业务后果（严重题名单），不按根因大类写死。
         frozen = golden.get('raw') or golden
         protected = (golden.get('negative_subtype') or case.get('negative_subtype')) in {'safety_critical','prompt_injection'} or frozen.get('criticality') == 'high'
+        strategy = GENERATION_REPAIRS.get(result.get('subfeature'))
         result.update(severity_label=('记录缺失' if category=='记录缺失' else '无' if category=='通过' else '严重' if protected else '普通'),
-                      tuning_directions=definition.get('directions',[]),repair_hint=definition.get('repair_hint',reason))
+                      tuning_directions=[strategy] if strategy else definition.get('directions',[]),
+                      repair_hint=f'尝试将回答提示词设为 {strategy}，用逐题结果核对是否改善。' if strategy else definition.get('repair_hint',reason))
         return result
     verdict = _saved_verdict(case)
     scored = bool(judge) and any(k in judge for k in ('verdict', 'correctness', 'quality', 'behavior_pass', 'checks'))
@@ -280,17 +344,32 @@ def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fin
     if missing:
         result['subfeature']='关键片段排名过低'
         return conclude('检索噪声', 'Ranking', '标准证据已全部进入候选，但第' + '、'.join(missing) + '段未进入最终内容，筛选时漏掉了。', 2, 'ranking_context_selection')
-    import re
-    answer = _text(case['model_answer'])
-    refusal = ('Over Refusal' in (case.get('failure_tags') or [])
-               or judge.get('over_refusal') is True
-               or judge.get('answer_behavior') in {'refusal', 'abstention'}
-               or re.search(r'(?:资料|材料|文档|手册|上下文).{0,12}(?:没有|未提供|未找到|未说明|未包含)|无法确认|不能确认|不能回答|无法回答|无法提供|无法确定', answer))
-    if refusal:
+    tags = case.get('failure_tags') or []
+    saved_issues = [issue for issue in judge.get('issues') or [] if isinstance(issue, dict)]
+    table_evidence = any(isinstance(quote, str) and re.search(r'\||[=＝][^；;\n]*[；;]\s*[^；;=＝\n]+[=＝]', quote)
+                         for quote in (check['quote'] for check in checks))
+    if table_evidence:
+        for issue in saved_issues:
+            if issue.get('failure_kind') not in {'contradiction', 'unsupported'}:
+                continue
+            details = [issue.get('reason'), issue.get('description'), *(issue.get('answer_quotes') or [])]
+            detail = ' '.join(value for value in details if isinstance(value, str) and value) or judge.get('reason') or ''
+            if re.search(r'\d|周期|清单|[项个]', _CITATION.sub('', detail)):
+                result['subfeature'] = TABLE_ERROR
+                return conclude('回答问题', 'Generation', '标准证据含表格行，保存的 Judge 问题指向数值、周期、数量或清单错误。')
+    wrong_denial, text_refusal = _document_denial(case['model_answer'], entries['final'])
+    saved_refusal = ('Over Refusal' in tags or judge.get('over_refusal') is True
+                     or judge.get('answer_behavior') in {'refusal', 'abstention'})
+    if wrong_denial and judge.get('answer_behavior') not in {'refusal', 'abstention'}:
+        result['subfeature'] = WRONG_DENIAL
+        return conclude('回答问题', 'Generation', '回答给出了实质内容，但声称资料缺少的对象可以在保存的 Final 中定位。')
+    if saved_refusal or text_refusal:
         result['subfeature']='模型过度拒绝（已检索到相关切片仍拒答）'
         return conclude('过度拒答', 'Generation', '标准证据已交给模型，但保存的回答或判分显示仍在拒答、表示资料没有或无法确认。', 4)
-    tags = case.get('failure_tags') or []
-    saved_issues = [issue for issue in judge.get('issues', []) if isinstance(issue, dict)]
+    question = case.get('question') or golden.get('question') or golden.get('user_query') or ''
+    if (len(re.findall(r'[？?]', question)) > 1 or re.search(r'和|以及|分别|各', question)) and _has_required_omission(case, golden, judge):
+        result['subfeature'] = MISSED_SUBQUESTION
+        return conclude('回答问题', 'Generation', '标准证据已进入 Final；题目含多个子问，保存的 Judge 记录指出漏答必答要点。')
     safety_issue = any(issue.get('safety_violation') is True and issue.get('failure_kind') in
                        {'omission', 'unsafe_operation', 'forbidden_action'} for issue in saved_issues)
     fact_issue = any(issue.get('failure_kind') in {'unsupported', 'contradiction', 'scope'}
@@ -336,6 +415,8 @@ def display_diagnosis(case, analysis, golden):
                 if type(top_k) is int and top_k > 0 and any(
                         type(check['rerank_rank']) is int and check['rerank_rank'] > top_k for check in missing):
                     layer, detail = '检索层', '排名靠后被截掉'
+            elif analysis.get('subfeature') in GENERATION_REPAIRS:
+                layer, detail = '生成层', analysis['subfeature']
             elif checks:
                 precision = analysis['retrieval_metrics'].get('precision_at_k')
                 if precision is not None and precision < .5:
@@ -412,7 +493,6 @@ def diagnostic_view(case, *, golden_item=None, corpus_chunks=None, corpus_finger
                'question_stages': stages, 'judge_stages': metrics.get('judge_stages'),
                'bottleneck': max(measured, key=lambda s: s['duration_ms']) if measured else None}
     issues = [{'type': 'missing_record', 'reason': g['condition']} for g in analysis['diagnostic_gaps']]
-    import re
     golden=golden_item or case.get('golden_item') or {}
     display_id=golden.get('display_id') or golden.get('coverage_slot') or (golden.get('raw') or {}).get('coverage_slot')
     if not display_id:

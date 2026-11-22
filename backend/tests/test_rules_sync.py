@@ -168,6 +168,21 @@ def test_109b_keeps_completed_strict_baseline_usable_with_saved_fingerprints():
         saved['run_snapshot']['prompt_version'][name] = old_hash
 
 
+def test_109g_keeps_the_previous_strict_baseline_usable_without_allowing_resume():
+    from app.evaluation_snapshot import require_resume_snapshot, run_snapshot
+    from app.rules import BASELINE
+
+    snapshot = run_snapshot({'id': 'frozen'}, {'prompt_strategy': BASELINE['prompt_strategy']}, {})
+    snapshot['prompt_version']['agent_system'] = '02b20fea1fdb4a999d785307ff26a2fc40c0c1c70d5d8ca893e1c315f7e0166e'
+    saved = {'run_snapshot': snapshot}
+    require_resume_snapshot(saved, for_candidate_baseline=True)
+    with pytest.raises(ValueError, match='prompt_version.agent_system'):
+        require_resume_snapshot(saved)
+    snapshot['prompt_version']['judge'] = 'changed'
+    with pytest.raises(ValueError, match='prompt_version.judge'):
+        require_resume_snapshot(saved, for_candidate_baseline=True)
+
+
 def test_current_explanations():
     from app import rules
     from app.ai_service import PROMPT_STRATEGIES
