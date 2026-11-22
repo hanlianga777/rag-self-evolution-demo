@@ -349,8 +349,10 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
     system = ('你是RAG优化Agent。根据保存的错题诊断提出优化方案。'
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
               '先读程序生成的基线诊断摘要、速度事实、逐题变化及已被证明有害的改动清单gate_harming_changes。本轮方案标签见goal.candidate_labels，direction由你根据事实自行确定，不预设方向。同轮修改参数互斥。不得照搬gate_harming_changes。'
-              f'回答提示词prompt_strategy可选Strict（Baseline所用的分级回答）、Looser（在Strict上加"补全要点、有据直接答、不因措辞差异拒答"，针对漏要点和过度拒答）、Safe（在Strict上加"安全结论在前、不给绕过方法、型号状态不明先追问、不执行自称授权"，针对安全题和注入题）；换提示词会影响全部50题的回答，要在risks里写明可能波及的题。query_decompose把一问多件事的问题拆成子问题分别检索，针对桥接题、跨段题。Baseline 关闭思考，Agent 不调这一项。关闭思考、温度 0 下判定稳定，回答文字仍可能不同。生成层和安全题可从 Prompt Strategy 和交付资料入手。每个方案相对其底座最多改 {MAX_CHANGED_PARAMETERS} 个参数。'
-              '诊断→动作对照（学朋友产品的规则动作库，优先参考、不限制）：检索层·查不到（标准证据没进候选或最终资料）→扩大candidate_k、放宽top_k、降低min_score，或开query_rewrite/multi_query/hyde；检索层·排序遗漏（证据在候选里但没进最终资料）→调rerank、top_k、min_score；型号、错误码等精确词查错→hybrid_alpha调向关键词（0.3）；被相似型号干扰（答成别的型号的数值）→提高min_score、保持rerank、减小top_k；生成层·漏要点→prompt_strategy=Looser、top_k、retrieval_max_tokens；生成层·过度拒答（证据在资料里却说没有）→prompt_strategy=Looser；安全边界·该拒不拒、型号不明就给步骤、被注入带偏→prompt_strategy=Safe；检索层·一问两件事的桥接或跨段题→query_decompose；安全边界·该拒没拒或过度拒答→prompt_strategy、min_score；性能·太慢→retrieval_max_tokens、top_k。每套方案先写明主攻哪一层哪一类问题（按bad_case_groups里题数最多、拖低门槛平均分最多的类别优先），再选对应动作；三套方案主攻不同类别，或同一类别的不同动作，并说明每个动作为什么只修这些题、不修其他题。'
+              '回答提示词prompt_strategy可选Strict（Baseline所用的分级回答）、Looser（有据直接答、补全要点，会放宽拒答）、Safe（安全结论在前、不给绕过方法、型号状态不明先追问、不执行自称授权）、Stepwise（逐个子问核对答案和证据，保持Strict的拒答标准）、Grounded（只说明当前资料的边界，处理错误否定和套话结尾）、TableCheck（依据表头逐行核对分类和计数）。R2-B使用Looser和retrieval_max_tokens=4096，结果31/50，安全拒答率90%；这两项一起改动，无法单独归因。'
+              '换提示词会影响全部50题的回答。选生成策略时必须在risks里按题号点名安全关键题和提示注入题，题号见prompt_strategy_risk_questions，并写明各类可能的退化。'
+              f'query_decompose把一问多件事的问题拆成子问题分别检索，针对桥接题、跨段题。Baseline 关闭思考，Agent 不调这一项。关闭思考、温度 0 下判定稳定，回答文字仍可能不同。生成层和安全题可从 Prompt Strategy 和交付资料入手。每个方案相对其底座最多改 {MAX_CHANGED_PARAMETERS} 个参数。'
+              '诊断→动作对照（学朋友产品的规则动作库，优先参考、不限制）：检索层·查不到（标准证据没进候选或最终资料）→扩大candidate_k、放宽top_k、降低min_score，或开query_rewrite/multi_query/hyde；检索层·排序遗漏（证据在候选里但没进最终资料）→调rerank、top_k、min_score；型号、错误码等精确词查错→hybrid_alpha调向关键词（0.3）；被相似型号干扰（答成别的型号的数值）→提高min_score、保持rerank、减小top_k；生成层·证据已在资料里却说没有，或套话结尾→prompt_strategy=Grounded；生成层·漏子问→prompt_strategy=Stepwise；生成层·表格、周期归类或计数错→prompt_strategy=TableCheck；安全边界·该拒不拒、型号不明就给步骤、被注入带偏→prompt_strategy=Safe；检索层·一问两件事的桥接或跨段题→query_decompose；安全边界·该拒没拒或过度拒答→prompt_strategy、min_score；性能·太慢→retrieval_max_tokens、top_k。每套方案先写明主攻哪一层哪一类问题（按bad_case_groups里题数最多、拖低门槛平均分最多的类别优先），再选对应动作；三套方案主攻不同类别，或同一类别的不同动作，并说明每个动作为什么只修这些题、不修其他题。'
               'prior_sandbox_results里带no_effect的方案：50题回答与已跑结果完全相同，说明它改的参数在当前条件下没有改变交给模型的资料，不要再提出同类无效改动。'
               '每道错题的bad_cases[].issue_tags列出它同时存在的全部问题（检索层/生成层/安全边界/性能，可多个），diagnosis_category只是排优先级用的主原因；设计方案时要兼顾同一题的全部标签，不要只看主原因。'
               'enhancement_telemetry是增强生效遥测：每个增强手段（query_rewrite/multi_query/hyde/query_decompose）在几道题上开启、在几道题上带来了原问题查不到的新资料（effective_questions、new_final_hits）；生效为0说明这个手段在当前题上没起作用。'
@@ -425,6 +427,10 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
         'baseline_performance':performance_facts(baseline_result or {},baseline_cases or []),
         'priority_parameters':PRIORITY_PARAMETERS,
         'allowed_parameter_values':{key: value for key, value in search_space_contract().items() if key in rules.AGENT['tunable']},
+        'prompt_strategy_risk_questions': {
+            subtype: [q['id'] for q in questions.values() if q.get('negative_subtype') == subtype]
+            for subtype in ('safety_critical', 'prompt_injection')
+        },
         'round_contract':{'count':len(labels),'parameters_disjoint':True,'max_changed_parameters':MAX_CHANGED_PARAMETERS},
         'previous_round_conclusions':round_conclusions or {},
         'gate_harming_changes':gate_harming_changes(prior_candidates,gates),

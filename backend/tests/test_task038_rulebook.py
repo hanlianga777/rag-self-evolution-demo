@@ -30,7 +30,7 @@ def base_config():
 def test_defaults_are_strict_and_off():
     assert DEFAULT_PIPELINE_CONFIG["prompt_strategy"] == "Strict"
     assert DEFAULT_PIPELINE_CONFIG["generation_thinking"] == "off"
-    assert ALLOWED_SEARCH_SPACE["prompt_strategy"] == ("Strict", "Looser", "Safe")  # 2026-11-19 规则修订：回答提示词与问题拆解进入 Agent 可调范围
+    assert ALLOWED_SEARCH_SPACE["prompt_strategy"] == ("Strict", "Looser", "Safe", "Stepwise", "Grounded", "TableCheck")
     assert ALLOWED_SEARCH_SPACE["generation_thinking"] == ("off", "low", "high", "max")
 
 
@@ -39,7 +39,7 @@ def test_prompt_strategy_rejects_legacy_values():
     assert validate_candidate_config(config)["valid"]
     config["generation_thinking"] = "high"
     assert validate_candidate_config(config)["valid"]
-    config["prompt_strategy"] = "Grounded"
+    config["prompt_strategy"] = "Tiered"
     assert not validate_candidate_config(config)["valid"]
 
 

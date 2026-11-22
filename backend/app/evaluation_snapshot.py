@@ -16,7 +16,7 @@ def _versions(judge):
     agent_system, _ = build_agent_prompt([], DEFAULT_PIPELINE_CONFIG, [], [], list('ABC'),
         retrieval_preview={'configs': []}, round_policy={'mode': 'full_rounds'}, causal_evidence=True)
     prompts = {strategy: generation_system_prompt(generation_version, strategy)
-               for strategy in ('Strict', 'Looser', 'Safe')}
+               for strategy in rules.PIPELINE_VALUES['prompt_strategy']}
     prompts.update(judge=RUBRIC_JUDGE_PROMPT, agent_system=agent_system)
     return {
         'rules_hash': rules.canonical_hash(rules.RULES)[:12],
@@ -52,8 +52,22 @@ def require_resume_snapshot(judge, current_judge=None, *, for_candidate_baseline
     # still anchor a new Candidate. Resuming a run keeps the full fingerprint check.
     if for_candidate_baseline and (saved['rules_hash'], current['rules_hash']) == ('f0d368403ec9', '2aa1acc7b9c0'):
         changed.remove('rules_hash')
-    changed.extend(f'prompt_version.{name}' for name, fingerprint in current['prompt_version'].items()
-                   if saved['prompt_version'].get(name) != fingerprint)
+    saved_prompts = saved['prompt_version']
+    current_prompts = current['prompt_version']
+    ignored_prompts = set()
+    # 109b expands the search space and planning prompt. Only a completed
+    # Strict Baseline may anchor a new Candidate across this exact upgrade.
+    if (for_candidate_baseline and (saved.get('pipeline_config') or {}).get('prompt_strategy') == 'Strict'
+            and (saved.get('search_space_version'), current['search_space_version']) == (
+                '48ce7c816182ef9701d14ba944f35b2f658c84128f97b5f876906e3e6e9dbc3e',
+                '272daae6a9c4061157e9665b43f016086180c2fa5d44111d79ac9ba7e195e0de')
+            and (saved_prompts.get('agent_system'), current_prompts['agent_system']) == (
+                '3a6d515d2a3b78f0acf3cf020436468d80f665f411b3f40e8824b505c014172a',
+                '4ca6578f34f254a015f1784c0c10cb5bfa0778a5dfe2c2cb70b31a2673747df7')):
+        changed.remove('search_space_version')
+        ignored_prompts = {'agent_system'} | ({'Stepwise', 'Grounded', 'TableCheck'} - saved_prompts.keys())
+    changed.extend(f'prompt_version.{name}' for name, fingerprint in current_prompts.items()
+                   if name not in ignored_prompts and saved_prompts.get(name) != fingerprint)
     if changed:
         raise ValueError('续跑启动快照已变化：' + '、'.join(changed))
 

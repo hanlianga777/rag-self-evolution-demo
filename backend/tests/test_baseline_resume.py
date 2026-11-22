@@ -43,18 +43,20 @@ class ResumeTests(unittest.TestCase):
         with patch('app.evaluation.time.sleep'):return self.runner.execute_baseline(run,items,config)
 
     def test_baseline_persists_start_snapshot(self):
+        from app.rules import RULES_VERSION
+
         key, _, config = self.runner.start_baseline()
         run = self.store.evaluation_run(key)
         frozen = run['judge'].get('run_snapshot', {})
         self.assertEqual(frozen.get('pipeline_config'), {key: value for key, value in config.items() if key != 'run_target'})
-        self.assertEqual(frozen['rules_version'], '2026-11-20')
+        self.assertEqual(frozen['rules_version'], RULES_VERSION)
         self.assertRegex(frozen['rules_hash'], r'^[0-9a-f]{12}$')
         self.assertEqual(frozen['judge_config'], {'model': 'fixture', 'thinking': 'off', 'temperature': 0, 'samples': 3})
         self.assertEqual(frozen['golden_version'], 'fixture-golden')
         self.assertEqual(frozen['knowledge_identity'], json.loads(run['dataset_snapshot_json'])['corpus_fingerprint'])
         versions = frozen['prompt_version']
-        self.assertEqual(set(versions), {'Strict', 'Looser', 'Safe', 'judge', 'agent_system'})
-        self.assertEqual(len(set(versions.values())), 5)
+        self.assertEqual(set(versions), {'Strict', 'Looser', 'Safe', 'Stepwise', 'Grounded', 'TableCheck', 'judge', 'agent_system'})
+        self.assertEqual(len(set(versions.values())), 8)
         self.assertTrue(all(len(value) == 64 for value in versions.values()))
 
     def test_baseline_resume_reports_current_rules_and_prompt_changes(self):

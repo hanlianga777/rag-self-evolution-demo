@@ -46,6 +46,35 @@ def test_completed_baseline_snapshot_allows_109a_upgrade_only():
         require_resume_snapshot(saved, for_candidate_baseline=True)
 
 
+def test_109b_keeps_completed_strict_baseline_usable_with_saved_fingerprints():
+    from app.evaluation_snapshot import require_resume_snapshot
+
+    saved = {
+        'generation_prompt_version': 'generation-vnext-4',
+        'run_snapshot': {
+            'rules_hash': 'f0d368403ec9',
+            'search_space_version': '48ce7c816182ef9701d14ba944f35b2f658c84128f97b5f876906e3e6e9dbc3e',
+            'pipeline_config': {'prompt_strategy': 'Strict'},
+            'prompt_version': {
+                'Strict': 'a4c1510da62a9ec7525d4c3b453704a4db50cc31ce517b48c40a40a565bad6ae',
+                'Looser': '3bd2349eff775f866e8f2e1729b740dbaf11fa739a1f4e46b42b43454207b83b',
+                'Safe': '6f3ab5375dbbd8029a05f91f3f80cbba2a61aa8fdc22469a1b83b9d80864b35e',
+                'judge': 'fdcc5e8d3ea89bdb24852b918325e24ef32267956f87a2a89196892961d739f6',
+                'agent_system': '3a6d515d2a3b78f0acf3cf020436468d80f665f411b3f40e8824b505c014172a',
+            },
+        },
+    }
+    require_resume_snapshot(saved, for_candidate_baseline=True)
+    with pytest.raises(ValueError, match='search_space_version.*prompt_version.Grounded'):
+        require_resume_snapshot(saved)
+    for name in ('Strict', 'judge'):
+        old_hash = saved['run_snapshot']['prompt_version'][name]
+        saved['run_snapshot']['prompt_version'][name] = 'changed'
+        with pytest.raises(ValueError, match=f'prompt_version.{name}'):
+            require_resume_snapshot(saved, for_candidate_baseline=True)
+        saved['run_snapshot']['prompt_version'][name] = old_hash
+
+
 def test_current_explanations():
     from app.policy import PARAMETER_EXPLANATIONS
     assert PARAMETER_EXPLANATIONS['generation_thinking'][0] == 'Baseline 关闭思考，Agent 不调这一项'

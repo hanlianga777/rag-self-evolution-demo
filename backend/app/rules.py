@@ -115,7 +115,7 @@ PIPELINE_VALUES = {
     "multi_query": (False, 2, 4, 6),
     "hyde": (True, False),
     "query_decompose": (False, True),
-    "prompt_strategy": ("Strict", "Looser", "Safe"),
+    "prompt_strategy": ("Strict", "Looser", "Safe", "Stepwise", "Grounded", "TableCheck"),
     "generation_thinking": THINKING_LEVELS,
     "retrieval_max_tokens": (False, 8192, 4096),
 }
