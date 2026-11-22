@@ -163,17 +163,27 @@ class DecisionContractTests(TestCase):
             cycle = run_until_qualified(self.store, SimpleNamespace(provider=self.provider), experiment_id)
             self.assertEqual((cycle['status'], cycle['phase']), ('qualified', 'review'))
             composite.assert_not_called()
-        with self.assertRaisesRegex(ValueError, '双审'):
-            self.store.confirm_experiment_report(experiment_id, winner, '总指挥')
-        with self.assertRaisesRegex(ValueError, '均通过'):
-            self.store.confirm_experiment_report(experiment_id, winner, '总指挥', delegated_review={'claude':'审查 A'})
+        from gate_review_fixture import gate_reviews
+        from pytest import MonkeyPatch
+
+        for actor in ('local_user', 'human', '总指挥'):
+            with self.assertRaisesRegex(ValueError, '双审'):
+                self.store.confirm_experiment_report(experiment_id, winner, actor)
         self.assertIsNone(self.store.latest_approval('experiment_report', experiment_id))
-        confirmation = self.store.confirm_experiment_report(experiment_id, winner, '总指挥',
-            delegated_review={'claude':'审查 A', 'gpt':'审查 B'})
+        with TemporaryDirectory() as directory, MonkeyPatch.context() as monkeypatch:
+            reviews = gate_reviews(Path(directory), monkeypatch, experiment_id, 'gate2')
+            with self.assertRaisesRegex(ValueError, '双审'):
+                self.store.confirm_experiment_report(experiment_id, winner, '总指挥',
+                    delegated_review={**reviews, 'stage': 'gate3'})
+            confirmation = self.store.confirm_experiment_report(experiment_id, winner, '总指挥',
+                delegated_review=reviews)
         self.assertEqual([confirmation[k] for k in ('authorizer','executed_by','review_method')],
                          ['用户','总指挥','预授权代确认'])
         saved = self.store.experiment(experiment_id)['result']['report_confirmation']
-        self.assertEqual(saved['review_evidence'], {'claude':'审查 A', 'gpt':'审查 B'})
+        self.assertEqual(saved['stage'], 'gate2')
+        for reviewer in ('claude', 'gpt'):
+            self.assertEqual(saved['review_evidence'][reviewer]['record'], reviews[reviewer]['record'])
+            self.assertRegex(saved['review_evidence'][reviewer]['sha256'], '^[0-9a-f]{64}$')
         with self.store.connection() as db:
             self.assertEqual(db.execute("SELECT count(*) FROM approvals WHERE gate='human_release'").fetchone()[0], 0)
 

@@ -110,3 +110,16 @@ it("suppresses incomplete final scores, preserves progress and blocks unreconcil
   expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect((fetch as any).mock.calls.every(([,init]:any)=>init?.method!=="POST")).toBe(true);
 });
+
+it("disables Gate 2 for a new experiment awaiting dual review", async () => {
+  const winner = { ...candidates[0], status: "evaluated", result: { qualification: { qualified: true } } };
+  await mount({ ...data, optimization: { ...data.optimization, candidates: [winner],
+    result: { decision_contract_version: "109c" } } });
+  await click("回归与推荐");
+  const button = [...document.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "确认报告与 Winner");
+  expect(button?.disabled).toBe(true);
+  expect(document.body.textContent).toContain("需 Claude 与 GPT 双审通过记录");
+  await act(async () => button!.click());
+  expect(document.querySelector(".confirm-dialog")).toBeNull();
+  expect((fetch as any).mock.calls.every(([, init]: any) => !init?.method)).toBe(true);
+});
