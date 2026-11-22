@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import rules
-from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, MAX_EVALS, search_space_contract, evaluate_regression, protected_question
+from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, MAX_EVALS, delegated_gate_audit, qualification_description, search_space_contract, evaluate_regression, protected_question
 from .paid_run import provider_task
 from .corpus import EMBEDDING_MODEL, CorpusStore, current_manifest, manifest_identity
 
@@ -341,7 +341,7 @@ class GovernanceStore:
                 )
                 connection.execute(
                     "INSERT OR IGNORE INTO production_versions (id, status, config_json, evaluation_run_id, dataset_version_id, approval_id, previous_version_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    ("baseline-v1", "active", _json({"top_k": 4, "min_score": None}), None, None, None, None, now),
+                    ("baseline-v1", "active", _json({"top_k": rules.BASELINE["top_k"], "min_score": None}), None, None, None, None, now),
                 )
                 connection.execute("INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)", ("golden-draft-v1", now))
             if not connection.execute("SELECT 1 FROM schema_migrations WHERE name = 'governance-flow-v2'").fetchone():
@@ -3122,12 +3122,12 @@ class GovernanceStore:
                 raise ValueError('报告已确认，不能改变已确认的实验结果')
             items = connection.execute("SELECT status, reasoning_json, result_json FROM candidate_configs WHERE experiment_id=?", (candidate['experiment_id'],)).fetchall()
             used = sum(sandbox_attempts_used({'status':item['status'],'reasoning':_load(item['reasoning_json'],{}),'result':_load(item['result_json'],{})}) for item in items)
-            # 规则总表五.6：分阶段停止的实验总预算 12 次含 D，不再为 D 单独预留；第 12 个 A/B/C 也可以跑。
+            # 规则总表六.6：分阶段停止的实验总预算包含 D，不单独预留。
             staged = result.get('round_policy', {}).get('stop_rule') == 'staged-v1'
             limit = MAX_EVALS if is_d or staged else MAX_EVALS - 1
             resuming = row['status']=='failed' and (product_interruption(candidate) or bool(candidate['result'].get('stop_request')))
             if used >= limit and not resuming:
-                raise ValueError('Sandbox budget exhausted；D 保留一次额度')
+                raise ValueError('Sandbox 评测预算已用完' if staged or is_d else 'Sandbox 评测额度已用完，剩余额度为 D 预留')
             if is_d and not result.get('report_confirmation'):
                 raise ValueError('D 需要 Gate 2 报告确认')
             attempts = list(candidate['reasoning'].get('sandbox_attempts', []))
@@ -3150,13 +3150,10 @@ class GovernanceStore:
             if experiment['result'].get('report_confirmation'):
                 raise ValueError('报告已确认')
             strict = experiment['result'].get('decision_contract_version') == '109c'
-            if strict and (audit_note or actor == '总指挥') and delegated_review is None:
+            if strict and audit_note and delegated_review is None:
                 raise ValueError('新实验 Gate 2 代确认须提交 Claude 和 GPT 双审依据')
-            if delegated_review is not None:
-                if (not strict or actor != '总指挥' or not isinstance(delegated_review, dict)
-                        or set(delegated_review) != {'claude', 'gpt'}
-                        or any(not isinstance(ref, str) or not ref.strip() for ref in delegated_review.values())):
-                    raise ValueError('Gate 2 预授权代确认须由总指挥提交 Claude 和 GPT 均通过的依据')
+            audit = (delegated_gate_audit('gate2', actor, delegated_review, current_experiment=strict)
+                     if strict or delegated_review is not None else {})
             self.require_current_baseline(experiment['baseline_run_id'], connection)
             candidates = experiment['candidates']
             if any(item['status'] not in {'evaluated','skipped'} or item['status']!='skipped' and item['result'].get('evaluation_complete') is False for item in candidates if item['reasoning'].get('candidate_label')!='D'):
@@ -3176,9 +3173,7 @@ class GovernanceStore:
             confirmation = {'winner_id': winner_id, 'actor': actor, 'confirmed_at': _now(), 'candidates': [{'id': item['id'], 'status': item['status'], 'result': item['result'], 'config': item['config']} for item in candidates]}
             if audit_note:
                 confirmation['audit_note'] = audit_note
-            if delegated_review is not None:
-                confirmation.update(authorizer='用户', executed_by='总指挥', review_method='预授权代确认',
-                                    review_evidence={key:ref.strip() for key,ref in delegated_review.items()})
+            confirmation.update(audit)
             result = {**experiment['result'], 'report_confirmation': confirmation}
             connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (_json(result), experiment_id))
             connection.execute('INSERT INTO approvals(gate,target_id,decision,actor,created_at) VALUES (?,?,?,?,?)', ('experiment_report', experiment_id, 'approved', actor, _now()))
@@ -3294,7 +3289,7 @@ class GovernanceStore:
                         '优先参考usable_repairs中的改动组合及对应source_candidate_id；source_candidates只列实际取用的来源。整组取用写verified，只取一部分写partial。事实表没有记录某题修好时不得宣称已修好。'
                         '输出简洁且完整的合法JSON，字符串中的换行必须转义，所有对象和数组必须闭合；不要添加合同以外的字段。'
                         '参数档案observations提供winner_config_diff（含当前参数的全部差异）、prerequisite_differences（不含当前参数的前提差异）及premise_label。前提不同的副作用仅为风险提示，必须写进风险清单并在Sandbox重点核对，不能单独作为放弃理由。没有前提相同证据不等于证明安全。'
-                        '本次实验strategy_contract为agent-strategy-3或agent-strategy-4时：必须给combination_mode和mode_reason。qualified_candidate_ids有2个及以上时用partial_fusion：先分析各方案合格原因，再取用至少另一个合格方案的有效参数（可以只取一部分）。若无冲突的参数并集已评测，改用winner_plus，保留Winner的改动并只加1个参数。只有1个合格方案时用winner_plus：以Winner为起点尝试不同参数组合，争取多答对。优先用已验证有效的参数（verified/partial）；没验证过的取值（new_attempt）优先级低，只在已验证参数不够时作为补充并写明why_not_verified。有合格方案时必须生成D。round_conclusions是已保存的逐轮总结，作为决策依据。'
+                        '本次实验strategy_contract为agent-strategy-3或agent-strategy-4时：必须给combination_mode和mode_reason。qualified_candidate_ids达到融合门槛时用partial_fusion：先分析各方案合格原因，再取用至少另一个合格方案的有效参数（可以只取一部分）。若无冲突的参数并集已评测，改用winner_plus，保留Winner的改动并按单 Winner 规则加参数。只有1个合格方案时用winner_plus：保留Winner的改动并按单 Winner 规则加参数，争取多答对。优先用已验证有效的参数（verified/partial）；没验证过的取值（new_attempt）优先级低，只在已验证参数不够时作为补充并写明why_not_verified。有合格方案时必须生成D。round_conclusions是已保存的逐轮总结，作为决策依据。'
                         '返回action_name,should_generate_d(bool),root_cause_alignment,complementary_capabilities,proposed_config_diff(平铺参数到值，列出所有相对Winner的变化，含恢复Baseline取值的参数),expected_improvement,risks,explanation,hypothesis,root_cause,intervention_direction,evidence_assertions:[{target_id,observation}],parameter_dependencies。依据/收益/风险/解释均为非空字符串。'
                         'should_generate_d=true时每个改动必须在changes数组给一条：{parameter,source_type:verified或partial或new_attempt,source_candidates:[完整历史ID],reason,target_question_ids:[剩余错题的正式ID],evidence_basis:事实表证据位置说明,side_effect_check:{historical_effects:历史伴随的新错题及门槛/P99变化,protected_overlap:[受保护题正式ID，与该取值档案的新错题交集必须全覆盖],winner_fixed_risk:检查Winner已经修好的题,gate_risk:检查临界门槛余量,mitigation:规避办法,same_premise_evidence:字符串或字符串数组均可，前提相同的历史证据，没有证据写\'未观察到\',different_premise_evidence:字符串或字符串数组均可，前提不同的来源及差异，没有证据写\'未观察到\',risk_checklist:字符串或字符串数组均可，重点盯哪些受保护题和临界门槛，没有证据写\'未观察到\'},expected_fixed_count:非负整数,possible_broken_count:非负整数}。'
                         'verified引用历史来源和修好题/证据位置，多参数来源整组取用；只取多参数来源中的一部分时写partial，有拆分对照就给contrast_ids:[d_facts.contrasts里的真实对照ID]，没有对照也可以，但要在reason里说明为什么只取这部分。new_attempt须是本实验未用过的取值，额外给why_not_verified说明为什么已验证参数不能解决或副作用不可接受。新尝试来源可为空，不要求两个来源。'
@@ -3303,7 +3298,8 @@ class GovernanceStore:
                            'bad_case_conclusion_ids须引用这些结论。changes.target_question_ids是预计修好的正式题号。' if strict else ''),
                         _json({'baseline':{key:baseline[key] for key in ('id','config','judge','dataset_version_id')},
                             'winner':strategy_candidate(winner), 'sources':[strategy_candidate(c) for c in eligible if c['id']!=winner['id']],
-                            'd_facts':facts, 'bad_cases':prompt_cases, 'search_space':{key: value for key, value in search_space_contract().items() if key in rules.AGENT['tunable']},
+                            'd_facts':facts, 'bad_cases':prompt_cases, 'qualification_rules':rules.QUALIFICATION,
+                            'agent_rules':rules.AGENT, 'search_space':{key: value for key, value in search_space_contract().items() if key in rules.AGENT['tunable']},
                             'strategy_contract':experiment['result'].get('strategy_contract'), 'round_conclusions':prior_conclusions,
                             **({'bad_case_groups':d_groups} if strict else {}),
                             **({'validation_rejection':{'reason':decision['attempts'][-2]['validation_error'], 'instruction':'根据原因重出完整建议；usable_repairs非空时必须生成D，只能在为空时有依据地不生成'}} if attempt else {})}), json_mode=True)
@@ -3492,6 +3488,9 @@ class GovernanceStore:
             return 'V1.2 不允许绕过 Gate 2 报告确认及 D 决策'
         if candidate.get("reasoning", {}).get("candidate_label") not in {"A", "B", "C", 'D'}:
             return '仅允许已验证方案发布'
+        qualification = candidate['result'].get('qualification_reassessment') or candidate['result'].get('qualification', {})
+        if qualification.get('rule_version') == rules.QUALIFICATION['version'] and qualification.get('qualified') is not True:
+            return '未通过当前发布资格：' + qualification_description()
         recommendation = self.recommendation(candidate["experiment_id"])
         result = (recommendation or {}).get("result", {})
         if result.get("status") != "Recommended" or result.get("recommended_candidate") != candidate["id"]:
@@ -3500,18 +3499,23 @@ class GovernanceStore:
 
     def release_state(self, candidate: dict, *, peers=None) -> dict:
         recommendation = (self.recommendation(candidate["experiment_id"]) or {}).get("result", {})
-        return {"sandbox": candidate["status"] == "evaluated", "qualified": bool(candidate["result"].get("release_qualification", {}).get("qualified")), "recommended": recommendation.get("recommended_candidate") == candidate["id"], "human_release": (self.latest_approval("human_release", candidate["id"]) or {}).get("decision") == "approved", "round_complete": self.round_completion(candidate, peers=peers)["complete"]}
+        result = candidate["result"]
+        qualified = bool(result.get("release_qualification", {}).get("qualified"))
+        qualification = result.get("qualification", {})
+        if qualification.get("rule_version") == rules.QUALIFICATION["version"]:
+            qualified = qualified and qualification.get("qualified") is True
+        return {"sandbox": candidate["status"] == "evaluated", "qualified": qualified, "recommended": recommendation.get("recommended_candidate") == candidate["id"], "human_release": (self.latest_approval("human_release", candidate["id"]) or {}).get("decision") == "approved", "round_complete": self.round_completion(candidate, peers=peers)["complete"]}
 
-    def publish_candidate(self, candidate_id: str, actor: str):
+    def publish_candidate(self, candidate_id: str, actor: str, *, delegated_review=None):
         candidate = self.candidate(candidate_id)
         if candidate is None or candidate["status"] != "evaluated":
             raise ValueError("仅已完成 Sandbox 的 Candidate 可发布")
         if not candidate["result"].get("release_qualification", {}).get("qualified"):
-            raise ValueError("未通过发布规则：需要11项 Hard Gate 全过、零新增 Bad Case 且至少修好1道")
+            raise ValueError("未通过发布规则：" + qualification_description())
         if error := self.release_gate_error(candidate):
             raise ValueError(error)
         if not candidate["result"].get("gates", {}).get("passed") or not candidate["result"].get("regression", {}).get("passed"):
-            raise ValueError("需要 11/11 Gate 与 Regression PASS")
+            raise ValueError("需要全部门槛及 Regression 通过")
         run = self.evaluation_run(candidate["result"]["evaluation_run_id"])
         if run is None or run["status"] != "completed":
             raise ValueError("Candidate Evaluation 未完成")
@@ -3521,8 +3525,12 @@ class GovernanceStore:
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK, self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            experiment = connection.execute("SELECT baseline_run_id FROM experiments WHERE id=?", (candidate["experiment_id"],)).fetchone()
+            experiment = connection.execute("SELECT baseline_run_id, result_json FROM experiments WHERE id=?", (candidate["experiment_id"],)).fetchone()
             self.require_current_baseline(experiment["baseline_run_id"], connection)
+            strict = _load(experiment['result_json'], {}).get('decision_contract_version') == '109c'
+            if strict and delegated_review is not None:
+                strict = self.current_baseline_identity(connection)['current_experiment_id'] == candidate['experiment_id']
+            audit = delegated_gate_audit('gate3', actor, delegated_review, current_experiment=strict)
             if connection.execute("SELECT 1 FROM production_versions WHERE json_extract(snapshot_json, '$.candidate_id') = ?", (candidate_id,)).fetchone():
                 raise ValueError("Candidate 已发布")
             row = connection.execute("SELECT status, result_json, config_json FROM candidate_configs WHERE id = ?", (candidate_id,)).fetchone()
@@ -3532,7 +3540,7 @@ class GovernanceStore:
             if row is None or row["status"] != "evaluated" or not current_result.get("release_qualification", {}).get("qualified"):
                 raise ValueError("Candidate 发布资格已变化")
             if not current_result.get("gates", {}).get("passed") or not current_result.get("regression", {}).get("passed"):
-                raise ValueError("11/11 Gate 或 Regression 已变化")
+                raise ValueError("门槛或 Regression 已变化")
             if connection.execute("SELECT status FROM evaluation_runs WHERE id = ?", (run["id"],)).fetchone()["status"] != "completed":
                 raise ValueError("Candidate Evaluation 已变化")
             from .evaluation_contract import policy_current
@@ -3549,7 +3557,7 @@ class GovernanceStore:
             if not self.round_completion(candidate).get("direct_or_legacy") and (selected.get("status") != "Recommended" or selected.get("recommended_candidate") != candidate_id):
                 raise ValueError("Recommendation 已变化")
             previous = self.active_production()
-            release = {"gate": "human_release", "target_id": candidate_id, "decision": "approved", "actor": actor, "created_at": _now()}
+            release = {"gate": "human_release", "target_id": candidate_id, "decision": "approved", "actor": actor, "created_at": _now(), **audit}
             approval = connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", (release["gate"], candidate_id, release["decision"], actor, release["created_at"]))
             release["id"] = approval.lastrowid
             if previous:
@@ -3702,7 +3710,9 @@ class GovernanceStore:
         with self.connection() as connection:
             items = [{**dict(candidate), "config": _load(candidate["config_json"], {}), "reasoning": _load(candidate["reasoning_json"], {}), "result": self._candidate_result(connection,candidate,light=light)} for candidate in candidates]
         numbers = sorted({item.get("reasoning", {}).get("round") for item in items if isinstance(item.get("reasoning", {}).get("round"), int)})
-        return {**dict(row), "result": _load(row["result_json"], {}), "candidates": [{**item, "product_interruption":product_interruption(item), "release_state": self.release_state(item, peers=items)} for item in items], "rounds": [self._round_summary(items, number) for number in numbers], "evaluation_budget": {"used": sum(sandbox_attempts_used(item) for item in items), "max": MAX_EVALS, 'reserved_for_d': 1}}
+        result = _load(row["result_json"], {})
+        staged = result.get('round_policy', {}).get('stop_rule') == 'staged-v1'
+        return {**dict(row), "result": result, "candidates": [{**item, "product_interruption":product_interruption(item), "release_state": self.release_state(item, peers=items)} for item in items], "rounds": [self._round_summary(items, number) for number in numbers], "evaluation_budget": {"used": sum(sandbox_attempts_used(item) for item in items), "max": MAX_EVALS, 'reserved_for_d': 0 if staged else 1}}
 
     def latest_experiment(self):
         with self.connection() as connection:

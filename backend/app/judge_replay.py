@@ -2,6 +2,7 @@
 import json
 from .diagnostic_evidence import digest
 from .evaluation_contract import evaluation_identity,VERSIONS
+from .policy import DEFAULT_PIPELINE_CONFIG
 
 
 def resolve_question_ids(snapshot, requested=None):
@@ -45,7 +46,7 @@ def saved_selection_error(trace,chunks):
     import math
     from .knowledge_pipeline import expand_parents
     config=trace.get('config') or {};hits=trace.get('reranked')
-    top_k=config.get('top_k');minimum=config.get('min_score',0)
+    top_k=config.get('top_k');minimum=config.get('min_score', DEFAULT_PIPELINE_CONFIG['min_score'])
     if type(top_k) is not int or top_k<=0 or type(minimum) not in (int,float) or not math.isfinite(minimum):return 'saved_selection_configuration_unverified'
     if not isinstance(hits,list) or any(not isinstance(e,dict) or type(e.get('score')) not in (int,float) or not math.isfinite(e['score']) for e in hits):return 'saved_rerank_scores_unverified'
     if any(e['score']<minimum for e in hits):return 'saved_rerank_threshold_contradiction'

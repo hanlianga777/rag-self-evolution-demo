@@ -9,14 +9,13 @@
 做法：
   1. 对每道正向题、消融题，用 Baseline 配置走一遍正式回答前的全部检索步骤（AiService.retrieve_context，与正式回答同一条代码），
      看标准证据切块是否全部进了最终交给模型的资料（all_hit）以及第一段标准证据排第几（rank）。
-  2. 再对 Agent 搜索空间里每个检索参数的每个可选值，各改一个参数扫一遍；最后把单参数里收益最大的几个两两组合再扫一遍
-     （Agent 每个方案最多改 2 个参数）。
+  2. 再对 Agent 搜索空间里每个检索参数的每个可选值，各改一个参数扫一遍；最后再扫收益较好的参数组合；供 Agent 使用的组合按本轮参数上限过滤。
   3. 汇总：Baseline 没拿到证据的题 = 检索缺口；其中某个配置能补回来的 = 可修空间。
 
 结论只作参考（用户 2026-11-16 21:26 定）：
-  Bad Case 有生成层、检索层、安全边界层、性能层四类，Agent 会按实际情况选方向（例如调思考档位），不只修检索。
+  Bad Case 有生成层、检索层、安全边界层、性能层四类，Agent 会按实际情况选方向（例如调整回答提示词），不只修检索。
   本扫描只量得出"检索层"的可修空间，所以输出的 GO / NO-GO 只是检索层的参考信号，不作为启动 Baseline 或 Agent 的硬条件。
-  参考口径：可修空间 ≥ --min-fixable（默认 5）道，且至少有一个 ≤2 参数的配置能补回 ≥3 道、同时弄丢的题 ≤1 道 → GO。
+  参考口径：可修空间 ≥ --min-fixable（默认 5）道，且至少有一个符合 Agent 改动上限的配置能补回 ≥3 道、同时弄丢的题 ≤1 道 → GO。
 
 PYTHONPATH=backend python3 backend/scripts/retrieval_headroom.py --csv 指挥/报告/049-新题卷定稿.csv --output 指挥/报告/050-检索可修空间.csv
   --smoke：只扫 3 道题 × 2 个配置，先确认能跑通（几乎不花钱）。
@@ -27,6 +26,9 @@ import io
 import json
 import os
 from itertools import combinations
+from statistics import median_low
+
+from app import rules
 from pathlib import Path
 
 RETRIEVAL_KEYS = ('candidate_k', 'top_k', 'min_score', 'hybrid_search', 'hybrid_alpha', 'rerank',
@@ -53,19 +55,6 @@ def golden_questions(csv_bytes):
         items.append({'qid': row['题号'].strip(), 'group': row['题型'].strip(), 'method': row.get('出题方式', '').strip(),
                       'question': row['问题'].strip(), 'golden': ids, 'quotes': quotes})
     return items
-
-
-RECALL_PAIR_PARTNERS = [('candidate_k', 24), ('multi_query', 4), ('query_decompose', True), ('hyde', True), ('query_rewrite', True), ('min_score', 0.2)]
-
-
-WIDE_COMBOS = [
-    {'top_k': 6, 'candidate_k': 24, 'min_score': 0.2},
-    {'top_k': 6, 'candidate_k': 24, 'min_score': 0},
-    {'top_k': 6, 'candidate_k': 24, 'min_score': 0.2, 'query_decompose': True},
-    {'top_k': 6, 'candidate_k': 24, 'min_score': 0.2, 'multi_query': 4},
-    {'top_k': 6, 'candidate_k': 24, 'min_score': 0.2, 'hyde': True},
-    {'top_k': 6, 'candidate_k': 24, 'min_score': 0.2, 'query_rewrite': True},
-]
 
 
 def single_variants(baseline, space):
@@ -129,9 +118,10 @@ def summarize(results, *, min_fixable=5, min_single=3, max_lost=1):
         rows.append({'config': name, 'n_params': len(data['change']), 'fixed': fixed, 'lost': lost, 'net': len(fixed) - len(lost)})
     rows.sort(key=lambda r: (-r['net'], r['n_params'], r['config']))
     fixable = sorted({q for r in rows for q in r['fixed']})
-    strong = [r for r in rows if r['n_params'] <= 2 and len(r['fixed']) >= min_single and len(r['lost']) <= max_lost]
+    limit = rules.AGENT['max_changed_parameters']
+    strong = [r for r in rows if r['n_params'] <= limit and len(r['fixed']) >= min_single and len(r['lost']) <= max_lost]
     verdict = 'GO' if len(fixable) >= min_fixable and strong else 'NO-GO'
-    return {'verdict': verdict, 'note': '仅检索层参考信号，不作为启动条件', 'rule': f'可修空间≥{min_fixable} 且存在 ≤2 参数配置补回≥{min_single}、弄丢≤{max_lost}',
+    return {'verdict': verdict, 'note': '仅检索层参考信号，不作为启动条件', 'rule': f'可修空间≥{min_fixable} 且存在 ≤{limit} 参数配置补回≥{min_single}、弄丢≤{max_lost}',
             'baseline_gap': gap, 'fixable': fixable, 'unfixable_gap': sorted(set(gap) - set(fixable)),
             'best_configs': rows[:8], 'strong_configs': [r['config'] for r in strong]}
 
@@ -154,8 +144,9 @@ def build_preview(baseline_run_id, items, results):
     只检索、不生成、不判分，结果确定；它只说明检索层，生成和判分仍要在 Sandbox 里验证。"""
     base = results['baseline']['hits']
     configs = []
+    limit = rules.AGENT['max_changed_parameters']
     for name, data in results.items():
-        if name == 'baseline':
+        if name == 'baseline' or len(data['change']) > limit:
             continue
         hits = data['hits']
         enters = sorted(q for q, h in base.items() if not h['all_hit'] and hits[q]['all_hit'])
@@ -197,8 +188,10 @@ def main(argv=None):
     def retrieve(question, config):
         return ai_service.retrieve_context(question, {**config, 'knowledge_identity': identity})[0]
 
+    space = ALLOWED_SEARCH_SPACE
+    wide_k = max(space['candidate_k'])
     if args.smoke:
-        items, variants = items[:3], [{'candidate_k': 24}]
+        items, variants = items[:3], [{'candidate_k': wide_k}]
         return {'smoke': True, 'knowledge_identity': identity, 'index_chunks': len(ai_service.corpus.chunks()), 'baseline_config': baseline, 'results': scan(items, baseline, variants, retrieve)}
     singles = single_variants(baseline, ALLOWED_SEARCH_SPACE)
     results = scan(items, baseline, singles, retrieve)
@@ -212,15 +205,22 @@ def main(argv=None):
     # 所以 candidate_k / multi_query / 问题拆解 / HyDE 单独看永远是 0，不会进入上面的两两组合。
     # 固定补扫"Top-K 放到最大 + 一个召回类参数"（Colin A 轮就是 candidate_k 24 + top_k 6），让扫描和给 Agent 的预演都看得到。
     widest = max(ALLOWED_SEARCH_SPACE.get('top_k', (baseline.get('top_k'),)))
+    middle_score = median_low(space['min_score'])
+    partners = [('candidate_k', wide_k),
+                ('multi_query', median_low([v for v in space['multi_query'] if type(v) is int])),
+                ('query_decompose', True), ('hyde', True), ('query_rewrite', True), ('min_score', middle_score)]
     if widest != baseline.get('top_k'):
-        for key, value in RECALL_PAIR_PARTNERS:
+        for key, value in partners:
             if value in ALLOWED_SEARCH_SPACE.get(key, ()) and value != baseline.get(key):
                 change = {'top_k': widest, key: value}
                 if change not in pairs:
                     pairs.append(change)
     # 2026-11-19（085 审核）：Top-K=6 + 单个召回参数仍补不回"一次问全"题——第 5 个父块的子块要么不在 12 个候选里，要么重排分低于 0.4。
     # 朋友的 A 轮一次改 2～5 个参数（扣子 A/B/C 改 4～5 个），所以再固定补扫几组"整体放宽检索"的三四参数组合。
-    for extra in WIDE_COMBOS:
+    widest_config = {'top_k': widest, 'candidate_k': wide_k, 'min_score': middle_score}
+    wide_combos = [widest_config, {**widest_config, 'min_score': min(space['min_score'])},
+                   *({**widest_config, key: value} for key, value in partners[1:-1])]
+    for extra in wide_combos:
         change = {k: v for k, v in extra.items() if v in ALLOWED_SEARCH_SPACE.get(k, ()) and v != baseline.get(k)}
         if len(change) >= 3 and change not in pairs:
             pairs.append(change)

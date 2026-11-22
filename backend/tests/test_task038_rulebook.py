@@ -2,7 +2,7 @@
 import unittest
 import pytest
 
-from app import policy
+from app import policy, rules
 from app.policy import (qualify_candidate, qualify_release, protected_question, validate_candidate_config,
                         select_final_candidate, DEFAULT_PIPELINE_CONFIG,
                         ALLOWED_SEARCH_SPACE)
@@ -28,9 +28,9 @@ def base_config():
 # ---------- 一、二：搜索空间与固定参数 ----------
 
 def test_defaults_are_strict_and_off():
-    assert DEFAULT_PIPELINE_CONFIG["prompt_strategy"] == "Strict"
-    assert DEFAULT_PIPELINE_CONFIG["generation_thinking"] == "off"
-    assert ALLOWED_SEARCH_SPACE["prompt_strategy"] == ("Strict", "Looser", "Safe", "Stepwise", "Grounded", "TableCheck")
+    assert DEFAULT_PIPELINE_CONFIG["prompt_strategy"] == rules.BASELINE["prompt_strategy"]
+    assert DEFAULT_PIPELINE_CONFIG["generation_thinking"] == rules.BASELINE["generation_thinking"]
+    assert ALLOWED_SEARCH_SPACE["prompt_strategy"] == rules.PIPELINE_VALUES["prompt_strategy"]
     assert ALLOWED_SEARCH_SPACE["generation_thinking"] == ("off", "low", "high", "max")
 
 
@@ -78,7 +78,7 @@ def test_2026_11_20b_qualification(new, fixed, complete, qualifies):
     comparison = {**regression(0, len(new)), 'comparison_complete': complete,
                   'new_regression_question_ids': new, 'all_fixed_question_ids': fixed}
     assert qualify_candidate(GATES_OK, comparison, 0, 5, 5)['qualified'] is True
-    result = qualify_candidate(GATES_OK, comparison, 0, 5, 5, rule_version='2026-11-20b')
+    result = qualify_candidate(GATES_OK, comparison, 0, 5, 5, rule_version=rules.QUALIFICATION['version'])
     assert result['rule_version'] == '2026-11-20b'
     assert result['qualified'] is qualifies
 
@@ -174,7 +174,7 @@ def test_max_two_parameters_per_candidate():
     base = base_config()
     too_many = [{"id": "A", "config_diff": {"top_k": 6, "hyde": True, "min_score": 0.1}},
                 {"id": "B", "config_diff": {"candidate_k": 24}}, {"id": "C", "config_diff": {"rerank": False}}]
-    with pytest.raises(ValueError, match="最多改两个参数"):
+    with pytest.raises(ValueError, match=f"最多改 {rules.AGENT['max_changed_parameters']} 个参数"):
         validate_round_contract(too_many, base, [], round_number=1)
 
 

@@ -23,7 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 from .ai_service import AiService
-from . import business_import
+from . import business_import, rules
 from .corpus import CorpusStore, DOCUMENTS_DIR, UPLOADS_DIR, current_manifest
 from .full_text import CORPUS_LOCK
 from .corpus_management import CorpusManager, require_consistent_switch
@@ -36,7 +36,7 @@ from .optimization import OptimizationAgent
 from .diagnostics import diagnostic_view
 from .diagnostic_categories import DIAGNOSTIC_CATEGORIES
 from .product_diagnostics import product_diagnostics
-from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, FIXED_PIPELINE_PARAMETERS, search_space_contract, validate_candidate_config
+from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, FIXED_PIPELINE_PARAMETERS, qualification_description, search_space_contract, validate_candidate_config
 from .telemetry import price_config
 from .providers import DeepSeekProvider, ProviderTimeout, ProviderUnavailable
 from .retrieval import RetrievalUnavailable
@@ -264,7 +264,7 @@ class ExperimentRequest(BaseModel):
     trigger_id: str | None = None
 
 
-class Gate2DelegatedReview(BaseModel):
+class DelegatedGateReview(BaseModel):
     claude: str = Field(min_length=1, max_length=1000)
     gpt: str = Field(min_length=1, max_length=1000)
 
@@ -272,7 +272,11 @@ class Gate2DelegatedReview(BaseModel):
 class RecommendationRequest(BaseModel):
     candidate_id: str = Field(min_length=1, max_length=120)
     actor: str = Field(default="local_user", min_length=1, max_length=80)
-    delegated_review: Gate2DelegatedReview | None = None
+    delegated_review: DelegatedGateReview | None = None
+
+
+class PublishRequest(ReviewRequest):
+    delegated_review: DelegatedGateReview | None = None
 
 
 class AliasRequest(BaseModel):
@@ -316,7 +320,7 @@ def overview(light: bool = False):
     if light:
         knowledge_state = {**knowledge_state, 'index':{key:value for key,value in knowledge_state['index'].items() if key!='coverage'},
             'coverage':{'profile':knowledge_state['coverage']['profile']} if knowledge_state.get('coverage') else None, 'sample_children':[]}
-    return {"generation_profiles": GENERATION_PROFILES, "data_source": "real", "production": production, "dataset": summary, "latest_evaluation": baseline, "knowledge": knowledge_state, **identity, "monitoring": {"events": len(store.monitoring_events()), "pending_triggers": sum(item["status"] == "pending_human_confirm" for item in triggers)}}
+    return {"judge_rules": rules.JUDGE, "generation_profiles": GENERATION_PROFILES, "data_source": "real", "production": production, "dataset": summary, "latest_evaluation": baseline, "knowledge": knowledge_state, **identity, "monitoring": {"events": len(store.monitoring_events()), "pending_triggers": sum(item["status"] == "pending_human_confirm" for item in triggers)}}
 
 
 @app.get("/api/workspace")
@@ -1694,8 +1698,10 @@ def pipeline():
     return {
         **identity,
         "config_draft": draft,
-        "baseline_defaults": {**DEFAULT_PIPELINE_CONFIG,"generation_thinking":ai_service.provider.settings.baseline_thinking},
-        "data_version": hashlib.sha256(json.dumps([identity, draft, active["id"] if active else None, knowledge_state["identity"], knowledge_state["coverage_status"]], sort_keys=True).encode()).hexdigest(),
+        "baseline_defaults": rules.BASELINE,
+        "rules": rules.RULES,
+        "qualification_description": qualification_description(),
+        "data_version": hashlib.sha256(json.dumps([rules.RULES_HASH, identity, draft, active["id"] if active else None, knowledge_state["identity"], knowledge_state["coverage_status"]], sort_keys=True).encode()).hexdigest(),
         "draft_identity": identity,
         "frozen_models": {"generation": ai_service.provider.settings.model, "judge": ai_service.provider.settings.model},
         "draft_stale": bool(draft and draft["identity"] != identity),
@@ -2014,7 +2020,7 @@ def run_candidate(candidate_id: str, payload: PaidActionRequest | None = None):
 
 @app.post("/api/candidates/{candidate_id}/publish", status_code=201, dependencies=[Depends(require_trusted_origin)])
 @evaluation_display
-def publish_candidate(candidate_id: str, payload: ReviewRequest):
+def publish_candidate(candidate_id: str, payload: PublishRequest):
     candidate = store.candidate(candidate_id)
     if candidate:
         experiment = store.experiment(candidate["experiment_id"])
@@ -2023,7 +2029,8 @@ def publish_candidate(candidate_id: str, payload: ReviewRequest):
     if payload.decision != "approved":
         raise HTTPException(status_code=422, detail="确认发布需要明确批准")
     try:
-        return store.publish_candidate(candidate_id, payload.actor)
+        return store.publish_candidate(candidate_id, payload.actor,
+            delegated_review=payload.delegated_review.model_dump() if payload.delegated_review else None)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 

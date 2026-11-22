@@ -1,4 +1,4 @@
-import { pagePurpose, parameterHelp } from "../helpText";
+import { pagePurpose } from "../helpText";
 import { IconLabel, IconTile } from "../ui/icons";
 import { PageShell } from "../components/PageShell";
 import { useEffect, useState } from "react";
@@ -6,7 +6,7 @@ import { errorMessage, postJson } from "../api";
 import { LoadingSkeleton, Badge, Section } from "../components/Primitives";
 import { pipelineCached, pipelineFetch, pipelineIdentity, invalidatePipeline } from "../pipelineCache";
 import { Drawer } from "../components/Dialog";
-import { descriptions, draftDefaults, formatValue, parameterNames, SearchSpaceTable } from "../components/PipelineFields";
+import { formatValue, parameterNames, searchSpaceHelp, SearchSpaceTable } from "../components/PipelineFields";
 
 import { ParamGrid, type ParamGroup } from "../ui/settings/ParamGrid";
 import { ParamChip } from "../ui/Primitives";
@@ -22,14 +22,14 @@ const settingsGroups: Record<string, string[]> = {
 
 export function SettingsPage({ data }: { data: any }) {
   const identity = pipelineIdentity(data);
-  const startDraft = (value: any) => { const start = value?.draft_stale ? value.baseline_config || value.baseline_defaults || value.config : value?.config_draft?.config || value?.baseline_config || value?.baseline_defaults || value?.config; const merged = { ...draftDefaults, ...start }; return Object.fromEntries(Object.keys(value?.search_space || {}).filter(key => merged[key] !== undefined).map(key => [key, merged[key]])); };
+  const startDraft = (value: any) => { const start = value?.draft_stale ? value.baseline_config || value.baseline_defaults || value.config : value?.config_draft?.config || value?.baseline_config || value?.baseline_defaults || value?.config; const merged = { ...value?.baseline_defaults, ...start }; return Object.fromEntries(Object.keys(value?.search_space || {}).filter(key => merged[key] !== undefined).map(key => [key, merged[key]])); };
   const [record, setRecord] = useState<any>(() => ({ identity, value: pipelineCached(identity) }));
   const pipeline = record.identity === identity ? record.value : pipelineCached(identity);
   const [draft, setDraft] = useState<Record<string, any>>(() => startDraft(pipeline));
   const [spaceOpen, setSpaceOpen] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
   useEffect(() => { let cancelled = false; const cached = pipelineCached(identity); setRecord({ identity, value: cached }); setDraft(startDraft(cached)); void pipelineFetch(identity).then(value => { if (!cancelled && (!cached || cached.data_version !== value.data_version)) { setRecord({ identity, value }); setDraft(startDraft(value)); } }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, [identity]);
   const baseline = pipeline?.baseline_config || {};
-  const base = pipeline?.baseline_config || { ...draftDefaults, ...(pipeline?.baseline_defaults || pipeline?.config) };
+  const base = pipeline?.baseline_config || (pipeline?.baseline_defaults || pipeline?.config || {});
   const published = pipeline?.active_version?.provenance === "published";
   const contract = pipeline?.search_space || {};
   const onlineConfig = pipeline?.active_version?.config || pipeline?.config;
@@ -56,19 +56,19 @@ export function SettingsPage({ data }: { data: any }) {
     {error && <p className="error-notice" role="alert">{error}</p>}
     {!pipeline && !error ? <LoadingSkeleton label="正在读取 Pipeline 配置" /> : <>
     <Section title={<IconLabel name="data">技术选型</IconLabel>} action={<Badge>固定</Badge>}><dl className="frozen-facts">{facts.filter(([, value]) => value != null && value !== "").map(([name, value]) => <div key={String(name)}><dt>{name}</dt><dd>{name === "索引" && /FAISS/i.test(String(value)) ? "FAISS 向量索引" : String(value)}</dd></div>)}</dl></Section>
-    <Section title={<IconLabel name="pipeline">Agent 可选参数</IconLabel>} action={<Badge tone="accent">{Object.keys(contract).length} 项可调参数</Badge>}>
+    <Section title={<IconLabel name="pipeline">Agent 可选参数</IconLabel>} action={<Badge tone="accent">{pipeline?.rules?.agent?.tunable?.length ?? Object.keys(contract).length} 项可调参数</Badge>}>
 
       {!pipeline?.baseline_config && <p className="muted">新 Baseline 待评测｜当前配置草稿 以已确认的 Baseline 默认配置作为起点</p>}
       {pipeline?.draft_stale && <p className="error-notice">已保存草稿的基准已变化，请重新核对并保存。</p>}
       <ParamGrid groups={Object.entries(settingsGroups).map(([name, keys], index) => ({
         name, icon: (["target", "data", "layers", "thinking"] as const)[index],
-        items: keys.filter(key => key === "temperature" || contract[key]).map(key => key === "temperature" ? {
-          key, label: parameterNames[key], note: descriptions[key], options: [],
-          value: pipeline?.fixed_parameters?.temperature ?? 0,
-          fixedValue: formatValue(pipeline?.fixed_parameters?.temperature ?? 0),
+        items: keys.filter(key => key === "temperature" ? pipeline?.fixed_parameters?.temperature !== undefined : contract[key]).map(key => key === "temperature" ? {
+          key, label: parameterNames[key], options: [],
+          value: pipeline.fixed_parameters.temperature,
+          fixedValue: formatValue(pipeline.fixed_parameters.temperature),
         } : ({
           key, label: parameterNames[key],
-          note: parameterHelp[key as keyof typeof parameterHelp],
+          note: searchSpaceHelp(key, contract[key]),
           options: contract[key].allowed.filter((value: any) => key !== "top_k" || value <= draft.candidate_k).map((value: any) => ({ value, label: formatValue(value, key) })),
           value: draft[key], baseline: baseline[key], online: published ? onlineConfig?.[key] : undefined,
           disabled: busy || key === "hybrid_alpha" && !draft.hybrid_search, changed: changed.includes(key),

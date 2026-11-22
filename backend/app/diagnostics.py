@@ -463,4 +463,4 @@ def experiment_plan(case, analysis, *, corpus_chunks=None, corpus_fingerprint=No
             'directions': directions, 'observations': [],
             'next_action': 'controlled_sandbox' if directions else 'repair_sources_or_trace',
             'blockers': [] if directions else [analysis['analysis_reason']],
-            'falsification': '同一题卷重新评测，检查 Bad Case 是否修好及11项 Hard Gate 是否通过。'}
+            'falsification': '同一题卷重新评测，检查 Bad Case 是否修好及全部门槛是否通过。'}

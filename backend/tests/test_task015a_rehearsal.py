@@ -8,8 +8,8 @@ from app.optimization_cycle import run_until_qualified
 
 class Stub(LifecycleProvider):
     class Settings(LifecycleProvider.Settings):
-        baseline_thinking='max'
-        judge_thinking='low'
+        # Historical fixture, deliberately unlike the current rule.
+        baseline_thinking, judge_thinking = ('max', 'low')
     settings=Settings()
     def __init__(self): self.calls=[]
     def complete(self, system, prompt, **kwargs):

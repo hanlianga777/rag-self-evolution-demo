@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 from app.diagnostics import diagnostic_view, standard_evidence
-from app.optimization import build_agent_prompt, strategy_case, strategy_candidate, INTERVENTIONS
+from app.optimization import ROUND_LABELS, build_agent_prompt, strategy_case, strategy_candidate, INTERVENTIONS
 from app.policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, MAX_EVALS, search_space_contract
 from app.agent_coverage import plan_coverage
 
@@ -34,7 +34,7 @@ def main():
     for key in ('run_target','knowledge_identity'):base_config.pop(key,None)
     gates=baseline['result']['gates']
     failed=[g for g in gates['gates'] if g.get('passed') is False]
-    system,prompt=build_agent_prompt(rows,base_config,[],failed,list('ABC'))
+    system,prompt=build_agent_prompt(rows,base_config,[],failed,ROUND_LABELS)
     # Evaluate only the old literal prompt expressions with the same saved cases.
     source=subprocess.run(['git','show',f'{OLD_REVISION}:backend/app/optimization.py'],cwd=ROOT,check=True,text=True,capture_output=True).stdout
     tree=ast.parse(source)
@@ -46,7 +46,7 @@ def main():
         'analysis_category':r['diagnostic_view']['analysis_category'],'root_cause_evidence':r['diagnostic_view']['evidence_checks'],
         'diagnostic_view':strategy_case(r)['diagnostic_view']} for r in rows for key in (r['id'],r['question_id'])}
     context={**globals(),'baseline_run_id':RUN,'experiment_id':'示例（未创建实验）',
-        'base_config':base_config,'bad_cases':rows,'prior_candidates':[],'round_number':1,'labels':list('ABC'),
+        'base_config':base_config,'bad_cases':rows,'prior_candidates':[],'round_number':1,'labels':ROUND_LABELS,
         'coverage_obligations':plan_coverage(rows,base_config,[]),'diagnostic_tasks':[
             {'question_id':r['question_id'],'case_id':r['id'],'status':'ready_for_experiment',
              'next_action':'sandbox_full_snapshot','experiment_plan':r['diagnostic_view']['experiment_plan'],
@@ -54,7 +54,7 @@ def main():
         'processing_progress':{'baseline_failed_question_ids':sorted(r['question_id'] for r in rows),
             'verified_configuration_id':None,'fixed_question_ids':[],
             'remaining_question_ids':sorted(r['question_id'] for r in rows),'status':'unfinished'},
-        'gate_results':gates,'failed_gates':failed,'evaluation_budget':{'used':0,'max':12,'reserved_for_d':1},
+        'gate_results':gates,'failed_gates':failed,'evaluation_budget':{'used':0,'max':MAX_EVALS,'reserved_for_d':1},
         'target_reference_map':target_reference_map,'monitoring_context':None,'monitoring_target_event_ids':[],
         'self':SimpleNamespace(store=SimpleNamespace(candidates=lambda:[]))}
     old_prompt=eval(compile(ast.Expression(old_prompt_node),'<old-prompt>','eval'),context)

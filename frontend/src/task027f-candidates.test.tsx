@@ -93,6 +93,15 @@ it('shows the reassessed qualification beside the original result',async()=>{
  expect(b?.querySelector('.candidate-card-header .badge')?.textContent).toBe('不合格 · 无修复');
  expect(b?.querySelector('.qualification-versions')?.textContent).toContain('旧规则版本：合格');
 });
+it('renders the current qualification contract returned by the API', async () => {
+ const qualificationDescription = '门槛全部通过，最多新增 4 道，至少修好 6 道';
+ vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(
+   url.endsWith('/api/pipeline') ? {qualification_description: qualificationDescription} : {},
+ ))));
+ await mount();
+ await click('回归与推荐');
+ expect(document.querySelector('.regression-limit-note')?.textContent).toContain(qualificationDescription);
+});
 it('027f2 explains regression limits alongside every failed Hard Gate',async()=>{
  const ordinary=data.optimization.candidates.find((c:any)=>c.reasoning.round===2 && c.reasoning.candidate_label==='A');
  const mixed=data.optimization.candidates.find((c:any)=>c.reasoning.round===1 && c.reasoning.candidate_label==='C');

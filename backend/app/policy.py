@@ -10,7 +10,7 @@ from . import rules
 
 
 MAX_EVALS = rules.AGENT['budget']
-FRIEND_BASELINE_CONFIG = {**rules.BASELINE, 'retrieval_max_tokens': rules.BASELINE_CONTEXT_LIMIT}
+FRIEND_BASELINE_CONFIG = rules.BASELINE.copy()
 # The default Pipeline comparison remains unfiltered until an explicit score floor is selected.
 DEFAULT_PIPELINE_CONFIG = {**FRIEND_BASELINE_CONFIG, 'min_score': rules.PIPELINE_VALUES['min_score'][0]}
 DEFAULT_PIPELINE_CONFIG.pop('temperature')
@@ -26,7 +26,7 @@ GATE_DEFINITIONS = (
     {'metric': 'latency_p99_seconds', 'operator': '<=', 'threshold': rules.GATES['p99_seconds']},
 )
 
-QUALITY_METRICS = tuple(gate["metric"] for gate in GATE_DEFINITIONS[:9])
+QUALITY_METRICS = tuple(gate["metric"] for gate in GATE_DEFINITIONS if gate['operator'] == '>=')
 ALLOWED_SEARCH_SPACE = rules.PIPELINE_VALUES
 FIXED_PIPELINE_PARAMETERS = {'temperature': rules.BASELINE['temperature']}
 
@@ -38,25 +38,29 @@ EXCLUDED_AUTOMATIC_PARAMETERS = frozenset({
 # Descriptions follow ALLOWED_SEARCH_SPACE order; values remain validator-owned.
 PARAMETER_EXPLANATIONS = {
     'query_decompose': ('把一句话里问了两三件事的问题拆成几个子问题，分别去查资料再合起来交给模型。适合答案分散在不同章节的题，但多一次模型调用、稍慢。', ['关闭', '开启（拆成子问题分别检索）']),
-    'prompt_strategy': ('交给模型的回答提示词。各档以 Strict 的分级回答为底，解决不同回答问题。', [
-        'Strict（Baseline 分级回答）',
-        'Looser（有据直接答、答全要点，减少过度拒答）',
-        'Safe（安全结论在前、拒绝绕过和注入，型号或状态不明先追问）',
-        'Stepwise（逐个子问检查答案和证据，避免漏答，保持 Strict 的拒答标准）',
-        'Grounded（按当前资料说明缺失内容，避免错误否定和套话结尾）',
-        'TableCheck（按表头逐行核对，避免表格归类和计数错误）',
+    'prompt_strategy': ('交给模型的回答提示词。各档以 Baseline 的分级回答为底，解决不同回答问题。', [
+        'Baseline 分级回答',
+        '有据直接答、答全要点，减少过度拒答',
+        '安全结论在前、拒绝绕过和注入，型号或状态不明先追问',
+        '逐个子问检查答案和证据，避免漏答，保持分级回答的拒答标准',
+        '按当前资料说明缺失内容，避免错误否定和套话结尾',
+        '按表头逐行核对，避免表格归类和计数错误',
     ]),
-    'candidate_k': ('第一轮查找时先捞回多少段资料，留给后面排序挑选。捞得多不容易漏掉关键证据，但排序更费时。', ['12（常规范围）', '24（范围加倍，适合证据分散在多处的题）']),
-    'top_k': ('排序后真正交给模型写回答的资料段数。给得多要点更全，但模型要读得更多、回答更慢，也更容易被无关内容干扰。', ['4（精简）', '6（更全，稍慢）']),
-    'min_score': ('相关分低于这条线的资料直接丢掉，不交给模型。线越高资料越干净，但也可能把有用的证据一起筛掉。', ['0（不筛）', '0.1（只去掉明显无关的）', '0.2（适度筛选）', '0.3（筛得较严）', '0.4（最严）']),
+    'candidate_k': ('第一轮查找时先捞回多少段资料，留给后面排序挑选。捞得多不容易漏掉关键证据，但排序更费时。', ['常规范围', '扩大范围，适合证据分散在多处的题']),
+    'top_k': ('排序后真正交给模型写回答的资料段数。给得多要点更全，但模型要读得更多、回答更慢，也更容易被无关内容干扰。', ['精简', '更全，稍慢']),
+    'min_score': ('相关分低于这条线的资料直接丢掉，不交给模型。线越高资料越干净，但也可能把有用的证据一起筛掉。', ['不筛', '只去掉明显无关的', '适度筛选', '筛得较严', '最严']),
     'hybrid_search': ('同时用两种方式找资料：语义检索（意思相近就能找到）和关键词检索（字面一致才能找到），再把两边的分数合起来。', ['开（两种一起用）', '关（只用语义检索）']),
-    'hybrid_alpha': ('混合检索时语义检索分数占多大比重，其余归关键词检索。只在混合检索开启时有效。', ['0.3（更看重关键词原文，适合型号、错误码这类精确词）', '0.5（两者各半）', '0.7（更看重意思相近，适合口语化问法）']),
+    'hybrid_alpha': ('混合检索时语义检索分数占多大比重，其余归关键词检索。只在混合检索开启时有效。', ['更看重关键词原文，适合型号、错误码这类精确词', '两者各半', '更看重意思相近，适合口语化问法']),
     'rerank': ('初步找回资料后，用专门的排序模型逐段判断和问题有多相关，再重新排队。', ['开（用排序模型精排）', '关（保持初步检索的顺序）', '仅原问题（只按用户原话做关键词排序，不调用排序模型）']),
     'query_rewrite': ('检索前先把用户的口语问题改写成更规范的说法再去查。', ['开', '关']),
-    'multi_query': ('从不同角度多生成几种问法，分别检索后合并结果，减少一种问法漏掉证据的情况。', ['关（只用原问题）', '2（多生成几种问法；越多覆盖面越广，也越慢）', '4（多生成几种问法；越多覆盖面越广，也越慢）', '6（多生成几种问法；越多覆盖面越广，也越慢）']),
+    'multi_query': ('从不同角度多生成几种问法，分别检索后合并结果，减少一种问法漏掉证据的情况。', ['关（只用原问题）', '多生成几种问法；越多覆盖面越广，也越慢', '多生成几种问法；越多覆盖面越广，也越慢', '多生成几种问法；越多覆盖面越广，也越慢']),
     'hyde': ('先让模型写一段"可能的答案"，再拿这段话去检索。它和说明书原文的写法更接近，有时比直接用问题检索更容易找到证据。', ['开', '关']),
-    'generation_thinking': ('Baseline 关闭思考，Agent 不调这一项', ['Off（不思考，最快）', 'Low（略想）', 'High（多想）', 'Max（想得最久，最慢）']),
-    'retrieval_max_tokens': ('交给模型的资料最多多长，超出部分截掉。', ['不限', '8192（较宽松）', '4096（较紧，回答更快，但可能截掉证据）']),
+    'generation_thinking': (
+        f"Baseline 思考档位为 {rules.BASELINE['generation_thinking']}，"
+        + ('Agent 不调这一项' if rules.AGENT['thinking_locked'] else 'Agent 可调整'),
+        ['不思考，最快', '略想', '多想', '想得最久，最慢'],
+    ),
+    'retrieval_max_tokens': ('交给模型的资料最多多长，超出部分截掉。', ['不限', '较宽松', '较紧，回答更快，但可能截掉证据']),
 }
 
 
@@ -93,10 +97,11 @@ def evaluate_gates(metrics: dict) -> dict:
 
 def evaluate_regression(*, new_critical_failures: int, new_ordinary_failures: int) -> dict:
     valid = all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in (new_critical_failures, new_ordinary_failures))
-    # 规则总表五.5（用户 2026-11-18 改回朋友口径）：逐题不退步只管严重题；普通题新增只记录，不设上限。
-    checks = {"critical": valid and new_critical_failures == 0}
+    critical_limit = rules.QUALIFICATION['max_new_critical']
+    # Regression records both counts. Current qualification also requires the full comparison.
+    checks = {"critical": valid and new_critical_failures <= critical_limit}
     passed = all(checks.values())
-    return {"passed": passed, "status": "PASS" if passed else ("NOT_EVALUABLE" if not valid else "FAIL"), "new_critical_failures": new_critical_failures, "new_ordinary_failures": new_ordinary_failures, "limits": {"critical": 0, "ordinary": None}, "checks": checks}
+    return {"passed": passed, "status": "PASS" if passed else ("NOT_EVALUABLE" if not valid else "FAIL"), "new_critical_failures": new_critical_failures, "new_ordinary_failures": new_ordinary_failures, "limits": {"critical": critical_limit, "ordinary": None}, "checks": checks}
 
 
 def protected_question(case, golden=None):
@@ -108,13 +113,17 @@ def protected_question(case, golden=None):
 
 
 
-CANDIDATE_QUALIFICATION_VERSION = rules.RULES_VERSION
+CANDIDATE_QUALIFICATION_VERSION = rules.QUALIFICATION['version']
+
+
+def qualification_description():
+    rule = rules.QUALIFICATION
+    return (f"{len(GATE_DEFINITIONS)} 项门槛全过，新增严重错题不超过 {rule['max_new_critical']} 道，"
+            f"相对 Baseline 新错不超过 {rule['max_new_failures']} 道，至少修好 {rule['min_fixed']} 道")
 
 
 def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int, baseline_bad_case_count: int, candidate_bad_case_count: int, *, rule_version: str | None = None) -> dict:
     counts_valid = all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in (target_bad_cases_fixed, baseline_bad_case_count, candidate_bad_case_count))
-    # 规则总表五.5（用户 2026-11-18 改回朋友口径）：11 项门槛全过 + 新增严重题 0 即合格。
-    # 错题总数、普通新增题只作记录和排序依据，不作资格条件（朋友按门槛平均分判合格，单题翻转不改变资格）。
     checks = {
         "hard_gates": gates.get("passed") is True,
         "regression": regression.get("passed") is True,
@@ -122,9 +131,10 @@ def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int
     version = {}
     if rule_version == CANDIDATE_QUALIFICATION_VERSION:
         fixed = regression.get('all_fixed_question_ids')
+        new = regression.get('new_regression_question_ids')
         checks.update(comparison_complete=regression.get('comparison_complete') is True,
-                      zero_new_failures=regression.get('new_regression_question_ids') == [],
-                      at_least_one_fixed=isinstance(fixed, list) and bool(fixed))
+                      zero_new_failures=isinstance(new, list) and len(new) <= rules.QUALIFICATION['max_new_failures'],
+                      at_least_one_fixed=isinstance(fixed, list) and len(fixed) >= rules.QUALIFICATION['min_fixed'])
         version['rule_version'] = rule_version
     qualified = all(checks.values())
     return {**version, "qualified": qualified, "status": "QUALIFIED" if qualified else "NOT_QUALIFIED", "checks": checks,
@@ -133,10 +143,24 @@ def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int
 
 
 def qualify_release(gates: dict, regression: dict, fixed_count: int, baseline_bad_case_count=None, candidate_bad_case_count=None) -> dict:
-    """Release uses the same single rule as candidates (规则总表五.5，2026-11-18 朋友口径)."""
+    """Legacy qualification for records outside the current Agent round contract."""
     checks = {"hard_gates": gates.get("passed") is True,
-              "regression": regression.get("passed") is True and regression.get("new_critical_failures") == 0}
+              "regression": regression.get("passed") is True and regression.get("new_critical_failures") is not None
+              and regression['new_critical_failures'] <= rules.QUALIFICATION['max_new_critical']}
     return {"qualified": all(checks.values()), "checks": checks}
+
+
+def delegated_gate_audit(gate, actor, reviews, *, current_experiment):
+    rule = rules.AUTHORIZATION[gate]
+    if reviews is None and actor != rule['executed_by']:
+        return {}
+    if (not rule['delegated'] or not current_experiment or actor != rule['executed_by']
+            or not isinstance(reviews, dict) or set(reviews) != set(rule['reviewers'])
+            or any(not isinstance(ref, str) or not ref.strip() for ref in reviews.values())):
+        raise ValueError(f"Gate {gate[-1]} 代行需要总指挥提供双审均通过的依据")
+    return {key: rule[key] for key in ('authorizer', 'executed_by', 'review_method')} | {
+        'review_evidence': {key: value.strip() for key, value in reviews.items()},
+    }
 
 
 def composite_source_eligible(candidate: dict, identity: str) -> bool:
@@ -177,23 +201,6 @@ def candidate_rank(candidate):
     return (bad if type(bad) is int and bad >= 0 else float('inf'), len(new_failure_ids(result)),
             latency if type(latency) in (int,float) else float('inf'),
             len(candidate.get('reasoning', {}).get('changed_parameters_vs_baseline', candidate.get('reasoning', {}).get('changed_parameters', {}))), candidate['id'])
-
-
-def d_improves_winner(final_candidate, winner):
-    d, w = final_candidate.get('result', {}), winner.get('result', {})
-    d_bad, w_bad = d.get('bad_case_count'), w.get('bad_case_count')
-    if type(d_bad) is not int or type(w_bad) is not int:
-        return False
-    if d_bad < w_bad:
-        return True
-    def p99(result):
-        return result.get('metrics', {}).get('latency_p99_seconds', result.get('latency_p99_seconds'))
-    def cost(result):
-        return result.get('estimated_cost') or result.get('metrics', {}).get('estimated_cost') or {}
-    dc, wc = cost(d), cost(w)
-    return bool(d_bad == w_bad and all(type(v) in (int,float) for v in (p99(d),p99(w),dc.get('amount'),wc.get('amount')))
-                and dc.get('currency') and dc.get('currency') == wc.get('currency')
-                and p99(d) < p99(w) and dc['amount'] < wc['amount'])
 
 
 def select_final_candidate(candidates: list[dict], final_candidate: dict | None = None) -> dict:

@@ -4,7 +4,7 @@ import threading
 from datetime import datetime, timezone
 
 from .paid_schedule import _settings, _write, unattended_authorization
-from .policy import DEFAULT_PIPELINE_CONFIG
+from .policy import DEFAULT_PIPELINE_CONFIG, MAX_EVALS
 
 KEY = 'baseline_agent_chain'
 _lock = threading.Lock()
@@ -53,7 +53,7 @@ def arm_chain(store, baseline_id, *, round_policy=None, paid_run=None, causal_ev
     if not run or run['config'].get('run_target') != 'baseline':
         raise ValueError('串联只能绑定显式Baseline')
     state = {'baseline_id':baseline_id, 'snapshot_id':run['dataset_version_id'], 'status':'waiting_baseline', 'designated':False,
-             'actor':'用户', 'audit_note':audit_note, 'authorized_at':datetime.now(timezone.utc).isoformat(), 'budget':12}
+             'actor':'用户', 'audit_note':audit_note, 'authorized_at':datetime.now(timezone.utc).isoformat(), 'budget':MAX_EVALS}
     if round_policy: state['round_policy'] = round_policy
     if paid_run: state['paid_run'] = paid_run
     if causal_evidence: state['causal_evidence'] = True

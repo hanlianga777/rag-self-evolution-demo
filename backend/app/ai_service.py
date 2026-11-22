@@ -76,8 +76,8 @@ STEPWISE_STRATEGY = STRICT_STRATEGY + "子问自检（不放宽拒答标准）�
 GROUNDED_STRATEGY = STRICT_STRATEGY + "资料边界：你看到的只是检索出来的部分资料，不是整本说明书，所以不要说'说明书里没有''手册没有提到'，只能说'当前提供的资料里没有找到……'；只对用户实际问到、而资料里确实找不到的内容这样说明，用户没问的内容不要追加'没有提到'之类的句子；资料里已经给出的数值、步骤和条件不得说成没有，参考值要照原样说明是参考值及其使用条件；证据里写了'参见第X页'但对应内容不在资料里时，说明资料未包含该部分内容，并给出所指的章节或页码。"
 TABLECHECK_STRATEGY = STRICT_STRATEGY + "表格核对：问题涉及表格、维护周期、清单、数量统计或对比时，先把资料表格中与问题相关的每一行按'项目=对应列的值'逐行核对，判断归类时以表头列名为准（例如周期列写的是36个月就不能算进12个月），核对完再统计数量、给出清单；不确定某行属于哪一类时如实说明，不要猜。"
 PROMPT_STRATEGIES = {
-    "Strict": STRICT_STRATEGY, "Looser": LOOSER_STRATEGY, "Safe": SAFE_STRATEGY,
-    "Stepwise": STEPWISE_STRATEGY, "Grounded": GROUNDED_STRATEGY, "TableCheck": TABLECHECK_STRATEGY,
+    rules.STRICT: STRICT_STRATEGY, rules.LOOSER: LOOSER_STRATEGY, rules.SAFE: SAFE_STRATEGY,
+    rules.STEPWISE: STEPWISE_STRATEGY, rules.GROUNDED: GROUNDED_STRATEGY, rules.TABLE_CHECK: TABLECHECK_STRATEGY,
 }
 NUMBERED_PROMPT_VERSIONS = frozenset({"generation-vnext-3", "generation-vnext-4"})
 
@@ -108,7 +108,7 @@ def generation_system_prompt(version, strategy):
             "Abstention": "证据不足、风险不明或问题应拒答时，明确拒答或要求澄清；不得补造事实。",
             "Tiered": STRICT_STRATEGY,
             **PROMPT_STRATEGIES,
-        }[strategy or "Strict"]
+        }[strategy or rules.BASELINE["prompt_strategy"]]
     boundary = generation_boundary(version)
     if strategy == "Grounded" and version == "generation-vnext-4":
         boundary += "\n说明资料中缺少什么、是否给出所指章节或页码时，以具体回答策略中的资料边界规则为准。"
@@ -253,7 +253,7 @@ class AiService:
                 if 'final' in trace:trace['final']=evidence
         from .context_budget import budget_context
         with measure(stages, "context_budget"):
-            evidence, context_budget = budget_context(evidence, config.get('retrieval_max_tokens', False), numbered=self.generation_prompt_version in NUMBERED_PROMPT_VERSIONS)
+            evidence, context_budget = budget_context(evidence, config.get('retrieval_max_tokens', rules.BASELINE['retrieval_max_tokens']), numbered=self.generation_prompt_version in NUMBERED_PROMPT_VERSIONS)
         trace['context_budget'] = context_budget
         if 'final' in trace: trace['final'] = evidence
         return evidence, context_budget, stages, trace, auxiliary_usage
@@ -314,7 +314,7 @@ class AiService:
             with thinking_task('hyde'):
                 queries.append(self.provider.complete("生成仅用于检索的假设性文档摘要，不作为事实或答案。", question).strip())
             labels.append('hyde')
-        if config.get('query_decompose', False):
+        if config.get('query_decompose', rules.BASELINE['query_decompose']):
             from .retrieval import prepare_decomposed_queries
             with measure(stages, 'query_decompose', parent='query_processing'):
                 subqueries, decomposition = prepare_decomposed_queries(question, self.decompose_query(question))
@@ -355,7 +355,7 @@ class AiService:
                 else:
                     usage.extend(one.get('token_usage') or []); recovery.extend(one.get('response_recovery') or [])
                 samples.append(one)
-            # 2026-11-18：单次 Judge 的 estimated_cost 是费用报告字典，不能直接 sum；按三次的真实用量合并重算一次
+            # 2026-11-18：单次 Judge 的 estimated_cost 是费用报告字典，不能直接 sum；按各次的真实用量合并重算
             result = {**aggregate_samples(category, samples), 'stages': [s for one in samples for s in (one.get('stages') or [])],
                       'token_usage': usage, 'response_recovery': recovery,
                       **(cost_fields(self.model, usage) if usage else {'estimated_cost': 0})}
@@ -1136,7 +1136,7 @@ class AiService:
         return validate_golden_candidate(candidate, chunks, validation_context={'seen': seen})
 
     def baseline_preview(self, question: str, *, on_token=None) -> dict:
-        production = self.store.active_production() or {"id": "baseline-v1", "config": {"top_k": 4, "min_score": None}}
+        production = self.store.active_production() or {"id": "baseline-v1", "config": {"top_k": rules.BASELINE["top_k"], "min_score": None}}
         config = {**production["config"], **({"knowledge_identity": production.get("snapshot", {})["knowledge_identity"]} if production.get("snapshot", {}).get("knowledge_identity") else {})}
         result = self.answer(question, config, **({"on_token": on_token} if on_token else {}))
         fingerprint = result.get("corpus_fingerprint")

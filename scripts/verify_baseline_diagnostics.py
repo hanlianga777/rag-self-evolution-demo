@@ -37,7 +37,9 @@ def verify(database):
         assert not policy_current(judge), 'V4 history must remain separate from V5'
         assert judge['evaluation_identity']=='d18aab6365a63c6de63e295866a7036e0fe6a25f1f74c2afbb4782bbab73ae3e'
         assert hashlib.sha256(GENERATION_BOUNDARY.encode()).hexdigest()==judge['generation_boundary_sha256']
-        assert len(GATE_DEFINITIONS)==11 and ALLOWED_SEARCH_SPACE['top_k']==(4,6)
+        from app import rules
+        assert len(GATE_DEFINITIONS) == sum(len(v) if isinstance(v, list) else 1 for v in rules.GATES.values())
+        assert ALLOWED_SEARCH_SPACE['top_k'] == rules.PIPELINE_VALUES['top_k']
         expected={3:'Ranking',4:'Ranking',6:'Ranking',7:'Retrieval',8:'Ranking',17:'Retrieval',24:'Retrieval',27:'Ranking',28:'Retrieval',29:'Retrieval'}
         diagnoses={};passes=0
         for row in raw_cases:

@@ -9,6 +9,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))
 from app.governance import GovernanceStore
+from app.rules import LEGACY_031E_ROUND_LIMIT
 
 EXPERIMENT = 'EXP-20261114175011989842'
 REASON = '继续完成三轮优化，用户 2026-11-14 预先授权'
@@ -51,7 +52,7 @@ def migrate(store):
             if 'skip' in saved:
                 saved.setdefault('skip_history',[]).append(saved.pop('skip'))
             db.execute("UPDATE candidate_configs SET status='generated',result_json=? WHERE id=?", (json.dumps(saved,ensure_ascii=False),cid))
-        result['round_policy'] = {'mode':'full_rounds','max_rounds':3,'set_by':'用户','note':'用户 2026-11-14 预先授权'}
+        result['round_policy'] = {'mode':'full_rounds','max_rounds':LEGACY_031E_ROUND_LIMIT,'set_by':'用户','note':'用户 2026-11-14 预先授权'}
         result['strategy_contract'] = 'agent-strategy-4'
         cycle = result.setdefault('optimization_cycle',{})
         cycle.update(status='ready',phase='analysis',current_round_only=False,last_error=None,updated_at=now)

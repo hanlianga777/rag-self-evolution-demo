@@ -5,6 +5,7 @@ import os
 import threading
 from datetime import datetime, timezone
 
+from . import rules
 from .evaluation import EvaluationRunner
 from .full_text import CORPUS_LOCK
 from .optimization import OptimizationAgent, ProposalValidationExhausted
@@ -49,7 +50,7 @@ def claim_cycle(store, experiment_id, *, current_round_only=False):
                      if c['status']=='failed' and c['result'].get('stop_request') and c['result'].get('evaluation_run_id')],
                  'used':experiment['evaluation_budget']['used'],
                  'remaining':max(0, MAX_EVALS-experiment['evaluation_budget']['used']),
-                 'reserved_for_d':1, 'last_error':None}
+                 'reserved_for_d':experiment['evaluation_budget']['reserved_for_d'], 'last_error':None}
         result = {**experiment['result'], 'optimization_cycle':state}
         from .paid_policy import current_binding
         if current_binding():result['paid_run']=current_binding()
@@ -277,15 +278,15 @@ STAGED_RULE = 'staged-v1'
 
 def staged_decision(round_number, qualified_count, used):
     """规则总表五.6，纯函数，方便单测。返回 'next_round' / 'composite' / 'finish_winner' / 'agent_failed'。"""
-    if round_number >= 1 and qualified_count >= 2:
+    if round_number > 0 and qualified_count >= rules.AGENT['min_qualified_for_fusion']:
         return 'composite' if used < MAX_EVALS else 'finish_winner'
-    if round_number >= 3 and qualified_count == 1:
+    if round_number >= rules.AGENT['single_winner_after_round'] and qualified_count:
         return 'composite' if used < MAX_EVALS else 'finish_winner'
-    if round_number < 3:
+    if round_number < rules.AGENT['single_winner_after_round']:
         return 'next_round' if used < MAX_EVALS else ('finish_winner' if qualified_count else 'agent_failed')
-    if round_number == 3:   # 前 9 个全不合格
+    if round_number < rules.AGENT['max_rounds']:
         return 'next_round' if used < MAX_EVALS else 'agent_failed'
-    return 'agent_failed'   # 第 4 轮结束仍无合格（有合格时已在上面转入 D）
+    return 'agent_failed'   # 已到最后一轮且没有合格方案
 
 
 def _qualified_abc(experiment):
@@ -294,9 +295,7 @@ def _qualified_abc(experiment):
 
 
 def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, runner, agent):
-    """规则总表五.6/五.7 分阶段停止：
-    每轮 3 个跑完再统计；累计合格 ≥2 → D；第 3 轮后只有 1 个合格 → D；前 9 个全不合格 → 第 4 轮，
-    第 4 轮一出现合格就停止本轮剩余方案、用剩余预算做 D；12 个全不合格 → 本次 Agent 优化失败。总预算 12 次含 D。"""
+    """按规则总表六.6/六.7 执行分阶段试跑。"""
     from .agent_strategy import conclude_round
 
     def execute(candidate):
@@ -380,8 +379,8 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                 if not runnable:
                     continue
                 experiment = store.experiment(experiment_id, light=True)
-                if number >= 4 and _qualified_abc(experiment) or experiment['evaluation_budget']['used'] >= MAX_EVALS and candidate['status']=='generated':
-                    store.skip_candidate(candidate['id'], '自动循环', '第4轮已出现合格方案或预算用完，未运行', automatic=True)
+                if number >= rules.AGENT['max_rounds'] and _qualified_abc(experiment) or experiment['evaluation_budget']['used'] >= MAX_EVALS and candidate['status']=='generated':
+                    store.skip_candidate(candidate['id'], '自动循环', '最后一轮已出现合格方案或预算用完，未运行', automatic=True)
                     continue
                 check_cycle_stop(store,experiment_id)
                 finished, stopped = execute(candidate)

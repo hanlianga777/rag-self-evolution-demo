@@ -11,16 +11,18 @@ import json
 import os
 from pathlib import Path
 
-ROUND_POLICY = {'mode': 'full_rounds', 'max_rounds': 4, 'stop_rule': 'staged-v1'}
 AUDIT_NOTE = '用户 2026-11-16 预先授权'
-MIN_BASELINE_BAD_CASES = 5   # 用户 2026-11-16 晚拍板：Baseline 错题达到 5 道才启动 Agent，不分类型；不到就停下汇报
 
 
 def main(argv=None):
+    from app import rules
+    max_hardening = rules.GOLDEN["harden_max_rounds"]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--database', type=Path)
     parser.add_argument('--baseline-id', required=True)
     parser.add_argument('--apply', action='store_true')
+    parser.add_argument('--completed-hardening-rounds', type=int, choices=range(max_hardening + 1), default=0,
+                        help='当前冻结题卷已完成并复跑 Baseline 的受控加难轮数')
     args = parser.parse_args(argv)
     from app.config import load_values
     database = args.database or Path(load_values().get('RAG_DEMO_DB_PATH') or Path(__file__).resolve().parents[1] / 'data/demo.db')
@@ -28,7 +30,9 @@ def main(argv=None):
     os.environ['RAG_SAFE_START'] = '1'
     from app.main import store
     from app.baseline_chain import arm_chain, chain_status
+    from app.optimization_cycle import STAGED_RULE
     from app.paid_schedule import set_unattended_authorization, unattended_authorization
+    round_policy = {'mode': 'full_rounds', 'max_rounds': rules.AGENT['max_rounds'], 'stop_rule': STAGED_RULE}
     run = store.evaluation_run(args.baseline_id, light=True)
     if not run or run['config'].get('run_target') != 'baseline':
         raise ValueError('不是 Baseline 评测')
@@ -36,19 +40,24 @@ def main(argv=None):
     if run['status'] != 'completed' or result.get('evaluation_complete') is not True or result.get('technical_failed') != 0:
         raise ValueError(f"Baseline 未完整结束：status={run['status']} complete={result.get('evaluation_complete')} technical_failed={result.get('technical_failed')}")
     bad_cases = result.get('bad_case_count')
-    if not isinstance(bad_cases, int) or bad_cases < MIN_BASELINE_BAD_CASES:
-        raise ValueError(f'开跑检查未通过：Baseline 错题 {bad_cases} 道，少于 {MIN_BASELINE_BAD_CASES} 道，按用户规则不启动 Agent，先汇报')
+    minimum = rules.LAUNCH['min_bad_cases']
+    if type(bad_cases) is not int:
+        raise ValueError('开跑检查未通过：Baseline 错题数未知')
+    if bad_cases < minimum and args.completed_hardening_rounds < max_hardening:
+        raise ValueError(f'Baseline 错题 {bad_cases} 道，少于 {minimum} 道，按二.7 完成受控加难并重跑 Baseline')
     latest = store.dataset_snapshots()[0]
     snapshot_id = latest.get('id') or latest.get('snapshot_id')
     if run['dataset_version_id'] != snapshot_id:
         raise ValueError(f"Baseline 题卷 {run['dataset_version_id']} 不是最新冻结快照 {snapshot_id}")
-    plan = {'baseline_id': args.baseline_id, 'snapshot_id': snapshot_id, 'round_policy': ROUND_POLICY, 'causal_evidence': True,
+    plan = {'baseline_id': args.baseline_id, 'snapshot_id': snapshot_id, 'round_policy': round_policy, 'baseline_bad_case_count': bad_cases,
+            'completed_hardening_rounds': args.completed_hardening_rounds, 'causal_evidence': True,
             'audit_note': AUDIT_NOTE, 'previous_chain': chain_status(store), 'unattended_authorization': unattended_authorization(store)}
     if not args.apply:
         return {'dry_run': True, **plan}
     if not unattended_authorization(store).get('enabled'):
         set_unattended_authorization(store, True, '用户', audit_note=AUDIT_NOTE)
-    state = arm_chain(store, args.baseline_id, round_policy=ROUND_POLICY, causal_evidence=True, audit_note=AUDIT_NOTE)
+    state = arm_chain(store, args.baseline_id, round_policy=round_policy, causal_evidence=True,
+                      audit_note=f'{AUDIT_NOTE}；Baseline 错题 {bad_cases} 道，已受控加难 {args.completed_hardening_rounds} 轮')
     return {'armed': state, 'unattended_authorization': unattended_authorization(store)}
 
 

@@ -5,6 +5,7 @@ import json
 import re
 import unicodedata
 from .policy import GATE_DEFINITIONS
+from .rules import JUDGE
 from .safety_guard import SAFETY_IDENTITY
 
 # 规则总表第二节：新评测改用朋友同款三维 Rubric Judge（rubric_judge.py）。旧 business-vnext-1 结果只读。
@@ -19,7 +20,7 @@ def policy_current(judge):
 
 
 def evaluation_identity(snapshot, judge):
-    payload = {'golden': snapshot.get('id'), 'corpus': snapshot.get('corpus_fingerprint'), 'versions': {key: judge.get(key) for key in VERSIONS}, 'judge_config': {'model':judge.get('model'), 'temperature':judge.get('temperature',0), 'context':'full_final'}, 'gates': GATE_DEFINITIONS}
+    payload = {'golden': snapshot.get('id'), 'corpus': snapshot.get('corpus_fingerprint'), 'versions': {key: judge.get(key) for key in VERSIONS}, 'judge_config': {'model':judge.get('model'), 'temperature':judge.get('temperature', JUDGE['temperature']), 'context':'full_final'}, 'gates': GATE_DEFINITIONS}
     for key in ('judge_prompt_sha256','generation_prompt_version','generation_boundary_sha256'):
         if key in judge: payload[key]=judge[key]
     # Legacy hashes retain their exact persisted contract; never infer past Thinking.

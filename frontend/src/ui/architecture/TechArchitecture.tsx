@@ -33,7 +33,7 @@ const MODEL_GROUPS: { name: string; items: M[] }[] = [
     { title: "DeepSeek", vendor: "深度求索", icon: "model", line: "改写、假设答案检索、回答", tip: "深度求索（DeepSeek）的对话模型，负责查询改写、假设答案检索、多路查询和最终回答。中文表达好，可以调节思考档位，价格低，适合需要反复评测的场景。" },
   ] },
   { name: "评测模型", items: [
-    { title: "DeepSeek", vendor: "深度求索", icon: "correct", line: "LLM-as-Judge 判分", tip: "LLM-as-Judge：拿每道题的参考答案和检索到的证据原文，对照回答打分（答案正确性、忠实度、完整性；负向题看行为和安全），每题判 3 次取中间值。演示阶段和生成模型同一家族；生产环境建议换成独立模型，并加人工抽检。" },
+    { title: "DeepSeek", vendor: "深度求索", icon: "correct", line: "LLM-as-Judge 判分", tip: "LLM-as-Judge：拿每道题的参考答案和检索到的证据原文，对照回答打分（答案正确性、忠实度、完整性；负向题看行为和安全），按规则汇总判分。演示阶段和生成模型同一家族；生产环境建议换成独立模型，并加人工抽检。" },
   ] },
   { name: "存储", items: [
     { title: "FAISS", vendor: "Meta 开源", icon: "data", line: "向量索引", tip: "Meta 开源的向量检索库，用内积做精确检索；数据量不大时速度快，不需要单独部署服务。" },
@@ -57,7 +57,7 @@ function ParamNode({ x, y, w, h, step }: { x: number; y: number; w: number; h: n
   </g>;
 }
 
-export function TechArchitecture(_: { layers?: unknown } = {}) {
+export function TechArchitecture({ judgeSamples }: { layers?: unknown; judgeSamples?: number } = {}) {
   const pages = ["概览", "知识库", "Golden Dataset", "Pipeline 配置", "Baseline", "Agent 工作台", "发布", "问答验证"];
   const pw = (AW - 7 * 10) / 8;
   const svc = [
@@ -78,7 +78,7 @@ export function TechArchitecture(_: { layers?: unknown } = {}) {
   const kw = (AW - 5 * 26) / 6, kx = (i: number) => X0 + i * (kw + 26);
   const ev = [
     { title: "规则计算", icon: "checks" as IconName, lines: ["Recall@K · Precision@K · MRR", "耗时 · Token 成本"], tip: `Recall@K：${helpText.recall} Precision@K：${helpText.precision} MRR：${helpText.mrr}` },
-    { title: "LLM-as-Judge 判分", icon: "correct" as IconName, lines: ["答对程度 · 要点覆盖", "忠于证据 · 安全"], tip: helpText.judge },
+    { title: "LLM-as-Judge 判分", icon: "correct" as IconName, lines: ["答对程度 · 要点覆盖", "忠于证据 · 安全"], tip: judgeSamples != null ? `每题判 ${judgeSamples} 次。正向与消融按维度取中间分，负向按多数判定。` : "对照参考答案和检索证据判分。" },
     { title: "Hard Gate", icon: "gate" as IconName, lines: ["质量 · 安全 · 速度", "每一项单独过线"], tip: helpText.hard_gate },
   ];
   const ew = (AW - 2 * 14) / 3, ex = (i: number) => X0 + i * (ew + 14);

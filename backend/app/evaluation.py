@@ -91,7 +91,7 @@ def candidate_comparison(baseline, candidate, targets, golden_questions=None):
             'net_improvement': len(fixed) - len(new), 'formal_blocking_question_ids': critical,
             'bad_case_count': sum(c.get('passed') is False for q, c in candidate.items() if q not in fluctuations),
             'initial_bad_case_count': sum(c.get('passed') is False for c in candidate.values()),
-            'regression_interpretation': '按单遍结果计新增 Bad Case；严重题不得新增；普通新增只记录不设上限（2026-11-18 朋友口径）'}
+            'regression_interpretation': '逐题对照同一 Baseline，记录修好、严重新增和普通新增，再按当前资格规则判定。'}
 
 
 def enhancement_summary(cases):
@@ -531,7 +531,8 @@ class EvaluationRunner:
         redline = (not effective_behavior) or bool(claims["confirmed"] or claims["pending"])
         score = round((judge["correctness"] * 25 + judge["completeness"] * 100 + judge["faithfulness"] * 100) / 3, 2)
         failure_tags = []
-        targets = {"positive": {"correctness": .8, "faithfulness": .8, "completeness": .75}, "ablation": {"correctness": .7, "faithfulness": .75, "completeness": .65}}.get(item["test_category"], {})
+        targets = {dimension: threshold / 100 for dimension, threshold in zip(
+            ('correctness', 'faithfulness', 'completeness'), rules.ITEM_THRESHOLDS.get(item["test_category"], ()))}
         if item["test_category"] != "negative":
             if judge["correctness"] / 4 < targets["correctness"] or judge["completeness"] < targets["completeness"]:
                 failure_tags.append("Generation Failure")
@@ -1180,6 +1181,8 @@ class EvaluationRunner:
         if run['status'] != 'completed':
             qualification = {**qualification, 'qualified': False}
         result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], "error": run.get("error_message"), **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "release_qualification": qualify_release(run["result"]["gates"], regression, len(comparison["all_fixed_question_ids"]), len(failed), comparison['bad_case_count']), "recommendation": None}
+        if qualification.get('rule_version') == CANDIDATE_QUALIFICATION_VERSION:
+            result['release_qualification'] = qualification
         result['estimated_cost'] = sandbox_cost(list(candidate_cases.values()))
         no_effect = no_effect_source(candidate, candidate_cases, self.store)
         if no_effect:
@@ -1190,13 +1193,12 @@ class EvaluationRunner:
                                        'blocking_reason': no_effect['reason']}
             result['release_qualification'] = {**result['release_qualification'], 'qualified': False}
         if candidate['reasoning'].get('candidate_label') == 'D':
-            result['release_qualification'] = result['qualification']
             winner = self.store.candidate(candidate['reasoning']['winner_id'])
             winner_cases = {item['question_id']: item for item in self.store.evaluation_case_results(winner['result']['evaluation_run_id'])}
             newly_failed = [key for key, item in winner_cases.items() if item.get('passed') and not candidate_cases.get(key, {}).get('passed')]
             newly_fixed = [key for key, item in winner_cases.items() if not item.get('passed') and candidate_cases.get(key, {}).get('passed')]
-            from .policy import d_improves_winner
-            result['winner_comparison'] = {'winner_id': winner['id'], 'new_failures': newly_failed, 'fixed_cases': newly_fixed, 'promote': run['status'] == 'completed' and result['release_qualification']['qualified'] and d_improves_winner({'result':result},winner)}
+            from .policy import d_regression_vs_winner
+            result['winner_comparison'] = {'winner_id': winner['id'], 'new_failures': newly_failed, 'fixed_cases': newly_fixed, 'promote': run['status'] == 'completed' and result['release_qualification']['qualified'] and not newly_failed and d_regression_vs_winner({'result':result},winner) is None}
         finished = self.store.finish_candidate(candidate["id"], "evaluated" if run['status'] == 'completed' else 'failed', result)
         recommendation = self.store.refresh_recommendation(candidate["experiment_id"])
         return {**finished, "recommendation": recommendation}

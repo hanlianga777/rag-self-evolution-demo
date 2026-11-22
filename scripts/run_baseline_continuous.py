@@ -65,7 +65,7 @@ def execute():
             nonlocal replay_used
             if replay and not replay_used:
                 mode=kwargs.get('json_mode',args[2] if len(args)>2 else False)
-                payload=json.loads(self._request(args[0],args[1],mode,kwargs.get('stream',False),kwargs.get('temperature',.2)).data)
+                payload=json.loads(self._request(args[0],args[1],mode,kwargs.get('stream',False), **{key:kwargs[key] for key in ('temperature',) if key in kwargs}).data)
                 user=json.loads(payload['messages'][1]['content']) if mode else None
                 if isinstance(user,dict) and user.get('question')==replay['question']:
                     assert user['actual_answer']==replay['answer']

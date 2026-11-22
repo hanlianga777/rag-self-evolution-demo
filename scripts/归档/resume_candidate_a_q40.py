@@ -79,7 +79,7 @@ def execute(ledger,audit,run=False):
         used=False
         validation=False
         def complete_with_metrics(self,system,user,json_mode=False,**kwargs):
-            payload=json.loads(self._request(system,user,json_mode,kwargs.get('stream',False),kwargs.get('temperature',.2)).data)
+            payload=json.loads(self._request(system,user,json_mode,kwargs.get('stream',False), **{key:kwargs[key] for key in ('temperature',) if key in kwargs}).data)
             sha=hashlib.sha256(json.dumps(payload,ensure_ascii=False).encode()).hexdigest()
             user_input=json.loads(user) if json_mode else None
             if isinstance(user_input,dict) and user_input.get('question')==item['question']:

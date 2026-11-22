@@ -1,9 +1,10 @@
 """Read-only release checks and signatures from saved evaluation records."""
 import json
 from .corpus import current_manifest, manifest_identity
-from .policy import validate_candidate_config
+from .policy import CANDIDATE_QUALIFICATION_VERSION, validate_candidate_config
+from .rules import QUALIFICATION
 
-LABELS = ['上线门槛全部通过', '回归检查没有严重的新增 Bad Case', '所有参数都在白名单范围内', '配置快照完整', '知识库版本和评测时一致']
+LABELS = ['上线门槛全部通过', '逐题回归满足资格要求', '所有参数都在白名单范围内', '配置快照完整', '知识库版本和评测时一致']
 
 def release_review_view(store, candidate_id=None):
     candidate = store.candidate(candidate_id) if candidate_id else None
@@ -13,10 +14,17 @@ def release_review_view(store, candidate_id=None):
     snapshot = json.loads(run['dataset_snapshot_json']) if run else {}
     regression = result.get('regression', {})
     critical = regression.get('new_critical_failures')
+    qualification = result.get('qualification', {})
+    regression_ok = (critical <= QUALIFICATION['max_new_critical'] if type(critical) is int
+                     else regression.get('checks', {}).get('critical'))
+    if qualification.get('rule_version') == CANDIDATE_QUALIFICATION_VERSION:
+        checks = qualification.get('checks', {})
+        regression_ok = all(checks.get(key) is True for key in
+                            ('regression', 'comparison_complete', 'zero_new_failures', 'at_least_one_fixed'))
     fingerprint = snapshot.get('corpus_fingerprint')
     config = (candidate or {}).get('config')
     checks = [result.get('gates', {}).get('passed'),
-              critical == 0 if isinstance(critical, int) else regression.get('checks', {}).get('critical'),
+              regression_ok,
               validate_candidate_config(config)['valid'] if config else None,
               bool(run['status'] == 'completed' and run.get('config') and snapshot and run.get('judge') and config and all(run['config'].get(key) == value for key, value in config.items())) if run else None,
               fingerprint == manifest_identity(current_manifest()) if fingerprint else None]

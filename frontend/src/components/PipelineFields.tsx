@@ -1,11 +1,17 @@
 import { DataTable } from "./DataTable";
 import { useState } from "react";
-import { displayText, parameterNames, descriptions, pipelineValue } from "../display";
+import { displayText, parameterNames, pipelineValue } from "../display";
 import { TruncatedText } from "./Primitives";
 import { Drawer } from "./Dialog";
 
-export { parameterNames, descriptions } from "../display";
-export const draftDefaults: Record<string, unknown> = { generation_thinking: "off", retrieval_max_tokens: false };
+export { parameterNames } from "../display";
+
+type SearchRule = { type: string; allowed: unknown[]; description?: string; options?: {value: unknown; description: string}[] };
+
+export function searchSpaceHelp(key: string, rule: SearchRule): string {
+  const options = rule.options?.map(option => `${formatValue(option.value, key)}（${option.description}）`).join("／");
+  return [rule.description, options].filter(Boolean).join(" ");
+}
 
 export function thinkingLabel(value: unknown): string {
   if (value && typeof value === "object") {
@@ -21,8 +27,8 @@ export function formatValue(value: unknown, key?: string): string {
   return pipelineValue(value, key) ?? "未采集";
 }
 
-export function SearchSpaceTable({ contract, baseline }: { contract: Record<string, { type: string; allowed: unknown[] }>; baseline: Record<string, unknown> }) {
-  return <div className="table-scroll"><DataTable className="search-space-table"><thead><tr><th>参数</th>{Object.keys(baseline).length > 0 && <th className="parameter-value">当前 Baseline</th>}<th className="parameter-value">允许范围</th><th>依赖关系</th><th>说明</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td className="muted"><TruncatedText lines={2}>{parameterNames[key] || key}</TruncatedText></td>{Object.keys(baseline).length > 0 && <td className="parameter-value muted"><TruncatedText lines={2}>{key === "generation_thinking" ? thinkingLabel(baseline[key]) : formatValue(baseline[key], key)}</TruncatedText></td>}<td className="parameter-value muted"><TruncatedText lines={2}>{rule.allowed.map(value => formatValue(value, key)).join(" / ")}</TruncatedText></td><td className="muted"><TruncatedText lines={2}>{key === "top_k" ? "Candidate K 不能小于 Top-K" : key === "hybrid_alpha" ? "Hybrid Search 已开启" : "—"}</TruncatedText></td><td className="muted"><TruncatedText lines={2}>{descriptions[key] || "—"}</TruncatedText></td></tr>)}</tbody></DataTable></div>;
+export function SearchSpaceTable({ contract, baseline }: { contract: Record<string, SearchRule>; baseline: Record<string, unknown> }) {
+  return <div className="table-scroll"><DataTable className="search-space-table"><thead><tr><th>参数</th>{Object.keys(baseline).length > 0 && <th className="parameter-value">当前 Baseline</th>}<th className="parameter-value">允许范围</th><th>依赖关系</th><th>说明</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td className="muted"><TruncatedText lines={2}>{parameterNames[key] || key}</TruncatedText></td>{Object.keys(baseline).length > 0 && <td className="parameter-value muted"><TruncatedText lines={2}>{key === "generation_thinking" ? thinkingLabel(baseline[key]) : formatValue(baseline[key], key)}</TruncatedText></td>}<td className="parameter-value muted"><TruncatedText lines={2}>{rule.allowed.map(value => formatValue(value, key)).join(" / ")}</TruncatedText></td><td className="muted"><TruncatedText lines={2}>{key === "top_k" ? "Candidate K 不能小于 Top-K" : key === "hybrid_alpha" ? "Hybrid Search 已开启" : "—"}</TruncatedText></td><td className="muted"><TruncatedText lines={2}>{searchSpaceHelp(key, rule) || "—"}</TruncatedText></td></tr>)}</tbody></DataTable></div>;
 }
 
 export const parameterGroups: Record<string, string[]> = { Query: ["query_rewrite", "multi_query", "hyde", "query_decompose", "alias_mapping"], Retrieval: ["candidate_k", "top_k", "min_score", "hybrid_search", "hybrid_alpha", "metadata_filter", "retrieval_max_tokens"], Rerank: ["rerank"], Generation: ["prompt_strategy", "generation_thinking", "temperature"] };

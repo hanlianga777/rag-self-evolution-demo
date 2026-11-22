@@ -33,7 +33,7 @@ CONFIG = {'parser': 'MinerU', 'parser_mode': 'vlm', 'table_normalize': 'table-kv
           'chunk_strategy': 'Parent-Child', 'parent_tokens': 1400, 'child_tokens': 400,
           'overlap_tokens': 80, 'tokenizer_model': EMBEDDING_MODEL,
           'embedding_model': 'text-embedding-v4', 'dimension': 1024,
-          'rerank_model': 'qwen3-rerank', 'candidate_k': 12, 'top_k': 4}
+          'rerank_model': 'qwen3-rerank', 'candidate_k': rules.BASELINE['candidate_k'], 'top_k': rules.BASELINE['top_k']}
 
 
 def digest(value):

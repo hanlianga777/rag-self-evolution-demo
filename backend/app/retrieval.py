@@ -10,7 +10,8 @@ from .telemetry import measure
 from .corpus import EMBEDDING_MODEL, INDEX_DIR, TOP_K, CorpusStore, manifest_identity
 from .evidence_equivalence import bundle_equivalence, group_index, matched_child_ids, stage_matches
 from .full_text import CORPUS_LOCK, validate_bundle, search_full_text
-from .rules import CANDIDATE_DEDUP
+from .rules import BASELINE, CANDIDATE_DEDUP
+from .policy import DEFAULT_PIPELINE_CONFIG
 
 
 class RetrievalUnavailable(RuntimeError):
@@ -296,7 +297,7 @@ class VectorRetriever:
         for alias, canonical in aliases.items():
             rewritten = rewritten.replace(alias, canonical)
         query_list = [rewritten, *(queries or [])]
-        candidate_k = int(config.get("candidate_k", 12))
+        candidate_k = int(config.get("candidate_k", BASELINE["candidate_k"]))
         knowledge = (self._bundle or {}).get('manifest', {}).get('knowledge_identity')
         equivalence = bundle_equivalence(self._bundle) if knowledge and CANDIDATE_DEDUP['enabled'] else None
         raw_k = candidate_k * CANDIDATE_DEDUP['recall_multiplier'] if equivalence else candidate_k
@@ -324,15 +325,15 @@ class VectorRetriever:
             trace['query_sources'] = query_sources
             trace['query_merge'] = {'method': 'max_score_per_chunk_then_shared_fusion_candidate_cap',
                                     'candidate_k': candidate_k, 'rerank_question': question}
-        with measure(stages, "hybrid_fusion" if config.get("hybrid_search", True) else "candidate_selection", "retrieval"):
+        with measure(stages, "hybrid_fusion" if config.get("hybrid_search", BASELINE["hybrid_search"]) else "candidate_selection", "retrieval"):
             candidate_ids = dict.fromkeys((*vector_scores, *bm25_scores))
             vector_normalized = self._normalize({key: vector_scores.get(key, 0.0) for key in candidate_ids})
             bm25_normalized = self._normalize({key: bm25_scores.get(key, 0.0) for key in candidate_ids})
-            alpha = float(config.get("hybrid_alpha", .5))
+            alpha = float(config.get("hybrid_alpha", BASELINE["hybrid_alpha"]))
             ranked = []
             for chunk_id in candidate_ids:
                 vector_score, bm25_score = vector_normalized.get(chunk_id, 0.0), bm25_normalized.get(chunk_id, 0.0)
-                combined = alpha * vector_score + (1 - alpha) * bm25_score if config.get("hybrid_search", True) else vector_score
+                combined = alpha * vector_score + (1 - alpha) * bm25_score if config.get("hybrid_search", BASELINE["hybrid_search"]) else vector_score
                 ranked.append({"chunk_id": chunk_id, "vector_score": vector_score, "bm25_score": bm25_score, "combined": combined})
             if equivalence:
                 # Break exact fusion ties by retrieval signals, then by recall order.
@@ -356,13 +357,13 @@ class VectorRetriever:
             import json
             hits = [self._materialize(by_id[item['chunk_id']], item['combined']) for item in ranked]
             with measure(stages, 'rerank', 'retrieval'):
-                try:reranked = query_only_order(question,hits) if config.get('rerank')=='query_only' else AlibabaProvider().rerank(question, hits) if config.get('rerank', True) else hits
+                try:reranked = query_only_order(question,hits) if config.get('rerank')=='query_only' else AlibabaProvider().rerank(question, hits) if config.get('rerank', BASELINE['rerank']) else hits
                 except Exception as error:raise RetrievalUnavailable('rerank',error) from error
             minimum = config.get('min_score')
             if minimum is not None: reranked = [h for h in reranked if h['score'] >= minimum]
             with measure(stages, 'parent_expand', 'retrieval'):
                 parents = json.loads((self._bundle['path']/'parents.json').read_text())
-                final = expand_parents(reranked, parents, int(config.get('top_k', 4)))
+                final = expand_parents(reranked, parents, int(config.get('top_k', BASELINE['top_k'])))
             if trace is not None:
                 trace.update(status='completed', reranked=reranked, final=final, parent_expand=True)
                 trace['enhancement'] = enhancement_effect(query_sources, (trace or {}).get('query_labels'), ranked, final)
@@ -374,7 +375,7 @@ class VectorRetriever:
             lexical_coverage = len(query_terms & _terms(chunk.get("chunk_text", chunk.get("text", "")))) / max(1, len(query_terms))
             # Keep the fused score in the rerank signal: Alpha must remain observable when rerank is enabled.
             rerank_score = None
-            if config.get("rerank", True):
+            if config.get("rerank", BASELINE["rerank"]):
                 with measure(stages, "rerank", "retrieval"):
                     rerank_score = 0.8 * item["combined"] + 0.2 * lexical_coverage
             final_score = rerank_score if rerank_score is not None else item["combined"]
@@ -382,9 +383,9 @@ class VectorRetriever:
         if config.get("rerank")=="query_only":
             output=query_only_order(question,output)
             output=[{**h,"final_score":h["score"]} for h in output]
-        minimum = float(config.get("min_score", 0))
+        minimum = float(config.get("min_score", DEFAULT_PIPELINE_CONFIG["min_score"]))
         with measure(stages, 'threshold_top_k', 'retrieval'):
-            final = [item for item in sorted(output, key=lambda item: (-item['final_score'], item['chunk_id'])) if item['final_score'] >= minimum][:int(config.get('top_k', 4))]
+            final = [item for item in sorted(output, key=lambda item: (-item['final_score'], item['chunk_id'])) if item['final_score'] >= minimum][:int(config.get('top_k', BASELINE['top_k']))]
         if trace is not None:
             trace.update(status='completed',reranked=sorted(output,key=lambda item:(-item['final_score'],item['chunk_id'])))
             trace['final'] = [{**item, 'rank': rank} for rank, item in enumerate(final, 1)]

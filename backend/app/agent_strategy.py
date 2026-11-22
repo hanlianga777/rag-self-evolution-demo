@@ -518,20 +518,22 @@ def validate_d_mode(suggestion, winner, history, facts=None):
         effective = effective_d_config({**winner_config, **addition}, addition)
         if effective is not None:
             validate_d_parameter_limit(effective, base)
-    if len(qualified) >= 2 and base and _d_fusion_already_evaluated(history, qualified, base):
-        if mode != 'winner_plus':
-            raise ValueError('合格方案的参数并集已评测，D须为winner_plus')
-        if (effective is None or len(addition) != 1 or addition.keys() & parameter_diff(winner_config, base).keys()
-                or parameter_diff(effective, winner_config) != addition):
-            raise ValueError('组合退化时，D 须保留 Winner 改动且只新增 1 个参数')
-    elif len(qualified) >= 2:
+    min_fusion = rules.AGENT['min_qualified_for_fusion']
+    fusion_repeated = len(qualified) >= min_fusion and base and _d_fusion_already_evaluated(history, qualified, base)
+    if len(qualified) >= min_fusion and not fusion_repeated:
         if mode != 'partial_fusion':
-            raise ValueError('已有2个及以上合格方案，D须为partial_fusion')
+            raise ValueError(f'已有 {min_fusion} 个及以上合格方案，D须为partial_fusion')
         others = qualified - {winner['id']}
         if not any(set(c.get('source_candidates') or []) & others for c in changes if isinstance(c, dict)):
             raise ValueError('partial_fusion须取用另一个合格方案的有效参数')
-    elif mode != 'winner_plus':
-        raise ValueError('只有1个合格方案，D须为winner_plus')
+    else:
+        if mode != 'winner_plus':
+            reason = '合格方案的参数并集已评测' if fusion_repeated else '合格方案数未达到融合门槛'
+            raise ValueError(f'{reason}，D须为winner_plus')
+        extra = rules.AGENT['winner_extra_parameters']
+        if base and (effective is None or len(addition) != extra or addition.keys() & parameter_diff(winner_config, base).keys()
+                     or parameter_diff(effective, winner_config) != addition):
+            raise ValueError(f'D 须保留 Winner 改动且只新增 {extra} 个参数')
     kinds = [{'已验证':'verified','部分取用':'partial','新尝试':'new_attempt'}.get(c.get('source_type'), c.get('source_type')) for c in changes if isinstance(c, dict)]
     if (facts or {}).get('usable_repairs') and kinds and all(k == 'new_attempt' for k in kinds):
         raise ValueError('事实表已有可用的验证参数（usable_repairs），须优先使用，未验证参数只能作为补充')
@@ -546,7 +548,7 @@ def validate_causal_proposals(response, comparisons):
     if len(directions) != len(set(directions)):
         raise ValueError('同轮方案方向必须不同')
     if any(len(c.get('config_diff', {})) > rules.AGENT['max_changed_parameters'] for c in candidates):
-        raise ValueError('每个方案相对基础方案最多改两个参数')
+        raise ValueError(f"每个方案相对基础方案最多改 {rules.AGENT['max_changed_parameters']} 个参数")
     for plan in response.get('prior_round_review', {}).get('plans', []):
         facts = comparisons.get(plan.get('candidate_id'), [])
         claims = plan.get('causal_claims')

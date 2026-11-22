@@ -1,7 +1,7 @@
 """给已跑完第 1 轮的手动实验接上 staged-v1 自动循环（用户 2026-11-17 07:07 授权：接着跑第 2、3 轮）。
 
 只改实验的 result_json 三项，不调用任何模型：
-- round_policy = staged-v1，max_rounds=3（跑满第 3 轮仍未达到转入 D 的条件就停下汇报）；
+- round_policy 使用规则总表的分阶段停止规则；可通过 --max-rounds 执行已授权的轮次上限；
 - causal_evidence = True（下一轮 Agent 拿到逐题对比 case_comparisons，并按逐题证据写本轮结论）；
 - 无人值守授权记为"用户"（凑够合格方案时可按规则确认 Winner、生成并跑 D；发布仍需用户）。
 默认 dry-run；加 --apply 才写入。写入后由 POST /api/experiments/{id}/run-cycle 启动。
@@ -20,7 +20,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--database', type=Path)
     parser.add_argument('--experiment-id', required=True)
-    parser.add_argument('--max-rounds', type=int, default=3)
+    from app import rules
+    parser.add_argument('--max-rounds', type=int, default=rules.AGENT['max_rounds'])
     parser.add_argument('--run-to-round', type=int, help='用户指定先跑到第 N 轮：之前各轮不转入 D，跑完第 N 轮停下')
     parser.add_argument('--apply', action='store_true')
     args = parser.parse_args(argv)

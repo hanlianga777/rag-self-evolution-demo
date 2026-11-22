@@ -15,8 +15,6 @@ BACKEND = Path(__file__).resolve().parents[1]
 REPORT = BACKEND.parent / '指挥/报告/101-端到端核对.md'
 sys.path.insert(0, str(BACKEND))
 
-THINKING_TEXT = 'Baseline 关闭思考，Agent 不调这一项'
-STABILITY_TEXT = '温度 0 下判定稳定，回答文字仍可能不同'
 STALE_TEXT = re.compile(r'Baseline\s*(?:使用|用|采用|设为|为|是)\s*(?:Thinking\s*)?(?:Max|High)'
                         r'|降档补位|保证[^。；，\n]{0,24}一致', re.IGNORECASE)
 
@@ -26,7 +24,7 @@ def collect():
     from app import main, rules
     from app.ai_service import AiService
     from app.config import Settings
-    from app.optimization import build_agent_prompt
+    from app.optimization import ROUND_LABELS, build_agent_prompt
     from app.paid_run import provider_task
     from app.providers import DeepSeekProvider
     from app.rubric_judge import RUBRIC_VERSION
@@ -38,7 +36,7 @@ def collect():
 
     baseline = {'id': 'offline-baseline', 'config': {**rules.BASELINE, 'retrieval_max_tokens': rules.BASELINE_CONTEXT_LIMIT}}
     system, prompt = build_agent_prompt([], {key: value for key, value in baseline['config'].items()
-                                            if key in rules.PIPELINE_VALUES}, [], [], list('ABC'))
+                                            if key in rules.PIPELINE_VALUES}, [], [], ROUND_LABELS)
     provider = DeepSeekProvider(Settings('offline-placeholder', 'https://offline.invalid', 'offline-model'))
     runtime = AiService(None, main.corpus, provider, False)
     payloads = {}
@@ -73,7 +71,10 @@ def collect():
 
 def compare(system, prompt, api, payloads):
     from app import rules
+    from app.policy import search_space_contract
 
+    thinking_text = search_space_contract()['generation_thinking']['description']
+    stability_text = f"温度 {rules.BASELINE['temperature']} 下判定稳定，回答文字仍可能不同"
     agent_allowed = prompt['allowed_parameter_values']
     api_allowed = api['search_space']
     body = json.loads(payloads['Agent']['messages'][1]['content'])
@@ -83,6 +84,9 @@ def compare(system, prompt, api, payloads):
     audit_tasks = ('Baseline', 'Sandbox', 'Judge')
     settings = {task: {key: payloads[task].get(key) for key in ('thinking', 'reasoning_effort', 'temperature')}
                 for task in payloads}
+    from app.providers import thinking_config
+    expected_thinking = {task: thinking_config('judge' if task == 'Judge' else 'answer')
+                         for task in audit_tasks}
     allowed = {key: list(values) for key, values in rules.PIPELINE_VALUES.items()}
     tunable = {key: allowed[key] for key in rules.AGENT['tunable']}
     agent_values = {key: entry['allowed'] for key, entry in agent_allowed.items()}
@@ -93,24 +97,29 @@ def compare(system, prompt, api, payloads):
         'Provider 消息': json.dumps([payload['messages'] for payload in payloads.values()], ensure_ascii=False),
     }.items()}
     return [
-        ('思考档关闭', THINKING_TEXT in system and thinking_description == THINKING_TEXT
-         and agent_config['generation_thinking'] == api_config['generation_thinking'] == rules.BASELINE['generation_thinking'] == 'off'
-         and body['goal']['baseline_configuration']['generation_thinking'] == 'off'
+        ('运行规则合同一致', api.get('rules') == rules.RULES and api.get('baseline_defaults') == rules.BASELINE
+         and body.get('qualification_rules') == rules.QUALIFICATION
+         and body['round_contract']['max_changed_parameters'] == rules.AGENT['max_changed_parameters'],
+         {'规则版本': rules.RULES_VERSION, '资格': body.get('qualification_rules'),
+          '当轮约束': body['round_contract']}),
+        ('思考档设置一致', thinking_text in system and thinking_description == thinking_text
+         and agent_config['generation_thinking'] == api_config['generation_thinking'] == rules.BASELINE['generation_thinking']
+         and body['goal']['baseline_configuration']['generation_thinking'] == rules.BASELINE['generation_thinking']
          and payloads['Agent']['messages'][0]['content'] == system
-         and all(settings[task]['thinking'] == {'type': 'disabled'} and settings[task]['reasoning_effort'] is None for task in audit_tasks),
-         {'Agent 原文': excerpt(system, THINKING_TEXT), '接口原文': thinking_description,
+         and all(settings[task]['thinking'] == expected_thinking[task]['thinking'] and settings[task]['reasoning_effort'] == expected_thinking[task].get('reasoning_effort') for task in audit_tasks),
+         {'Agent 原文': excerpt(system, thinking_text), '接口原文': thinking_description,
           'Agent 配置': agent_config['generation_thinking'], '接口配置': api_config['generation_thinking'],
           'Provider': settings}),
-        ('温度为 0', STABILITY_TEXT in system and api['fixed_parameters']['temperature'] == rules.BASELINE['temperature'] == rules.JUDGE['temperature'] == 0
-         and all(type(settings[task]['temperature']) in (int, float) and settings[task]['temperature'] == 0 for task in audit_tasks),
-         {'Agent 原文': excerpt(system, STABILITY_TEXT), '接口 fixed_parameters': api['fixed_parameters'],
+        ('温度设置一致', stability_text in system and api['fixed_parameters']['temperature'] == rules.BASELINE['temperature'] == rules.JUDGE['temperature']
+         and all(type(settings[task]['temperature']) in (int, float) and settings[task]['temperature'] == (rules.JUDGE if task == 'Judge' else rules.BASELINE)['temperature'] for task in audit_tasks),
+         {'Agent 原文': excerpt(system, stability_text), '接口 fixed_parameters': api['fixed_parameters'],
           'Provider temperature': {task: settings[task]['temperature'] for task in audit_tasks}}),
         ('搜索空间一致', rules.canonical_hash(agent_values) == rules.canonical_hash(tunable)
          and rules.canonical_hash(api_values) == rules.canonical_hash(allowed)
          and rules.canonical_hash(body.get('allowed_parameter_values')) == rules.canonical_hash(agent_allowed),
          {'rules.py Agent 白名单': tunable, 'Agent 请求取值': agent_values, '接口取值': api_values}),
         ('旧说法扫描', not any(drift.values()),
-         {'命中原文': drift, 'Agent 当前原文': excerpt(system, STABILITY_TEXT), '接口当前原文': thinking_description}),
+         {'命中原文': drift, 'Agent 当前原文': excerpt(system, stability_text), '接口当前原文': thinking_description}),
     ]
 
 

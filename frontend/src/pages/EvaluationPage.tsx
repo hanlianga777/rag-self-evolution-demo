@@ -307,5 +307,5 @@ export function EvaluationDimensions({result}:{result:Row}) {
     const value=result.metrics?.[key] ?? result.comparison_metrics?.[key] ?? gate?.actual;
     const reason=result.metric_unavailable_reasons?.[key] || gate?.reason || '本次记录未保存该指标，不能按0计算';
     return <div key={key}><dt>{names[key]}</dt><dd>{typeof value==='number'?format(value,key.endsWith('_seconds')?' s':key==='mrr'?'':'%'):<><span>未采集</span><small>{reason}</small></>}</dd></div>;
-  })}</dl></section>)}</div><p className="muted">仅读取本次持久化分数；11项{displayText("Hard Gate")}及{displayText("Overall")}判定保持独立。</p></Section>;
+  })}</dl></section>)}</div><p className="muted">仅读取本次持久化分数；{typeof result.gates?.total === "number" ? `${result.gates.total} 项 ` : ""}{displayText("Hard Gate")}及{displayText("Overall")}判定保持独立。</p></Section>;
 }

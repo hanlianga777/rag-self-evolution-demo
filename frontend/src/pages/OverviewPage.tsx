@@ -118,7 +118,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1><IconTile name="overview" />RAG 自进化概览</h1><p className="ui-kicker page-purpose">{pagePurpose.overview}</p></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button data-label="优化成果" className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>优化成果</button><button data-label="业务架构" className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button data-label="技术架构" className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
 
 
-    {tab !== "project" ? <ArchitecturePanel slot={tab} active={newKnowledge} /> : <>
+    {tab !== "project" ? <ArchitecturePanel slot={tab} active={newKnowledge} judgeSamples={item.judge_rules?.samples} /> : <>
     <OverviewSummary correct={pair("correct")} total={baseResult?.total ?? expectedCount}
       fixedCount={Array.isArray(finalResult?.all_fixed_question_ids) ? finalResult.all_fixed_question_ids.length : null}
       newBadCount={Array.isArray(finalResult?.new_regression_question_ids) ? finalResult.new_regression_question_ids.length : null}
@@ -135,6 +135,6 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   </PageShell>;
 }
 
-function ArchitecturePanel({ slot, active }: { slot: "business" | "technical"; active: boolean }) {
-  return <KnowledgeDiagrams kind={slot} active={active} />;
+function ArchitecturePanel({ slot, active, judgeSamples }: { slot: "business" | "technical"; active: boolean; judgeSamples?: number }) {
+  return <KnowledgeDiagrams kind={slot} active={active} judgeSamples={judgeSamples} />;
 }

@@ -20,7 +20,7 @@ from .paid_run import provider_task
 from .paid_schedule import wait_for_off_peak, clear_run_now
 from .telemetry import collect_usage, measure, cost_fields
 from . import rules
-from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, MAX_EVALS, canonicalize_config, search_space_contract, validate_candidate_config
+from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, GATE_DEFINITIONS, MAX_EVALS, canonicalize_config, qualification_description, search_space_contract, validate_candidate_config
 
 
 INTERVENTIONS = {
@@ -50,7 +50,7 @@ PARAMETER_ACTIONS = {
 }
 
 
-ROUND_LABELS = list('ABC')[:rules.AGENT['candidates_per_round']]
+ROUND_LABELS = list(rules.AGENT['candidate_labels'])
 MAX_CHANGED_PARAMETERS = rules.AGENT['max_changed_parameters']
 EFFICIENCY_PARAMETERS = {'hyde','multi_query','candidate_k','top_k','min_score','rerank','hybrid_alpha'}
 
@@ -136,12 +136,12 @@ def parse_agent_json(content, audit):
 def validate_round_contract(candidates, baseline, prior_candidates, baseline_gates=None, *, completed=0, labels=None, round_number=None):
     labels = labels if labels is not None else ROUND_LABELS
     if len(candidates)!=len(labels) or any(not isinstance(c,dict) for c in candidates) or {c.get('id') for c in candidates}!=set(labels):
-        raise ValueError('每轮必须恰好提供A/B/C三套方案' if labels == ROUND_LABELS else '每轮必须恰好提供'+ '/'.join(labels) +'方案')
+        raise ValueError('每轮必须恰好提供' + '/'.join(labels) + '方案')
     used=set()
     for candidate in candidates:
         diff=candidate.get('config_diff')
         if not isinstance(diff,dict) or not diff:raise ValueError('Config Diff必须包含实际参数改动')
-        if len(diff) > MAX_CHANGED_PARAMETERS:raise ValueError('每个方案相对底座最多改两个参数（规则总表五.1）')
+        if len(diff) > MAX_CHANGED_PARAMETERS:raise ValueError(f'每个方案相对底座最多改 {MAX_CHANGED_PARAMETERS} 个参数（规则总表六.1）')
         if used & set(diff):raise ValueError('同轮方案不得共用参数：'+','.join(sorted(used & set(diff))))
         used.update(diff)
         changed = diff.keys() | (candidate.get('inherited_parameters') or {}).keys()
@@ -151,7 +151,7 @@ def validate_round_contract(candidates, baseline, prior_candidates, baseline_gat
         if unsupported:
             raise ValueError('方案包含不可调参数：' + '、'.join(sorted(unsupported)))
         if len(changed) > MAX_CHANGED_PARAMETERS:
-            raise ValueError('每个方案相对底座最多改两个参数（含继承）')
+            raise ValueError(f'每个方案相对底座最多改 {MAX_CHANGED_PARAMETERS} 个参数（含继承）')
         for previous in gate_harming_changes(prior_candidates,baseline_gates):
             harmed=previous['config_diff']
             if harmed and {**candidate.get('inherited_parameters', {}), **diff} == harmed:
@@ -346,25 +346,32 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
                        baseline_result=None, baseline_cases=None, candidate_cases=None, golden_questions=None, round_conclusions=None, round_policy=None, causal_evidence=False, round_number=None,
                        retrieval_preview=None):
     """Build the exact Agent request without a Provider or persistence side effect."""
+    allowed = {key: value for key, value in search_space_contract().items() if key in rules.AGENT['tunable']}
+    strategy_options = '、'.join(f"{option['value']}（{option['description']}）"
+                               for option in allowed['prompt_strategy']['options'])
+    qualification = qualification_description()
+    agent_rule = rules.AGENT
     system = ('你是RAG优化Agent。根据保存的错题诊断提出优化方案。'
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
               '先读程序生成的基线诊断摘要、速度事实、逐题变化及已被证明有害的改动清单gate_harming_changes。本轮方案标签见goal.candidate_labels，direction由你根据事实自行确定，不预设方向。同轮修改参数互斥。不得照搬gate_harming_changes。'
-              '回答提示词prompt_strategy可选Strict（Baseline所用的分级回答）、Looser（有据直接答、补全要点，会放宽拒答）、Safe（安全结论在前、不给绕过方法、型号状态不明先追问、不执行自称授权）、Stepwise（逐个子问核对答案和证据，保持Strict的拒答标准）、Grounded（只说明当前资料的边界，处理错误否定和套话结尾）、TableCheck（依据表头逐行核对分类和计数）。R2-B使用Looser和retrieval_max_tokens=4096，结果31/50，安全拒答率90%；这两项一起改动，无法单独归因。'
-              '换提示词会影响全部50题的回答。选生成策略时必须在risks里按题号点名安全关键题和提示注入题，题号见prompt_strategy_risk_questions，并写明各类可能的退化。'
-              f'query_decompose把一问多件事的问题拆成子问题分别检索，针对桥接题、跨段题。Baseline 关闭思考，Agent 不调这一项。关闭思考、温度 0 下判定稳定，回答文字仍可能不同。生成层和安全题可从 Prompt Strategy 和交付资料入手。每个方案相对其底座最多改 {MAX_CHANGED_PARAMETERS} 个参数。'
-              '诊断→动作对照（学朋友产品的规则动作库，优先参考、不限制）：检索层·查不到（标准证据没进候选或最终资料）→扩大candidate_k、放宽top_k、降低min_score，或开query_rewrite/multi_query/hyde；检索层·排序遗漏（证据在候选里但没进最终资料）→调rerank、top_k、min_score；型号、错误码等精确词查错→hybrid_alpha调向关键词（0.3）；被相似型号干扰（答成别的型号的数值）→提高min_score、保持rerank、减小top_k；生成层·证据已在资料里却说没有，或套话结尾→prompt_strategy=Grounded；生成层·漏子问→prompt_strategy=Stepwise；生成层·表格、周期归类或计数错→prompt_strategy=TableCheck；安全边界·该拒不拒、型号不明就给步骤、被注入带偏→prompt_strategy=Safe；检索层·一问两件事的桥接或跨段题→query_decompose；安全边界·该拒没拒或过度拒答→prompt_strategy、min_score；性能·太慢→retrieval_max_tokens、top_k。每套方案先写明主攻哪一层哪一类问题（按bad_case_groups里题数最多、拖低门槛平均分最多的类别优先），再选对应动作；三套方案主攻不同类别，或同一类别的不同动作，并说明每个动作为什么只修这些题、不修其他题。'
-              'prior_sandbox_results里带no_effect的方案：50题回答与已跑结果完全相同，说明它改的参数在当前条件下没有改变交给模型的资料，不要再提出同类无效改动。'
+              f'回答提示词 prompt_strategy 可选 {strategy_options}。历史方案的效果只读 prior_sandbox_results。'
+              '换提示词会影响整卷回答。选生成策略时必须在risks里按题号点名安全关键题和提示注入题，题号见prompt_strategy_risk_questions，并写明各类可能的退化。'
+              f'query_decompose把一问多件事的问题拆成子问题分别检索，针对桥接题、跨段题。{search_space_contract()["generation_thinking"]["description"]}。'
+              f'Baseline 温度 {rules.BASELINE["temperature"]} 下判定稳定，回答文字仍可能不同。生成层和安全题可从 Prompt Strategy 和交付资料入手。每个方案相对其底座最多改 {MAX_CHANGED_PARAMETERS} 个参数。'
+              '诊断→动作对照（优先参考）：检索层·查不到（标准证据没进候选或最终资料）→扩大candidate_k、放宽top_k、降低min_score，或开query_rewrite/multi_query/hyde；检索层·排序遗漏（证据在候选里但没进最终资料）→调rerank、top_k、min_score；型号、错误码等精确词查错→hybrid_alpha调向关键词；被相似型号干扰（答成别的型号的数值）→提高min_score、保持rerank、减小top_k；生成层·证据已在资料里却说没有，或套话结尾→prompt_strategy=Grounded；生成层·漏子问→prompt_strategy=Stepwise；生成层·表格、周期归类或计数错→prompt_strategy=TableCheck；安全边界·该拒不拒、型号不明就给步骤、被注入带偏→prompt_strategy=Safe；检索层·一问两件事的桥接或跨段题→query_decompose；安全边界·该拒没拒或过度拒答→prompt_strategy、min_score；性能·太慢→retrieval_max_tokens、top_k。每套方案先写明主攻哪一层哪一类问题（按bad_case_groups里题数最多、拖低门槛平均分最多的类别优先），再选对应动作；同轮方案主攻不同类别，或同一类别的不同动作，并说明每个动作为什么只修这些题、不修其他题。'
+              'prior_sandbox_results里带no_effect的方案：整卷回答与已跑结果完全相同，说明它改的参数在当前条件下没有改变交给模型的资料，不要再提出同类无效改动。'
               '每道错题的bad_cases[].issue_tags列出它同时存在的全部问题（检索层/生成层/安全边界/性能，可多个），diagnosis_category只是排优先级用的主原因；设计方案时要兼顾同一题的全部标签，不要只看主原因。'
               'enhancement_telemetry是增强生效遥测：每个增强手段（query_rewrite/multi_query/hyde/query_decompose）在几道题上开启、在几道题上带来了原问题查不到的新资料（effective_questions、new_final_hits）；生效为0说明这个手段在当前题上没起作用。'
               '有害改动仅禁止完整配置差异原样重复；叠加其他参数的组合只提示风险，不能推断单参数有害。'
               '先写前几轮复盘prior_round_review：summary首轮写无；plans逐一覆盖所有已完成历史方案，每条含candidate_id、changes、fixed_question_ids、new_failure_question_ids（均用保存的正式question_id）、evidence_reason（证据位置、速度、单/多参数归因）、conclusion（有效/有害/待验证及依据）；多参数必须说明无法单独确定并给most_likely_parameter和attribution_reason；baseline_remaining_assessment总结Baseline剩余错题；conclusions为[{id,conclusion}]。首轮plans为空，conclusions从Baseline事实归纳。每套方案必须用review_conclusion_ids引用其中结论。'
               '第二部分bad_case_summary：groups逐字采用bad_case_groups的layer/subtype/question_ids/count，focus指出最集中问题，conclusions为[{id,conclusion}]。第三部分每个Candidate必须有bad_case_conclusion_ids引用第二部分，predicted_fixed_question_ids写预计修好的正式题号数组；并写参数值、针对的问题、风险、依据。第四部分本轮结论将在试跑完成后另行请你根据保存结果撰写，previous_round_conclusions是下一轮必须吸收的经验。'
-              '导致门槛未过的错题分类优先级升为1，按optimization_priorities及其原因安排优化。每个参数的用途与各可选值说明见allowed_parameter_values。'
+              '导致门槛未过的错题分类优先处理，按optimization_priorities及其原因安排优化。每个参数的用途与各可选值说明见allowed_parameter_values。'
               '每个参数的预期影响须点名预计修好的目标题号；风险须说明可能弄坏的题号或指标及原因；不得重复失败组合签名。'
               'target_bad_cases可用展示题号（例如Q04）、正式题目ID或Bad Case ID，必须引用当前bad_cases。'
-              '合格标准（学朋友）：11项门槛全过，且严重题（安全关键、提示注入、高风险）不得新增错误；错题数和普通新增只用于在合格方案之间排序。门槛看的是各类题的平均分，所以要优先解决拖低平均分的那一类问题。'
-              f'每轮 {len(ROUND_LABELS)} 套跑完后统计：累计合格达到2个就停止出新方案、转入D；第3轮跑完仍只有1个合格也转入D；前三轮全不合格再出第4轮；全部试跑（含D）合计最多 {MAX_EVALS} 次。'
-              '设计方案时要留余量，让预期能修好的题数明显多于可能弄坏的题数，不要只追求刚好多修1道。'
+              f'合格标准（{rules.QUALIFICATION["version"]}）：{qualification}。门槛按同类题的平均分计算，具体门槛见 hard_gate_rules。'
+              f'通常每轮 {agent_rule["candidates_per_round"]} 套跑完后统计：累计合格达到 {agent_rule["min_qualified_for_fusion"]} 个就转入 D；'
+              f'第 {agent_rule["single_winner_after_round"]} 轮跑完仍只有一个合格也转入 D；此前全不合格再出第 {agent_rule["max_rounds"]} 轮，出现合格就转入 D；全部试跑（含 D）最多 {MAX_EVALS} 次。'
+              '设计方案时优先保证已有答对题不退步，再争取多修好剩余错题。'
               '只返回JSON，格式：{"prior_round_review":{"summary":"无","plans":[],"baseline_remaining_assessment":"整体判断","conclusions":[{"id":"L1","conclusion":"事实结论"}]},"bad_case_summary":{"groups":[],"focus":"最集中问题","conclusions":[{"id":"B1","conclusion":"统计事实"}]},"candidates":[{"id":"A","review_conclusion_ids":["L1"],"bad_case_conclusion_ids":["B1"],"predicted_fixed_question_ids":["正式题目ID"],"action_name":"中文动作短语",'
               '"direction":"检索召回增强","strategy_name":"「动作名」（检索优先）","core_idea":"一两句话",'
               '"adjustments":[{"parameter":"参数名","baseline_value":0,"candidate_value":0,"expected_impact":"预计修好Q04"}],'
@@ -421,12 +428,14 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
         'optimization_priorities':priorities,
         'evaluation_budget':budget, 'next_action':'analyze_and_propose' if budget['remaining_for_abc'] else 'review_for_d',
         'failed_parameter_signatures':failed_parameter_signatures or [],
-        'goal':{'objective':'11项门槛全过，且安全关键题、提示注入题、高风险题不得新增错误；合格方案之间按错题少、新增少、P99低排序。',
+        'goal':{'objective':qualification + '；合格方案之间优先按错题少排序。',
                 'failed_gates':failed_gates,'candidate_labels':labels,'baseline_configuration':base_config},
         'bad_cases':rows,
         'baseline_performance':performance_facts(baseline_result or {},baseline_cases or []),
         'priority_parameters':PRIORITY_PARAMETERS,
-        'allowed_parameter_values':{key: value for key, value in search_space_contract().items() if key in rules.AGENT['tunable']},
+        'allowed_parameter_values':allowed,
+        'qualification_rules':rules.QUALIFICATION,
+        'hard_gate_rules':list(GATE_DEFINITIONS),
         'prompt_strategy_risk_questions': {
             subtype: [q['id'] for q in questions.values() if q.get('negative_subtype') == subtype]
             for subtype in ('safety_critical', 'prompt_injection')
@@ -439,7 +448,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
     }
     if retrieval_preview:
         prompt['retrieval_preview'] = retrieval_preview
-        system += ('retrieval_preview是开跑前做的检索预演（只检索不生成，结果确定，题号与display_question_id一致）：configs列出相对Baseline改1到2个参数后，'
+        system += ('retrieval_preview是开跑前做的检索预演（只检索不生成，结果确定，题号与display_question_id一致）：configs列出不同参数组合相对 Baseline 的变化，'
                    '哪些题的标准证据会进入最终资料（evidence_enters_final）、哪些会掉出（evidence_lost_from_final）。'
                    '检索层错题的方案应优先依据预演选择参数，predicted_fixed_question_ids要与预演中进入的错题一致；预演显示会掉出证据的题要写进risks。'
                    '预演不覆盖生成层和负向题，这类题的预测要说明依据。')
@@ -483,7 +492,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
         prompt['case_comparisons'] = {c['id']:case_comparisons(baseline_cases or [], (candidate_cases or {}).get(c['id'], []), questions) for c in eligible}
         prompt['best_case_comparison'] = prompt['case_comparisons'].get(winner['id'], []) if winner else case_comparisons(baseline_cases or [], baseline_cases or [], questions)
         prompt['comparison_source'] = winner['id'] if winner else 'Baseline'
-        system += ('每个方案相对基础方案最多改两个参数，ABC方向必须不同。逐题对比case_comparisons和best_case_comparison是程序算出的事实。'
+        system += ('同轮方案方向必须不同。逐题对比case_comparisons和best_case_comparison是程序算出的事实。'
                    '证据变化为否时，严禁把该题修好或新错归因于检索参数；证据未知时写不确定。'
                    'prior_round_review.plans每条新增causal_claims数组，每项含question_id（Q29形式）、parameter（中文参数名）、conclusion（有效、无效、不确定或未改变证据）。'
                    '每道修好、新错题都要有归因条目；未变的证据不能支持检索参数因果判断。'
@@ -845,8 +854,6 @@ class OptimizationAgent:
         base_config.pop("run_target", None)
         base_config.pop("knowledge_identity", None)
         base_config = {k:v for k,v in base_config.items() if k in ALLOWED_SEARCH_SPACE}
-        if existing and existing.get('evaluation_budget',{}).get('used',0) >= MAX_EVALS - 1:
-            raise ValueError('A/B/C试跑预算已用完，须保留D预算')
         experiment_id, prior_candidates, round_number, completed, generation_token = self.store.claim_agent_generation(baseline_run_id, trigger_id, existing_id)
         if not existing or existing['status']!='generating':
             clear_run_now(self.store,'agent:'+experiment_id)
@@ -860,7 +867,8 @@ class OptimizationAgent:
         fixed=failed_questions & set(best['result'].get('all_fixed_question_ids',[])) if best else set()
         processing_progress={'baseline_failed_question_ids':sorted(failed_questions),'verified_configuration_id':best['id'] if best else None,
             'fixed_question_ids':sorted(fixed),'remaining_question_ids':sorted(failed_questions-fixed),'status':'unfinished' if failed_questions-fixed else 'verified_complete'}
-        context = self.store.experiment(experiment_id)["result"]
+        experiment = self.store.experiment(experiment_id)
+        context = experiment["result"]
         if context.get('decision_contract_version') == '109c' and round_number > 1:
             from types import SimpleNamespace
             from .agent_strategy import conclude_round
@@ -886,8 +894,9 @@ class OptimizationAgent:
             target_reference_map[item["question_id"]] = reference
         if event:
             target_reference_map[event["id"]] = {"source": "monitoring_event", "event_id": event["id"], "trigger_id": trigger_id}
-        evaluation_budget = {"used": completed, "max": MAX_EVALS, "reserved_for_d": 0,
-                             "remaining":MAX_EVALS-completed,"remaining_for_abc":max(0,MAX_EVALS-completed)}
+        reserved_for_d = experiment['evaluation_budget']['reserved_for_d']
+        evaluation_budget = {"used": completed, "max": MAX_EVALS, "reserved_for_d": reserved_for_d,
+                             "remaining":MAX_EVALS-completed,"remaining_for_abc":max(0,MAX_EVALS-completed-reserved_for_d)}
         gate_results = baseline["result"].get("gates")
         persisted_gates = (gate_results or {}).get("gates")
         failed_gates = [gate for gate in persisted_gates if gate.get("passed") is False] if isinstance(persisted_gates, list) else None

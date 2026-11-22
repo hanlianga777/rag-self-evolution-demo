@@ -142,7 +142,7 @@ def summary():
                           'UTC时间': call['started_at'], '多伦多时间': timestamp.astimezone(ZoneInfo('America/Toronto')).isoformat(),
                           'Provider': call['provider'], '模型': call['model'], '用途': call['task'],
                           '思考': payload.get('reasoning_effort', payload.get('thinking', {}).get('type', '不适用')),
-                          'temperature': payload.get('temperature', '未传'), '状态': call['status'],
+                          'temperature': payload['temperature'] if 'temperature' in payload else '未传', '状态': call['status'],
                           '输入token': usage.get('prompt_tokens', usage.get('total_tokens', '未知')),
                           '输出token': usage.get('completion_tokens', '不适用'),
                           '缓存命中token': usage.get('prompt_cache_hit_tokens', '不适用'),

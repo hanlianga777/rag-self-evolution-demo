@@ -24,7 +24,7 @@ from app.governance import GovernanceStore
 from app.evaluation import EvaluationRunner, candidate_comparison, protected_question, sandbox_cost
 from app.evaluation_contract import evaluation_identity, policy_current
 from app.policy import (ALLOWED_SEARCH_SPACE, GATE_DEFINITIONS, evaluate_gates, validate_candidate_config,
-                        evaluate_regression, qualify_release, d_improves_winner)
+                        CANDIDATE_QUALIFICATION_VERSION, evaluate_regression, qualify_candidate, qualification_description)
 
 DEFAULT_SOURCE = ROOT / 'backend/data/demo.db'
 DEFAULT_OUT = ROOT / 'output/task021c'
@@ -449,7 +449,7 @@ def qualification(baseline, cases, metrics, golden):
     # critical issue; do not miss them by examining PASS->FAIL alone.
     continued = comparison.get('continued_failure_new_critical_question_ids', [])
     checks = {'完整50题': len(cases) == 50 and len(baseline) == 50 and comparison['comparison_complete'],
-              '11/11': gates['passed'] and gates['passed_count'] == 11,
+              f'{len(GATE_DEFINITIONS)}/{len(GATE_DEFINITIONS)}': gates['passed'] and gates['passed_count'] == len(GATE_DEFINITIONS),
               '无新增关键错题': comparison['new_critical_failures'] == 0 and not continued,
               '比Baseline至少少1错题': sum(c.get('passed') is False for c in cases.values()) <= sum(c.get('passed') is False for c in baseline.values()) - 1,
               '至少修好1题': len(comparison['all_fixed_question_ids']) >= 1}
@@ -464,16 +464,18 @@ def trial_outcome(baseline, original, trial, original_metrics, trial_metrics):
     gates = evaluate_gates(trial_metrics)
     regression = evaluate_regression(new_critical_failures=comparison['new_critical_failures'],
                                     new_ordinary_failures=comparison['new_ordinary_failures'])
-    release = qualify_release(gates, regression, len(comparison['all_fixed_question_ids']))
-    def result(cases, metrics):
-        return {'result': {'bad_case_count': sum(c.get('passed') is False for c in cases.values()),
-                           'metrics': metrics, 'estimated_cost': sandbox_cost(list(cases.values()))}}
+    regression.update(comparison)
+    release = qualify_candidate(gates, regression, len(comparison['all_fixed_question_ids']),
+                                sum(c.get('passed') is False for c in baseline.values()), comparison['bad_case_count'],
+                                rule_version=CANDIDATE_QUALIFICATION_VERSION)
+    vs_winner = candidate_comparison(original, trial, list(original))
     checks = {'完整50题': len(baseline) == len(original) == len(trial) == 50
                             and comparison['comparison_complete'] and set(original) == set(trial),
-              '11/11门槛': gates['passed'] and gates['passed_count'] == 11,
-              '相对Baseline零新增错题': release['checks']['zero_new_failures'],
-              '相对Baseline至少修好1道': release['checks']['at_least_one_fixed'],
-              '错题更少或错题相同且P99及费用均更低': d_improves_winner(result(trial, trial_metrics), result(original, original_metrics))}
+              f'{len(GATE_DEFINITIONS)}/{len(GATE_DEFINITIONS)}门槛': gates['passed'] and gates['passed_count'] == len(GATE_DEFINITIONS),
+              '相对 Baseline 的新增错题在上限内': release['checks']['zero_new_failures'],
+              '相对 Baseline 达到最低修复数': release['checks']['at_least_one_fixed'],
+              '相对 Winner 无新错且总错题更少': vs_winner['comparison_complete'] and not vs_winner['new_regression_question_ids']
+              and vs_winner['bad_case_count'] < sum(c.get('passed') is False for c in original.values())}
     return {'wins': all(checks.values()), 'checks': checks}
 
 
@@ -498,7 +500,7 @@ def compare_trials(out, report, state):
     snapshot = json.loads(original['dataset_snapshot_json'])
     golden = {q['id']: q for q in snapshot['questions']}
     lines = ['# 内部试跑D候选逐题对比', '', '仅使用保存数据，没有模型调用；结果只供内部判断，不写正式候选、D结论或推荐。', '',
-             '判定沿用现有D规则：零新增错题和至少修好1道相对Baseline；优劣相对R3-C原评测。另列相对R3-C及内部复核的新坏题，不混淆两种比较。', '',
+             f'当前 D 资格要求：{qualification_description()}。晋升须相对 R3-C 原评测无新错且总错题更少。', '',
              '| 门槛/指标 | ' + ' | '.join(names) + ' |', '| --- | ' + ' | '.join(['---'] * 5) + ' |',
              '| 运行编号 | ' + ' | '.join(r['id'] for r in runs) + ' |',
              '| 错题数 | ' + ' | '.join(str(sum(c['passed'] is False for c in group.values())) for group in cases) + ' |']
