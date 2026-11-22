@@ -130,7 +130,8 @@ class SavedGenerationTests(unittest.TestCase):
         store=fixture.store
         exp=store.create_experiment('EVAL-test')
         with store.connection() as db:
-            db.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps({'round_policy':{'mode':'full_rounds','max_rounds':3}}),exp))
+            db.execute('UPDATE experiments SET result_json=json_set(result_json,\'$.round_policy\',json(?)) WHERE id=?',
+                       (json.dumps({'mode':'full_rounds','max_rounds':3}),exp))
         from app.paid_schedule import set_settings
         set_settings(store,False)
         class Provider:

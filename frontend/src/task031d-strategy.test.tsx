@@ -12,3 +12,20 @@ it('shows the saved four-part strategy and conclusion without generating narrati
  await act(async()=>root!.render(<><RoundStrategy experiment={experiment} round={2}/><div>三个Candidate</div><RoundConclusion experiment={experiment} round={2}/></>));
  const text=container.textContent!;expect(text).toContain('Agent 策略');expect(text).toContain('标准证据被挤出回答证据');expect(text).toContain('排名靠后被截掉：2');expect(text.indexOf('三个Candidate')).toBeLessThan(text.indexOf('本轮结论'));expect(text).toContain('下一轮检查召回');expect(text).not.toContain('人工提示');
 });
+
+it('shows original Trace provenance and the saved prediction comparison',async()=>{
+ const container=document.createElement('div');document.body.append(container);root=createRoot(container);
+ const experiment={result:{round:2,
+   agent_trace_strategies:{1:{trace_id:27,bad_case_summary:{groups:[{layer:'检索层问题',subtype:'没找到证据',count:1,question_ids:['Q17']}],focus:'保存的原始重点'}}},
+   round_conclusions:{1:{status:'saved',review:{plans:[{candidate_id:'R1-A',fixed_question_ids:['Q17']}],
+     lessons:['继续核对证据']},prediction_comparison:{note:'已知题上的预测；同一题可能重复计入',
+     by_direction:{检索方向:{hits:1,predictions:1},生成方向:{hits:0,predictions:1}},
+     rows:[{candidate_id:'R1-A',predicted_fixed_question_ids:['Q17'],actual_fixed_question_ids:['Q17'],matched_question_ids:['Q17'],unmatched_reason:'预测与结果一致'}]}}}},
+   candidates:[{id:'R1-A',reasoning:{round:1,candidate_label:'A',predicted_fixed_question_ids:['Q17']}}]};
+ await act(async()=>root!.render(<><RoundStrategy experiment={experiment} round={1}/><RoundConclusion experiment={experiment} round={1}/></>));
+ expect(container.textContent).toContain('来自原始 Agent 记录');
+ expect(container.textContent).toContain('保存的原始重点');
+ expect(container.textContent).toContain('同一题可能重复计入');
+ expect(container.querySelector('table[aria-label="预测与实测对照"]')?.textContent).toContain('预测修好实际修好命中未命中原因');
+ expect(container.textContent).toContain('检索方向 1/1 次、生成方向 0/1 次');
+});

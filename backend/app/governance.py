@@ -2850,11 +2850,6 @@ class GovernanceStore:
             finished = {'evaluated', 'skipped'} if strict else {'evaluated', 'failed'}
             if current and any(item["status"] not in finished for item in current):
                 raise ValueError("上一轮 A/B/C 必须全部完成 Sandbox 后才能继续优化")
-            if strict and current_round:
-                previous = context.get('round_conclusions', {}).get(str(current_round), {})
-                if (previous.get('status') != 'saved' or not previous.get('review', {}).get('lessons')
-                        or not isinstance(previous.get('parameter_findings'), list)):
-                    raise ValueError('上一轮复盘尚未保存完整 lesson 和参数判断，请先完成本轮复盘')
             full_rounds = existing and existing['result'].get('round_policy',{}).get('mode') == 'full_rounds'
             if not full_rounds and any(item["result"].get("qualification",{}).get("qualified") and item["result"].get("bad_case_count")==0 for item in current):
                 raise ValueError("本轮完整评测已无剩余业务问题")
@@ -3199,10 +3194,12 @@ class GovernanceStore:
         from .paid_schedule import wait_for_off_peak, save_composite_schedule
         # The short transactional validation below runs again after waiting.
         # No corpus/database lock is held while the price window is closed.
-        self.restore_round_reviews(experiment_id)
         requested = self.experiment(experiment_id, light=True)
+        if requested and requested['result'].get('decision_contract_version') == '109c' and requested['result'].get('strategy_contract') != 'agent-strategy-4':
+            raise ValueError('strategy_contract 无效：新实验必须保存 agent-strategy-4')
         if not requested or not requested['result'].get('report_confirmation'):
             raise ValueError('需要Gate 2人工确认合格Winner')
+        self.restore_round_reviews(experiment_id)
         frozen_baseline = self.require_current_baseline(requested['baseline_run_id'])
         # Materialize facts even when the price window queues the actual suggestion.
         frozen_winner = next(c for c in requested['candidates'] if c['id']==requested['result']['report_confirmation']['winner_id'])

@@ -134,8 +134,7 @@ class CoverageTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'身份'):
                     complete_coverage(store,'EXP',expected_binding='stale',backup_path=Path(directory)/'stale.db')
                 self.assertFalse((Path(directory)/'stale.db').exists())
-                # Current validation requires the Agent's review before checking ABC.
-                with self.assertRaisesRegex(ValueError,'prior_round_review'):
+                with self.assertRaisesRegex(ValueError,'策略合同'):
                     complete_coverage(store,'EXP',expected_binding='bound',backup_path=backup)
             self.assertTrue(oldest.exists())
             self.assertTrue(recent.exists())

@@ -153,7 +153,7 @@ class FullRoundsTests(unittest.TestCase):
 
     def test_zero_bad_cases_does_not_block_next_full_round(self):
         with self.store.connection() as db:
-            db.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps({'round_policy':{'mode':'full_rounds','max_rounds':3}}),self.exp))
+            db.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps({'strategy_contract':'agent-strategy-4','round_policy':{'mode':'full_rounds','max_rounds':3}}),self.exp))
         self.store.save_candidate(self.exp,'R1-A',DEFAULT_PIPELINE_CONFIG,{'candidate_label':'A','round':1})
         self.store.finish_candidate(self.exp+'-R1-A','evaluated',{'qualification':{'qualified':True},'bad_case_count':0})
         self.assertEqual(self.store.claim_agent_generation('BASE',experiment_id=self.exp)[2],2)
@@ -263,6 +263,7 @@ class CompositeV4Tests(unittest.TestCase):
         with self.store.connection() as db:
             state=json.loads(db.execute('SELECT result_json FROM experiments WHERE id=?',(self.experiment,)).fetchone()[0])
             state['strategy_contract']='agent-strategy-4'
+            state.pop('decision_contract_version', None)  # Historical V4 response format.
             db.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps(state),self.experiment))
             for number,label in ((2,'B'),(3,'C')):
                 db.execute('INSERT INTO candidate_configs SELECT ?,experiment_id,status,config_json,?,result_json,created_at FROM candidate_configs WHERE id=?',

@@ -128,6 +128,9 @@ def complete_coverage(store,experiment_id,*,expected_binding,backup_path):
         store.require_current_baseline(baseline['id'],connection)
         if store.current_baseline_identity(connection)['current_experiment_id']!=experiment_id:raise ValueError('不是当前Experiment')
         if report['binding']!=expected_binding:raise ValueError('规划身份或证据已变化，请重新预览')
+        state = experiment['result']
+        if not state.get('strategy_contract') or state.get('decision_contract_version') == '109c':
+            raise ValueError('请通过 Agent 合同生成候选，补齐规划无法提供本轮策略合同所需的证据')
         if experiment['status']!='completed' or experiment['result'].get('report_confirmation') or any(c['status'] in {'running','queued'} for c in experiment['candidates']):raise ValueError('实验正在运行或已确认，不能补齐规划')
         audit={}
         _,batch=prepare_response(_json({'candidates':report['proposals']}),base,rows,experiment['candidates'],

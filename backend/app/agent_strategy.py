@@ -174,7 +174,7 @@ def prediction_comparison(review, candidates, winner_facts=None):
             totals[direction]['predictions'] += len(predicted)
         rows.append({'candidate_id':candidate['id'], 'directions':directions, 'predicted_fixed_question_ids':predicted,
                      'actual_fixed_question_ids':actual, 'matched_question_ids':matched,
-                     'unmatched_reason':plan['unmatched_reason']})
+                     'unmatched_reason':'预测与结果一致' if set(predicted) == set(actual) else plan['unmatched_reason']})
     return {'rows':rows, 'by_direction':totals, 'note':PREDICTION_NOTE}
 
 

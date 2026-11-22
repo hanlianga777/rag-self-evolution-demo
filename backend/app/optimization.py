@@ -578,6 +578,8 @@ def normalize_agent_candidate(candidate):
 
 def prepare_response(content,base_config,bad_cases,prior_candidates,completed,round_number,labels,trigger_id,monitoring_target_event_ids,audit):
     """One offline validation path for fresh and already-paid responses; no semantic repairs."""
+    if audit.get('decision_contract_version') == '109c' and audit.get('strategy_contract') != 'agent-strategy-4':
+        raise ValueError('strategy_contract 无效：新实验必须保存 agent-strategy-4')
     audit.update(parsed_json=None,parsed_candidates=None,rejected_candidates=[])
     prior=[base_config]+[item['config'] for item in prior_candidates]
     target_reference_map={key:{'bad_case_id':item['id']} for item in bad_cases for key in (item['id'],item['question_id'])}
@@ -626,6 +628,8 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
     if history_required:
         from .agent_strategy import validate_history_decisions
         validate_history_decisions(result, audit['history_lessons'], audit['prior_parameter_findings'], base_config)
+    elif audit.get('decision_contract_version') == '109c' and result.get('history_decisions', []) != []:
+        raise ValueError('首轮没有历史经验，history_decisions 须留空')
     if audit.get('causal_evidence'):
         from .agent_strategy import validate_causal_proposals
         validate_causal_proposals(result, audit.get('case_comparisons', {}))
@@ -857,6 +861,20 @@ class OptimizationAgent:
         processing_progress={'baseline_failed_question_ids':sorted(failed_questions),'verified_configuration_id':best['id'] if best else None,
             'fixed_question_ids':sorted(fixed),'remaining_question_ids':sorted(failed_questions-fixed),'status':'unfinished' if failed_questions-fixed else 'verified_complete'}
         context = self.store.experiment(experiment_id)["result"]
+        if context.get('decision_contract_version') == '109c' and round_number > 1:
+            from types import SimpleNamespace
+            from .agent_strategy import conclude_round
+
+            try:
+                previous = conclude_round(self.store, SimpleNamespace(provider=self.provider), experiment_id)
+                if not previous or not (previous.get('review') or {}).get('lessons') or not isinstance(previous.get('parameter_findings'), list):
+                    raise ValueError('上一轮复盘尚未保存完整 lesson 和参数判断')
+                context = self.store.experiment(experiment_id, light=True)['result']
+            except Exception as error:
+                self.store.save_agent_trace(experiment_id, 'failed',
+                    {'generation_status':'failed', 'validation_stage':'prior_round_review', 'validation_error':str(error)},
+                    str(error), generation_token=generation_token)
+                raise
         # Only this experiment's observed runs may inform a new round.
         trigger_id = trigger_id or context.get("trigger_id")
         monitoring_context = {"trigger": self.store.optimization_trigger(trigger_id), "event": event or context.get("monitoring_event"), "confirmed_baseline_id": context.get("baseline_id"), "golden_id": context.get("golden_id"), "corpus_fingerprint": context.get("corpus_fingerprint")} if trigger_id else None

@@ -133,6 +133,10 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
         experiment = store.experiment(experiment_id, light=True)
         d = next((c for c in experiment['candidates'] if c['reasoning'].get('candidate_label')=='D'), None)
         if d is None or d['status']=='evaluated':
+            if dual_review and d:
+                from .agent_strategy import conclude_round
+                save('running', 'composite_review')
+                conclude_round(store, runtime, experiment_id, final_d=True)
             store.refresh_recommendation(experiment_id)
             return save('recommended', 'before_release')
         return None

@@ -102,7 +102,7 @@ class ChainTests(unittest.TestCase):
         self.assertEqual(state['status'],'agent_running')
         exp=self.store.experiment(state['experiment_id'])
         self.assertEqual(exp['baseline_run_id'],'BASE');self.assertEqual(exp['candidates'],[])
-        self.assertEqual(exp['result']['strategy_contract'],'agent-strategy-3')
+        self.assertEqual(exp['result']['strategy_contract'],'agent-strategy-4')
         self.assertEqual(self.store.current_baseline_identity()['current_baseline_id'],'BASE')
         with self.store.connection() as db:
             self.assertEqual(db.execute('select count(*) from experiments').fetchone()[0],1)

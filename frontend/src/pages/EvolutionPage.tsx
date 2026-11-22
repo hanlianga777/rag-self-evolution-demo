@@ -134,7 +134,8 @@ export function EvolutionPage({ data }: { data: any }) {
   const pending = currentRound.filter(item => ["generated", "failed"].includes(item.status));
   const policyBlocked = !!evaluation.requires_policy_upgrade || !!data.workspace?.requires_policy_upgrade;
   const coverage = experiment?.coverage_plan;
-  const planningIncomplete = !!coverage && coverage.status === "incomplete";
+  const planningIncomplete = coverage?.status === "incomplete" && !!experiment?.result?.strategy_contract
+    && experiment.result.decision_contract_version !== "109c";
   const planningBlocked = planningIncomplete && currentRound.length < 3;
   const triedSandbox = candidates.some(candidate => ["running","queued","evaluated","failed"].includes(candidate.status) || candidate.result?.evaluation_run_id);
   const completePlan = () => void action("零调用补齐本轮规划", () => postJson(`/api/experiments/${experiment.id}/complete-plan`, { binding: coverage.binding }));
@@ -192,7 +193,11 @@ export function EvolutionPage({ data }: { data: any }) {
     finally { if (currentIdentity.current === captured) setBusy(false); }
   };
   const generate = () => requestPaid('生成A/B/C优化建议', '一次Agent策略分析调用；不自动执行Sandbox。', () => void executeGenerate());
-  const continueRound = () => requestPaid('生成下一轮建议', '读取已保存历史实验反馈，一次Agent分析；不自动评测。', () => void action('生成下一轮A/B/C', () => postJson(`/api/experiments/${experiment.id}/continue`)));
+  const missingRoundReview = experiment?.result?.decision_contract_version === '109c'
+    && experiment.result.round_conclusions?.[String(roundNumber)]?.status !== 'saved';
+  const continueRound = () => requestPaid('生成下一轮建议',
+    missingRoundReview ? '先复盘本轮已保存结果，再生成下一轮方案。' : '读取已保存历史实验反馈，生成下一轮方案。',
+    () => void action('生成下一轮A/B/C', () => postJson(`/api/experiments/${experiment.id}/continue`)));
   const run = (candidate: any) => candidate.resume_plan?.can_resume === false ? setError(candidate.resume_plan.reason || '当前无法继续，请查看原因') : requestPaid('运行 Candidate Sandbox', '继续完成尚未结束的评测；会产生模型费用。', () => void executeCandidate(candidate));
   const executeCandidate = async (candidate: any) => {
     if (!["generated", "failed"].includes(candidate.status) || activeOperation(candidate.id)) return;

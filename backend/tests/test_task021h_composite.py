@@ -15,6 +15,8 @@ class PrerequisiteTests(unittest.TestCase):
     validate = refinement.RefinementTests.validate
     def setUp(self):
         refinement.RefinementTests.setUp(self)
+        with self.store.connection() as db:
+            db.execute("UPDATE experiments SET result_json=json_remove(result_json,'$.decision_contract_version','$.strategy_contract') WHERE id=?", (self.experiment,))
         self.replace_case( {'passed':False, 'programmatic_metrics':{'retrieval_trace':{
             'candidates':[{'chunk_id':'c'}], 'reranked':[{'chunk_id':str(i)} for i in range(5)]+[{'chunk_id':'c'}], 'final':[]}}})
         self.refresh_facts()

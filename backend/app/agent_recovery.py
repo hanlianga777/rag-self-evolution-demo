@@ -6,6 +6,7 @@ import sqlite3
 from pathlib import Path
 
 from .diagnostics import diagnostic_view
+from .agent_strategy import NEW_EXPERIMENT_STRATEGY, bad_case_groups
 from .full_text import CORPUS_LOCK
 from .governance import _json, _now
 from .optimization import prepare_response
@@ -62,6 +63,9 @@ def recover_saved_response(store,trace_id,*,apply=False,expected_binding=None,ba
     base={**DEFAULT_PIPELINE_CONFIG,**baseline['config']}
     for key in ('run_target','knowledge_identity'):base.pop(key,None)
     audit=dict(saved)
+    audit.update(NEW_EXPERIMENT_STRATEGY)
+    audit.setdefault('bad_case_groups', bad_case_groups([row['result'] for row in bad_cases],
+        diagnoses={row['question_id']:row['diagnostic_view'] for row in bad_cases}))
     for key in ('validation_error','provider_error'):audit.pop(key,None)
     used=store.experiment(source['id'])['evaluation_budget']['used']
     labels=['A','B','C'][:min(3,MAX_EVALS-1-used)]
@@ -94,7 +98,9 @@ def recover_saved_response(store,trace_id,*,apply=False,expected_binding=None,ba
             'source_failure':saved.get('validation_error')},round=1,
             generation_status='partial' if audit['rejected_candidates'] else 'completed',
             evaluation_budget={'used':used,'max':MAX_EVALS,'reserved_for_d':1})
-        connection.execute('INSERT INTO experiments VALUES (?,?,?,?,?)',(experiment_id,baseline['id'],'completed',_json({**result,**audit}),_now()))
+        round_strategy = {key:result[key] for key in ('prior_round_review','bad_case_summary')}
+        connection.execute('INSERT INTO experiments VALUES (?,?,?,?,?)',(experiment_id,baseline['id'],'completed',
+            _json({**result,**audit,'agent_strategies':{'1':round_strategy}}),_now()))
         for label,config,reasoning in batch:
             connection.execute("INSERT INTO candidate_configs VALUES (?,?,'generated',?,?,'{}',?)",
                 (experiment_id+'-'+label,experiment_id,_json(config),_json(reasoning),_now()))

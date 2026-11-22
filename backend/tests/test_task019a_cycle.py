@@ -19,6 +19,9 @@ class UnattendedCycleTests(unittest.TestCase):
     def run_scenario(self, better=False, enabled=True, ordinary=False):
         store=self.store
         exp=store.create_experiment('EVAL-test')
+        with store.connection() as db:
+            # This fixture exercises the pre-109c unattended authorization.
+            db.execute("UPDATE experiments SET result_json='{}' WHERE id=?", (exp,))
         set_unattended_authorization(store,enabled,'用户 2026-11-05 授权')
         identity=store.evaluation_run('EVAL-test')['judge']['evaluation_identity']
         calls=[]

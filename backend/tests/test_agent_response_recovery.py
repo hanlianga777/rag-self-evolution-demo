@@ -8,6 +8,7 @@ drafts=contracts.drafts
 
 class ResponseTests(unittest.TestCase):
     setUp=contracts.OptimizationContractTests.setUp
+    saved_drafts=contracts.OptimizationContractTests.saved_drafts
     run_drafts=contracts.OptimizationContractTests.run_drafts
 
     def test_only_complete_abc_round_is_accepted(self):
@@ -78,6 +79,7 @@ class ResponseTests(unittest.TestCase):
 
 class RecoveryTests(unittest.TestCase):
     setUp=contracts.OptimizationContractTests.setUp
+    saved_drafts=contracts.OptimizationContractTests.saved_drafts
     run_drafts=contracts.OptimizationContractTests.run_drafts
     def failed_source(self):
         from pathlib import Path

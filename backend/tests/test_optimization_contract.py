@@ -3,6 +3,7 @@
 import json
 import tempfile
 import unittest
+from copy import deepcopy
 from pathlib import Path
 
 from identity_fixture import completed_baseline
@@ -66,12 +67,30 @@ class OptimizationContractTests(unittest.TestCase):
         completed_baseline(self.store, run_id="EVAL-test")
         self.store.record_bad_case("EVAL-test", "Q1", "Retrieval", "ordinary", trace_case())
 
+    def saved_drafts(self, result):
+        from app.agent_inputs import baseline_bad_case_rows
+        from app.agent_strategy import bad_case_groups
+
+        rows = baseline_bad_case_rows(self.store, self.store.evaluation_run('EVAL-test'))
+        groups = bad_case_groups([row['result'] for row in rows],
+                                 diagnoses={row['question_id']:row['diagnostic_view'] for row in rows})
+        result = deepcopy(result)
+        result['prior_round_review']['summary'] = '无'
+        result['bad_case_summary'] = {'groups':groups, 'focus':'核对保存的错题',
+                                      'conclusions':[{'id':'B1', 'conclusion':'有已保存的错题'}]}
+        for candidate in result['candidates']:
+            candidate.update(bad_case_conclusion_ids=['B1'], predicted_fixed_question_ids=['Q1'],
+                             adjustments=[{'parameter':key, 'candidate_value':value, 'expected_impact':'预计修好Q1'}
+                                          for key,value in candidate['config_diff'].items()],
+                             risks=[{'question_ids':[],'metric':'时延','reason':'待评测'}])
+        return result
+
     def run_drafts(self, result):
         # Each response is an independent first round; incomplete real rounds remain blocked.
         self.store = GovernanceStore(Path(self.directory.name) / f"contract-{len(list(Path(self.directory.name).glob('*.db')))}.db")
         completed_baseline(self.store, run_id="EVAL-test")
         self.store.record_bad_case("EVAL-test","Q1","Retrieval","ordinary",trace_case())
-        raw = json.dumps(result, ensure_ascii=False)
+        raw = json.dumps(self.saved_drafts(result), ensure_ascii=False)
         provider = FixedProvider(raw)
         try:
             experiment = OptimizationAgent(self.store, provider).generate("EVAL-test")
@@ -122,7 +141,7 @@ class OptimizationContractTests(unittest.TestCase):
     def test_prompt_forwards_persisted_gate_and_budget_context_with_identity(self):
         gates = {'passed': False, 'gates': [{'id': 'latency_p99_seconds', 'actual': 12, 'threshold': 10, 'status': 'FAIL', 'passed': False}, {'id': 'positive_correctness', 'actual': 95, 'threshold': 90, 'status': 'PASS', 'passed': True}]}
         self.store.finish_evaluation_run('EVAL-test', 'completed', {'gates': gates})
-        provider = FixedProvider(json.dumps(drafts()))
+        provider = FixedProvider(json.dumps(self.saved_drafts(drafts())))
         generated = OptimizationAgent(self.store, provider).generate('EVAL-test')
         self.assertEqual(generated['baseline_run_id'],'EVAL-test')
         self.assertEqual(provider.prompt['goal']['failed_gates'],[gates['gates'][0]])
@@ -134,7 +153,7 @@ class OptimizationContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             OptimizationAgent(self.store, retry).generate('EVAL-test', experiment_id=generated['id'])
         self.assertEqual(self.store.experiment(generated['id'])['evaluation_budget']['used'],3)
-        self.assertEqual(retry.prompt['goal']['failed_gates'], [gates['gates'][0]])
+        self.assertIsNone(retry.prompt)
 
     def test_bad_candidate_k_rejects_round_and_preserves_full_raw_trace(self):
         result=drafts();result['candidates'][2]['config_diff']['candidate_k']='32'
@@ -231,24 +250,18 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual([c['reasoning']['root_cause'] for c in experiment['candidates']],['Retrieval']*3)
         self.assertEqual(provider.prompt['bad_cases'][0]['diagnosis_category'],'检索层问题')
 
-    def test_round2_uses_temporary_saved_results_and_new_configuration(self):
-        generated=OptimizationAgent(self.store,FixedProvider(json.dumps(drafts()))).generate('EVAL-test')
+    def test_round2_cannot_use_technical_failures_as_a_completed_round(self):
+        generated=OptimizationAgent(self.store,FixedProvider(json.dumps(self.saved_drafts(drafts())))).generate('EVAL-test')
         for c in generated['candidates']:self.store.finish_candidate(c['id'],'failed',{})
-        response=drafts()
-        for row in response['candidates']:row['hypothesis']+=' second round'
-        response['candidates'][0]['config_diff']={'query_rewrite':True}
-        response['candidates'][1]['config_diff']={'hyde':True}
-        response['candidates'][2]['config_diff']={'retrieval_max_tokens':8192}
-        response['candidates'][2]['direction']='上下文预算'
-        result=OptimizationAgent(self.store,FixedProvider(json.dumps(response))).generate('EVAL-test',experiment_id=generated['id'])
-        new=[c for c in result['candidates'] if c['reasoning'].get('round')==2]
-        self.assertEqual(len(new),3)
-        self.assertEqual(new[0]['config']['query_rewrite'],True)
+        provider = FixedProvider('must not be called')
+        with self.assertRaisesRegex(ValueError, '上一轮.*Sandbox'):
+            OptimizationAgent(self.store,provider).generate('EVAL-test',experiment_id=generated['id'])
+        self.assertIsNone(provider.prompt)
 
     def test_generation_target_allows_retrieval_parameters(self):
         self.store.record_bad_case('EVAL-test','Q1','Generation','ordinary',trace_case('Generation'))
         self.store.record_bad_case('EVAL-test','Q-unknown','Unknown','ordinary',{'primary_root_cause':'Unknown'})
-        provider=FixedProvider(json.dumps(drafts()))
+        provider=FixedProvider(json.dumps(self.saved_drafts(drafts())))
         result=OptimizationAgent(self.store,provider).generate('EVAL-test')
         self.assertEqual(len(result['candidates']),3)
         self.assertEqual([row['question_id'] for row in provider.prompt['bad_cases']],['Q1'])
@@ -256,7 +269,7 @@ class OptimizationContractTests(unittest.TestCase):
 
     def test_evaluation_audit_is_local_only_not_strategy_input(self):
         self.store.record_bad_case('EVAL-test','Q-risk','Unknown','ordinary',{'failure_tags':['Evidence Pending Review'],'primary_root_cause':'Unknown','diagnosis':{'status':'disputed','reason':'fixture matcher dispute'}})
-        provider=FixedProvider(json.dumps(drafts()))
+        provider=FixedProvider(json.dumps(self.saved_drafts(drafts())))
         OptimizationAgent(self.store,provider).generate('EVAL-test')
         self.assertEqual(len(provider.prompt['bad_cases']),1)
         self.assertNotIn('all_bad_case_audit',provider.prompt)
@@ -296,7 +309,7 @@ class OptimizationContractTests(unittest.TestCase):
     def test_persistence_response_reuse_revalidates_without_second_provider_call(self):
         import hashlib
         from unittest.mock import patch
-        provider = FixedProvider(json.dumps(drafts()))
+        provider = FixedProvider(json.dumps(self.saved_drafts(drafts())))
         provider.request_summary = lambda system,user,**kwargs: {'request_sha256':hashlib.sha256((system+user).encode()).hexdigest()}
         real_complete = provider.complete
         calls = []
@@ -317,7 +330,7 @@ class OptimizationContractTests(unittest.TestCase):
         import hashlib
         from unittest.mock import patch
         from app.telemetry import record_usage
-        provider=FixedProvider(json.dumps(drafts()))
+        provider=FixedProvider(json.dumps(self.saved_drafts(drafts())))
         provider.request_summary=lambda system,user,**kw: {'request_sha256':hashlib.sha256((system+user).encode()).hexdigest()}
         complete=provider.complete
         calls=[]
@@ -338,7 +351,7 @@ class OptimizationContractTests(unittest.TestCase):
         import hashlib
         from app.evaluation_stage import checkpoint_request
         from app.telemetry import record_usage
-        provider=FixedProvider(json.dumps(drafts()))
+        provider=FixedProvider(json.dumps(self.saved_drafts(drafts())))
         provider.request_summary=lambda system,user,**kw: {'request_sha256':hashlib.sha256((system+user).encode()).hexdigest()}
         calls=[]
         crashed=False
@@ -346,7 +359,7 @@ class OptimizationContractTests(unittest.TestCase):
             nonlocal crashed
             def action():
                 calls.append(True);record_usage({'provider':'Stub','status':'ok'})
-                return json.dumps(drafts())
+                return provider.response
             content=checkpoint_request('Stub','fixture','agent',{'system':system,'user':user},action)
             if not crashed:
                 crashed=True;raise KeyboardInterrupt('worker exited after durable RPC response')
