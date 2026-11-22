@@ -200,6 +200,27 @@ def test_d_partial_fusion_needs_second_qualified_source():
         validate_d_mode(_suggestion("winner_plus", ["R1-B"]), winner, [winner, other])
 
 
+def test_d_degenerate_fusion_allows_adding_one_parameter_to_winner():
+    winner, other = _qualified("R1-C", 2, "C"), _qualified("R2-C", 4, "C")
+    winner['config'].update(hybrid_alpha=0.7, query_decompose=True)
+    other['config']['hybrid_alpha'] = 0.7
+    suggestion = {**_suggestion('winner_plus', ['R1-A']), 'proposed_config_diff': {'top_k': 6}}
+    facts = {'baseline_config': base_config()}
+    validate_d_mode(suggestion, winner, [winner, other], facts)
+
+    with pytest.raises(ValueError, match='winner_plus'):
+        validate_d_mode({**suggestion, 'combination_mode': 'partial_fusion'}, winner, [winner, other], facts)
+    with pytest.raises(ValueError, match='新增 1 个参数'):
+        validate_d_mode({**suggestion, 'proposed_config_diff': {'query_decompose': False}},
+                        winner, [winner, other], facts)
+    with pytest.raises(ValueError, match='保留 Winner'):
+        validate_d_mode({**suggestion, 'proposed_config_diff': {'hybrid_search': False}},
+                        winner, [winner, other], facts)
+    other['config']['top_k'] = 6
+    with pytest.raises(ValueError, match='partial_fusion'):
+        validate_d_mode(suggestion, winner, [winner, other], facts)
+
+
 def test_d_single_qualified_may_use_new_attempt_but_prefers_verified():
     winner = _qualified("R1-A", 5)
     validate_d_mode(_suggestion("winner_plus", [], "new_attempt"), winner, [winner])
@@ -207,6 +228,14 @@ def test_d_single_qualified_may_use_new_attempt_but_prefers_verified():
         validate_d_mode(_suggestion("winner_plus", [], "new_attempt"), winner, [winner], {"usable_repairs": [{"x": 1}]})
     with pytest.raises(ValueError, match="必须生成D"):
         validate_d_mode({**_suggestion("winner_plus", []), "should_generate_d": False}, winner, [winner])
+
+
+def test_d_mode_limits_effective_changes_from_baseline():
+    winner = _qualified('R1-C', 2, 'C')
+    winner['config'].update(hybrid_alpha=0.7, query_decompose=True)
+    suggestion = {**_suggestion('winner_plus', ['R1-A']), 'proposed_config_diff': {'top_k': 6, 'hyde': True}}
+    with pytest.raises(ValueError, match='相对 Baseline 最多改 3'):
+        validate_d_mode(suggestion, winner, [winner], {'baseline_config': base_config()})
 
 
 def test_select_final_candidate():

@@ -42,12 +42,16 @@ def run_snapshot(golden, config, judge):
     }
 
 
-def require_resume_snapshot(judge, current_judge=None):
+def require_resume_snapshot(judge, current_judge=None, *, for_candidate_baseline=False):
     saved = judge.get('run_snapshot')
     if not isinstance(saved, dict) or not saved.get('rules_hash') or not isinstance(saved.get('prompt_version'), dict):
         raise ValueError('续跑原记录缺少 rules_hash 或 prompt_version，无法验证启动快照')
     current = _versions(current_judge if current_judge is not None else judge)
     changed = [field for field in ('rules_hash', 'search_space_version') if saved.get(field) != current[field]]
+    # 109a changes qualification and D planning only. The completed Baseline can
+    # still anchor a new Candidate. Resuming a run keeps the full fingerprint check.
+    if for_candidate_baseline and (saved['rules_hash'], current['rules_hash']) == ('f0d368403ec9', '2aa1acc7b9c0'):
+        changed.remove('rules_hash')
     changed.extend(f'prompt_version.{name}' for name, fingerprint in current['prompt_version'].items()
                    if saved['prompt_version'].get(name) != fingerprint)
     if changed:

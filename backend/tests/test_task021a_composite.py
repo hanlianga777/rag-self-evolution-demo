@@ -61,7 +61,12 @@ class RefinementTests(unittest.TestCase):
         config,_=self.validate(value)
         self.assertEqual(parameter_diff(config,DEFAULT_PIPELINE_CONFIG),{'top_k':6,'hybrid_alpha':0.7})
         value['proposed_config_diff'].pop('query_decompose')
-        with self.assertRaisesRegex(ValueError,'相对 Baseline 最多改 2'):
+        value['changes'].pop()
+        config, _ = self.validate(value)
+        self.assertEqual(parameter_diff(config, DEFAULT_PIPELINE_CONFIG),
+                         {'top_k': 6, 'hybrid_alpha': 0.7, 'query_decompose': True})
+        value['proposed_config_diff']['hyde'] = True
+        with self.assertRaisesRegex(ValueError,'相对 Baseline 最多改 3'):
             self.validate(value)
         value['proposed_config_diff']={'query_decompose':True}
         with self.assertRaisesRegex(ValueError,'D必须不同于 Winner'):
@@ -70,7 +75,7 @@ class RefinementTests(unittest.TestCase):
     def test_rejections(self):
         cases=[]
         v=self.suggestion();v['proposed_config_diff']={'top_k':5};cases.append((v,'Pipeline'))
-        v=self.suggestion();v['proposed_config_diff'].update(query_rewrite=True,hyde=True);cases.append((v,'2'))
+        v=self.suggestion();v['proposed_config_diff'].update(query_rewrite=True,hyde=True,query_decompose=True);cases.append((v,'最多改 3'))
         v=self.suggestion();v['proposed_config_diff']={'candidate_k':24};cases.append((v,'D必须不同于 Winner'))
         v=self.suggestion();del v['changes'][0]['side_effect_check'];cases.append((v,'副作用'))
         v=self.suggestion();v['proposed_config_diff']={'hyde':True};v['changes'][0].update(parameter='hyde',source_type='new_attempt',source_candidates=[]);cases.append((v,'已验证'))

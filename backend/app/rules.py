@@ -3,7 +3,7 @@
 import hashlib
 import json
 
-RULES_VERSION = '2026-11-20'
+RULES_VERSION = '2026-11-20b'
 CHUNKING = {
     'strategy': 'parent-child-v2',
     'parent_tokens': 1400,
@@ -58,6 +58,7 @@ GATES = {
 AGENT = {
     'candidates_per_round': 3,
     'max_changed_parameters': 2,
+    'd_max_changed_parameters': 3,
     'budget': 12,
     'thinking_locked': True,
     'downgrade_rule': False,

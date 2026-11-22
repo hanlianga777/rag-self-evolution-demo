@@ -359,14 +359,27 @@ def conclude_round(store, runtime, experiment_id, *, final_d=False):
     raise ValueError('本轮结论连续校验拒绝：'+saved['attempts'][-1]['error'])
 
 
+def _d_fusion_already_evaluated(history, qualified, base):
+    from .composite import parameter_diff
+
+    evaluated = {c['id']: parameter_diff(c['config'], base) for c in history if c.get('status') == 'evaluated'}
+    combined = {}
+    for candidate_id in qualified:
+        for key, value in evaluated[candidate_id].items():
+            if key in combined and combined[key] != value:
+                return False
+            combined[key] = value
+    return bool(combined) and combined in evaluated.values()
+
+
 def validate_d_mode(suggestion, winner, history, facts=None):
-    """规则总表五.7：≥2个合格→部分合并（D须取用另一个合格方案的参数）；只有1个合格→从Winner出发尝试不同组合。
+    """规则总表六.7：多个合格方案可部分合并，组合已跑过时改为 Winner 加一项。
     优先用验证过的参数；没验证过的参数可以用，但已有可用的验证参数时不能全部用新参数。D 必须生成。"""
     mode = suggestion.get('combination_mode')
     if mode == 'winner_plus_verified':
         mode = suggestion['combination_mode'] = 'winner_plus'
     if mode not in {'partial_fusion','winner_plus'} or not isinstance(suggestion.get('mode_reason'), str) or not suggestion['mode_reason'].strip():
-        raise ValueError('D须选择partial_fusion（部分合并）或winner_plus（基于唯一合格方案精修），并说明原因')
+        raise ValueError('D须选择partial_fusion（部分合并）或winner_plus（基于Winner精修），并说明原因')
     if suggestion.get('should_generate_d') is not True:
         raise ValueError('有合格方案时必须生成D（规则总表五.7）')
     qualified = {c['id'] for c in history if c.get('status') == 'evaluated' and c['reasoning'].get('candidate_label') in {'A','B','C'}
@@ -374,7 +387,23 @@ def validate_d_mode(suggestion, winner, history, facts=None):
     changes = suggestion.get('changes', [])
     if not isinstance(changes, list) or not changes:
         raise ValueError('D至少要改1个参数')
-    if len(qualified) >= 2:
+    from .composite import effective_d_config, parameter_diff, pipeline_config, validate_d_parameter_limit
+
+    base = (facts or {}).get('baseline_config')
+    addition = suggestion.get('proposed_config_diff')
+    effective = None
+    if base and isinstance(addition, dict):
+        winner_config = pipeline_config(winner['config'])
+        effective = effective_d_config({**winner_config, **addition}, addition)
+        if effective is not None:
+            validate_d_parameter_limit(effective, base)
+    if len(qualified) >= 2 and base and _d_fusion_already_evaluated(history, qualified, base):
+        if mode != 'winner_plus':
+            raise ValueError('合格方案的参数并集已评测，D须为winner_plus')
+        if (effective is None or len(addition) != 1 or addition.keys() & parameter_diff(winner_config, base).keys()
+                or parameter_diff(effective, winner_config) != addition):
+            raise ValueError('组合退化时，D 须保留 Winner 改动且只新增 1 个参数')
+    elif len(qualified) >= 2:
         if mode != 'partial_fusion':
             raise ValueError('已有2个及以上合格方案，D须为partial_fusion')
         others = qualified - {winner['id']}

@@ -1051,7 +1051,7 @@ class EvaluationRunner:
             raise ValueError('评测规则已升级，请建立新Baseline；旧 Candidate 只读')
         if baseline['config'].get('knowledge_identity'):
             from .evaluation_snapshot import require_resume_snapshot
-            require_resume_snapshot(baseline['judge'])
+            require_resume_snapshot(baseline['judge'], for_candidate_baseline=True)
         from .policy import validate_candidate_config
         if not validate_candidate_config(candidate["config"])["valid"]:
             raise ValueError("Candidate 参数超出 Search Space")

@@ -79,10 +79,17 @@ class PrerequisiteTests(unittest.TestCase):
         self.assertEqual(result['facts']['usable_repairs'],[])
 
     def test_usable_repairs_can_replace_a_winner_edit_to_fit_the_limit(self):
-        self.winner['config'].update(candidate_k=12,hybrid_alpha=0.7,query_decompose=True)
+        self.winner['config'].update(candidate_k=24,hybrid_alpha=0.7,query_decompose=True)
         self.other['config']['hybrid_alpha']=0.7
         self.refresh_facts()
         self.assertIn({'top_k':6,'query_decompose':False},
+                      [r['proposed_config_diff'] for r in self.facts['usable_repairs'] if r['parameter']=='top_k'])
+
+    def test_usable_repair_can_add_a_third_baseline_change(self):
+        self.winner['config'].update(candidate_k=12,hybrid_alpha=0.7,query_decompose=True)
+        self.other['config']['hybrid_alpha']=0.7
+        self.refresh_facts()
+        self.assertIn({'top_k':6},
                       [r['proposed_config_diff'] for r in self.facts['usable_repairs'] if r['parameter']=='top_k'])
 
     def test_out_of_reach_evidence_and_winner_reversal_are_not_usable(self):

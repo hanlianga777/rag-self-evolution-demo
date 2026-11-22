@@ -101,7 +101,7 @@ def protected_question(case, golden=None):
 
 
 
-CANDIDATE_QUALIFICATION_VERSION = '2026-11-20b'
+CANDIDATE_QUALIFICATION_VERSION = rules.RULES_VERSION
 
 
 def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int, baseline_bad_case_count: int, candidate_bad_case_count: int, *, rule_version: str | None = None) -> dict:

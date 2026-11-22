@@ -117,7 +117,7 @@ def usable_repairs(facts):
     """Identify historical repairs supported by saved Winner positions, not predicted gains."""
     base = facts['baseline_config']; winner = facts['winner_config']; repairs = []
     tunable = set(rules.AGENT['tunable'])
-    limit = rules.AGENT['max_changed_parameters']
+    limit = rules.AGENT['d_max_changed_parameters']
     for failure in facts['remaining_failures']:
         positions = failure['evidence_positions']
         if not isinstance(positions,list):continue
@@ -176,6 +176,12 @@ def effective_d_config(config, changes):
     return effective
 
 
+def validate_d_parameter_limit(config, base):
+    limit = rules.AGENT['d_max_changed_parameters']
+    if len(parameter_diff(config, base)) > limit:
+        raise ValueError(f"相对 Baseline 最多改 {limit} 个参数")
+
+
 def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
     diff = suggestion.get('proposed_config_diff')
     if not isinstance(diff,dict) or set(diff)-set(ALLOWED_SEARCH_SPACE):raise ValueError('非法Pipeline参数')
@@ -188,8 +194,7 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
     if effective_config is None:
         raise ValueError('取值不在Pipeline ALLOWED_SEARCH_SPACE选项里，hybrid_alpha仅在 Hybrid Search 开启时可选')
     changes = parameter_diff(config,winner_config)
-    if len(parameter_diff(config, base)) > rules.AGENT['max_changed_parameters']:
-        raise ValueError(f"相对 Baseline 最多改 {rules.AGENT['max_changed_parameters']} 个参数")
+    validate_d_parameter_limit(effective_config, base)
     if not changes:raise ValueError('D必须不同于 Winner')
     rows = suggestion.get('changes')
     if not isinstance(rows,list) or len(rows)!=len(changes) or any(not isinstance(r,dict) for r in rows) or {r.get('parameter') for r in rows}!=set(changes):

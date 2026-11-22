@@ -13,7 +13,7 @@ ENV_KEYS = {'BASELINE_THINKING', 'JUDGE_THINKING', 'JUDGE_SAMPLES'}
 
 def test_rulebook_machine_contract():
     from app import rules
-    from app.policy import ALLOWED_SEARCH_SPACE, FRIEND_BASELINE_CONFIG, MAX_EVALS
+    from app.policy import ALLOWED_SEARCH_SPACE, CANDIDATE_QUALIFICATION_VERSION, FRIEND_BASELINE_CONFIG, MAX_EVALS
     data = re.search(r'```json rules\s*\n(.*?)\n```',
                      (ROOT / '指挥/规则总表.md').read_text(), re.S)
     assert data
@@ -22,9 +22,28 @@ def test_rulebook_machine_contract():
     canonical = json.dumps(documented, sort_keys=True, separators=(',', ':'))
     assert getattr(rules, 'RULES_HASH', None) == hashlib.sha256(canonical.encode()).hexdigest()[:12]
     assert rules.RULES_VERSION == rules.RULES['rules_version']
+    assert rules.RULES_VERSION == CANDIDATE_QUALIFICATION_VERSION == '2026-11-20b'
+    assert rules.AGENT['max_changed_parameters'] == 2
+    assert rules.AGENT['d_max_changed_parameters'] == 3
     assert all(FRIEND_BASELINE_CONFIG[key] == value for key, value in rules.BASELINE.items())
     assert set(ALLOWED_SEARCH_SPACE) - {'generation_thinking'} == set(rules.AGENT['tunable'])
     assert MAX_EVALS == rules.AGENT['budget']
+
+
+def test_completed_baseline_snapshot_allows_109a_upgrade_only():
+    from app.evaluation_snapshot import require_resume_snapshot, run_snapshot
+
+    snapshot = run_snapshot({'id': 'frozen'}, {}, {})
+    saved = {'run_snapshot': {**snapshot, 'rules_hash': 'f0d368403ec9', 'rules_version': '2026-11-20'}}
+    require_resume_snapshot(saved, for_candidate_baseline=True)
+    with pytest.raises(ValueError, match='rules_hash'):
+        require_resume_snapshot(saved)
+    saved['run_snapshot']['prompt_version']['Strict'] = 'changed'
+    with pytest.raises(ValueError, match='prompt_version.Strict'):
+        require_resume_snapshot(saved, for_candidate_baseline=True)
+    saved['run_snapshot']['rules_hash'] = 'unknown'
+    with pytest.raises(ValueError, match='rules_hash'):
+        require_resume_snapshot(saved, for_candidate_baseline=True)
 
 
 def test_current_explanations():
