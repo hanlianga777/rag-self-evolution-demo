@@ -341,7 +341,7 @@ while :; do
   if ! (cd "$REPO/backend" &&
         PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider tests/test_rules_sync.py &&
         PYTHONDONTWRITEBYTECODE=1 python3 scripts/rules_e2e_check.py --check) >"$rules_log" 2>&1; then
-    record "跳过：$task，规则测试或端到端核对未通过（$rules_log）"
+    record "跳过：${task}，规则测试或端到端核对未通过（${rules_log}）"
     rules_skipped+=$'\n'"$task"$'\n'
     continue
   fi
