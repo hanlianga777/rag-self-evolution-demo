@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 # Demo Readiness
 
 当前真实保存结果见 [Current Demo Truth](CURRENT_DEMO_TRUTH.md)，V1.4 代码与离线验收见 [实施验收](V1_4_IMPLEMENTATION_VERIFICATION.md)。旧“全文active未升级/Provider未运行”属于Historical。当前新Knowledge已真实激活，Full100 Slot完整，但质量99/100、机器合格87/人工13，Gate1 Pending；未冻结新Snapshot或运行新Baseline/Agent。最新结果见[最终收口验收](FINAL_CLOSURE_VERIFICATION.md)，离线通过不代表Gate就绪。

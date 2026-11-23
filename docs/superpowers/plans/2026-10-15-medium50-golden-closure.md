@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 # Medium50 Golden Closure Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking. User explicitly authorizes autonomous execution without ordinary stage confirmation.

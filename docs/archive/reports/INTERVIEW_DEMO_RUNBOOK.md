@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 > 当前合同见SPEC文首2026-10-08版本；下文Legacy演示成绩不是新Knowledge结果。新Golden仍待Human Gate 1。
 
 # 20–30 分钟 Interview Demo 演示路径

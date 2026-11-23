@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 # Independent Experiment Preview Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

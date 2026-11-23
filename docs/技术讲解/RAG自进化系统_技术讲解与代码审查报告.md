@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../README.md)。
+
 # RAG 自进化系统 — 技术讲解与代码审查报告
 
 > **项目**：机器人售后智能客服 · RAG 自进化系统（GitHub：`hanlianga777/rag-self-evolution-demo`）

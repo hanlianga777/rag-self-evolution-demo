@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 # V1.4 文档与架构同步验收
 
 日期：2026-09-30（Asia/Shanghai）。检查基线：`f6ea03d`。使用 ponytail full 与 diagram-design；仅文档和图交付，业务实现保持 Phase 1，不执行真实 Provider、数据库迁移、Golden/评测/实验/人工发布或索引重建。

@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 > Judge VNext：`BASELINE_READY=true`。新Golden `GD-20261031071527` 已冻结，当前Judge6.4协议已验证，当前1124项完整离线回归无新增P0/P1（13项已知P2保留）。历史技术NE及费用Unknown按实记录，见[最终实施与验收](docs/JUDGE_VNEXT_FINAL_CLOSEOUT_20261101.md)。正式新版Baseline仍须用户本人在前端点击。
 
 > 普通 Uvicorn 启动默认安全加载已有数据库（`RAG_SAFE_START=1`）；该模式不自动迁移、清理、中断或恢复任务，不调用索引构建脚本。详细合同见 SPEC。

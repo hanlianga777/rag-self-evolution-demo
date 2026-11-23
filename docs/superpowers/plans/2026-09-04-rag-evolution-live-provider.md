@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 # RAG Evolution 第二阶段实施计划
 
 **目标：** 增加可审计的 DeepSeek 真实模式与本地证据检索，同时保留稳定的 Mock Demo。

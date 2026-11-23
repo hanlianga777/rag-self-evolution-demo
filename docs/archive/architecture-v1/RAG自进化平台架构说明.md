@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 # RAG Evolution 平台架构说明
 
 > 当前正式架构同源于概览页面，2026-10-08同步；唯一规则见[SPEC当前合同](../docs/RAG_SELF_EVOLUTION_SPEC.md)。图表达流程设计，不表达当前阶段已执行；实际Full由用户冻结，新Medium业务V2独立停在人工治理，Legacy Production独立。

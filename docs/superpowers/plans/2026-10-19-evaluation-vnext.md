@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 # Evaluation VNext Implementation Plan
 
 本轮设计已由用户附件批准，直接在当前工作区顺序实施；不分派子Agent，不新建工作树，不触碰其他任务文件。

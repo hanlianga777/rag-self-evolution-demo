@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 # UI V2 只读验收（2026-10-15）
 
 本轮仅重组 Baseline、Agent、发布、问答验证的前端表达，未执行新评测或问答。当前页面读取已保存 Mini20：Overall 95.80、11/11 Hard Gate、3 个原始失败、2 个技术 Bad Case。Candidate A 已评测不合格，B/C 尚未完成；当前运行初始配置，没有经 Candidate 人工晋升的新 Production。Medium50 工作集仍按有限失败合同停止，不被上述旧有 Mini20 成绩替代。真实状态以当前保存身份为准，不将 Fixture 答案/审批/回滚截图视为业务结果。
@@ -69,7 +71,7 @@ Knowledge已激活4份PDF/157页，349 Parent/368 Child、text-embedding-v4 1024
 
 ## V1.4 实施保护检查（2026-10-02）
 
-上述真实业务身份、成绩和冻结内容保持原样，不能称为本轮 V2/Provider 实测。实施前 SQLite Backup API 备份及索引副本位于 `/Users/zhanghaohan/.codex/backups/rag-v14-20260930-3a44f2f/`，完整性为 `ok`。阶段只读比较 25 张业务表排序内容与四个 active 索引文件 SHA-256 均不变；最终比较见 [实施验收](V1_4_IMPLEMENTATION_VERIFICATION.md)。全文备份 Staging 与代码支持分开记录，未切真实 active。旧后台服务没有自动重启，默认库未由本次代码导入或迁移。
+上述真实业务身份、成绩和冻结内容保持原样，不能称为本轮 V2/Provider 实测。实施前 SQLite Backup API 备份及索引副本位于 `本机备份目录`，完整性为 `ok`。阶段只读比较 25 张业务表排序内容与四个 active 索引文件 SHA-256 均不变；最终比较见 [实施验收](V1_4_IMPLEMENTATION_VERIFICATION.md)。全文备份 Staging 与代码支持分开记录，未切真实 active。旧后台服务没有自动重启，默认库未由本次代码导入或迁移。
 
 
 ## Interview Demo 只读复核（2026-10-03）

@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 # V1.2 implementation ledger
 
 Baseline: `93486f23db4bb4711bba332dd0063b330838af47`. User-authorized V1.2 plan is the scope. Ponytail full. Real user database is read-only; backup and all tests use `/tmp/rag-v12.bVmzUQ/`.

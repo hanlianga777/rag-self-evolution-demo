@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 # RAG Evolution 第二阶段真实 Provider 设计
 
 ## 目标

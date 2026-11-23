@@ -1,7 +1,9 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 # Mini20业务质量收口 Implementation Plan
 
 **Goal:** 按用户2026-10-14完整附件，在本轮独立预算内合法组卷、逐题治理及所有者委托审核；仅条件全部真实满足才冻结。
-**Spec:** docs/RAG_SELF_EVOLUTION_SPEC.md；授权源 /Users/zhanghaohan/.codex/attachments/de77008d-285d-4ee1-8d11-07be46e7c105/已粘贴的文本.txt。
+**Spec:** docs/RAG_SELF_EVOLUTION_SPEC.md；授权源 本机授权记录（路径已隐去）
 **Architecture:** 保留现有Mini Coverage，以Business V2装饰业务输入，原20题仅作新候选内容来源，兼容优先复用，缺槽定向补齐。复用PaidRun、逐Slot持久化、十维审计、Probe/QC、Revision及现有委托事务。
 **Tech Stack:** 现有Python/SQLite/React；无新依赖、知识索引重建或评测运行。
 

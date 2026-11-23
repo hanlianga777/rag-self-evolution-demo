@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 ## 2026-10-28 Round 0 既有节点内部能力
 
 既有Provider按任务映射Thinking，AiService共用V2；查询处理节点新增有界子意图拆解，检索合并仍沿Candidate→Rerank→Parent/Final。生成前以官方本地Tokenizer执行可选完整块上下文容量检查，不完整则安全停止。共同评测身份与独立实验配置哈希分开；无新服务/数据库表/一级导航，不修改Judge/Gate核心。Pipeline Draft与Baseline报告沿既有Card/Drawer调整归属。

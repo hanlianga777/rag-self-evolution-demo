@@ -1,3 +1,5 @@
+> **历史版本，已被 README 取代**。现行流程见 [仓库首页](../../../README.md)。
+
 # Medium50 Golden重新规划与质量收口
 
 本轮依据：用户2026-10-15新任务，原文及SHA保存于本地`output/playwright/medium50-golden-closure-20261015/source-authorization.json`。用户明确授权自主规划/执行/Owner Delegated AI Review，无需普通阶段确认。本轮仅Golden；不运行Baseline、Agent、Sandbox、Regression、Gate2或Production。
