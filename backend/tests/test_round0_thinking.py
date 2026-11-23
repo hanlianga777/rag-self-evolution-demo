@@ -109,7 +109,7 @@ class ThinkingTests(unittest.TestCase):
         self.assertEqual(calls[-1][2]['thinking'], {'type':'disabled'})
         self.assertNotIn('GOLDEN SECRET', repr(calls))
         self.assertIn('涉及安全', calls[-1][0])
-        self.assertNotEqual(generation_contract(), generation_contract('generation-vnext-1'))
+        self.assertNotEqual(generation_contract(), generation_contract('generation-vnext-2'))
 
     def test_checkpoint_identity_includes_effort_and_reuses_only_matching_request(self):
         from app.evaluation_stage import _request_checkpoint
@@ -171,7 +171,7 @@ class ThinkingTests(unittest.TestCase):
         from app.optimization import OptimizationAgent
         from unittest.mock import Mock
         store = Mock()
-        for version in ('generation-vnext-1','generation-vnext-2'):
+        for version in ('generation-vnext-2','generation-vnext-3'):
             store.evaluation_run.return_value = {'judge':generation_contract(version)}
             with self.assertRaisesRegex(ValueError, 'Generation'):
                 OptimizationAgent(store,self.provider).generate('old-baseline')

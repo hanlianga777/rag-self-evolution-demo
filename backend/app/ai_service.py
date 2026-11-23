@@ -87,19 +87,19 @@ def generation_boundary(version):
         return GENERATION_STRUCTURED_V4
     if version == "generation-vnext-3":
         return GENERATION_STRUCTURED
-    return GENERATION_BOUNDARY if version == "generation-vnext-1" else GENERATION_BOUNDARY.replace("有据正常回答并引用Chunk", "有据正常回答并保留真实来源引用") + GENERATION_EXPRESSION
+    if version == "generation-vnext-2":
+        return GENERATION_BOUNDARY.replace("有据正常回答并引用Chunk", "有据正常回答并保留真实来源引用") + GENERATION_EXPRESSION
+    raise ValueError('Unknown Generation prompt version: ' + str(version))
 
 
 def generation_contract(version=GENERATION_PROMPT_VERSION):
-    if version not in {'generation-vnext-1', 'generation-vnext-2', 'generation-vnext-3', 'generation-vnext-4'}:
-        raise ValueError('Unknown Generation prompt version: ' + str(version))
     boundary = generation_boundary(version)
     return {'generation_prompt_version': version,
             'generation_boundary_sha256': hashlib.sha256(boundary.encode()).hexdigest()}
 
 
 def generation_system_prompt(version, strategy):
-    if strategy == "Grounded" and version in {"generation-vnext-1", "generation-vnext-2", "generation-vnext-3"}:
+    if strategy == "Grounded" and version in {"generation-vnext-2", "generation-vnext-3"}:
         # Earlier experiments used this name for a different prompt.
         strategy_text = "只能基于给定证据回答；证据不足时明确说明。"
     else:

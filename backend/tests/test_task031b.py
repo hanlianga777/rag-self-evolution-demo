@@ -199,13 +199,12 @@ class PromptV3Tests(unittest.TestCase):
             run_id = store.create_baseline_run(snapshot, config, judge)
             self.assertEqual(store.evaluation_run(run_id)['judge']['generation_prompt_version'], 'generation-vnext-4')
             # Read old stored JSON without version migration or rewriting it.
-            for version in ('generation-vnext-1', 'generation-vnext-2', 'generation-vnext-3'):
+            for version in ('generation-vnext-2', 'generation-vnext-3'):
                 with store.connection() as connection:
                     connection.execute('UPDATE evaluation_runs SET judge_json=? WHERE id=?', (json.dumps(generation_contract(version)), run_id))
                 self.assertEqual(store.evaluation_run(run_id)['judge'], generation_contract(version))
 
     def test_old_generation_contracts_keep_their_hash(self):
-        self.assertEqual(generation_contract('generation-vnext-1')['generation_boundary_sha256'], 'd1fa3c13186c04fb95bd01be6615f25c6a59dbdd766290a108c4bfac78456ea2')
         self.assertEqual(generation_contract('generation-vnext-2')['generation_boundary_sha256'], 'ecc0a21cfb29dca1febb48f3c4f46f128cb12f8b94a8409b9ded08db427715af')
 
 

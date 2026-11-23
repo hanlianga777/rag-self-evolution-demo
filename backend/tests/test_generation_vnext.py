@@ -5,7 +5,6 @@ from types import SimpleNamespace
 
 from app.ai_service import AiService, GENERATION_BOUNDARY
 from app.evaluation import EvaluationRunner
-from app.evaluation_contract import evaluation_identity
 
 
 class RecordingProvider:
@@ -42,18 +41,10 @@ class GenerationVNextTests(unittest.TestCase):
             self.assertNotIn('required_checks', user)
             self.assertNotIn('历史Judge', user)
 
-    def test_explicit_legacy_versions_remain_readable(self):
-        old, provider = self.service(generation_prompt_version='generation-vnext-1')
-        new, _ = self.service(generation_prompt_version='generation-vnext-2')
-        old.answer('问题', {'prompt_strategy':'Grounded'})
-        self.assertEqual(provider.requests[0][0], '你是机器人官方 PDF 知识助手。只能基于给定证据回答；证据不足时明确说明。' + GENERATION_BOUNDARY + '回答使用中文，简洁、可执行。')
-        self.assertEqual(old.generation_contract['generation_prompt_version'], 'generation-vnext-1')
-        self.assertEqual(old.generation_contract['generation_boundary_sha256'], hashlib.sha256(GENERATION_BOUNDARY.encode()).hexdigest())
-        self.assertNotEqual(evaluation_identity({'id': 'GD'}, old.generation_contract), evaluation_identity({'id': 'GD'}, new.generation_contract))
-
     def test_unknown_version_is_rejected_before_retrieval_or_provider(self):
-        with self.assertRaises(ValueError):
-            self.service(generation_prompt_version='typo')
+        for version in ('typo', 'generation-vnext-1'):
+            with self.subTest(version=version), self.assertRaisesRegex(ValueError, 'Unknown Generation prompt version'):
+                self.service(generation_prompt_version=version)
 
     def test_replay_preserves_selected_generation_version(self):
         from test_judge_replay_v5 import JudgeReplayTests
@@ -63,7 +54,7 @@ class GenerationVNextTests(unittest.TestCase):
         args[0]['judge'].update(generation_contract('generation-vnext-2'))
         args[4].update(generation_contract('generation-vnext-2'))
         self.assertTrue(replay_eligibility(*args, 'fp')['can_replay'])
-        args[4].update(generation_contract('generation-vnext-1'))
+        args[4].update(generation_contract('generation-vnext-3'))
         result = replay_eligibility(*args, 'fp')
         self.assertFalse(result['can_replay'])
         self.assertIn('generation_contract_changed', result['eligibility'][0]['blockers'])

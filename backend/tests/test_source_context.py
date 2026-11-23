@@ -39,12 +39,6 @@ class SourceContextTests(unittest.TestCase):
         self.assertIn('页1–2',provider.request[1])
         self.assertIn('仅适用于B2。',provider.request[1])
 
-    def test_historical_v1_boundary_remains_unchanged(self):
-        from app.ai_service import generation_boundary
-        self.assertEqual(generation_boundary('generation-vnext-1'), GENERATION_BOUNDARY)
-        self.assertIn('有据正常回答并引用Chunk', generation_boundary('generation-vnext-1'))
-        self.assertNotIn('不要输出机器Chunk ID', generation_boundary('generation-vnext-1'))
-
     def test_shared_document_identity_is_sent_once_and_body_is_not_json_escaped(self):
         entries=[{'chunk_id':str(i),'document_id':'D1','document':'很长的同一份设备手册.pdf','product':'B2','content':'第一行\n第二行'} for i in range(4)]
         value=generation_context(entries)
