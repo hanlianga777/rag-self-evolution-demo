@@ -1,7 +1,7 @@
 import {AnswerEvidence} from '../components/AnswerEvidence';
 import {HoverCard} from '../ui/HoverCard';
 import { useApprovedGolden } from "../goldenCache";
-import { pagePurpose } from "../helpText";
+import { coreTerm, pagePurpose } from "../helpText";
 import { judgePresentation } from "../components/judgePresentation";
 import { shortSourceName } from "./FrozenQuestionDetails";
 import { Icon, IconLabel, IconTile } from "../ui/icons";
@@ -296,7 +296,7 @@ export function BaselineCaseDetails({ item, snapshot, config, gates, strategyLin
     {businessVerdict(item) === 'FAIL' && <section className="candidate-card drawer-section"><h3>本次诊断</h3>
       <p>{view.diagnosis_category || displayText(item.primary_root_cause || "主归因未记录")}</p>
       {view.analysis_reason && <p>{view.analysis_reason}</p>}
-      {strategyLink ? <a href={strategyLink}>查看 Agent 本轮保存的优化假设</a>
+      {strategyLink ? <a href={strategyLink}>查看 Agent（{coreTerm.agent}）本轮保存的优化假设</a>
         : (view.repair_hint || item.optimization_strategy) && <div className="muted-prose"><TruncatedText lines={3}>{view.repair_hint || savedDirections(item)}</TruncatedText></div>}
     </section>}
 

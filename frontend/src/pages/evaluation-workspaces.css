@@ -545,13 +545,15 @@ body :is(.evolution-page.page-shell,.drawer.workbench-drawer) .candidate-story-b
 
 .verification-page .monitoring-table {
   min-width: 0;
+  max-width: 100%;
   overflow: auto !important;
 }
 .verification-page.page-shell .monitoring-layout .monitoring-table table {
   min-width: 760px !important;
 }
 .verification-page .monitoring-table th:nth-child(2) { width: 26%; }
-.verification-page .monitoring-question { display: block; min-width: 10rem; }
+.verification-page .monitoring-question { display: block; min-width: 0; }
+.verification-page .monitoring-table .monitoring-question { min-width: 10rem; }
 .verification-page .monitoring-question-label {
   display: block;
   overflow: hidden;
@@ -560,13 +562,14 @@ body :is(.evolution-page.page-shell,.drawer.workbench-drawer) .candidate-story-b
 }
 
 .candidate-overview-mobile { display: none; }
-.compare-select { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+.compare-select { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: 100%; margin: 0 0 10px; }
+.compare-select select { min-width: 0; max-width: 100%; }
 .compare-parameters { margin: 0; padding-left: 16px; }
 .compare-parameters li + li { margin-top: 6px; }
 .compare-question-links { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 .saved-verdict-matrix { margin-top: 12px; }
 .saved-verdict-matrix summary { cursor: pointer; font-weight: 700; }
-.saved-verdict-matrix .table-scroll { max-height: 30rem; overflow: auto !important; }
+.evolution-page.page-shell .page-content .saved-verdict-matrix .table-scroll { height: auto; max-height: 30rem; overflow: auto !important; }
 .page-shell .saved-verdict-matrix .table-scroll table { min-width: 580px !important; }
 .candidate-overview-table thead th { position: sticky; top: 0; background: var(--ui-surface); z-index: 1; }
 .candidate-overview-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -576,7 +579,7 @@ body :is(.evolution-page.page-shell,.drawer.workbench-drawer) .candidate-story-b
   .compare-mobile-values { margin: 0; }
   .compare-mobile-values > div { display: grid; grid-template-columns: minmax(7rem, 38%) minmax(0, 1fr); gap: 8px; padding: 8px 0; border-top: 1px solid var(--ui-rule); }
   .compare-mobile-values dd { margin: 0; overflow-wrap: anywhere; }
-  .verification-page .monitoring-table .monitoring-question { min-height: 44px; text-align: left; }
+  .verification-page .monitoring-question { min-height: 44px; text-align: left; }
 }
 .raw-record { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .phrase-observation { margin-top: 12px; }

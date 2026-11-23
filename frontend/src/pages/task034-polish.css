@@ -72,9 +72,11 @@
 .thinking-message .thinking-dots {display:inline-block;animation:thinking-pulse 1.2s infinite;}
 @keyframes thinking-pulse {50% {opacity:.25;}}
 .human-gates {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:22px 0;}
-.human-gates article {padding:16px;border:1px solid var(--ui-rule);border-radius:var(--ui-r-card);}
+.human-gates article {padding:16px;border:1px solid var(--ui-rule);border-radius:var(--ui-r-card);overflow-wrap:anywhere;}
 .human-gates h3 {min-height:24px;font-size:14px;}
-.human-gates p {font-size:12px;line-height:1.8;}
+.human-gates p {font-size:var(--ui-fs-meta);line-height:1.6;color:var(--ui-muted);}
+.human-gates p:first-of-type {font-size:var(--ui-fs-body);color:var(--ui-ink);}
+@media(max-width:760px) { .human-gates {grid-template-columns:minmax(0,1fr);} }
 .release-diff table {width:100%;table-layout:fixed;border-collapse:collapse;}
 .release-diff th,.release-diff td {text-align:left;border-bottom:1px solid var(--ui-rule);padding:10px;}
 .release-eligibility ul {list-style:none;padding:0;line-height:2;}

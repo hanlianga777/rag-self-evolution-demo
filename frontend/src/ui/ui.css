@@ -138,6 +138,7 @@ td { border-bottom-color: var(--ui-rule-2); }
 .ui-float.dark b, .ui-float.dark strong { color: #fff; font-weight: 600; }
 .ui-float.pinned { outline: 2px solid var(--ui-navy-3); outline-offset: 0; }
 .ui-hover-trigger { display: inline-flex; }
+.ui-hover-trigger [tabindex="0"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* —— StatTransition：44 → 48 —— */
 .ui-transition { display: inline-flex; align-items: baseline; gap: 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }

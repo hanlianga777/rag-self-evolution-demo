@@ -69,7 +69,7 @@ it("keeps Gate 1 available when every question is approved but the current run h
   expect(document.querySelector(".ui-gp-steps li:last-child")?.textContent).toBe("题卷确认（Gate 1）待人工确认");
   expect(document.querySelector(".ui-gp-steps li:last-child")?.classList.contains("done")).toBe(false);
   expect(document.querySelector(".ui-gp")?.textContent).toContain("尚未冻结");
-  const confirm = [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "冻结 Golden Dataset")!;
+  const confirm = [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "冻结黄金测试集")!;
   expect(confirm).toBeTruthy();
   await act(async () => document.querySelector<HTMLInputElement>(".review-batch input")!.click());
   expect(confirm.disabled).toBe(false);

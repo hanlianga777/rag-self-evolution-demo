@@ -51,7 +51,7 @@ it('shows the frozen paper and hides its single repeated source', async () => {
  expect(document.querySelector('.question-provenance')).toBeNull();
  await act(async () => document.querySelector<HTMLElement>('.review-table tbody tr[role=button]')!.click());
  expect(document.querySelector('.frozen-question-details')?.textContent).not.toContain('来源：人工审核');
- expect([...document.querySelectorAll('button')].some(b => b.textContent === '冻结 Golden Dataset')).toBe(false);
+ expect([...document.querySelectorAll('button')].some(b => b.textContent === '冻结黄金测试集')).toBe(false);
  expect(document.querySelector('[aria-label="Golden Dataset 摘要"]')?.textContent).toContain('覆盖规划');
 });
 it('keeps the freeze action hidden while the current paper is being read', async () => {

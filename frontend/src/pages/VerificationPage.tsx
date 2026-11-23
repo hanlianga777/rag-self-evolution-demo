@@ -2,7 +2,7 @@ import {CitationViewer} from '../components/CitationViewer';
 import { pagePurpose } from "../helpText";
 import {loadConversations} from "../conversations";
 import {monitoringRecords, monitoringCitationCount, secondsText} from "../components/chatPresentation";
-import { shortSourceName } from "./FrozenQuestionDetails";
+import { FrozenQuestionDetails, shortSourceName } from "./FrozenQuestionDetails";
 import { IconLabel, IconTile } from "../ui/icons";
 import { QuestionBadge } from "../ui/Primitives";
 import {SavedAnswerComparison} from "../components/SavedAnswerComparison";
@@ -17,8 +17,9 @@ import { preloadHistory } from "../listPreload";
 import { detailJson, PageWarmupContext, useDetailPrefetch } from "../preload";
 import { cachedJson, errorMessage, getJson, postJson } from "../api";
 import { LoadingSkeleton, Section, Status, TruncatedText } from "../components/Primitives";
-import { ConfirmDialog, Drawer } from "../components/Dialog";
+import { ConfirmDialog, Drawer, QuestionDrawer } from "../components/Dialog";
 import { savedSnapshot } from "../evaluationProgress";
+import { goldenFetch } from "../goldenCache";
 import { AssistantPage, type ChatExample } from "./AssistantPage";
 import type { Citation } from "../types";
 import { useOperation } from "../operation";
@@ -43,6 +44,8 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
   const historyRows = records.slice((historyPage - 1) * 200, historyPage * 200);
   const latencies = records.map(row=>row.metrics?.latency_ms).filter((value:unknown):value is number=>typeof value === "number" && Number.isFinite(value));
   const [eventDetail, setEventDetail] = useState<any>(null);
+  const [frozenOpen, setFrozenOpen] = useState(false);
+  const [frozenDetail, setFrozenDetail] = useState<{ row?: any; error?: string }>({});
   const [assessmentReason,setAssessmentReason]=useState("");
   const [assessmentSeverity,setAssessmentSeverity]=useState<"ordinary"|"critical">("ordinary");
   const [contextDetail, setContextDetail] = useState(false);
@@ -118,6 +121,19 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
   const frozenEventQuestion = typeof eventQuestionId === "string" && eventGoldenId &&
     eventGoldenId === data.workspace?.current_golden_id && eventGoldenId === data.evaluation?.dataset_version_id &&
     data.evaluation?.dataset_snapshot?.question_ids?.includes(eventQuestionId) ? eventQuestionId : null;
+  const savedFrozenRow = frozenEventQuestion && data.evaluation.dataset_snapshot.questions?.find(
+    (row: any) => row.id === frozenEventQuestion && typeof row.question === "string");
+  useEffect(() => {
+    if (!frozenOpen || !frozenEventQuestion || savedFrozenRow) return;
+    let active = true;
+    void goldenFetch<any[]>(eventGoldenId, "/api/governance/snapshots").then(snapshots => {
+      const snapshot = snapshots.find(item => item.id === eventGoldenId && item.status === "approved")?.snapshot;
+      const row = snapshot?.question_ids?.includes(frozenEventQuestion) && snapshot.questions?.find((item: any) => item.id === frozenEventQuestion);
+      if (active) setFrozenDetail(row ? { row } : { error: "对应的冻结题详情未保存。" });
+    }).catch(() => { if (active) setFrozenDetail({ error: "冻结题详情读取失败。" }); });
+    return () => { active = false; };
+  }, [frozenOpen, frozenEventQuestion, eventGoldenId, savedFrozenRow]);
+  const frozenRow = savedFrozenRow || frozenDetail.row;
   const openRemaining=(id:string)=>{setQuestionId(id);setTab("compare");location.hash=`verification?tab=compare&q=${encodeURIComponent(id)}`;};
   return <PageShell className={`page verification-page verification-${tab}`} header={<div className="page-title"><div><h1><IconTile name="verify" />问答验证</h1><p className="ui-kicker page-purpose">{pagePurpose.verification}</p></div></div>} tabs={<div className="tabs"><button data-label="回答对比" aria-pressed={tab === "compare"} className={tab === "compare" ? "selected" : ""} onClick={() => setTab("compare")}>回答对比</button><button data-label="实时问答" aria-pressed={tab === "qa"} className={tab === "qa" ? "selected" : ""} onClick={() => setTab("qa")}>实时问答</button><button data-label="线上反馈" aria-pressed={tab === "monitoring"} className={tab === "monitoring" ? "selected" : ""} onClick={() => setTab("monitoring")}>线上反馈</button></div>} resetKey={tab}>
 
@@ -147,7 +163,12 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
       <p className="feedback-next-inputs">线上问题经人工确认后可作为优化线索。新版本仍须评测、回归和人工发布确认。</p>
     </section></div></>}
     <ConfirmDialog open={agentConfirm} onOpenChange={setAgentConfirm} title="确认启动监控 Agent" busy={busy} onConfirm={() => { setAgentConfirm(false); void startAgent(); }}><p>将为所选反馈生成 Round 1 优化 Candidate，会调用模型并产生费用。</p><p>不会影响当前线上版本。</p></ConfirmDialog>
-    <Drawer className="workbench-drawer" open={!!eventDetail} onOpenChange={open => !open && setEventDetail(null)} title="线上问答与来源"><div className="drawer-body story-details"><Section title="反馈结论"><p>{eventDetail?.localOnly ? "仅本机保存，未关联线上反馈记录" : eventDetail?.determinable ? eventDetail.bad_case ? "人工判定为 Bad Case，后续以关联 Trigger 为准" : "人工判定正常" : "等待人工判断，尚非已确认 Bad Case"}</p></Section><Section title="问题"><CaseAnswer text={eventDetail?.question || "未保存问题"}/></Section><Section title="实际回答"><CaseAnswer text={eventDetail?.answer || "未保存回答"} final={eventDetail?.metrics?.retrieval_trace?.final ?? []} onOpenCitation={setCitation}/></Section><Section title="版本与引用来源"><p>请求时版本：{eventDetail?.source?.production_version_id || eventDetail?.source?.version || "未记录"}</p>{frozenEventQuestion && <button type="button" className="text-button" onClick={() => { setEventDetail(null); openRemaining(frozenEventQuestion); }}>查看冻结题 {shortQuestionId(frozenEventQuestion)}</button>}<p>引用以保存检索记录为准；反馈记录未单独采集引用正文时，不推测来源。</p></Section>{eventDetail && !eventDetail.localOnly && <Section title="人工标注"><label>问题原因（必填）<textarea aria-label="Bad Case 原因" value={assessmentReason} onChange={e=>setAssessmentReason(e.target.value)} maxLength={2000}/></label><label>严重程度<select aria-label="标注严重程度" value={assessmentSeverity} onChange={e=>setAssessmentSeverity(e.target.value as 'ordinary'|'critical')}><option value="ordinary">一般</option><option value="critical">严重</option></select></label><button className="primary" disabled={busy || !assessmentReason.trim()} onClick={()=>void assess(eventDetail,true,assessmentSeverity)}>保存 Bad Case 标注</button>{error && <p role="alert">{error}</p>}</Section>}</div></Drawer>
+    <Drawer className="workbench-drawer" open={!!eventDetail} onOpenChange={open => !open && setEventDetail(null)} title="线上问答与来源"><div className="drawer-body story-details"><Section title="反馈结论"><p>{eventDetail?.localOnly ? "仅本机保存，未关联线上反馈记录" : eventDetail?.determinable ? eventDetail.bad_case ? "人工判定为失败案例（Bad Case），后续以关联实验线索为准" : "人工判定正常" : "等待人工判断是否属于失败案例（Bad Case）"}</p></Section><Section title="问题"><CaseAnswer text={eventDetail?.question || "未保存问题"}/></Section><Section title="实际回答"><CaseAnswer text={eventDetail?.answer || "未保存回答"} final={eventDetail?.metrics?.retrieval_trace?.final ?? []} onOpenCitation={setCitation}/></Section><Section title="版本与引用来源"><p>请求时版本：{eventDetail?.source?.production_version_id || eventDetail?.source?.version || "未记录"}</p>{frozenEventQuestion && <button type="button" className="text-button" onClick={event => { event.currentTarget.focus(); setFrozenDetail({}); setFrozenOpen(true); }}>查看冻结题 {shortQuestionId(frozenEventQuestion)}</button>}<p>引用以保存检索记录为准；反馈记录未单独采集引用正文时，不推测来源。</p></Section>{eventDetail && !eventDetail.localOnly && <Section title="人工标注"><label>问题原因（必填）<textarea aria-label="Bad Case 原因" value={assessmentReason} onChange={e=>setAssessmentReason(e.target.value)} maxLength={2000}/></label><label>严重程度<select aria-label="标注严重程度" value={assessmentSeverity} onChange={e=>setAssessmentSeverity(e.target.value as 'ordinary'|'critical')}><option value="ordinary">一般</option><option value="critical">严重</option></select></label><button className="primary" disabled={busy || !assessmentReason.trim()} onClick={()=>void assess(eventDetail,true,assessmentSeverity)}>保存 Bad Case 标注</button>{error && <p role="alert">{error}</p>}</Section>}</div></Drawer>
+    <QuestionDrawer className="workbench-drawer" open={frozenOpen && !!frozenEventQuestion} onOpenChange={setFrozenOpen}
+      questionLabel={frozenRow?.display_id || shortQuestionId(frozenEventQuestion || "")}>
+      <div className="drawer-body">{frozenRow ? <FrozenQuestionDetails row={frozenRow}/>
+        : frozenDetail.error ? <p role="alert">{frozenDetail.error}</p> : <LoadingSkeleton label="正在读取冻结题详情"/>}</div>
+    </QuestionDrawer>
     <Drawer className="workbench-drawer" open={contextDetail} onOpenChange={setContextDetail} title="监控触发与实验上下文"><div className="drawer-body"><Section title="反馈与实验上下文"><p>反馈状态：{trigger ? displayText(trigger.status) : "暂无反馈"}</p>{!linkedContext && contextId ? error ? <p role="alert">{error}</p> : <LoadingSkeleton label="正在读取关联上下文" /> : <p>关联优化：{linkedContext ? "已建立" : "尚未确认，未创建上下文"}</p>}{linkedContext && <><p>Baseline：{currentContext ? "当前 Baseline" : "历史上下文，只读"}</p><p>{linkedContext.status === "pending_agent" ? "待启动Round 1" : `Agent 状态：${displayText(linkedContext.status)} · Round ${linkedContext.result?.round ?? linkedContext.rounds?.at(-1)?.round ?? "未记录"}`}</p></>}</Section></div></Drawer>
     <CitationViewer citation={citation} onClose={()=>setCitation(null)}/>
   </PageShell>;
