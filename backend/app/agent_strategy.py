@@ -418,6 +418,8 @@ def conclude_round(store, runtime, experiment_id, *, final_d=False):
               'skipped_candidates':[c['id'] for c in current if c['status']=='skipped'],
               'previous_round_conclusions':round_conclusions_for_prompt(store,baseline,experiment['candidates'],
                   {n:r for n,r in experiment['result'].get('round_conclusions',{}).items() if n!=str(number)})}
+    if 'parameter_effect_ledger' in experiment['result']:
+        prompt['parameter_effect_ledger'] = experiment['result']['parameter_effect_ledger']
     system = ('你是RAG优化Agent。只读本实验保存事实，撰写解释，输出JSON。case_comparisons是程序事实。'
               '标准证据在最终资料的位置与辅助查询新增命中是不同的记录。引用时以对应字段为准，缺失写未知。'
               'plans逐一覆盖已跑过的Candidate（跳过的不算），每项给candidate_id。实际修好、新错、预测命中题号和数量由程序填写。'

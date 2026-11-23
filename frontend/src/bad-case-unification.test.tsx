@@ -47,3 +47,18 @@ it('offers Sandbox for one valid candidate while disclosing rejected candidates'
  expect(document.querySelector('.candidate-card')?.textContent).toContain('原始合法假设');
  expect(document.querySelector('details[open]')).toBeNull();
 });
+
+it('shows saved per-question mechanism decisions and reasons including rejected drafts',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
+ const mechanism_checks={
+  A:[{question_id:'Q21',display_question_id:'Q21',fault:{stage:'排序靠后'},decision:'放行',reason:'同底座预演支持'}],
+  B:[{question_id:'Q15',display_question_id:'Q15',fault:{stage:'进了 Final 但生成出错'},decision:'补证',reason:'已核对上下文变化'}],
+ };
+ const rejected={B:[{question_id:'Q17',display_question_id:'Q17',fault:{stage:'排序靠后'},decision:'拒绝',reason:'提示词无法补回证据'}]};
+ await render(<EvolutionPage data={{evaluation,badCases:rows,optimization:{id:'v2',candidates:[],result:{mechanism_contract:'113b',mechanism_checks,validation_retries:[{mechanism_checks:rejected}]}}}}/>);
+ const section = [...document.querySelectorAll('details')].find(item=>item.querySelector('summary')?.textContent==='逐题机制校验');
+ expect(section?.textContent).toContain('Q21 · 排序靠后 · 放行');
+ expect(section?.textContent).toContain('Q15 · 进了 Final 但生成出错 · 补证');
+ expect(section?.textContent).toContain('Q17 · 排序靠后 · 拒绝');
+ expect(section?.textContent).toContain('提示词无法补回证据');
+});

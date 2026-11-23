@@ -96,12 +96,21 @@ def hit_of(evidence, golden, quotes=None):
 
 def scan(items, baseline, variants, retrieve):
     """retrieve(question, config) -> 最终交给模型的资料列表。返回 {配置名: {题号: hit}}。"""
+    from app.ai_service import generation_context
+
     def label(change):
         return 'baseline' if not change else ' + '.join(f'{k}={json.dumps(v)}' for k, v in sorted(change.items()))
     results = {}
     for change in [{}, *variants]:
         config = {**baseline, **change}
-        results[label(change)] = {'change': change, 'hits': {item['qid']: hit_of(retrieve(item['question'], config), item['golden'], item.get('quotes')) for item in items}}
+        hits = {}
+        for item in items:
+            context = retrieve(item['question'], config)
+            hit = hit_of(context, item['golden'], item.get('quotes'))
+            if all(isinstance(entry.get('content'), str) for entry in context):
+                hit['context_fingerprint'] = rules.canonical_hash(generation_context(context))
+            hits[item['qid']] = hit
+        results[label(change)] = {'change': change, 'hits': hits}
     return results
 
 
@@ -151,10 +160,15 @@ def build_preview(baseline_run_id, items, results):
         hits = data['hits']
         enters = sorted(q for q, h in base.items() if not h['all_hit'] and hits[q]['all_hit'])
         lost = sorted(q for q, h in base.items() if h['all_hit'] and not hits[q]['all_hit'])
-        configs.append({'change': data['change'], 'evidence_enters_final': enters, 'evidence_lost_from_final': lost, 'net': len(enters) - len(lost)})
+        context = {q: h['context_fingerprint'] for q, h in hits.items() if h.get('context_fingerprint')}
+        changed = sorted(q for q, fingerprint in context.items() if base[q].get('context_fingerprint')
+                         and base[q]['context_fingerprint'] != fingerprint)
+        configs.append({'change': data['change'], 'evidence_enters_final': enters, 'evidence_lost_from_final': lost,
+                        'net': len(enters) - len(lost), 'context_changed_question_ids': changed, 'context_fingerprints': context})
     configs.sort(key=lambda c: (-c['net'], len(c['change']), json.dumps(c['change'], sort_keys=True)))
     return {'baseline_run_id': baseline_run_id, 'kind': 'retrieval_preview',
             'note': '只检索不生成：说明改某个参数后标准证据进不进最终资料。证据进来不等于一定答对，掉出去大概率答错；生成层和负向题不在预演范围。',
+            'context_fingerprints': {q: h['context_fingerprint'] for q, h in base.items() if h.get('context_fingerprint')},
             'baseline_evidence': {item['qid']: {'group': item['group'], 'method': item['method'], 'all_hit': base[item['qid']]['all_hit'], 'rank': base[item['qid']]['rank']} for item in items},
             'configs': configs}
 

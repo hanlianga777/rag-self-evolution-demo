@@ -591,9 +591,14 @@ def normalize_agent_candidate(candidate):
 
 def prepare_response(content,base_config,bad_cases,prior_candidates,completed,round_number,labels,trigger_id,monitoring_target_event_ids,audit):
     """One offline validation path for fresh and already-paid responses; no semantic repairs."""
+    from .agent_mechanism import CONTRACT, same_base, validate_mechanism
+    from .composite import parameter_diff, pipeline_config
     if audit.get('decision_contract_version') == '109c' and audit.get('strategy_contract') != 'agent-strategy-4':
         raise ValueError('strategy_contract 无效：新实验必须保存 agent-strategy-4')
     audit.update(parsed_json=None,parsed_candidates=None,rejected_candidates=[])
+    mechanism_enabled = audit.get('mechanism_contract') == CONTRACT
+    if mechanism_enabled:
+        audit['mechanism_checks'] = {}
     prior=[base_config]+[item['config'] for item in prior_candidates]
     target_reference_map={key:{'bad_case_id':item['id']} for item in bad_cases for key in (item['id'],item['question_id'])}
     display_ids = {}
@@ -689,6 +694,10 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
                 raise ValueError('同一目标被重复引用（含题号与Case别名）')
             candidate['target_bad_cases'] = [display_ids.get(r,r) for r in candidate['target_bad_cases']]
             selected=[item for item in bad_cases if item['id'] in candidate['target_bad_cases'] or item['question_id'] in candidate['target_bad_cases']]
+            if mechanism_enabled and not set(candidate.get('predicted_fixed_question_ids') or []).issubset(
+                    item['question_id'] for item in selected):
+                audit['failed_field'] = 'predicted_fixed_question_ids'
+                raise ValueError('预计修好的题必须同时列为待校验目标')
             roots={item['question_id']:item['diagnostic_view']['primary_root_cause'] for item in selected}
             candidate['target_root_causes']=roots
             candidate['root_cause']=next(iter(set(roots.values()))) if len(set(roots.values()))==1 else 'Mixed'
@@ -712,6 +721,25 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
                     audit.update(failed_field=issue["field"], actual_value=issue["actual"], expected_type=issue["expected_type"], allowed_values=issue["allowed_values"])
                 raise ValueError("Agent Candidate Config 不符合冻结 Search Space：" + "; ".join(check["errors"]))
             audit['validation_stage']='intervention'
+            if mechanism_enabled:
+                audit['validation_stage'] = 'mechanism'
+                source_id = candidate.get('inherited_from')
+                source = next((item for item in prior_candidates if item['id'] == source_id), None)
+                comparison_id = 'Baseline' if not source_id else (
+                    source_id if source and same_base(source['config'], effective_base) else None)
+                facts = audit['fault_stages'].get(comparison_id, {})
+                targets = [{**item, 'mechanism_fault': facts.get(item['question_id']) or {
+                    'code': 'unknown', 'stage': '未知', 'subtype': None, 'reason': '实际对照底座缺少该题的已保存诊断。'}}
+                           for item in selected]
+                ledger = audit['parameter_effect_ledger']
+                decisions = validate_mechanism(candidate, targets, comparison_id, audit.get('retrieval_preview') or {},
+                    ledger['current'] + ledger['historical'],
+                    base_changes=parameter_diff(effective_base, pipeline_config(base_config)))
+                candidate['mechanism_checks'] = audit['mechanism_checks'][candidate['id']] = decisions
+                denied = [row for row in decisions if row['decision'] == '拒绝']
+                if denied:
+                    raise ValueError('；'.join(f"{row['display_question_id']}：{row['reason']}" for row in denied))
+                audit['validation_stage'] = 'intervention'
             target_cases={reference:item['result'] for item in bad_cases for reference in (item['id'],item['question_id'])}
             validate_intervention(candidate,target_cases,effective_base)
             target_ids = [item['diagnostic_view'].get('display_question_id') or item['question_id'] for item in selected]
@@ -768,7 +796,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
     for candidate, config in staged:
         batch.append((f"R{round_number}-{candidate['id']}", config, {
             **{key:candidate[key] for key in ('direction','strategy_name','core_idea','adjustments','risks','parameter_signature','review_conclusion_ids')},
-            **{key:candidate[key] for key in ('bad_case_conclusion_ids','predicted_fixed_question_ids') if key in candidate},
+            **{key:candidate[key] for key in ('bad_case_conclusion_ids','predicted_fixed_question_ids','mechanism_checks') if key in candidate},
             "intervention_direction":candidate['intervention_direction'], "supporting_directions":candidate.get('supporting_directions',[]), "action_name":candidate["action_name"], "intervention_contract_version":"agent-closure-4", "experiment_kind":candidate.get("experiment_kind","confirmed"), "falsification":candidate.get("falsification"), "parameter_dependencies":candidate.get('parameter_dependencies',[]), "evidence_assertions":candidate.get('evidence_assertions',[]), "performance_stage":candidate.get('performance_stage'),
             "target_root_causes": candidate.get("target_root_causes"), "provenance": candidate.get("provenance"), "target_group": candidate.get("target_group") if isinstance(candidate.get("target_group"),str) else None, "root_cause": candidate["root_cause"], "root_cause_evidence": candidate["root_cause_evidence"], "expected_improvement": candidate["expected_improvement"], "target_diagnosis": [strategy_case(item) for item in bad_cases if item["id"] in candidate["target_bad_cases"] or item["question_id"] in candidate["target_bad_cases"]], "root_cause_cluster": result.get("root_cause_cluster"), "observed_evidence": candidate["target_bad_cases"], "hypothesis": candidate["hypothesis"], "proposal": candidate["why"], "risk": candidate["risk"],
             **({'inherited_from':candidate['inherited_from'],'inherited_parameters':candidate['inherited_parameters']} if candidate.get('inherited_from') else {}),
@@ -923,12 +951,27 @@ class OptimizationAgent:
             return rows
         from .agent_strategy import round_conclusions_for_prompt
         round_conclusions = round_conclusions_for_prompt(self.store,baseline,prior_candidates,context.get('round_conclusions'))
+        baseline_cases = saved_cases(baseline_run_id)
+        candidate_cases = {c['id']: saved_cases(c.get('result', {}).get('evaluation_run_id')) for c in prior_candidates}
+        retrieval_preview = load_retrieval_preview(self.store, baseline_run_id)
         system,prompt=build_agent_prompt(failures,base_config,prior_candidates,failed_gates,labels,
             baseline_gates=persisted_gates,evaluation_budget=evaluation_budget,failed_parameter_signatures=audit['failed_parameter_signatures'],
-            baseline_result=baseline['result'],baseline_cases=saved_cases(baseline_run_id),
-            candidate_cases={c['id']:saved_cases(c.get('result',{}).get('evaluation_run_id')) for c in prior_candidates},
+            baseline_result=baseline['result'],baseline_cases=baseline_cases,candidate_cases=candidate_cases,
             golden_questions=list(questions.values()),round_conclusions=round_conclusions,round_policy=context.get('round_policy'),causal_evidence=context.get('causal_evidence') is True,round_number=round_number,
-            retrieval_preview=load_retrieval_preview(self.store, baseline_run_id))
+            retrieval_preview=retrieval_preview)
+        from .agent_mechanism import CONTRACT, fault_stage, faults_for_cases
+        if context.get('mechanism_contract') == CONTRACT:
+            faults = {'Baseline': {item['question_id']: fault_stage(item) for item in bad_cases}}
+            faults.update({c['id']: faults_for_cases(baseline, candidate_cases[c['id']], bad_cases) for c in verified})
+            audit.update(mechanism_contract=CONTRACT, round=round_number, retrieval_preview=retrieval_preview,
+                         fault_stages=faults, parameter_effect_ledger=context['parameter_effect_ledger'], validation_retries=[])
+            prompt.update(fault_stages=faults, parameter_effect_ledger=audit['parameter_effect_ledger'],
+                          parameter_stages=rules.AGENT_PARAMETER_STAGES)
+            system += ('每个目标必须按实际底座查看 fault_stages，再按 parameter_stages 选动作。'
+                       '预计修好的题必须同时列入target_bad_cases。'
+                       '放行需要同一底座、同题、同一完整改动的预演或账本依据。历史账本只作试验线索，组合结果不能单独归因。'
+                       '跨层作用需在方案的 cross_layer_mechanisms 对象内按题号写出中间机制，且同底座检索预演必须支持；'
+                       '单改提示词不能补回未进最终资料的证据。标准证据已齐全时不能仅用召回或排序参数修复生成错误。')
         audit['causal_evidence'] = context.get('causal_evidence') is True
         audit['case_comparisons'] = prompt.get('case_comparisons', {})
         audit['best_case_comparison'] = prompt.get('best_case_comparison', [])
@@ -1006,6 +1049,7 @@ class OptimizationAgent:
                         raise ProposalValidationExhausted('连续 3 次方案不合规；首次被拒后的 3 次重出均未通过：'+str(validation_error)) from validation_error
                     rejection={'attempt':attempt+1,'reason':str(validation_error),'rejected_response':content,'sandbox_budget_used':0,
                                'stage':audit['validation_stage'],'rejected_candidates':list(audit.get('rejected_candidates') or []),
+                               **({'mechanism_checks':audit['mechanism_checks']} if 'mechanism_checks' in audit else {}),
                                **({'syntax_repair':audit['syntax_repair']} if audit.get('syntax_repair') else {})}
                     audit.setdefault('validation_retries',[]).append(rejection)
                     audit.setdefault('format_retry',{'reason':str(validation_error),'first_raw_text':content,'sandbox_budget_used':0})

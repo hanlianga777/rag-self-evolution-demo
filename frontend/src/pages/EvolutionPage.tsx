@@ -373,6 +373,7 @@ function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: 
 
     {experiment?.result?.generation_status==='no_candidates' && <p className="workbench-status" role="status">本轮没有合法 Candidate，不能运行 Sandbox；未生成不代表优化成功。</p>}
     {experiment?.result?.rejected_candidates?.length>0 && <><p className="workbench-status">本轮保留 {currentRound.length} 个合法 Candidate，拒绝 {experiment.result.rejected_candidates.length} 个 Candidate；拒绝项不会进入 Sandbox。</p></>}
+    <MechanismDecisions result={experiment?.result} round={displayRound}/>
     {experiment?.result?.generation_status==='insufficient_evidence' && <p className="workbench-status" role="status">Candidate 依据不足：{experiment.result.insufficient_evidence || '暂无足够依据生成合格优化假设；待核实原始证据，不补造A/B/C。'}</p>}
     {data.workspace?.baseline_unavailable_reason && <p className="error-notice">{data.workspace.baseline_unavailable_reason}</p>}
     <p className="agent-identity sr-only">{evaluation.id ? `${archive ? "关联" : "当前"} Baseline：${baselineName(evaluation)}` : "当前有效 Baseline 尚未就绪。"}</p>
@@ -494,6 +495,37 @@ function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: 
     </>}</div></QuestionDrawer>
 
   </PageShell>;
+}
+
+type MechanismDecision = {
+  question_id: string;
+  display_question_id: string;
+  fault: { stage: string; subtype?: string };
+  decision: string;
+  reason: string;
+  mechanism?: string;
+};
+
+function MechanismDecisions({ result, round }: { result: any; round: number }) {
+  if (result?.mechanism_contract !== '113b') return null;
+  const current = !result.round || result.round === round;
+  const rows = (checks?: Record<string, MechanismDecision[]>) =>
+    Object.entries(checks ?? {}).flatMap(([label, decisions]) => decisions.map(row => ({ label, row })));
+  const decisions = [
+    ...(current ? (result?.validation_retries ?? []).flatMap((attempt: { mechanism_checks?: Record<string, MechanismDecision[]> }) =>
+      rows(attempt.mechanism_checks).filter(item => item.row.decision === '拒绝')) : []),
+    ...rows(current ? result?.mechanism_checks : result?.agent_strategies?.[String(round)]?.mechanism_checks),
+    ...(current ? (result?.composite?.attempts ?? []).flatMap((attempt: { mechanism_checks?: MechanismDecision[] }) =>
+      rows({ D: attempt.mechanism_checks ?? [] })) : []),
+  ];
+  if (!decisions.length) return null;
+  return <details className="workbench-status">
+    <summary>逐题机制校验</summary>
+    <ul>{decisions.map(({ label, row }, index) => <li key={`${label}-${row.question_id}-${index}`}>
+      <strong>方案 {label} · {row.display_question_id} · {row.fault.stage} · {row.decision}</strong>
+      <p>{row.fault.subtype ? `${row.fault.subtype}。 ` : ''}{row.reason} {row.mechanism}</p>
+    </li>)}</ul>
+  </details>;
 }
 
 function coverageReason(value:unknown):string {

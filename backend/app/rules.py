@@ -89,6 +89,22 @@ AGENT = {
     ],
 }
 AGENT['candidates_per_round'] = len(AGENT['candidate_labels'])
+# Agent decision rules are versioned per experiment, independent of the frozen evaluation.
+AGENT_PARAMETER_STAGES = {
+    'candidate_k': ('recall', 'ranking'),
+    'hybrid_alpha': ('recall', 'ranking'),
+    'hybrid_search': ('recall', 'ranking'),
+    'query_decompose': ('recall', 'ranking'),
+    'query_rewrite': ('recall',),
+    'multi_query': ('recall',),
+    'hyde': ('recall',),
+    'min_score': ('recall', 'ranking'),
+    'top_k': ('final',),
+    'rerank': ('final',),
+    'prompt_strategy': ('generation',),
+    'retrieval_max_tokens': ('generation',),
+}
+AGENT_CONTEXT_PARAMETERS = ('top_k', 'rerank', 'retrieval_max_tokens')
 QUALIFICATION = {'version': RULES_VERSION, 'max_new_critical': 0, 'max_new_failures': 0, 'min_fixed': 1}
 # Legacy authorization is part of the saved evaluation rules fingerprint.
 AUTHORIZATION = {
