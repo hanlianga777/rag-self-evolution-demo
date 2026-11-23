@@ -272,3 +272,36 @@ class RefinementTests(unittest.TestCase):
     def test_equivalent_numeric_value_does_not_count_as_third_change(self):
         value=self.suggestion();value['proposed_config_diff']['min_score']=0.0
         self.assertEqual(self.validate(value)[0]['min_score'],0)
+
+
+class QualifiedFusionTests(unittest.TestCase):
+    def test_qualified_fusion_can_try_a_parameter_without_a_target_repair(self):
+        winner = {'id':'R2-B', 'status':'evaluated', 'config':{**DEFAULT_PIPELINE_CONFIG, 'query_decompose':True},
+                  'result':{'evaluation_identity':'fixture'}}
+        peer = {'id':'R3-B', 'config':{**winner['config'], 'top_k':6}, 'status':'evaluated',
+                'result':{'evaluation_identity':'fixture'}}
+        source = {'candidate_id':peer['id'], 'qualified':True, 'fixed_question_ids':['q1']}
+        facts = {'remaining_failures':[{'question_id':'q2'}],
+                 'protected_questions':[{'question_id':'q1'}], 'contrasts':[], 'history':[source],
+                 'parameter_profiles':{'top_k':[{'value':6, 'observations':[{'new_failure_question_ids':[]}]}]}}
+        value = {'combination_mode':'partial_fusion', 'proposed_config_diff':{'top_k':6},
+                 'changes':[{'parameter':'top_k', 'source_type':'partial', 'source_candidates':[peer['id']],
+                             'target_question_ids':['q2'], 'reason':'试跑合格方案的组合',
+                             'evidence_basis':'来源方案合格，q2 仍错',
+                             'expected_fixed_count':1, 'possible_broken_count':1,
+                             'side_effect_check':{'historical_effects':'未修好 q2', 'protected_overlap':[],
+                                                  'winner_fixed_risk':'重查 q1', 'gate_risk':'检查 11 项门槛',
+                                                  'mitigation':'完整 Sandbox'}}]}
+        history = [winner, peer]
+
+        config, changes = validate_d_refinement(value, winner, history, DEFAULT_PIPELINE_CONFIG, facts)
+        self.assertEqual(config['top_k'], 6)
+        self.assertFalse(changes[0]['target_repair_verified'])
+
+        value['changes'][0]['source_type'] = 'verified'
+        with self.assertRaisesRegex(ValueError, '已验证来源须曾修好'):
+            validate_d_refinement(value, winner, history, DEFAULT_PIPELINE_CONFIG, facts)
+        value['changes'][0]['source_type'] = 'partial'
+        source['qualified'] = False
+        with self.assertRaisesRegex(ValueError, '已验证来源须曾修好'):
+            validate_d_refinement(value, winner, history, DEFAULT_PIPELINE_CONFIG, facts)

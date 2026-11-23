@@ -3292,9 +3292,10 @@ class GovernanceStore:
                         '返回action_name,should_generate_d(bool),root_cause_alignment,complementary_capabilities,proposed_config_diff(平铺参数到值，列出所有相对Winner的变化，含恢复Baseline取值的参数),expected_improvement,risks,explanation,hypothesis,root_cause,intervention_direction,evidence_assertions:[{target_id,observation}],parameter_dependencies。依据/收益/风险/解释均为非空字符串。'
                         'should_generate_d=true时每个改动必须在changes数组给一条：{parameter,source_type:verified或partial或new_attempt,source_candidates:[完整历史ID],reason,target_question_ids:[剩余错题的正式ID],evidence_basis:事实表证据位置说明,side_effect_check:{historical_effects:历史伴随的新错题及门槛/P99变化,protected_overlap:[受保护题正式ID，与该取值档案的新错题交集必须全覆盖],winner_fixed_risk:检查Winner已经修好的题,gate_risk:检查临界门槛余量,mitigation:规避办法,same_premise_evidence:字符串或字符串数组均可，前提相同的历史证据，没有证据写\'未观察到\',different_premise_evidence:字符串或字符串数组均可，前提不同的来源及差异，没有证据写\'未观察到\',risk_checklist:字符串或字符串数组均可，重点盯哪些受保护题和临界门槛，没有证据写\'未观察到\'},expected_fixed_count:非负整数,possible_broken_count:非负整数}。'
                         'verified引用历史来源和修好题/证据位置，多参数来源整组取用；只取多参数来源中的一部分时写partial，有拆分对照就给contrast_ids:[d_facts.contrasts里的真实对照ID]，没有对照也可以，但要在reason里说明为什么只取这部分。new_attempt须是本实验未用过的取值，额外给why_not_verified说明为什么已验证参数不能解决或副作用不可接受。新尝试来源可为空，不要求两个来源。'
+                        'partial_fusion时，用qualified_candidate_ids从history筛出合格来源，取它们parameter_diff中不冲突的并集；如果并集未评测且相对Baseline不超出3项，优先提出该方案。proposed_config_diff只列相对Winner的差异，changes与这些差异逐一对应。合格方案未修过当前目标题时，用partial引用其真实参数，并在证据依据写明目标仍待Sandbox验证；不要把来源方案的合格当作该题已修好。'
                         '副作用检查不能只想剩余错题，要逐一检查历史翻错的保护题、Winner修好题、所有门槛。should_generate_d必须为true；风险大小不能作为不生成理由。'
-                        + ('bad_case_summary须逐字采用bad_case_groups，给出focus和conclusions:[{id,conclusion}]。'
-                           'bad_case_conclusion_ids须引用这些结论。changes.target_question_ids是预计修好的正式题号。' if strict else ''),
+                        + ('bad_case_summary须为{groups,focus,conclusions:[{id,conclusion}]}，其中groups直接复制bad_case_groups。'
+                           'bad_case_conclusion_ids须引用这些结论。changes.target_question_ids只允许从d_facts.remaining_failures取正式题号，表示预期改善，不能填Winner已经答对的题。' if strict else ''),
                         _json({'baseline':{key:baseline[key] for key in ('id','config','judge','dataset_version_id')},
                             'winner':strategy_candidate(winner), 'sources':[strategy_candidate(c) for c in eligible if c['id']!=winner['id']],
                             'd_facts':facts, 'bad_cases':prompt_cases, 'qualification_rules':rules.QUALIFICATION,

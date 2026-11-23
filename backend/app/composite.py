@@ -232,6 +232,7 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
             side['protected_overlap']=truth
         selected=row.get('source_candidates',[])
         if not isinstance(selected,list):raise ValueError('来源须为列表')
+        qualification_only = False
         if kind=='new_attempt':
             if profile['used_in']:raise ValueError('新尝试必须是本实验未用过的参数取值')
             if not isinstance(row.get('why_not_verified'),str) or not row['why_not_verified'].strip():raise ValueError('新尝试须说明为什么不用已验证参数')
@@ -244,10 +245,14 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
                 source=sources[cid];source_config=pipeline_config(source['config'])
                 if type(source_config[key]) is not type(value) or source_config[key]!=value:raise ValueError('来源取值与D不一致')
                 record=next(r for r in facts['history'] if r['candidate_id']==cid)
-                if not set(record['fixed_question_ids']) & set(targets):raise ValueError('已验证来源须曾修好针对的剩余 Bad Case')
+                if not set(record['fixed_question_ids']) & set(targets):
+                    if not (kind == 'partial' and suggestion.get('combination_mode') == 'partial_fusion' and record['qualified']):
+                        raise ValueError('已验证来源须曾修好针对的剩余 Bad Case')
+                    qualification_only = True
                 bundle=parameter_diff(source_config,base)
                 whole=all(config[k]==v and type(config[k]) is type(v) for k,v in bundle.items())
                 if not whole and kind!='partial':raise ValueError('多参数来源只取一部分时，source_type须写partial（部分取用）')
-        records.append({**row,'source_type':kind, **({'partial_contrast_verified':bool(valid_contrasts)} if kind=='partial' else {}),
+        records.append({**row,'source_type':kind, **({'partial_contrast_verified':bool(valid_contrasts) and not qualification_only} if kind=='partial' else {}),
+                        **({'target_repair_verified':False} if qualification_only else {}),
                         **({'normalized_fields':normalized} if normalized else {})})
     return effective_config,records
