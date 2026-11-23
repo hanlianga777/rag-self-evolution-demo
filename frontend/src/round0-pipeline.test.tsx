@@ -14,7 +14,7 @@ const contract = {
   generation_thinking: { allowed: ["off", "low", "high", "max"] },
   prompt_strategy: { allowed: ["Strict", "Looser", "Safe"] },
   query_decompose: { allowed: [false, true] },
-  retrieval_max_tokens: { allowed: [false, 8192, 4096] },
+  retrieval_max_tokens: { allowed: [false, 8192, 4096], description: '交给模型的资料最多多长，超出部分截掉。', options: [{ value: 8192, description: '较宽松' }, { value: 4096, description: '可能截掉证据' }] },
   min_score: { allowed: [0.2, 0.4] },
 };
 it("saves freely selected Thinking and context, preserves saved drafts and removes retired controls", async () => {
@@ -38,7 +38,7 @@ it("saves freely selected Thinking and context, preserves saved drafts and remov
  expect(posts[0].config).toEqual({generation_thinking:"max",prompt_strategy:"Strict",query_decompose:false,retrieval_max_tokens:4096,min_score:0.2});
  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe('最高（Max）');
  await act(async()=>{document.querySelector<HTMLElement>('[data-parameter="retrieval_max_tokens"] .ui-pg-info')!.focus();await new Promise(resolve=>setTimeout(resolve,150));});
- expect(document.querySelector('[role=tooltip]')?.textContent).toBe('交给模型的资料最多多长，超出部分截掉。 Unlimited／8192（较宽松）／4096（较紧，回答更快，但可能截掉证据）');
+ expect(document.querySelector('[role=tooltip]')?.textContent).toBe('交给模型的资料最多多长，超出部分截掉。 8192（较宽松）／4096（可能截掉证据）');
 });
 it("reports saved Run values and absent historical Thinking as unknown in report and drawer", async () => {
   const run = { id: "R-OLD", status: "completed", dataset_version_id: "G-OLD", config: { candidate_k: 12, top_k: 4, hybrid_search: true, rerank: true }, judge: { model: "judge-old", generation_prompt_version: "generation-vnext-1", execution_snapshot: { generation_model: "gen-old" } }, result: {}, dataset_snapshot: { id: "G-OLD" } };

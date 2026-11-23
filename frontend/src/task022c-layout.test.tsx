@@ -32,11 +32,14 @@ it('keeps candidate summaries uniform and saves full risk prose for the disclosu
  await mount(<EvolutionPage data={{evaluation:{id:'base',config:{top_k:4}},optimization:{id:'exp',candidates}}}/>);
  await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='进化路线')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
  for(const card of document.querySelectorAll('.candidate-card')){
-  expect(card.querySelectorAll('.candidate-summary-row')).toHaveLength(7);
+  expect(card.querySelectorAll('.candidate-summary-row')).toHaveLength(3);
   const details=card.querySelector<HTMLDetailsElement>('details')!;
   expect(details.open).toBe(false);
   const risk=[...details.querySelectorAll('p')].find(p=>p.textContent?.startsWith('风险 ·'))!;
   expect(risk.textContent).not.toContain('完整内容见');expect(risk.textContent).toContain('安全风险');expect(risk.textContent).toContain('延迟风险');expect(risk.textContent).toContain('受保护题风险');
-  expect(card.querySelector('.candidate-result-line')?.textContent).toContain('修好 Q04');
+  expect(card.querySelector('.candidate-result-line')).toBeNull();
  }
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看沙盒评测和逐题回归')!.click());
+ const fixed=[...document.querySelectorAll('.candidate-overview-table tbody tr')].find(row=>row.firstChild?.textContent==='修好');
+ expect(fixed?.textContent).toContain('Q04');
 });

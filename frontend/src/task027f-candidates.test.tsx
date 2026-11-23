@@ -59,11 +59,12 @@ it('shows all ten saved checks between conclusion and tradeoff, with rejection d
  expect(document.querySelectorAll('.candidate-rejections > button')).toHaveLength(8);expect(document.querySelector('.ui-fin-others details')).toBeNull();expect(document.body.textContent).not.toContain('逐题追踪 ·');expect(document.querySelector('.ui-fin-reason')?.textContent).toContain('保存的采纳理由');
  await act(async()=>document.querySelector<HTMLButtonElement>('.candidate-rejections > button')!.click());expect(document.querySelector('[role=dialog]')?.textContent).toContain('逐题追踪');
 });
-it('keeps six primary metrics in teaching order and uses white secondary actions',async()=>{
- await mount();await click('进化路线');
- const table=document.querySelector('.ui-ct table')!;expect([...table.querySelectorAll('tbody th')].slice(0,6).map(e=>e.textContent)).toEqual(['答对','新增 Bad Case','Hard Gate','安全拒答率','P50','P99']);expect(table.querySelector('colgroup')).not.toBeNull();
- expect(document.querySelector('.ui-ct-more')).toBeNull();
- expect(table.querySelectorAll('tbody tr').length).toBeGreaterThan(6);expect(table.textContent).not.toContain('运行状态');expect(table.textContent).not.toContain('Candidate 合格');expect(table.textContent).not.toContain('指定目标修好');
+it('puts the main metrics in the five-column round comparison and moves details to the drawer',async()=>{
+ await mount();await click('回归与推荐');
+ const table=document.querySelector('table[aria-label="跨方案总表"]')!;
+ expect([...table.querySelectorAll('thead th')].map(e=>e.textContent)).toEqual(['指标','Baseline','R3-A','R3-B','R3-C','D']);
+ expect([...table.querySelectorAll('tbody th')].map(e=>e.textContent)).toEqual(['改了什么','门槛通过数','答对数','修好','新错','主攻问题','回归检查','延迟中位数（P50）','延迟高位（P99）','证据可信度','推荐价值','是否合格']);
+ expect(table.textContent).not.toContain('指定目标修好');
  await click('查看高级指标');expect(document.querySelector('[role=dialog]')?.textContent).not.toMatch(/Provider Cost|费用未采集|无法准确回算/);
 });
 it('keeps unknown ranking unknown and omits empty side-effect cards',async()=>{
@@ -88,10 +89,13 @@ it('shows the reassessed qualification beside the original result',async()=>{
  const cards=Array.from(document.querySelectorAll('.candidate-cards .candidate-card'));
  const a = cards.find(card=>card.textContent?.includes('Candidate A'));
  expect(a?.querySelector('.candidate-card-header .badge')?.textContent).toBe('不合格 · 新错 Q22');
- expect(a?.querySelector('.qualification-versions')?.textContent).toContain('旧规则版本：合格');
  const b = cards.find(card=>card.textContent?.includes('Candidate B'));
  expect(b?.querySelector('.candidate-card-header .badge')?.textContent).toBe('不合格 · 无修复');
- expect(b?.querySelector('.qualification-versions')?.textContent).toContain('旧规则版本：合格');
+ await click('查看沙盒评测和逐题回归');
+ const table=document.querySelector('table[aria-label="跨方案总表"]')!;
+ const verdict=[...table.querySelectorAll('tbody tr')].find(row=>row.firstChild?.textContent==='是否合格')!;
+ expect(verdict.children[2]?.textContent).toContain('旧规则版本：合格');
+ expect(verdict.children[3]?.textContent).toContain('旧规则版本：合格');
 });
 it('renders the current qualification contract returned by the API', async () => {
  const qualificationDescription = '门槛全部通过，最多新增 4 道，至少修好 6 道';

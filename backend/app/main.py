@@ -45,6 +45,7 @@ from .retrieval import RetrievalUnavailable
 from .agent_coverage import plan_coverage, complete_coverage
 from .knowledge_pipeline import AlibabaProvider
 from .evaluation_stage import perform_stage
+from .independent_case_review import independent_case_notes
 from .read_view import read_view, evaluation_display
 from .display_summaries import register_routes as register_display_summary_routes
 
@@ -2123,7 +2124,7 @@ def comparison_case(run_id: str, question_id: str):
     if store.superseded_evaluation(run_id):raise HTTPException(404, 'Evaluation run not found')
     # Read one saved case, never hydrate the full evaluation or generate an answer.
     with store.connection() as connection:
-        run = connection.execute('SELECT status,dataset_snapshot_json,config_json FROM evaluation_runs WHERE id=?', (run_id,)).fetchone()
+        run = connection.execute('SELECT status,dataset_version_id,dataset_snapshot_json,config_json FROM evaluation_runs WHERE id=?', (run_id,)).fetchone()
     case = store.evaluation_case_result(run_id, question_id) if run else None
     if case is None:raise HTTPException(404, 'Saved case not found')
     snapshot = json.loads(run['dataset_snapshot_json'])
@@ -2132,7 +2133,9 @@ def comparison_case(run_id: str, question_id: str):
         from .agent_inputs import prepare_baseline_rows
         prepared = prepare_baseline_rows({'dataset_snapshot_json':run['dataset_snapshot_json'], 'config':json.loads(run['config_json'])}, [{'question_id':question_id, 'result':case}])[0]
         case = {**case, 'diagnostic_view':prepared['diagnostic_view']}
-    return {'status':run['status'], 'case':case, 'question':{key:question[key] for key in ('reference_answer','expected_response','business_requirements') if key in question}}
+    notes = independent_case_notes(run_id, run['dataset_version_id'], question, case) if run['status'] == 'completed' else []
+    return {'status':run['status'], 'case':case, 'independent_review_notes':notes,
+            'question':{key:question[key] for key in ('reference_answer','expected_response','business_requirements') if key in question}}
 
 
 @app.post('/api/evaluations/{run_id}/stop', dependencies=[Depends(require_trusted_origin)])

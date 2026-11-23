@@ -65,19 +65,13 @@ it('explains each gate in its own module and shows the saved threshold and formu
 
 const overviewData = () => ({ evaluation: { id: 'before', status: 'completed', config: {}, result: { total: 2, bad_case_count: 1 } },
   optimization: { id: 'exp', baseline_run_id: 'before', candidates: [{ id: 'D', status: 'evaluated', reasoning: { candidate_label: 'D' }, result: { total: 2, bad_case_count: 0, all_fixed_question_ids: ['Q01'], evaluation_run_id: 'after' } }], recommendation: { recommended_candidate: 'D' } }, overview: { dataset: { total: 2, approved: 2 } } });
-it.each([false, true])('reads saved question lists without per-case attribution requests (failed=%s)', async fail => {
-  const pending: Record<string, (value: Response) => void> = {};
-  const fetch = vi.fn((url: string) => new Promise<Response>(resolve => { pending[new URL(url).pathname] = resolve; }));
+it('keeps case-level list requests out of Overview', async () => {
+  const fetch = vi.fn();
   vi.stubGlobal('fetch', fetch);
   await mount(<OverviewPage data={overviewData()} navigate={() => {}} />);
-  const fixed = () => document.querySelector('.ui-ovs-fixed')!;
-  expect(fixed().querySelectorAll('[role=status]')).toHaveLength(1);
-  await act(async () => Object.entries(pending).forEach(([url, resolve]) => resolve(fail ? new Response('failed', { status: 500 }) : response({ id: url.includes('before') ? 'before' : 'after', status: 'completed', dataset_version_id: 'same', judge: { evaluation_identity: 'same' }, cases: [{ question_id: 'Q01', question: '已读到的问题' }] }))));
-  expect(fixed().textContent).toContain(fail ? '题目未保存' : '已读到的问题');
-  expect(fixed().querySelector('[role=status]')).toBeNull();
-  expect(fixed().textContent).not.toContain('—');
-  expect(fetch.mock.calls).toHaveLength(2);
-  expect(fetch.mock.calls.every(([url]) => url.endsWith('/comparison-cases'))).toBe(true);
+  expect(document.querySelectorAll('.overview-kpi')).toHaveLength(4);
+  expect(document.querySelector('.overview-kpi-grid')?.textContent).not.toContain('Q01');
+  expect(fetch).not.toHaveBeenCalled();
 });
 
 it('shows a skeleton instead of an empty comparison while the saved list is pending', async () => {

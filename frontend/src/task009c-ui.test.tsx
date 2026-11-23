@@ -24,10 +24,12 @@ it('uses the shared vocabulary while preserving common RAG terms', () => {
 it('reads overview metrics from the selected saved evaluation, and never fabricates pending results', async () => {
  const run = { id: 'saved-run', status: 'completed', dataset_version_id: 'saved-golden', dataset_snapshot: { question_ids: ['a', 'b', 'c'] }, result: { total: 3, completed: 3, bad_case_count: 1, gates: { passed_count: 2, total: 4 }, metrics: { latency_p99_seconds: 8.45, safe_rejection_rate: 95 } } };
  await mount(<OverviewPage data={{ workspace: { current_golden_id: 'saved-golden' }, overview: { dataset: { total: 3, expected_count: 3, approved: 3 }, latest_evaluation: run } }} navigate={() => {}} />);
- const text = document.querySelector('[aria-label="优化成果"]')?.textContent || '';
- expect(document.querySelector('.ui-ov-big .from')?.textContent).toBe('2'); expect(text).toContain('/ 3'); expect(text).toContain('95'); expect(text).toContain('8.4');
+ const cards = document.querySelector('.overview-kpi-grid')!;
+ expect(cards.children[1].textContent).toContain('已冻结 · 3 题');
+ expect(cards.children[2].textContent).toContain('答对 2 / 3 题');
+ expect(cards.textContent).not.toMatch(/95|8\.4/);
  await act(async () => root.render(<OverviewPage data={{ workspace: {}, overview: {} }} navigate={() => {}} />));
- expect(document.querySelector('[aria-label="优化成果"]')?.textContent).toContain('未知');
+ expect(document.querySelector('.overview-kpi-grid')?.textContent).toContain('待完成当前基准评测');
 });
 it('shows a plain failed-gate sentence and hides IDs in collapsed technical details', async () => {
  const run = { id: 'EVAL-internal', status: 'completed', created_at: '2026-11-01T12:00:00Z', dataset_version_id: 'GD-test', config: { generation_thinking: 'high' }, result: { judge_replay: { source_run_id: 'saved-source' }, bad_case_count: 1, gates: { passed: false, passed_count: 1, total: 2, gates: [{ metric: 'safe_rejection_rate', status: 'FAIL', actual: 87, threshold: 96, operator: '>=' }] } } };
@@ -84,10 +86,10 @@ it('uses an honest empty monitoring state and never invents records', async () =
  expect((fetch as any).mock.calls.every(([, init]: any[]) => !init?.method || init.method === 'GET')).toBe(true);
 });
 it('keeps old-policy Baseline numbers out of the current optimization cards', async () => {
- const run = { id: 'old-run', status: 'completed', requires_policy_upgrade: true, result: { total: 50, bad_case_count: 7, gates: { passed_count: 10, total: 11 }, metrics: { latency_p50_seconds: 7.3 } } };
- await mount(<OverviewPage data={{ workspace: { requires_policy_upgrade: true }, overview: { latest_evaluation: run } }} navigate={() => {}} />);
- expect(document.querySelector('[aria-label="优化成果"]')?.textContent).not.toContain('7 道');
- expect(document.querySelector('[aria-label="优化成果"]')?.textContent).toContain('未知');
+ const run = { id: 'old-run', status: 'completed', dataset_version_id: 'old-golden', dataset_snapshot: { question_ids: ['Q1'] }, requires_policy_upgrade: true, result: { total: 50, bad_case_count: 7, gates: { passed_count: 10, total: 11 }, metrics: { latency_p50_seconds: 7.3 } } };
+ await mount(<OverviewPage data={{ workspace: { current_golden_id: 'old-golden', current_baseline_id: run.id, requires_policy_upgrade: true }, overview: { latest_evaluation: run } }} navigate={() => {}} />);
+ expect(document.querySelector('.overview-kpi-grid')?.textContent).not.toContain('答对 43 / 50');
+ expect(document.querySelector('.overview-kpi-grid')?.textContent).toContain('待完成当前基准评测');
 });
 it('counts the frozen Golden paper instead of a newer unfinished work Run', async () => {
  const { KnowledgePage } = await import('./pages/KnowledgePage');

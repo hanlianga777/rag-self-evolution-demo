@@ -294,7 +294,8 @@ export function BaselineCaseDetails({ item, snapshot, config, gates, strategyLin
     <section className="candidate-card drawer-section"><h3>答案对比</h3><div className="case-answer-stack"><div><h4>参考答案</h4><CaseAnswer text={reference} reference final={(golden.evidence_details || []).flatMap((source: Row) => source.chunks || [])} />{typeof view.missing_points==='string' && <div className="muted-prose muted"><TruncatedText lines={3}>{view.missing_points}</TruncatedText></div>}{missing.length>0 && <div className="missing-points"><strong>未答到的要点</strong><ul>{missing.map(point=><li key={point}>{point}</li>)}</ul></div>}</div><div><h4>实际回答</h4><CaseAnswer text={item.model_answer || '历史未保存回答'} final={final} /></div></div><div className="muted-prose case-difference"><TruncatedText lines={3}><span>{summary.text}</span></TruncatedText></div></section>
     <AnswerEvidence row={item} question={golden}/>
     {businessVerdict(item) === 'FAIL' && <section className="candidate-card drawer-section"><h3>本次诊断</h3>
-      <p>{view.diagnosis_category || item.primary_root_cause || "主归因未记录"}</p>
+      <p>{view.diagnosis_category || displayText(item.primary_root_cause || "主归因未记录")}</p>
+      {view.analysis_reason && <p>{view.analysis_reason}</p>}
       {strategyLink ? <a href={strategyLink}>查看 Agent 本轮保存的优化假设</a>
         : (view.repair_hint || item.optimization_strategy) && <div className="muted-prose"><TruncatedText lines={3}>{view.repair_hint || savedDirections(item)}</TruncatedText></div>}
     </section>}

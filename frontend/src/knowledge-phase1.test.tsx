@@ -12,8 +12,9 @@ it('keeps Legacy Production separate when the active Knowledge lifecycle has no 
   await act(async () => root.render(<OverviewPage navigate={() => {}} data={{ overview: { knowledge: { legacy: false, identity: { pipeline_version_id: 'KP-new' }, index: { child_count: 30 }, target_config: {} } }, workspace: { requires_new_golden: true }, versions: [{ status: 'active', provenance: 'published', snapshot: { candidate_id: 'C-old' } }] }} />));
   expect(document.body.textContent).toContain('当前线上 ·');
   expect(document.querySelector('.optimization-results')).toBeNull();
-  expect(document.querySelector('.ui-ov-status')?.textContent).not.toContain('Candidate D 已发布');
-  expect(document.querySelector('.ui-ov-action')?.textContent).toContain('Golden');
+  expect(document.querySelector('.overview-current')?.textContent).toContain('当前线上 · 当前线上配置');
+  expect(document.querySelector('.overview-kpi:last-child')?.textContent).toContain('暂无匹配的优化实验');
+  expect(document.querySelector('.overview-current button')?.textContent).toBe('核对题卷确认');
   await act(async () => root.unmount());
 });
 it('shows every business topic and expands the final topic without adding a drawer', async () => {

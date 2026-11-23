@@ -39,7 +39,8 @@ it('keeps FAIL as Bad Case while diagnosis remains part of Agent processing', ()
   render(<BaselineCaseDetails item={{ passed: false, question_id: 'offline', diagnosis: { status: 'disputed' }, primary_root_cause: 'Unknown', diagnostic_view: { analysis_category: 'evaluation_issue', analysis_reason: '安全拒答正确，但评测规则存在兼容问题。', target_eligible: false } }} snapshot={{}} config={{}} gates={[]} />);
   const cards = document.querySelectorAll('.bad-case-details > section');
   expect(document.querySelector('.case-review')?.textContent).toContain('答错');expect(document.querySelector('.bad-case-details > details')).toBeNull();
-  expect(cards[3].textContent).toContain('核验来源覆盖并提出优化假设');
+  expect(cards[3].textContent).toContain('安全拒答正确，但评测规则存在兼容问题。');
+  expect(cards[3].textContent).not.toContain('提出优化假设');
   expect(cards[2].textContent).toContain('本题未保存可对齐的逐要点判分，检索路径未知。');
 });
 it('formats mixed HTML and markdown lists and turns behavior enums into the saved business expectation', () => {
@@ -62,7 +63,7 @@ it('preserves HTML citation URLs and meaningful image descriptions as inert text
   expect(answer).toContain('onclick="alert(1)"');
 });
 it.each(['confirmed','disputed','needs_review'])('keeps historical and Agent shared details free of confidence labels with %s saved records unchanged', status => {
-  const item = {question_id:'historical-case',primary_root_cause:'Safety',diagnosis:{status,reason:'旧诊断'},diagnostic_view:{primary_root_cause:'Generation',analysis_category:'rag_failure',is_technical_bad_case:true,optimization_directions:['grounded_generation'],analysis_reason:'已有依据被错误解释',target_eligible:true}};
+  const item = {question_id:'historical-case',passed:false,primary_root_cause:'Safety',diagnosis:{status,reason:'旧诊断'},diagnostic_view:{primary_root_cause:'Generation',analysis_category:'rag_failure',is_technical_bad_case:true,optimization_directions:['grounded_generation'],analysis_reason:'已有依据被错误解释',target_eligible:true}};
   const before=JSON.stringify(item);
   render(<CaseDetails item={item} snapshot={{}} config={{}} gates={[]} />);
   const business=[...document.querySelectorAll('.bad-case-details > section')].map(el=>el.textContent).join('');

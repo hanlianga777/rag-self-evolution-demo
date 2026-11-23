@@ -36,7 +36,7 @@ it("keeps Baseline conclusions and saved identity inside the report, and preserv
   expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(cell => cell.textContent)).toEqual(["题号", "问题", "题型", "负向子类", "主题", "层级与细分", "缺了什么", "严重程度i", ""]);
   expect(document.querySelector(".product-diagnosis-table tbody tr td:nth-child(6)")?.textContent).toContain("检索失败");
   await act(async()=>document.querySelector<HTMLElement>(".product-diagnosis-table tbody tr")!.click());
-  expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["业务问题", "答案对比", "判分与检索路径", "优化方向"]);
+  expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["业务问题", "答案对比", "判分与检索路径", "本次诊断"]);
   expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("技术详情");
   expect(document.querySelector(".bad-case-details > details")).toBeNull();expect(document.querySelector(".bad-case-details > .story-disclosure")).toBeNull();
   expect(JSON.stringify(input)).toBe(frozen);
@@ -70,7 +70,7 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
 
   await click("进化路线");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(3);
-  expect([...document.querySelectorAll(".candidate-card:first-child .candidate-summary-row dt")].map(label => label.textContent)).toEqual(["改了什么","针对","依据","实验效果","正式资格","证据可信度","推荐价值"]);
+  expect([...document.querySelectorAll(".candidate-card:first-child .candidate-summary-row dt")].map(label => label.textContent)).toEqual(["改了什么","针对","依据"]);
   expect(document.querySelector(".candidate-card")?.textContent).toContain("Q-stored");
   const details=document.querySelector<HTMLDetailsElement>('.candidate-card details')!;
   expect(details.open).toBe(false);
@@ -78,13 +78,13 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   const target=details.querySelector<HTMLElement>('.ui-q')!;
   await act(async()=>{target.focus();await new Promise(resolve=>setTimeout(resolve,150));});
   expect(document.querySelector('[role=tooltip]')?.textContent).toContain("持久化问题");
-  await click("进化路线");
-  expect([...document.querySelectorAll(".ui-ct tbody th")].slice(0,6).map(cell => cell.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "安全拒答率", "P50", "P99"]);
+  await click("查看沙盒评测和逐题回归");
+  const summary = document.querySelector('table[aria-label="跨方案总表"]')!;
+  for (const label of ['答对数', '是否合格', '证据可信度', '推荐价值', '回归检查']) expect(summary.textContent).toContain(label);
   expect(document.querySelector('.ui-ct-more')).toBeNull();
-  for(const label of ["Regression Check"]) expect(document.querySelector(".ui-ct")?.textContent).toContain(label);
   expect(document.body.textContent).not.toContain("Input Tokens");
   await click("查看高级指标");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Input Tokens");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("comparison_metrics");
   expect(JSON.stringify(input)).toBe(frozen);
   expect((fetch as any).mock.calls.every((call: any[]) => !call[1]?.method || call[1].method === "GET")).toBe(true);
 });

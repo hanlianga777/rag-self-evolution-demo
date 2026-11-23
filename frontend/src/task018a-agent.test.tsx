@@ -21,10 +21,10 @@ it.each([false,true])("keeps compact progress on overview and saved Sandbox and 
     expect(document.querySelectorAll(".page-shell-header .tabs button")).toHaveLength(3);
     if(button.textContent === "概览")expect(document.querySelector(".ui-agent-stats")?.textContent).toContain("7/50");else expect(document.querySelector(".page-shell-header .ui-agent-stats")).toBeNull();
   }
-  const sandbox=[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(button => button.textContent === "进化路线")!;
+  const sandbox=[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(button => button.textContent === "回归与推荐")!;
   await act(async()=>sandbox.click());
-  expect(document.querySelector(".tabs button.active")?.textContent).toBe("进化路线");
-  expect(document.querySelector(".sandbox-core-table")?.textContent).toContain(paused?"已暂停 7/50":"运行中 7/50");
+  expect(document.querySelector(".tabs button.active")?.textContent).toBe("回归与推荐");
+  expect(document.querySelector('table[aria-label="跨方案总表"]')?.textContent).toContain(paused?"已暂停 · 7/50":"运行中 · 7/50");
   expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method)).toBe(true);
 });
 it("removes repeated strategy fields and keeps one before/after parameter list",async()=>{

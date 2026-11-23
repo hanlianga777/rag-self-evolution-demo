@@ -54,5 +54,5 @@ it.each([undefined, 7])('reads topic count from saved plan or knowledge coverage
   await mount({ generationRuns: [{ id: 'run', status: 'completed', question_ids: ['q'], profile: { expected_count: 1 }, artifacts: { hard_validation: saved == null ? {} : { frozen_plan: { clusters: Array.from({ length: saved }, () => ({})) } } } }], snapshots: [], dataset: [question] }, 3);
   expect(document.querySelector('.ui-gp-steps li:first-child small')?.textContent).toBe(`${saved ?? 3} 个主题`);
   const gate = document.querySelector('.ui-gp-steps li:last-child')!;
-  expect(gate.querySelector('strong')?.textContent).toBe('Gate 1'); expect(gate.querySelector('small')?.textContent).toBe('人工审核');
+  expect(gate.querySelector('strong')?.textContent).toBe('题卷确认（Gate 1）'); expect(gate.querySelector('small')?.textContent).toBe('待人工确认');
 });

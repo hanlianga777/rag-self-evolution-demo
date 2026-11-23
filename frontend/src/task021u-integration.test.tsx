@@ -16,15 +16,20 @@ const baseline={id:'base',status:'completed',config:sampleBaselineConfig,dataset
 const experiment=()=>{const exp=structuredClone(sampleExperiment);return {...exp,id:'exp',baseline_run_id:'base',recommendation:{status:'Recommended',recommended_candidate:exp.candidates[0].id},candidates:exp.candidates.map(c=>({...c,result:{...c.result,total:50,gates:{...c.result.gates,passed_count:11,total:11},metrics:Object.fromEntries(c.result.gates.gates.map(g=>[g.metric,g.actual]))}}))};};
 const data=(released=false)=>{const optimization=experiment(),id=optimization.candidates.find(c=>c.reasoning.candidate_label==='D')!.id;return {evaluation:baseline,optimization,overview:{dataset:{total:50,approved:50,expected_count:50},production:{provenance:released?'published':'bootstrap',snapshot:{candidate_id:released?id:undefined}}},workspace:{}};};
 it.each([false,true])('uses saved overview numbers and actual production identity (released %s)',async released=>{
- const d=data(released),navigate=vi.fn();await mount(<OverviewPage data={d} navigate={navigate}/>);
- expect(document.querySelector('.ui-ov-big')?.textContent).toMatch(/44.*48.*50/);
- expect(document.querySelector('.ui-ov-status')?.textContent).toContain(released?'已发布 Candidate D':'待发布 Candidate D');expect(document.querySelector('.ui-ov-status')?.textContent?.includes('当前线上')).toBe(!released);
- await click(released?'去问答验证':'去发布');if(released)expect(location.hash).toBe('#verification?tab=compare');else expect(navigate).toHaveBeenCalledWith('versions');
- expect(document.querySelectorAll('.ui-ov-step')).toHaveLength(6);
+  const d=data(released),navigate=vi.fn(), corpus_snapshot_id='corpus';
+ const production = { ...d.overview.production, snapshot: { ...d.overview.production.snapshot, human_release: released ? { decision: 'approved' } : undefined } };
+ const evaluation = { ...baseline, dataset_version_id: 'g', dataset_snapshot: { ...baseline.dataset_snapshot, corpus_fingerprint: { corpus_snapshot_id } }, config: { ...baseline.config, knowledge_identity: { corpus_snapshot_id } } };
+ const workspace = { current_golden_id: 'g', current_baseline_id: evaluation.id, current_experiment_id: d.optimization.id };
+ await mount(<OverviewPage data={{...d, evaluation, workspace, overview: { production, knowledge: { identity: { corpus_snapshot_id } } } }} navigate={navigate}/>);
+ const cards = document.querySelectorAll('.overview-kpi');
+ expect(cards).toHaveLength(4);
+ expect(cards[2].textContent).toContain('答对 44 / 50 题');
+ expect(document.querySelector('.overview-current')?.textContent).toContain(released?'Candidate D 已发布':'已推荐 Candidate D，待发布确认');
+ await click(released?'查看回答对比':'查看发布确认');if(released)expect(location.hash).toBe('#verification?tab=compare');else expect(navigate).toHaveBeenCalledWith('versions');
 });
 it('retains incomplete-workflow primary actions and unknown metrics',async()=>{
  const navigate=vi.fn();await mount(<OverviewPage data={{workspace:{requires_new_golden:true},overview:{knowledge:{identity:{corpus_snapshot_id:'new'}}}}} navigate={navigate}/>);
- await click('完成 Golden Dataset 重建');expect(navigate).toHaveBeenCalledWith('governance');expect(document.querySelector('.ui-ov-big')?.textContent).toContain('未知');
+ await click('核对题卷确认');expect(navigate).toHaveBeenCalledWith('governance');expect(document.querySelector('.overview-kpi-grid')?.textContent).toContain('待完成当前基准评测');
 });
 it('connects all round cards to the existing drawer and migrates diagnosis to Baseline',async()=>{
  const d=data();await mount(<EvolutionPage data={d}/>);

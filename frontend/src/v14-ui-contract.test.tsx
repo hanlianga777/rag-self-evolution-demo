@@ -43,8 +43,8 @@ it.each([true, false])("I4 manual current Preview is available with legacy Run=%
   if (legacy) await act(async()=>root.render(<CurrentCoveragePreview profile="mini" corpusFingerprint={{D:"fixture"}} documents={[]}/>));
   await clickText("预览当前 Corpus 覆盖规划");
   expect(posts).toEqual([{ url: expect.stringContaining("/api/governance/coverage-preview"), body: { profile: "mini" } }]);
-  expect(document.body.textContent).toContain("当前 Corpus · V2 覆盖规划 Preview");
-  expect(document.body.textContent).toContain("1 Topics · 1 Slots · Gap 0 · Merge 1");
+  expect(document.body.textContent).toContain("当前知识库 · 题型与主题预览");
+  expect(document.body.textContent).toContain("1 个业务主题 · 1 道计划题 · Gap 0 · Merge 1");
   expect(JSON.stringify(input)).toBe(frozen);
 });
 
@@ -84,7 +84,8 @@ it.each([0, 1.25, null])("M4 Sandbox and release keep frozen estimated cost %s a
   const input = { ...data("B1"), optimization: { id: "E1", candidates: [candidate] } };
   await render(<EvolutionPage data={input} />); await clickText("进化路线");
   const expected = cost == null ? "费用未采集 · Token Usage / Provider Cost unavailable" : `¥ ${(cost * 7.2).toFixed(2)}（估算费用）`;
-  expect(document.querySelector(".sandbox-core-table")?.textContent).not.toContain("费用");
+  await clickText("查看沙盒评测和逐题回归");
+  expect(document.querySelector(".candidate-overview-table")?.textContent).not.toContain("费用");
   await clickText("查看高级指标");
   if(cost==null) expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("费用未采集");else expect(document.querySelector('[role="dialog"]')?.textContent).toContain(expected);
   expect(document.body.textContent).not.toContain("暂未配置单价");
@@ -239,14 +240,12 @@ it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox an
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} }))));
   const d = { id: "E1-D", status: "evaluated", config: {}, reasoning: { candidate_label: "D" }, result: { gates: { passed: true, passed_count: 11, total: 11 }, regression: { passed: false, status: "FAIL" }, qualification: { qualified: false }, release_qualification: { qualified: false } } };
   await render(<EvolutionPage data={{ workspace: identity("B1", "E1"), evaluation: { id: "B1", status: "completed", config: {} }, optimization: { id: "E1", candidates: [d], result: { report_confirmation: { winner_id: "A" }, composite: { candidate_id: d.id } } } }} />);
-  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "进化路线")!.click());
-  expect([...document.querySelectorAll('.sandbox-core-table tbody th')].slice(0,6).map(node=>node.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "安全拒答率", "P50", "P99"]);
-  expect(document.querySelector('.ui-ct-more')).toBeNull();
-  const coreRows = [...document.querySelectorAll(".sandbox-core-table tbody tr")];
+  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "回归与推荐")!.click());
+  const coreRows = [...document.querySelectorAll('table[aria-label="跨方案总表"] tbody tr')];
   const value = (label: string) => coreRows.find(row => row.querySelector("th")?.textContent === label)?.lastElementChild?.textContent;
-  expect(value("Hard Gate")).toBe("11 / 11");
-  expect(value("Regression Check")).toBe("未通过");
-  expect(value("Candidate 合格")).toBeUndefined();
+  expect(value("门槛通过数")).toBe("11/11");
+  expect(value("回归检查")).toBe("未通过");
+  expect(value("是否合格")).toContain("不合格");
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "进化路线")!.click());
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Candidate D")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(x => x.textContent === "查看 D 完整报告")!.click());
@@ -255,17 +254,20 @@ it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox an
 });
 
 it.each([undefined, "running", "failed"])("review R2 keeps %s Baseline at Evaluation before Agent", async status => {
-  const input = { ...data("B1"), snapshots: [{ id: identity("B1").current_golden_id, status: "approved", snapshot: { question_ids: ["Q1"], questions: [{ id: "Q1", test_category: "positive" }] } }], overview: { dataset: { expected_count: 1, approved: 1 } }, evaluation: status ? { id: "B1", status } : {} };
+  const corpus_snapshot_id = 'fixture';
+  const input = { ...data("B1"), snapshots: [{ id: identity("B1").current_golden_id, status: "approved", snapshot: { corpus_fingerprint: { corpus_snapshot_id }, question_ids: ["Q1"], questions: [{ id: "Q1", test_category: "positive" }] } }], overview: { knowledge: { identity: { corpus_snapshot_id } } }, evaluation: status ? { id: "B1", status, dataset_version_id: identity("B1").current_golden_id, config: { knowledge_identity: { corpus_snapshot_id } } } : {} };
   await render(<OverviewPage data={input} navigate={() => {}} />);
-  expect(document.querySelector(".ui-ov-action")?.textContent).toMatch(/Baseline/);
-  expect(document.querySelector(".ui-ov-status")?.textContent).not.toContain("运行 Optimization Agent");
+  expect(document.querySelector(".overview-current button")?.textContent).toMatch(/Baseline/);
+  expect(document.querySelector(".overview-current p")?.textContent).toBe(status === 'running' ? '评测进行中' : '待完成当前基准评测');
 });
 
 it("review R2 an older Production does not finish a new recommendation Gate3", async () => {
-  const candidate = { id: "E1-A", status: "evaluated", reasoning: { candidate_label: "A" }, release_state: { sandbox: true, qualified: true, recommended: true, round_complete: true } };
-  const input = { ...data("B1"), snapshots: [{ id: identity("B1").current_golden_id, status: "approved", snapshot: { question_ids: ["Q1"], questions: [{ id: "Q1", test_category: "positive" }] } }], overview: { dataset: { expected_count: 1, approved: 1 } }, evaluation: { id: "B1", status: "completed" }, optimization: { id: "E1", baseline_run_id: "B1", candidates: [candidate], recommendation: { result: { status: "Recommended", recommended_candidate: candidate.id } } }, versions: [{ id: "P0", status: "active", provenance: "published", snapshot: { candidate_id: "E0-C" } }] };
+  const candidate = { id: "E1-A", status: "evaluated", reasoning: { candidate_label: "A" }, result: { total: 1, bad_case_count: 0, qualification: { qualified: true } }, release_state: { sandbox: true, qualified: true, recommended: true, round_complete: true } };
+  const corpus_snapshot_id = 'fixture';
+  const input = { ...data("B1"), snapshots: [{ id: identity("B1").current_golden_id, status: "approved", snapshot: { corpus_fingerprint: { corpus_snapshot_id }, question_ids: ["Q1"], questions: [{ id: "Q1", test_category: "positive" }] } }], overview: { knowledge: { identity: { corpus_snapshot_id } } }, evaluation: { id: "B1", status: "completed", dataset_version_id: identity("B1").current_golden_id, config: { knowledge_identity: { corpus_snapshot_id } }, result: { total: 1, bad_case_count: 1 } }, optimization: { id: "E1", baseline_run_id: "B1", candidates: [candidate], recommendation: { result: { status: "Recommended", recommended_candidate: candidate.id } } }, versions: [{ id: "P0", status: "active", provenance: "published", snapshot: { candidate_id: "E0-C" } }] };
   await render(<OverviewPage data={input} navigate={() => {}} />);
-  expect(document.querySelector(".ui-ov-action")?.textContent).toBe("去发布");
+  expect(document.querySelector(".overview-current button")?.textContent).toBe("查看发布确认");
+  expect(document.querySelector(".overview-current p")?.textContent).toContain('待发布确认');
   await act(async () => root.render(<VersionsPage data={input} />));
   expect(document.querySelector('[aria-label="发布阶段"]')).toBeNull();
   expect(document.querySelector(".ui-rel")?.textContent).toContain("Candidate A");

@@ -7,6 +7,7 @@ import { onIdle, warmPageData, warmupRoute } from "./pageWarmup";
 import { PageWarmupContext } from "./preload";
 import { OverviewPage } from "./pages/OverviewPage";
 import { PageShell } from "./components/PageShell";
+import { coreTerm } from "./helpText";
 import { useOperation } from "./operation";
 import type { AppData, Citation, Page } from "./types";
 
@@ -27,10 +28,10 @@ const SettingsPage = lazy(() => pageModules.settings().then(module => ({ default
 const VerificationPage = lazy(() => pageModules.verification().then(module => ({ default: module.VerificationPage })));
 const VersionsPage = lazy(() => pageModules.versions().then(module => ({ default: module.VersionsPage })));
 
-const navigation: { id: Page; label: string; icon: typeof ICONS.overview }[] = [
-  { id: "overview", label: "RAG 自进化概览", icon: ICONS.overview }, { id: "knowledge", label: "知识库", icon: ICONS.knowledge },
-  { id: "governance", label: "黄金测试集", icon: ICONS.golden }, { id: "settings", label: "Pipeline 配置", icon: ICONS.pipeline },
-  { id: "evaluation", label: "Baseline", icon: ICONS.baseline }, { id: "evolution", label: "Agent 工作台", icon: ICONS.agent },
+const navigation: { id: Page; label: string; icon: typeof ICONS.overview; explanation?: string }[] = [
+  { id: "overview", label: "RAG 自进化概览", explanation: coreTerm.rag, icon: ICONS.overview }, { id: "knowledge", label: "知识库", icon: ICONS.knowledge },
+  { id: "governance", label: "黄金测试集", icon: ICONS.golden }, { id: "settings", label: "Pipeline 配置", explanation: coreTerm.pipeline, icon: ICONS.pipeline },
+  { id: "evaluation", label: "Baseline", explanation: coreTerm.baseline, icon: ICONS.baseline }, { id: "evolution", label: "Agent 工作台", explanation: coreTerm.agent, icon: ICONS.agent },
   { id: "versions", label: "发布", icon: ICONS.release }, { id: "verification", label: "问答验证", icon: ICONS.verify },
 ];
 const items = navigation;
@@ -103,7 +104,7 @@ export default function App() {
   const openCitation = (citation: Citation) => { setOpenedDocument({ citation }); navigate("knowledge"); };
   const skeleton = <PageShell className="page page-loading" header={<div className="page-title"><h1>{navigation.find(item=>item.id===page)?.label}</h1></div>}><div className="golden-skeleton" role="status" aria-label="正在加载页面内容">{[1,2,3].map(index=><span key={index} aria-hidden="true"/>)}</div></PageShell>;
   const content = !data ? error ? <div className="state" role="alert"><h1>无法加载当前页面</h1><p>{error}</p><button className="primary" onClick={() => void refresh()}>重试</button></div> : skeleton : page === "overview" ? <OverviewPage data={data} navigate={navigate} /> : page === "knowledge" ? <KnowledgePage data={data} onChanged={refresh} openedDocument={openedDocument} onOpenedDocument={() => setOpenedDocument(undefined)} /> : page === "governance" ? <GovernancePage data={data} /> : page === "evaluation" ? <EvaluationPage data={data} navigate={navigate} /> : page === "evolution" ? <EvolutionPage data={data} /> : page === "versions" ? <VersionsPage data={data} /> : page === "verification" ? <VerificationPage data={data} onOpenCitation={openCitation} onOpenDocument={name => { setOpenedDocument({ name }); navigate("knowledge"); }} /> : <SettingsPage data={data} />;
-  return <PageWarmupContext.Provider value={pagesWarming}><div className="app-shell"><a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById("main-content")?.focus(); }}>跳转到主内容</a><aside><div className="brand"><Bot size={21} aria-hidden="true" /><span>RAG 自进化</span></div><nav aria-label="主导航">{navigation.map(item => <NavigationLink key={item.id} item={item} page={page} navigate={navigate} prefetch={prefetch} />)}</nav></aside><main id="main-content" className="main" tabIndex={-1}><button className="secondary mobile-menu" aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} aria-hidden="true" />菜单</button>{menuOpen && <nav id="mobile-navigation" className="mobile-navigation" aria-label="移动导航">{items.map(item => <a key={item.id} href={`#${item.id}`} aria-current={page === item.id ? "page" : undefined} onClick={() => navigate(item.id)}>{item.label}</a>)}</nav>}{data && error && <p className="error-notice" role="alert">{error}<button onClick={() => void refresh()}>重试</button></p>}<PageErrorBoundary key={`${page}:${identityKey(data?.workspace)}`}><Suspense fallback={skeleton}>{content}</Suspense></PageErrorBoundary></main></div></PageWarmupContext.Provider>;
+  return <PageWarmupContext.Provider value={pagesWarming}><div className="app-shell"><a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById("main-content")?.focus(); }}>跳转到主内容</a><aside><div className="brand"><Bot size={21} aria-hidden="true" /><span>RAG 自进化</span></div><nav aria-label="主导航">{navigation.map(item => <NavigationLink key={item.id} item={item} page={page} navigate={navigate} prefetch={prefetch} />)}</nav></aside><main id="main-content" className="main" tabIndex={-1}><button className="secondary mobile-menu" aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} aria-hidden="true" />菜单</button>{menuOpen && <nav id="mobile-navigation" className="mobile-navigation" aria-label="移动导航">{items.map(item => <a key={item.id} href={`#${item.id}`} aria-current={page === item.id ? "page" : undefined} onClick={() => navigate(item.id)}>{item.label}{item.explanation && <small className="mobile-nav-explanation">{item.explanation}</small>}</a>)}</nav>}{data && error && <p className="error-notice" role="alert">{error}<button onClick={() => void refresh()}>重试</button></p>}<PageErrorBoundary key={`${page}:${identityKey(data?.workspace)}`}><Suspense fallback={skeleton}>{content}</Suspense></PageErrorBoundary></main></div></PageWarmupContext.Provider>;
 }
 
 export class PageErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -116,7 +117,7 @@ export class PageErrorBoundary extends Component<{ children: ReactNode }, { erro
   }
 }
 
-function NavigationLink({ item, page, navigate, prefetch }: { item: { id: Page; label: string; icon: typeof ICONS.overview }; page: Page; navigate: (page: Page) => void; prefetch: (page: Page) => Promise<unknown> }) {
+function NavigationLink({ item, page, navigate, prefetch }: { item: (typeof navigation)[number]; page: Page; navigate: (page: Page) => void; prefetch: (page: Page) => Promise<unknown> }) {
   const Icon = item.icon;
-  return <a href={`#${item.id}`} className={page === item.id ? "active" : ""} aria-current={page === item.id ? "page" : undefined} onMouseEnter={()=>void prefetch(item.id)} onFocus={()=>void prefetch(item.id)} onClick={() => navigate(item.id)}><Icon size={17} strokeWidth={1.75} aria-hidden="true" focusable="false" />{item.label}</a>;
+  return <a href={`#${item.id}`} className={page === item.id ? "active" : ""} title={item.explanation} aria-description={item.explanation} aria-current={page === item.id ? "page" : undefined} onMouseEnter={()=>void prefetch(item.id)} onFocus={()=>void prefetch(item.id)} onClick={() => navigate(item.id)}><Icon size={17} strokeWidth={1.75} aria-hidden="true" focusable="false" />{item.label}</a>;
 }

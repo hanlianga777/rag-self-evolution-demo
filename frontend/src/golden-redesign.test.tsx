@@ -46,7 +46,7 @@ it("shows a skeleton until the initial run and frozen snapshot resolve", async (
   vi.stubGlobal("fetch", vi.fn((url: string) => new Promise(resolve => pending.push(() => resolve(new Response(JSON.stringify(url.includes("generation-runs?") ? [run] : url.includes("snapshots?") ? [snapshot] : goldenFixture(url, [row]))))))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ workspace: frozenData.workspace }} />));
-  expect(document.querySelector('[aria-label="正在读取 Golden Dataset"]')).not.toBeNull();
+  expect(document.querySelector('[aria-label="正在读取黄金测试集"]')).not.toBeNull();
   expect(document.body.textContent).not.toContain("未生成");
   expect(document.body.textContent).not.toContain("20 题位");
   expect(document.querySelector('[aria-label="测试集 Profile"]')).toBeNull();
@@ -72,9 +72,7 @@ it("hides frozen editing controls and renders numbered answers and source eviden
   expect(document.querySelector(".golden-probe-result")?.textContent).toContain("题目与证据校验通过");
   expect(document.querySelector(".golden-probe-result")?.textContent).toContain("P1 召回观察");
   for (const label of ["运行检索探针", "运行质检"]) {
-    const button = [...document.querySelectorAll("button")].find(button => button.textContent === label)!;
-    expect(button).toBeDefined();
-    expect(button.disabled).toBe(false);
+    expect([...document.querySelectorAll('[role=dialog] button')].some(button => button.textContent === label)).toBe(false);
   }
   expect(document.querySelector('button[title="已冻结，修改需新建题卷版本"]')).toBeNull();
   expect(document.body.textContent).toContain("题卷已冻结，只读");

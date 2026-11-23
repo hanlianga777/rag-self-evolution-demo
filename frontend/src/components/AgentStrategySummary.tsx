@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { detailJson } from '../preload';
 import { completeResult } from './EvolutionStory';
 import { savedSnapshot } from '../evaluationProgress';
@@ -169,10 +169,11 @@ export function qualificationReasons(result: any): string {
 }
 
 const comparisonMetrics = ['改了什么', '门槛通过数', '答对数', '修好', '新错',
-  '主攻问题', '回归检查', '延迟中位数（P50）', '延迟高位（P99）', '推荐价值', '是否合格'];
+  '主攻问题', '回归检查', '延迟中位数（P50）', '延迟高位（P99）', '证据可信度', '推荐价值', '是否合格'];
 
-export function CandidateOverviewTable({ evaluation, candidates, rounds, experiment, targets = [], onOpen, onQuestion, onAdvanced }: {
+export function CandidateOverviewTable({ evaluation, candidates, rounds, experiment, selectedRound, onRoundChange, targets = [], onOpen, onQuestion, onAdvanced }: {
   evaluation: any; candidates: any[]; rounds: { round: number }[]; experiment?: any; targets?: any[];
+  selectedRound: number; onRoundChange: (round: number) => void;
   onOpen?: (candidate: any) => void;
   onQuestion?: (id: string, candidate?: any) => void;
   onAdvanced?: () => void;
@@ -182,7 +183,6 @@ export function CandidateOverviewTable({ evaluation, candidates, rounds, experim
     ...candidates.filter(item => item.reasoning?.candidate_label !== 'D').map(item => item.reasoning?.round || 1),
   ])].filter(Number.isInteger).sort((a, b) => a - b);
   const numbers = roundNumbers.length ? roundNumbers : [1];
-  const [selectedRound, setSelectedRound] = useState<number>();
   const round = selectedRound && numbers.includes(selectedRound) ? selectedRound : numbers.at(-1)!;
   const [mobileColumn, setMobileColumn] = useState(0);
   const active = ['A', 'B', 'C'].map(label => candidates.find(item =>
@@ -197,16 +197,19 @@ export function CandidateOverviewTable({ evaluation, candidates, rounds, experim
   };
   const links = (ids: string[] | undefined, candidate: any) => onQuestion && Array.isArray(ids) && ids.length
     ? <span className="compare-question-links">{[...new Set(ids)].map(id =>
-        <button className="text-button" key={id} onClick={() => onQuestion(id, candidate)}>{shortQuestionId(id)}</button>)}</span>
+        <button className="text-button" key={id} onClick={event => { event.currentTarget.focus(); onQuestion(id, candidate); }}>{shortQuestionId(id)}</button>)}</span>
     : questions(ids);
   const columns: ReactNode[][] = [
     ['基准配置', baselineResult ? gatesText(baselineResult) : '未完成', baselineResult ? scoreText(baselineResult) : '未完成', '—', '—',
-      '—', '基准评测', latency(baselineResult, 'latency_p50_seconds'), latency(baselineResult, 'latency_p99_seconds'), '对照基准', '基准评测'],
+      '—', '基准评测', latency(baselineResult, 'latency_p50_seconds'), latency(baselineResult, 'latency_p99_seconds'), '基准评测', '对照基准', '基准评测'],
     ...schemes.slice(1).map(candidate => {
       if (!candidate) return Array<string>(comparisonMetrics.length).fill('未运行');
       const status: Record<string, string> = { running: '运行中', queued: '排队中', failed: '运行失败', evaluated: '未完成', skipped: '已跳过' };
       const result = completeResult(candidate);
-      const pending = status[candidate.status] || '未运行';
+      const savedProgress = candidate.result;
+      const progress = Number.isFinite(savedProgress?.completed) && Number.isFinite(savedProgress?.total)
+        ? ` · ${savedProgress.completed}/${savedProgress.total}` : '';
+      const pending = (savedProgress?.price_pause?.paused ? '已暂停' : status[candidate.status] || '未运行') + progress;
       const changes = parameterChanges(candidate, evaluation.config || {});
       return [
         changes.length ? <ul className="compare-parameters">{changes.map(({key, from, to}) =>
@@ -218,6 +221,7 @@ export function CandidateOverviewTable({ evaluation, candidates, rounds, experim
         targetText(candidate, experiment, targets),
         result?.regression?.status === 'PASS' ? '通过' : result?.regression?.status === 'FAIL' ? '未通过' : '未保存',
         latency(result, 'latency_p50_seconds'), latency(result, 'latency_p99_seconds'),
+        result ? candidateEvidence(candidate, experiment) : pending,
         result ? candidateValue(candidate, experiment) : pending,
         result ? <QualificationVersions result={result}/> : pending,
       ];
@@ -227,7 +231,7 @@ export function CandidateOverviewTable({ evaluation, candidates, rounds, experim
     ? <button className="text-button" onClick={() => onOpen(schemes[index])}>{labels[index]}</button>
     : labels[index];
   return <Section title="跨方案总表" action={onAdvanced && <button className="text-button" onClick={onAdvanced}>查看高级指标</button>}>
-    {numbers.length > 1 && <label className="compare-select">对比轮次 <select value={round} onChange={event => setSelectedRound(Number(event.target.value))}>
+    {numbers.length > 1 && <label className="compare-select">对比轮次 <select value={round} onChange={event => onRoundChange(Number(event.target.value))}>
       {numbers.map(value => <option key={value} value={value}>第 {value} 轮</option>)}
     </select></label>}
     {d && <p>方案 D 基于 {schemeName(candidates.find(item => item.id === d.reasoning?.winner_id), d.reasoning?.winner_id)}，切换轮次时保留同一 D。</p>}
@@ -255,6 +259,10 @@ export function CandidateOverviewTable({ evaluation, candidates, rounds, experim
 function SavedVerdictMatrix({ evaluation, schemes, labels, onQuestion }: {
   evaluation: any; schemes: any[]; labels: string[]; onQuestion: (id: string, candidate?: any) => void;
 }) {
+  const openQuestion = (event: MouseEvent<HTMLButtonElement>, id: string, candidate?: any) => {
+    event.currentTarget.focus();
+    onQuestion(id, candidate);
+  };
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState('changed');
   const [runs, setRuns] = useState<any[]>();
@@ -321,13 +329,13 @@ function SavedVerdictMatrix({ evaluation, schemes, labels, onQuestion }: {
       <div className="table-scroll" tabIndex={0} role="region" aria-label="逐题回归矩阵"><table className="candidate-overview-table">
         <thead><tr><th scope="col">题号</th>{labels.map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
         <tbody>{rows.map(row => <tr key={row.question_id}>
-          <th scope="row"><button className="text-button" onClick={() => onQuestion(row.question_id)}>{shortQuestionId(row.question_id)}</button></th>
+          <th scope="row"><button className="text-button" onClick={event => openQuestion(event, row.question_id)}>{shortQuestionId(row.question_id)}</button></th>
           {labels.map((label, index) => {
             const verdict = scores[index]?.get(row.question_id);
             const change = index && typeof verdict === 'boolean' && typeof row.passed === 'boolean' && verdict !== row.passed;
             const severity = schemes[index]?.result?.regression_review?.case_severities?.[row.question_id];
             return <td key={label}>{typeof verdict === 'boolean'
-              ? <button className="text-button" aria-label={`${label} ${shortQuestionId(row.question_id)} 题目详情`} onClick={() => onQuestion(row.question_id, schemes[index])}>
+              ? <button className="text-button" aria-label={`${label} ${shortQuestionId(row.question_id)} 题目详情`} onClick={event => openQuestion(event, row.question_id, schemes[index])}>
                   <TableVerdict value={verdict} pass="PASS" fail="FAIL"/>{change ? verdict ? ' · 修好' : severity === 'critical' ? ' · 严重新错' : severity === 'ordinary' ? ' · 普通新错' : ' · 新错' : null}
                 </button>
               : ids[index] ? '未采集' : '未运行'}</td>;
@@ -344,7 +352,7 @@ function SavedVerdictMatrix({ evaluation, schemes, labels, onQuestion }: {
         <p>按正向与消融题的保存回答，统计包含「说明书没有」原词的答案。每题计一次。字面匹配第 1 版。</p>
         {observations ? <ul>{labels.map((label, index) => <li key={label}>{label} · {observations[index]
           ? <>{observations[index]!.length}/{observedQuestions.length} 题 {observations[index]!.map(id =>
-            <button className="text-button" key={id} onClick={() => onQuestion(id, schemes[index])}>{shortQuestionId(id)}</button>)}</>
+            <button className="text-button" key={id} onClick={event => openQuestion(event, id, schemes[index])}>{shortQuestionId(id)}</button>)}</>
           : "未采集"}</li>)}</ul>
           : <button className="text-button" disabled={scanning} onClick={() => void scan()}>{scanning ? "读取保存回答…" : "查看「说明书没有」计数"}</button>}
       </div>

@@ -43,13 +43,15 @@ it.each([
   ['有本方案的检索预演', { audit: { retrieval_preview } }, '预演：改后 Q20、Q30 的证据会进入资料'],
   ['无检索预演', {}, '预计修好 Q16、Q20'],
   ['只有其他配置的检索预演', { retrieval_preview: { ...retrieval_preview, configs: retrieval_preview.configs.slice(0, 1) } }, '预计修好 Q16、Q20'],
-])('拼装五行首屏（%s）', async (_case, saved, basis) => {
+])('路线保留方案依据，指标集中在对比页（%s）', async (_case, saved, basis) => {
   await mount({ ...saved, agent_strategies: { 1: strategy } }, [candidate]);
   expect([...document.querySelectorAll('.candidate-card-summary .summary-text')].map(line => line.textContent)).toEqual([
     'Candidate A · 扩大召回', 'Candidate K 12 → 24；Top-K 4 → 6', '检索层 2 题：Q16、Q20', basis,
-    '修好 Q16、Q20 · 新错 无 · 43/50 · 门槛 11/11',
   ]);
   expect(document.querySelector('.candidate-card details')?.textContent).toContain('检查靠后的证据');
+  expect(document.querySelector('.candidate-card .candidate-result-line')).toBeNull();
+  await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '查看沙盒评测和逐题回归')!.click());
+  expect(document.querySelector('.candidate-overview-table')?.textContent).toContain('43/50');
 });
 
 it('汇总各轮和未运行的方案，只显示完成评测的成绩', async () => {
@@ -122,5 +124,6 @@ it('switches from a new experiment to the read-only archive with its own saved B
   expect(document.body.textContent).not.toContain('运行本轮 A/B/C Sandbox');
   await select('current');
   expect(document.body.textContent).not.toContain('旧实验只读');
-  expect(document.querySelector('.candidate-result-line')?.textContent).toContain('43/50');
+  await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '查看沙盒评测和逐题回归')!.click());
+  expect(document.querySelector('.candidate-overview-table')?.textContent).toContain('43/50');
 });

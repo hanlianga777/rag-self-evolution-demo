@@ -30,7 +30,7 @@ it('shows PASS without old failure attribution while retaining the unmodified au
   const conclusion = document.querySelector('.case-review')!;
   expect(conclusion.textContent).toContain('答对');
   expect(conclusion.textContent).not.toMatch(/FAIL|Bad Case|失败现象|技术归属|尚待证据定位/);
-  expect(document.querySelectorAll('.bad-case-details > section')[3].textContent).not.toContain('候选召回覆盖');
+  expect([...document.querySelectorAll('.bad-case-details > section > h3')].map(node => node.textContent)).not.toContain('本次诊断');
   expect(document.querySelector('.case-answer-stack')?.textContent).toContain('引用来源未核验');
   expect(document.querySelector('.bad-case-details > details')).toBeNull();
   expect(JSON.stringify(item)).toBe(saved);

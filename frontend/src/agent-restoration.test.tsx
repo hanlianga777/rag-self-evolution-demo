@@ -32,11 +32,12 @@ it("restores stages and complete generated plans without inventing evaluated res
 
 it("shows a status row and separate candidate/release decision rows and blocks Gate2 while another candidate is generated", async () => {
   const value = { ...data, optimization: { ...data.optimization, candidates: [{ ...candidates[0], status: "evaluated", result: { qualification: { qualified: true }, gates: { total: 11, passed_count: 11 }, regression: { status: "PASS", new_critical_failures: 0, new_ordinary_failures: 0 }, target_bad_cases_fixed: 1 } }, candidates[1], candidates[2]] } };
-  await mount(value); await click("进化路线");
-  expect(document.querySelectorAll(".sandbox-core-table tbody tr").length).toBeGreaterThan(6);
-  expect(document.querySelector('.ui-ct-more')).toBeNull();
-  expect(document.querySelector(".sandbox-core-table")?.textContent).toContain("全部原 Bad Case 修好");
-  expect(document.body.textContent).not.toContain("确认报告与赢家");
+  await mount(value); await click("回归与推荐");
+  const table = document.querySelector('table[aria-label="跨方案总表"]')!;
+  expect(table.querySelectorAll("tbody tr").length).toBeGreaterThan(6);
+  expect(table.textContent).toContain('合格');
+  expect(table.textContent).toContain('未运行');
+  expect(document.body.textContent).not.toContain("确认报告与 Winner");
   expect(document.body.textContent).toContain("运行本轮 A/B/C Sandbox");
 });
 
@@ -80,7 +81,7 @@ it("runs three saved candidates while retaining an honest uncovered-question war
 });
 
 it("keeps incomplete coverage out of Sandbox and offers same-round zero-call completion", async () => {
-  await mount({ ...data, optimization:{...data.optimization,candidates:[candidates[0]],coverage_plan:{status:"incomplete",covered_count:1,total:10,binding:"reviewed",matrix:[{question_id:"Q1",candidates:[],gap:"缺口待记录"}]}}});
+  await mount({ ...data, optimization:{...data.optimization,candidates:[candidates[0]],result:{...data.optimization.result,strategy_contract:{version:"saved"}},coverage_plan:{status:"incomplete",covered_count:1,total:10,binding:"reviewed",matrix:[{question_id:"Q1",candidates:[],gap:"缺口待记录"}]}}});
   expect(document.body.textContent).toContain("补齐本轮规划（不收费）");
   expect(document.body.textContent).not.toContain("运行本轮 A/B/C Sandbox");
   expect(document.querySelector(".agent-overview")?.textContent).toContain("规划未完成");
@@ -92,13 +93,10 @@ it("keeps incomplete coverage out of Sandbox and offers same-round zero-call com
 it("suppresses incomplete final scores, preserves progress and blocks unreconciled paid continuation", async () => {
   const incomplete={evaluation_complete:false,completed:38,total:50,gates:{passed_count:0,total:11,passed:null},bad_case_count:6,regression:{status:"FAIL",new_critical_failures:12,new_ordinary_failures:3},qualification:{qualified:false},request_accounting:{call_events:156,unknown_usage_events:1}};
   await mount({...data,optimization:{...data.optimization,candidates:[{...candidates[0],status:"failed",result:incomplete,resume_plan:{can_resume:false,reusable:38,completed:38,total:50,next_question_id:"Q39",reason:"需先对账：Embedding请求结果未知"}},candidates[1],candidates[2]],recommendation:{status:"No Qualified Candidate"}}});
-  await click("进化路线");
-  expect(document.querySelector(".ui-ct-more")).toBeNull();
-  expect(document.querySelector('.sandbox-core-table')?.textContent).toContain("未完成");
-  expect(document.querySelector('.sandbox-core-table')?.textContent).toContain("未完成");
-  expect(document.querySelector('.sandbox-core-table')?.textContent).not.toContain("0 / 11");
-  expect(document.querySelector('.sandbox-core-table')?.textContent).not.toContain("严重 12");
   await click("回归与推荐");
+  const summary = document.querySelector('table[aria-label="跨方案总表"]')!;
+  expect(summary.textContent).toContain("运行失败 · 38/50");
+  expect(summary.textContent).not.toMatch(/0\s*\/\s*11|严重 12/);
   expect(document.body.textContent).toContain("本轮实验尚未完成");
   expect(document.body.textContent).not.toContain("保存结论：本轮暂无合格候选方案");
   await click("进化路线");

@@ -69,6 +69,13 @@ it('opens feedback details when clicking the truncated question inside its actio
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ events: [event], triggers: [] }))));
   await mount(<VerificationPage data={{ monitoring: { events: [event] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
   await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '线上反馈')!.click());
-  await act(async () => (document.querySelector('.monitoring-table tbody button .ui-clamp,.monitoring-table tbody button .truncated-text') as HTMLElement).click());
+  const region = document.querySelector<HTMLElement>('[role="region"][aria-label="线上问答记录表"]')!;
+  expect(region.tabIndex).toBe(0);
+  const trigger = region.querySelector<HTMLButtonElement>('.monitoring-question')!;
+  expect(trigger.type).toBe('button');
+  await act(async () => trigger.querySelector<HTMLElement>('.monitoring-question-label')!.click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('保存的回答');
+  await act(async () => document.querySelector<HTMLButtonElement>('[role="dialog"] [aria-label="关闭"]')!.click());
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  expect(document.activeElement).toBe(trigger);
 });

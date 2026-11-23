@@ -17,7 +17,7 @@ beforeEach(()=>{sessionStorage.clear();history.replaceState(null,'','/');invalid
 afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();invalidateReads();invalidatePipeline();});
 async function mount(node:React.ReactNode){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));}
 async function click(text:string){await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent===text)!.click());}
-const d=()=>({id:'exp-D',status:'evaluated',reasoning:{candidate_label:'D',winner_id:'winner',changes:[{target_question_ids:['Q04','Q06'],side_effect_check:{protected_overlap:['Q15','Q17']}}]},result:{evaluation_run_id:'after',evaluation_identity:'same',total:50,bad_case_count:2,continued_failure_question_ids:['Q06','Q27'],all_fixed_question_ids:['Q04','Q38'],winner_comparison:{fixed_cases:['Q04'],new_failures:[]},gates:{},new_regression_question_ids:[]}});
+const d=()=>({id:'exp-D',status:'evaluated',reasoning:{candidate_label:'D',winner_id:'winner',changes:[{target_question_ids:['Q04','Q06'],side_effect_check:{protected_overlap:['Q15','Q17']}}]},result:{evaluation_run_id:'after',evaluation_identity:'same',total:50,bad_case_count:2,continued_failure_question_ids:['Q06','Q27'],all_fixed_question_ids:['Q04','Q38'],winner_comparison:{fixed_cases:['Q04'],new_failures:[]},qualification:{qualified:true},gates:{},new_regression_question_ids:[]}});
 const exp=()=>({id:'exp',baseline_run_id:'base',candidates:[{id:'winner',status:'evaluated',result:{total:50,bad_case_count:3}},d()],result:{d_facts:{protected_questions:[{question_id:'Q15'},{question_id:'Q17'}]}},recommendation:{status:'Recommended',recommended_candidate:'exp-D'}});
 const savedRun={id:'after',status:'completed',judge:{evaluation_identity:'same'},cases:[{question_id:'Q15',passed:true},{question_id:'Q17',passed:true}]};
 it('hides protected counts while pending, then shows verified counts without mutating the experiment',async()=>{
@@ -46,7 +46,7 @@ it('shows real next-round inputs, one empty state and clickable remaining questi
  location.hash='#verification?tab=monitoring';await mount(<VerificationPage data={{evaluation:{id:'base'},optimization:exp(),monitoring:{events:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
  expect(document.querySelectorAll('.feedback-loop-node')).toHaveLength(0);expect([...document.querySelectorAll('.monitoring-remaining .ui-q')].map(n=>n.textContent)).toEqual(['Q06','Q27']);expect(document.querySelector('.monitoring-stats')?.textContent).toContain('已标注失败案例0');
  expect(document.querySelector('.feedback-empty')?.textContent).toBe('暂无线上问答记录。');expect(document.body.textContent).not.toMatch(/当前尚无实际问答记录|当前尚无反馈记录|符合现有触发规则/);
- await click('Q27');expect(location.hash).toBe('#verification?tab=compare&q=Q27');expect(document.querySelector('.tabs [aria-pressed="true"]')?.textContent).toBe('Before/After');expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method||init.method==='GET')).toBe(true);
+ await click('Q27');expect(location.hash).toBe('#verification?tab=compare&q=Q27');expect(document.querySelector('.tabs [aria-pressed="true"]')?.textContent).toBe('回答对比');expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method||init.method==='GET')).toBe(true);
 });
 it('counts only human-confirmed bad cases and retains feedback assessment controls',async()=>{
  location.hash='#verification?tab=monitoring';const events=[{id:'a',question:'保存的问题',bad_case:true,determinable:true},{id:'b',question:'未判定',bad_case:true,determinable:false},{id:'c',question:'正常',bad_case:false,determinable:true}];await mount(<VerificationPage data={{monitoring:{events}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
@@ -62,11 +62,17 @@ it('marks percentage and latency margins at their numeric boundaries, leaving mi
  location.hash='#evaluation?tab=gates';const gates=[['positive_correctness',94,95],['positive_faithfulness',93.99,95],['latency_p50_seconds',19,20],['latency_p99_seconds',18.99,20],['safe_rejection_rate',undefined,95]].map(([metric,actual,threshold])=>({metric,actual,threshold,operator:'>=',status:'PASS'}));const run={id:'base',status:'completed',cases:[],result:{gates:{gates}}};vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(run))));await mount(<EvaluationPage data={{evaluation:run}}/>);
  const rows=[...document.querySelectorAll('.ui-hg-card li')];expect(rows.map(row=>!!row.querySelector('.gate-tight'))).toEqual([true,false,false,true,false]);await act(async()=>{document.querySelector<HTMLElement>('.gate-tight')!.focus();await new Promise(resolve=>setTimeout(resolve,160));});expect(document.querySelector('[role=tooltip]')?.textContent).toBe('余量很小，后续 Candidate 容易在这一项失败');
 });
-it('puts saved remaining failures in overview without an attribution placeholder, with compare links',async()=>{
- const optimization=exp(),evaluation={id:'base',status:'completed',config:{},dataset_snapshot:{question_ids:['Q04','Q38','Q06','Q27'],questions:[]},result:{total:50,bad_case_count:6}};const navigate=vi.fn();await mount(<OverviewPage data={{evaluation,optimization,overview:{dataset:{total:50,approved:50},production:{provenance:'published',snapshot:{candidate_id:'exp-D'}}}}} navigate={navigate}/>);
- expect(document.querySelector('[aria-label="修好的题目"]')?.textContent).toContain('仍未修好：Q06、Q27');expect(document.querySelector('.ui-ovs-fixed')?.textContent).not.toContain('—');await click('Q06');expect(location.hash).toBe('#verification?tab=compare&q=Q06');await click('去问答验证');expect(location.hash).toBe('#verification?tab=compare');
+it('keeps case-level remaining failures in verification and leaves a route there after release',async()=>{
+ const optimization=exp(), corpus_snapshot_id='corpus';
+ const evaluation={id:'base',status:'completed',dataset_version_id:'paper',config:{knowledge_identity:{corpus_snapshot_id}},dataset_snapshot:{corpus_fingerprint:{corpus_snapshot_id},question_ids:['Q04','Q38','Q06','Q27'],questions:[]},result:{total:50,bad_case_count:6}};
+ const workspace={current_golden_id:'paper',current_baseline_id:'base'};
+ const overview={knowledge:{identity:{corpus_snapshot_id}},production:{provenance:'published',snapshot:{candidate_id:'exp-D',human_release:{decision:'approved'}}}};
+ await mount(<OverviewPage data={{evaluation,optimization:{...optimization,baseline_run_id:'base'},workspace,overview}} navigate={()=>{}}/>);
+ expect(document.querySelector('.overview-current')?.textContent).toContain('已发布');
+ expect(document.querySelector('.overview-kpi-grid')?.textContent).not.toContain('Q06');
+ await click('查看回答对比');expect(location.hash).toBe('#verification?tab=compare');
 });
 
 it('defaults to Before/After even when an older session saved the live QA tab',async()=>{
- sessionStorage.setItem('rag-qa-tab',JSON.stringify({version:1,state:{tab:'qa'}}));await mount(<VerificationPage data={{}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);expect(document.querySelector('.tabs [aria-pressed="true"]')?.textContent).toBe('Before/After');
+ sessionStorage.setItem('rag-qa-tab',JSON.stringify({version:1,state:{tab:'qa'}}));await mount(<VerificationPage data={{}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);expect(document.querySelector('.tabs [aria-pressed="true"]')?.textContent).toBe('回答对比');
 });

@@ -46,7 +46,7 @@ it('uses the shared local short timestamp in the frozen Golden summary', async (
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ rows: questions, total: 1, candidate_index: questions }))));
   await mount(<GovernancePage data={{ workspace: { current_golden_id: 'gd' }, dataset: questions,
     generationRuns: [{ id: 'gen', status: 'completed', question_ids: ['q'], profile: { expected_count: 1 } }],
-    snapshots: [{ id: 'gd', created_at, snapshot: { generation_run_id: 'gen', question_ids: ['q'], questions } }] }} />);
+    snapshots: [{ id: 'gd', status: 'approved', created_at, snapshot: { generation_run_id: 'gen', question_ids: ['q'], questions } }] }} />);
   expect(document.querySelector('.ui-gp')?.textContent).toContain(`已冻结 · ${localShortTime(created_at)}`);
   expect(document.querySelector('.ui-gp')?.textContent).not.toContain('UTC');
 });

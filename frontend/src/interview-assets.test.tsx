@@ -117,7 +117,7 @@ it("shows a completed failed Probe as pending action rather than not started", a
   vi.stubGlobal("fetch", vi.fn(async (url:string) => new Response(JSON.stringify(goldenFixture(url,[row])))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{generationRuns:[run], snapshots:[], dataset:[row], documents:[]}} />));
-  const probe = [...document.querySelectorAll(".ui-gp-steps li")].find(item=>item.querySelector("strong")?.textContent==="Probe")!;
+  const probe = [...document.querySelectorAll(".ui-gp-steps li")].find(item=>item.querySelector("strong")?.textContent==="检索探针")!;
   expect(probe.textContent).toContain("0/1");
   expect(probe.textContent).toContain("待处理");
   expect(probe.textContent).not.toContain("待开始");

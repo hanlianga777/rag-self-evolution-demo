@@ -32,16 +32,27 @@ it('opens business topic groups inline without the old details drawer',async()=>
 });
 it('uses the frozen record and saved quality states in the Golden summary',async()=>{
  await mount(<GovernancePage data={{workspace:{current_golden_id:'gd'},generationRuns:[run],snapshots:[snapshot],dataset:questions}}/>);
- const summary=document.querySelector('.ui-gp');expect(summary).not.toBeNull();expect(summary?.textContent).toContain('1 题');expect(summary?.textContent).toContain('11-04');expect(summary?.textContent).toContain('Probe');expect(summary?.querySelectorAll('li.done')).toHaveLength(6);expect(document.querySelector('.stage-stepper')).toBeNull();await click('候选池');expect(document.querySelector('.ui-gp')).toBeNull();
+ const summary=document.querySelector('.ui-gp');expect(summary).not.toBeNull();expect(summary?.textContent).toContain('1 题');expect(summary?.textContent).toContain('11-04');expect(summary?.textContent).toContain('检索探针');expect(summary?.querySelectorAll('li.done')).toHaveLength(6);expect(document.querySelector('.stage-stepper')).toBeNull();await click('候选池');expect(document.querySelector('.ui-gp')).toBeNull();
 });
 it('keeps full questions in single-line ClampText and shortens sources using the existing filename rule',async()=>{
  const detail=vi.fn();await mount(<QuestionTable rows={questions} onDetail={detail}/>);
  expect(document.body.textContent).toContain('B2 用户手册 · p8');expect(document.body.textContent).not.toContain('2 条');expect(document.body.textContent).not.toContain('加分 1');expect(document.querySelector('td:nth-child(3) .truncated-text')?.textContent).toContain(questions[0].question);await act(async()=>document.querySelector<HTMLTableRowElement>('tbody tr')!.click());expect(detail).toHaveBeenCalledWith(questions[0]);
 });
 it('shows saved numeric Sandbox metrics, highlights Winner/D, keeps round switching and denominator details',async()=>{
- const exp=structuredClone(sampleExperiment);(exp.candidates[0].result as any).initial_bad_case_count=2;await mount(<EvolutionPage data={{evaluation:{status:'completed',result:{total:50,bad_case_count:6,gates:{passed_count:11,total:11},metrics:{latency_p99_seconds:42.24,safe_rejection_rate:100}}},optimization:{...exp,id:"exp"}}}/>);await click('进化路线');await click('Round 3');
- expect(document.querySelector('.ui-ct')).not.toBeNull();expect(document.querySelectorAll('.ui-ct thead .hl')).toHaveLength(2);expect(document.querySelectorAll('.ui-ct tbody tr')).toHaveLength(7);expect(document.querySelector('.ui-ct tbody')?.textContent).toContain('44');expect(document.querySelector('.ui-ct tbody')?.textContent).toContain('100%');expect(document.querySelectorAll('.ui-ct .best').length).toBeGreaterThan(0);
- expect(document.querySelector('.ui-ct-more')).toBeNull();expect(document.querySelector('.ui-ct')?.textContent).toContain('全部原 Bad Case 修好');expect(document.querySelector('.ui-ct')?.textContent).toContain('4 / 6');expect(document.querySelector('.sandbox-denominators')).not.toBeNull();await click('Round 1');expect(document.querySelector('.ui-ct')?.textContent).toContain('R1-A');await click('查看高级指标');expect(document.querySelector('[role=dialog]')).not.toBeNull();
+ const exp=structuredClone(sampleExperiment);(exp.candidates[0].result as any).comparison_metrics={recall_at_k:100};await mount(<EvolutionPage data={{evaluation:{status:'completed',result:{total:50,bad_case_count:6,gates:{passed_count:11,total:11},metrics:{latency_p99_seconds:42.24,safe_rejection_rate:100,precision_at_k:77.9},comparison_metrics:{recall_at_k:100}}},optimization:{...exp,id:"exp"}}}/>);await click('进化路线');await click('Round 3');await click('查看沙盒评测和逐题回归');
+ const table = document.querySelector('table[aria-label="跨方案总表"]')!;
+ expect([...table.querySelectorAll('thead th')].slice(1).map(cell => cell.textContent)).toEqual(['Baseline','R3-A','R3-B','R3-C','D']);
+ expect(table.textContent).toContain('44/50');
+ expect(table.textContent).toContain('48/50');
+ const chooser = document.querySelector<HTMLSelectElement>('.compare-select select')!;
+ await act(async()=>{chooser.value='1';chooser.dispatchEvent(new Event('change',{bubbles:true}));});
+ expect(table.querySelector('thead')?.textContent).toContain('R1-A');
+ await click('查看高级指标');
+ const audit = document.querySelector('[role=dialog]')!;
+ expect(audit.textContent).toContain('R1-A');
+ expect(audit.textContent).toMatch(/前 K 条召回率.*100/);
+ expect(audit.textContent).toContain('各指标只统计有对应检索记录的题');
+ expect(audit.textContent).not.toMatch(/前 K 条相关比例|77\.90/);
 });
 it('labels the online candidate and configuration from the active version rather than experiment defaults',async()=>{
  history.replaceState(null,'','#verification?tab=qa');

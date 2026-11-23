@@ -1,6 +1,6 @@
 import { currentQualification } from "../candidateQualification";
 import { useApprovedGolden } from "../goldenCache";
-import { pagePurpose } from "../helpText";
+import { coreTerm, pagePurpose } from "../helpText";
 import { usePageTab } from "../usePageTab";
 import { IconTile } from "../ui/icons";
 import { completeResult, recommendationOf, schemeName } from "../components/EvolutionStory";
@@ -72,10 +72,10 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
         ? `${data.workspace?.document_count ?? knowledge.documents ?? "未知"} 份文档 · ${data.workspace?.chunk_count ?? "未知"} 个片段`
         : "当前索引身份未记录", page: "knowledge" },
     { label: "黄金测试集", value: frozen ? `已冻结 · ${frozenTotal ?? "未知"} 题` : goldenId ? "待核对冻结题卷身份" : "待人工确认题卷", page: "governance" },
-    { label: "Baseline（基准评测）", value: baseline && typeof baseline.total === "number" && typeof baseline.bad_case_count === "number"
+    { label: `Baseline（${coreTerm.baseline}）`, value: baseline && typeof baseline.total === "number" && typeof baseline.bad_case_count === "number"
         ? `答对 ${baseline.total - baseline.bad_case_count} / ${baseline.total} 题`
         : baselineValid && run?.status === "running" ? "评测进行中" : "待完成当前基准评测", page: "evaluation" },
-    { label: "Agent（优化助手）", value: completedRound ? `已完成 ${completedRound} 轮 · ${candidates.filter(completeResult).length} 个方案已评测` : agentProgress, page: "evolution" },
+    { label: `Agent（${coreTerm.agent}）`, value: completedRound ? `已完成 ${completedRound} 轮 · ${candidates.filter(completeResult).length} 个方案已评测` : agentProgress, page: "evolution" },
   ];
   const next: [Page, string, string?] = !knowledge?.identity ? ["knowledge", "查看知识库"]
     : !frozen ? ["governance", "核对题卷确认"]

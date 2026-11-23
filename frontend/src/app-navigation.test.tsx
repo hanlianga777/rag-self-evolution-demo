@@ -21,6 +21,16 @@ it("opens the overview with the V1.3 lifecycle navigation", async () => {
   expect(document.body.textContent).toContain("RAG 自进化概览");
   expect(document.body.textContent).toContain("黄金测试集");
   expect(document.body.textContent).toContain("问答验证");
+  const desktop = document.querySelector('nav[aria-label="主导航"]');
+  expect(desktop?.querySelector('[href="#evaluation"]')?.getAttribute("aria-description")).toBe("基准评测");
+  await act(async () => document.querySelector<HTMLButtonElement>(".mobile-menu")!.click());
+  const mobile = document.querySelector('nav[aria-label="移动导航"]');
+  expect([...mobile!.querySelectorAll("a")].map(link => link.getAttribute("href")))
+    .toEqual([...desktop!.querySelectorAll("a")].map(link => link.getAttribute("href")));
+  for (const [route, meaning] of Object.entries({ overview: "检索增强生成", settings: "处理流程", evaluation: "基准评测", evolution: "优化智能体" })) {
+    expect(mobile?.querySelector(`[href="#${route}"] small`)?.textContent).toBe(meaning);
+    expect(desktop?.querySelector(`[href="#${route}"]`)?.getAttribute("aria-description")).toBe(meaning);
+  }
   expect([...document.querySelectorAll('nav[aria-label="主导航"] a')].map(item => item.textContent)).toEqual(["RAG 自进化概览", "知识库", "黄金测试集", "Pipeline 配置", "Baseline", "Agent 工作台", "发布", "问答验证"]);
 });
 
