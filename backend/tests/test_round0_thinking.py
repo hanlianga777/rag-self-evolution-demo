@@ -16,7 +16,7 @@ _env = {name: str(Path(_isolation.name) / suffix) for name, suffix in {
     'RAG_DEMO_INDEX_DIR':'index','RAG_DEMO_DOCUMENTS_DIR':'documents',
     'RAG_DEMO_UPLOADS_DIR':'uploads'}.items()}
 with patch.dict(os.environ, _env):
-    from app import providers
+    from app import providers, rules
     from app.config import Settings, load_settings
     from app.ai_service import AiService, generation_contract
     from app.paid_run import provider_task
@@ -30,7 +30,7 @@ class Response(io.BytesIO):
 
 class ThinkingTests(unittest.TestCase):
     def setUp(self):
-        environment = patch.dict(os.environ, {**_env, 'JUDGE_THINKING':'low'})
+        environment = patch.dict(os.environ, _env)
         environment.start(); self.addCleanup(environment.stop)
         self.network = patch('socket.create_connection', side_effect=AssertionError('offline only'))
         self.network.start()
@@ -46,7 +46,7 @@ class ThinkingTests(unittest.TestCase):
         self.assertEqual(load_settings({'DEEPSEEK_MODEL':'deepseek-v4-flash'}, empty).model, 'deepseek-flash')
 
     def test_tasks_independent_and_off_has_no_effort(self):
-        for task, effort in {'baseline':'max','judge':'low','agent':'high','query_rewrite':'off','multi_query':'off','hyde':'off','query_decompose':'off'}.items():
+        for task, effort in {'baseline':rules.BASELINE['generation_thinking'],'judge':rules.JUDGE['thinking'],'agent':'high','query_rewrite':'off','multi_query':'off','hyde':'off','query_decompose':'off'}.items():
             with providers.thinking_task(task):
                 payload = self.payload()
                 self.assertEqual(payload['thinking'], {'type':'disabled' if effort == 'off' else 'enabled'})
@@ -60,7 +60,10 @@ class ThinkingTests(unittest.TestCase):
             self.assertEqual(self.payload()['thinking'], {'type':'disabled'})
             self.assertNotIn('reasoning_effort', self.payload())
             with provider_task('judge'):
-                self.assertEqual(self.payload()['reasoning_effort'], 'low')
+                self.assertEqual(self.payload()['thinking'], {'type':'disabled'})
+                self.assertNotIn('reasoning_effort', self.payload())
+                with providers.judge_thinking('low'):
+                    self.assertEqual(self.payload()['reasoning_effort'], 'low')
             with provider_task('agent'):
                 self.assertEqual(self.payload()['reasoning_effort'], 'high')
         with providers.thinking_task('agent', 'typo'):
@@ -88,7 +91,7 @@ class ThinkingTests(unittest.TestCase):
             with self.assertRaises(providers.ProviderInvalidResponse) as error:self.provider.complete('system','user')
         self.assertEqual(error.exception.response_metadata['finish_reason'], 'length')
         self.assertNotIn('PRIVATE THINKING', error.exception.raw_provider_response)
-        with patch('urllib.request.urlopen', side_effect=socket.timeout()), patch('app.paid_run.payment_usage'):
+        with patch('urllib.request.urlopen', side_effect=socket.timeout()), patch('app.paid_run.payment_usage'), patch('app.providers.time.sleep'):
             with self.assertRaises(providers.ProviderTimeout):self.provider.complete('system','user')
 
     def test_v4_default_candidate_off_auxiliary_tasks_and_no_golden_leakage(self):
@@ -151,7 +154,9 @@ class ThinkingTests(unittest.TestCase):
         with providers.thinking_task('candidate','off'):
             service.answer('question', {'run_target':'baseline','generation_thinking':'high'})
             service.judge('question','golden','answer','positive')
-        self.assertEqual([c.get('reasoning_effort', 'off') for c in calls], ['high','low'])
+            with providers.judge_thinking('low'):
+                service.judge('question','golden','answer','positive')
+        self.assertEqual([c.get('reasoning_effort', 'off') for c in calls], ['high','off','low'])
 
     def test_decompose_strict_bounded_json_and_disabled_thinking(self):
         class Provider:

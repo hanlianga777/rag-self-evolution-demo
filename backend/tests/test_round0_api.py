@@ -14,7 +14,7 @@ class Round0APITests(unittest.TestCase):
         self.assertEqual(result['judge']['model'],'deepseek-v4-flash')
 
     def test_pipeline_exposes_defaults_separately_from_saved_production(self):
-        from app.policy import DEFAULT_PIPELINE_CONFIG
+        from app import rules
         store=Mock()
         store.current_baseline_identity.return_value={'current_baseline_id':None}
         store.active_production.return_value={'id':'old','config':{'prompt_strategy':'Abstention'}}
@@ -22,5 +22,5 @@ class Round0APITests(unittest.TestCase):
         store.monitoring_events.return_value=[]
         with patch.object(main,'store',store),patch.object(main,'knowledge',return_value={'identity':{},'coverage_status':'fixture','index':{}}): result=main.pipeline()
         self.assertEqual(result['config']['prompt_strategy'],'Abstention')
-        self.assertEqual(result['baseline_defaults'],{**DEFAULT_PIPELINE_CONFIG,'generation_thinking':main.ai_service.provider.settings.baseline_thinking})
+        self.assertEqual(result['baseline_defaults'], rules.BASELINE)
         self.assertIsNone(result['baseline_config'])

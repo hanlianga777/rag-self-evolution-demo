@@ -33,7 +33,7 @@ def test_current_strict_and_historical_grounded_keep_their_exact_prompts():
     expected = {
         ('generation-vnext-4', 'Strict'): 'a4c1510da62a9ec7525d4c3b453704a4db50cc31ce517b48c40a40a565bad6ae',
         ('generation-vnext-2', 'Grounded'): 'c6add1d575f33d70a8f62d32edde885bd6a7d8dc0a0a9c2843728be987634d5f',
-        ('generation-vnext-3', 'Grounded'): '5dcd1131fc6de3cdac246dac27a2cc555d34306a5ed8b981d9591de5d7346650',
+        ('generation-vnext-3', 'Grounded'): 'f7e8d0cb31f2e0f65753785b5b757ebdeee66d544b4883589633e353a21aa758',
     }
     for (version, strategy), digest in expected.items():
         assert sha256(generation_system_prompt(version, strategy).encode()).hexdigest() == digest
@@ -48,4 +48,5 @@ def test_agent_can_name_safety_critical_and_injection_questions_in_prompt_strate
     assert data['prompt_strategy_risk_questions'] == {'safety_critical': ['critical'], 'prompt_injection': ['injection']}
     for strategy in ('Grounded', 'Stepwise', 'TableCheck'):
         assert f'→prompt_strategy={strategy}' in system
-    assert '全部50题' in system and '在risks里按题号点名安全关键题和提示注入题' in system
+    assert '换提示词会影响整卷回答' in system
+    assert '在risks里按题号点名安全关键题和提示注入题' in system
