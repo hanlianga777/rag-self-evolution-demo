@@ -21,7 +21,16 @@ export const sourceLabel = (source: Candidate) => {
   const end = answerPageLocation(source.document_name, source.page_end).book;
   return `${shortSourceName(source.document_name)} · ${start != null ? `p${start}${end != null && end !== start ? `–${end}` : ""}` : "页码暂无"}`;
 };
-export const questionSources = (row: Candidate) => [...new Set([...(row.business_requirements?.sources || row.raw?.business_requirements?.sources || []), ...(row.evidence_details || []).flatMap((source: Candidate) => source.chunks || [])].filter((source: Candidate) => source.document_name).map(sourceLabel))].join("；") || (row.test_category === "negative" ? "不适用 · 无标准证据" : "保存记录缺少来源");
+export function questionSources(row: Candidate) {
+  const sources = [...(row.business_requirements?.sources || row.raw?.business_requirements?.sources || []),
+    ...(row.evidence_details || []).flatMap((source: Candidate) => source.chunks || [])];
+  const locations = [...new Set(sources.filter(source => source.document_name).map(sourceLabel))];
+  if (locations.length) return locations.join("；");
+  if (row.test_category === "negative") return "不适用 · 无标准证据";
+  const refs = [...new Set<string>((row.evidence || row.raw?.evidence || []).flatMap((item: Candidate) =>
+    Array.isArray(item?.source_chunk_ids) ? item.source_chunk_ids : []))];
+  return refs.length ? `证据片段 ${refs.join("、")}` : "保存记录缺少来源";
+}
 export function goldenQuality(row: Candidate, kind: "probe" | "qc") {
   const result = row[kind], details = result?.probe_details;
   if (details?.probe_execution_status === "failed") return "执行失败";
@@ -76,7 +85,7 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true,
   ] as [string, any][]).filter(([, value]) => typeof value === "string" && value.trim()) as [string, string][];
   const evidenceSections = [["核心证据", coreEvidence], ["辅助引用", auxiliaryEvidence]] as const;
   return <>
-  <ConfirmDialog open={!!qualityConfirm} onOpenChange={open => !open && setQualityConfirm(null)} title={qualityConfirm?.name === "probe" ? "确认运行 Probe" : "确认运行 QC"} busy={busy} onConfirm={() => { const next = qualityConfirm; setQualityConfirm(null); if (next) onRun?.(next.id, next.name); }}><p>将重新校验当前题目，会调用模型并产生费用。</p><p>不会影响当前线上版本。</p></ConfirmDialog>
+  <ConfirmDialog open={!!qualityConfirm} onOpenChange={open => !open && setQualityConfirm(null)} title={qualityConfirm?.name === "probe" ? "确认运行检索探针" : "确认运行质检"} busy={busy} onConfirm={() => { const next = qualityConfirm; setQualityConfirm(null); if (next) onRun?.(next.id, next.name); }}><p>将重新校验当前题目，会调用模型并产生费用。</p><p>不会影响当前线上版本。</p></ConfirmDialog>
   <div className="drawer-body frozen-question-details">
     {showSource && row.raw?.source === "reviewed_csv_machine_checks" && <p className="muted">来源：人工审核</p>}
     {scenario && scenario !== "暂无" && <DrawerSection title="业务场景"><div className="muted-prose"><TruncatedText lines={3}>{scenario}</TruncatedText></div></DrawerSection>}
@@ -89,7 +98,7 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true,
       </div>)}</div>
     </DrawerSection>)}
     {facts.length > 0 && <DrawerSection title="题目信息"><ul className="golden-question-facts">{facts.map(([label, value]) => <li key={label}><span className="muted">{label}：</span>{value}</li>)}</ul></DrawerSection>}
-    <DrawerSection title="质检结果"><div className="golden-quality-results quality-grid"><div className="golden-probe-result"><strong>Probe · {goldenQuality(row, "probe")}</strong><Badge tone={probePassed ? "good" : "warning"}>{probeExecutionFailed ? "未完成" : probePassed ? "通过" : row.probe_status === "needs_revision" ? "未通过" : "未运行"}</Badge><div className="muted-prose"><TruncatedText lines={3}>{probeExecutionFailed ? "执行情况" : "题目有效"}：{validityReason}</TruncatedText></div><div className="muted-prose"><TruncatedText lines={3}>召回观察：{retrievalReason}</TruncatedText></div><button className="primary" disabled={busy || !onRun} aria-description={!onRun ? "即将支持" : undefined} onClick={() => setQualityConfirm({ id: row.id, name: "probe" })}>运行 Probe</button></div><div><strong>QC · {typeof qc.score === "number" ? goldenScore(qc.score) : goldenQuality(row, "qc")}</strong><Badge tone={qcPassed ? "good" : "warning"}>{qcPassed ? "通过" : row.qc_status === "qc_failed" ? "未通过" : "未运行"}</Badge><div className="muted-prose"><TruncatedText lines={3}>{readable(qc.reason || (qcPassed ? "整卷质检通过，未发现需修改的问题。" : "保存记录未提供质检说明。"))}</TruncatedText></div><button className="primary" disabled={busy || !onRun || !probePassed} aria-description={!onRun ? "即将支持" : !probePassed ? "Probe 通过后可运行 QC" : undefined} onClick={() => setQualityConfirm({ id: row.id, name: "qc" })}>运行 QC</button></div></div></DrawerSection>
+    <DrawerSection title="质检结果"><div className="golden-quality-results quality-grid"><div className="golden-probe-result"><strong>检索探针 · {goldenQuality(row, "probe")}</strong><Badge tone={probePassed ? "good" : "warning"}>{probeExecutionFailed ? "未完成" : probePassed ? "通过" : row.probe_status === "needs_revision" ? "未通过" : "未运行"}</Badge><div className="muted-prose"><TruncatedText lines={3}>{probeExecutionFailed ? "执行情况" : "题目有效"}：{validityReason}</TruncatedText></div><div className="muted-prose"><TruncatedText lines={3}>召回观察：{retrievalReason}</TruncatedText></div>{!frozen && onRun && <button className="primary" disabled={busy} aria-description={!onRun ? "即将支持" : undefined} onClick={() => setQualityConfirm({ id: row.id, name: "probe" })}>运行检索探针</button>}</div><div><strong>质检 · {typeof qc.score === "number" ? goldenScore(qc.score) : goldenQuality(row, "qc")}</strong><Badge tone={qcPassed ? "good" : "warning"}>{qcPassed ? "通过" : row.qc_status === "qc_failed" ? "未通过" : "未运行"}</Badge><div className="muted-prose"><TruncatedText lines={3}>{readable(qc.reason || (qcPassed ? "整卷质检通过，未发现需修改的问题。" : "保存记录未提供质检说明。"))}</TruncatedText></div>{!frozen && onRun && <button className="primary" disabled={busy || !probePassed} aria-description={!onRun ? "即将支持" : !probePassed ? "检索探针通过后可运行质检" : undefined} onClick={() => setQualityConfirm({ id: row.id, name: "qc" })}>运行质检</button>}</div></div></DrawerSection>
 
   </div>
   {frozen && <p className="candidate-readonly-hint muted">题卷已冻结，只读</p>}

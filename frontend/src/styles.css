@@ -1465,3 +1465,43 @@ button { border-radius:8px; }
 .versions-page .ui-rel-actions .text-button:hover:not(:disabled) { color:var(--ui-ink); }
 
 .drawer .generation-progress:empty { display: none; }
+
+.overview-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.overview-kpi-grid .overview-kpi {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  text-align: left;
+  white-space: normal;
+  color: var(--ui-ink);
+  border-radius: var(--ui-r-card);
+}
+.overview-kpi > span:last-child { display: grid; gap: 6px; }
+.overview-kpi strong { font-weight: 700; }
+.overview-kpi span span { font-variant-numeric: tabular-nums; }
+.overview-current {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.overview-current h2, .overview-current p { margin: 0 0 6px; }
+@media (max-width: 900px) {
+  .overview-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .overview-kpi-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.document-inspector > .tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--ui-surface);
+}

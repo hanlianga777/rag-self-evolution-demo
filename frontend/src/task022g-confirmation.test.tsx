@@ -35,7 +35,7 @@ it.each(['completed', 'partial', 'not_run'])('confirms before any Baseline start
   await cancelWithoutRequest(fetcher, label); await click(label);
   expect(document.querySelector('.confirm-dialog')?.textContent).toContain('会调用模型并产生费用');
   expect(document.querySelector('.confirm-dialog')?.textContent).toContain('不会影响当前线上版本');
-  if (status !== 'partial') expect(document.querySelector('.confirm-dialog')?.textContent).toContain('当前 Pipeline 配置对 50 题重新评测');
+  if (status !== 'partial') expect(document.querySelector('.confirm-dialog')?.textContent).toContain('当前 Pipeline 配置对当前冻结题卷重新评测');
   await click('确认');
   const posts = fetcher.mock.calls.filter(([, init]) => init?.method === 'POST'); expect(posts).toHaveLength(1);
   expect(posts[0][0]).toMatch(/\/api\/evaluations\/run$/);
@@ -45,8 +45,8 @@ it.each(['completed', 'partial', 'not_run'])('confirms before any Baseline start
 it.each(['probe', 'qc'] as const)('confirms single-question %s before invoking its callback', async kind => {
   const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher); const onRun = vi.fn();
   await mount(<FrozenQuestionDetails row={{ id: 'q', probe_status: 'probe_passed' }} frozen={false} onRun={onRun} />);
-  await cancelWithoutRequest(fetcher, kind === 'probe' ? '运行 Probe' : '运行 QC'); expect(onRun).not.toHaveBeenCalled();
-  await click(kind === 'probe' ? '运行 Probe' : '运行 QC'); await click('确认'); expect(onRun).toHaveBeenCalledTimes(1); expect(onRun).toHaveBeenCalledWith('q', kind);
+  await cancelWithoutRequest(fetcher, kind === 'probe' ? '运行检索探针' : '运行质检'); expect(onRun).not.toHaveBeenCalled();
+  await click(kind === 'probe' ? '运行检索探针' : '运行质检'); await click('确认'); expect(onRun).toHaveBeenCalledTimes(1); expect(onRun).toHaveBeenCalledWith('q', kind);
 });
 it('confirms retrying failed Golden generation before making requests', async () => {
   const run = { id: '022g-golden', status: 'needs_regeneration', question_ids: [], phase: 'generating', profile: { name: 'mini', expected_count: 20 }, artifacts: {} };
@@ -65,7 +65,7 @@ it.each(['regenerate', 'reselect', 'resume'])('confirms revision operation %s wi
 it('confirms monitoring Agent generation before starting its linked context', async () => {
   const fetcher = vi.fn(async () => response({ id: 'exp', baseline_run_id: 'b', status: 'pending_agent' })); vi.stubGlobal('fetch', fetcher);
   await mount(<VerificationPage data={{ workspace: { current_baseline_id: 'b' }, monitoring: { triggers: [{ id: 'trigger', status: 'human_confirmed', optimization_run_id: 'exp' }] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
-  await click('Monitoring'); await cancelWithoutRequest(fetcher, '启动此上下文 Agent · Round 1');
+  await click('线上反馈'); await cancelWithoutRequest(fetcher, '启动此上下文 Agent · Round 1');
 });
 it('uses the shared dialog for a paid immediate resume', async () => {
   const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher); await mount(<PricePauseNotice pause={{ paused: true }} evaluationId="b" />);
@@ -77,7 +77,7 @@ it('confirms continuing a stopped task before any resume preflight or POST', asy
   await mount(<OperationProvider><Stopped /></OperationProvider>); await click('准备已停止任务'); await cancelWithoutRequest(fetcher, '继续运行');
 });
 
-it.each(['重建 Knowledge Pipeline', '删除'])('confirms knowledge model action %s before requests', async label => {
+it.each(['重建知识处理流程', '删除'])('confirms knowledge model action %s before requests', async label => {
   const fetcher = vi.fn(async () => response({})); vi.stubGlobal('fetch', fetcher);
   await mount(<KnowledgePage data={{ documents: [{ id: 'doc', name: '资料.pdf', status: 'Indexed' }] }} />);
   await cancelWithoutRequest(fetcher, label);

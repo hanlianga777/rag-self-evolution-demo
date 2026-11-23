@@ -49,7 +49,7 @@ export type ChatMessage = {
   content: string;
   createdAt: string;
   question?: string;
-  mode?: "live" | "mock";
+  mode?: "live" | "local" | "mock";
   model?: string | null;
   latencyMs?: number | null;
   fallbackReason?: string | null;

@@ -98,17 +98,17 @@ export function BusinessTopicCoverage() {
             <td className="ui-num">{gap || null}</td>
           </tr>
           {open && <tr className="business-topic-detail"><td colSpan={7}>
-            {topic.clusters.length ? <table aria-label={`${topic.name}的分组`}>
+            {topic.clusters.length ? <>{typeof topic.quota === "number" && topic.quota <= 2 && <p>该主题第二层仅供浏览。</p>}<table aria-label={`${topic.name}的分组`}>
               <thead><tr><th scope="col">分组名称与成员小节</th><th scope="col">片段数</th><th scope="col">小节级同质性</th>
                 <th scope="col">片段加权占比</th>
-                <th scope="col">目标正向配额</th><th scope="col">实际题数</th></tr></thead>
+                {!(typeof topic.quota === "number" && topic.quota <= 2) && <th scope="col">目标正向配额</th>}<th scope="col">实际题数</th></tr></thead>
               <tbody>{topic.clusters.map(group => <tr key={group.id}>
-                <th scope="row"><strong>{group.name}</strong><small className="business-topic-model">{group.id}{group.basis === "manual" && " · 手册二级编号"}</small><SectionDirectory sections={group.sections} /></th>
+                <th scope="row"><strong>{topic.name === "维修" && group.name === "机械结构与密封件" ? "下臂、外壳与通用密封程序" : group.name}</strong><small className="business-topic-model">{group.id}{group.basis === "manual" && " · 手册二级编号"}</small><SectionDirectory sections={group.sections} /></th>
                 <td className="ui-num">{group.size}</td><td className="ui-num">{(group.homogeneity * 100).toFixed(1)}%</td>
                 <td className="ui-num">{(group.weighted_homogeneity * 100).toFixed(1)}%</td>
-                <td className="ui-num">{group.quota}</td><td className="ui-num">{group.questions ?? "—"}</td>
+                {!(typeof topic.quota === "number" && topic.quota <= 2) && <td className="ui-num">{group.quota}</td>}<td className="ui-num">{group.questions ?? "—"}</td>
               </tr>)}</tbody>
-            </table> : <><strong>编号小节目录</strong><SectionDirectory sections={topic.sections} /></>}
+            </table></> : <><strong>编号小节目录</strong><SectionDirectory sections={topic.sections} /></>}
           </td></tr>}
         </Fragment>;
       })}</tbody>

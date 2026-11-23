@@ -58,19 +58,21 @@ it('汇总各轮和未运行的方案，只显示完成评测的成绩', async (
     { ...candidate, id: 'EXP-R2-B', status: 'evaluated', reasoning: { candidate_label: 'B', round: 2 }, result: { evaluation_complete: false } }];
   await mount({}, candidates, 'candidate-comparison');
   const table = document.querySelector('[aria-label="跨方案总表"]');
-  expect([...table?.querySelectorAll('thead th') ?? []].map(cell => cell.textContent)).toEqual([
-    '指标', 'Baseline', 'R1-A', 'R1-B', 'R1-C', 'R2-A', 'R2-B', 'R2-C', 'D',
-  ]);
-  expect([...table?.querySelectorAll('tbody tr:first-child td') ?? []].map(cell => cell.textContent)).toEqual([
-    '—', 'Candidate K 12 → 24；Top-K 4 → 6', '未运行', '未运行', '未运行', 'Candidate K 12 → 24；Top-K 4 → 6', '未运行', '未运行',
-  ]);
-  expect([...table?.querySelectorAll('tbody tr') ?? []].slice(1).map(row => [...row.querySelectorAll('td')].map(cell => cell.textContent))).toEqual([
-    ['10/11', '11/11', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
-    ['41/50', '43/50', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
-    ['—', 'Q16、Q20', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
-    ['—', '无', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
-    ['—', '合格规则版本：当时未保存', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
-  ]);
+  const headings = () => Array.from(table!.querySelectorAll('thead th'), cell => cell.textContent);
+  const values = (label: string) => Array.from(
+    Array.from(table!.querySelectorAll('tbody tr')).find(row => row.querySelector('th')?.textContent === label)!.querySelectorAll('td'),
+    cell => cell.textContent,
+  );
+  expect(headings()).toEqual(['指标', 'Baseline', 'R2-A', 'R2-B', 'R2-C', 'D']);
+  expect(values('答对数')).toEqual(['41/50', '未运行', '未完成', '未运行', '未运行']);
+  const round = document.querySelector<HTMLSelectElement>('.compare-select select')!;
+  await act(async () => { round.value = '1'; round.dispatchEvent(new Event('change', {bubbles:true})); });
+  expect(headings()).toEqual(['指标', 'Baseline', 'R1-A', 'R1-B', 'R1-C', 'D']);
+  expect(values('门槛通过数')).toEqual(['10/11', '11/11', '已跳过', '未运行', '未运行']);
+  expect(values('答对数')).toEqual(['41/50', '43/50', '已跳过', '未运行', '未运行']);
+  expect(values('修好')[1]).toBe('Q16Q20');
+  expect(values('新错')[1]).toBe('无');
+  expect(values('是否合格')[1]).toBe('合格规则版本：当时未保存');
 });
 
 it('uses saved reassessments as the main A/B verdict and preserves the former verdict in route and review', async () => {

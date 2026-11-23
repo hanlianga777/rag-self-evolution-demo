@@ -14,7 +14,7 @@ export function preloadCandidates(identity: string, path: string) {
           first = page;
           const params = new URLSearchParams(path.split("?")[1] || "");
           if (params.get("status") === "machine" && (!params.get("group") || params.get("group") === "all") && !params.get("search") && page.total === 0 && page.candidate_index?.some((row: any) => ["machine_qualified", "owner_delegated_approved"].includes(row.qualification_status)))
-            throw new Error("机器合格统计与列表不一致，请重试或重启后端");
+            throw new Error("校验通过统计与列表不一致，请重试或重启后端");
         }
         if (page.data_version !== first.data_version) break;
         rows.push(...page.rows); offset += page.rows.length;

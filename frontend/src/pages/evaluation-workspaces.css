@@ -542,3 +542,34 @@ body :is(.evolution-page.page-shell,.drawer.workbench-drawer) .candidate-story-b
 }
 .evolution-page .candidate-summary-card .candidate-card-header .badge { flex: 0 0 auto; max-width: 52%; }
 .round-cause-evidence { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.verification-page .monitoring-table {
+  min-width: 0;
+  overflow-x: auto;
+}
+.verification-page.page-shell .monitoring-layout .monitoring-table table {
+  min-width: 760px;
+}
+.verification-page .monitoring-table th:nth-child(2) { width: 26%; }
+.verification-page .monitoring-question { display: block; min-width: 10rem; }
+
+.candidate-overview-mobile { display: none; }
+.compare-select { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+.compare-parameters { margin: 0; padding-left: 16px; }
+.compare-parameters li + li { margin-top: 6px; }
+.compare-question-links { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.saved-verdict-matrix { margin-top: 12px; }
+.saved-verdict-matrix summary { cursor: pointer; font-weight: 700; }
+.saved-verdict-matrix .table-scroll { max-height: 30rem; }
+.saved-verdict-matrix .table-scroll table { min-width: 580px; }
+.candidate-overview-table thead th { position: sticky; top: 0; background: var(--ui-surface); z-index: 1; }
+.candidate-overview-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) {
+  .candidate-overview-desktop { display: none; }
+  .candidate-overview-mobile { display: block; }
+  .compare-mobile-values { margin: 0; }
+  .compare-mobile-values > div { display: grid; grid-template-columns: minmax(7rem, 38%) minmax(0, 1fr); gap: 8px; padding: 8px 0; border-top: 1px solid var(--ui-rule); }
+  .compare-mobile-values dd { margin: 0; overflow-wrap: anywhere; }
+}
+.raw-record { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.phrase-observation { margin-top: 12px; }
