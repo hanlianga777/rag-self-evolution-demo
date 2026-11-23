@@ -165,7 +165,7 @@ class DecisionContractTests(TestCase):
             self.store.confirm_experiment_report(experiment_id, winner, 'human')
         with self.store.connection() as db:
             db.execute("UPDATE candidate_configs SET result_json=? WHERE id=?", (json.dumps(evaluated), winner))
-        set_unattended_authorization(self.store, True, '用户')
+        set_unattended_authorization(self.store, True, '当前用户')
         with patch('app.agent_strategy.conclude_round'), patch.object(self.store, 'create_composite', return_value={'status': 'declined'}) as composite:
             cycle = run_until_qualified(self.store, SimpleNamespace(provider=self.provider), experiment_id)
             self.assertEqual((cycle['status'], cycle['phase']), ('recommended', 'before_release'))
@@ -175,6 +175,8 @@ class DecisionContractTests(TestCase):
         self.assertEqual([saved[key] for key in ('authorizer', 'executed_by', 'review_method')],
                          ['用户', 'Codex', '用户授权自动执行'])
         self.assertNotIn('review_evidence', saved)
+        self.assertEqual(saved['authorization']['actor'], '当前用户')
+        self.assertTrue(saved['authorization']['authorized_at'])
         with self.store.connection() as db:
             self.assertEqual(db.execute("SELECT count(*) FROM approvals WHERE gate='human_release'").fetchone()[0], 0)
 

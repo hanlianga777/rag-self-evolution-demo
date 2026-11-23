@@ -36,7 +36,7 @@ from .optimization import OptimizationAgent
 from .diagnostics import diagnostic_view
 from .diagnostic_categories import DIAGNOSTIC_CATEGORIES
 from .product_diagnostics import product_diagnostics
-from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, FIXED_PIPELINE_PARAMETERS, qualification_description, search_space_contract, validate_candidate_config
+from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, FIXED_PIPELINE_PARAMETERS, qualification_description, require_gate_request_actor, search_space_contract, validate_candidate_config
 from .telemetry import price_config
 from .providers import DeepSeekProvider, ProviderTimeout, ProviderUnavailable
 from .retrieval import RetrievalUnavailable
@@ -1868,6 +1868,7 @@ def select_recommendation(run_id: str, payload: RecommendationRequest):
     require_current_baseline(experiment["baseline_run_id"])
     require_idle_cycle(experiment)
     try:
+        require_gate_request_actor('gate2', payload.actor, allow_self_check=True)
         return store.select_recommendation(run_id, payload.candidate_id, payload.actor,
             delegated_review=payload.delegated_review.model_dump() if payload.delegated_review else None)
     except ValueError as error:
@@ -1893,6 +1894,7 @@ class UnattendedRequest(BaseModel):
 def update_unattended_authorization(payload: UnattendedRequest):
     from .paid_schedule import set_unattended_authorization
     try:
+        require_gate_request_actor('gate2', payload.actor)
         return set_unattended_authorization(store, payload.enabled, payload.actor, audit_note=payload.audit_note)
     except ValueError as error:
         raise HTTPException(422, str(error)) from error
@@ -2030,6 +2032,7 @@ def publish_candidate(candidate_id: str, payload: PublishRequest):
     if payload.decision != "approved":
         raise HTTPException(status_code=422, detail="确认发布需要明确批准")
     try:
+        require_gate_request_actor('gate3', payload.actor)
         return store.publish_candidate(candidate_id, payload.actor,
             delegated_review=payload.delegated_review.model_dump() if payload.delegated_review else None)
     except ValueError as error:

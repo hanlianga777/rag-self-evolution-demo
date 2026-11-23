@@ -383,6 +383,92 @@ class EvaluationRunner:
         execution = self.runtime.answer(item["question"], config)
         return self.score_execution(item, execution)
 
+    def diagnostic_retest(self, run_id, question_ids, *, repetitions=3):
+        """Read a frozen scheme and score fresh trials without evaluation writes."""
+        from uuid import uuid4
+        from .corpus import current_manifest, manifest_identity
+        from .evaluation_stage import _request_checkpoint
+        from .judge_replay import resolve_question_ids
+        from .paid_run import accounting_only, execution_limits
+        from .providers import judge_thinking
+        from .request_reuse import bypass_reuse
+
+        if type(repetitions) is not int or repetitions < 1:
+            raise ValueError('复测次数须为正整数')
+        if not question_ids:
+            raise ValueError('至少指定一道题')
+        run = self.store.evaluation_run(run_id)
+        if (not run or run['status'] != 'completed'
+                or run['config'].get('run_target') not in {'baseline', 'sandbox_candidate'}):
+            raise ValueError('复测对象须为已完成的 Baseline 或 Candidate Sandbox 运行 ID')
+        snapshot = json.loads(run['dataset_snapshot_json'])
+        judge = run['judge']
+        if (not policy_current(judge) or judge.get('evaluation_identity') != evaluation_identity(snapshot, judge)
+                or judge.get('model') != self.runtime.model):
+            raise ValueError('复测对象的冻结题卷、Judge 或模型合同不匹配')
+        if (snapshot.get('corpus_fingerprint') != manifest_identity(current_manifest())
+                or run['config'].get('knowledge_identity', snapshot['corpus_fingerprint']) != snapshot['corpus_fingerprint']):
+            raise ValueError('复测对象的知识库身份不一致')
+        selected = resolve_question_ids(snapshot, question_ids)
+        frozen = {q['id']: q for q in snapshot['questions']}
+        if any('test_category' not in frozen.get(q, {}) for q in selected):
+            raise ValueError('复测题目缺少冻结类别或原题内容')
+        items = self.snapshot_items({**snapshot, 'question_ids': selected})
+        effort = judge.get('judge_thinking', {}).get('reasoning_effort', 'off')
+        limits = judge.get('execution_snapshot', {}).get('request_limits')
+        diagnostic_id = f'DIAG-{uuid4().hex}'
+        token = _request_checkpoint.set(None)
+        try:
+            with bypass_reuse(), judge_thinking(effort), execution_limits(limits), accounting_only():
+                self._require_generation_contract(judge)
+                questions = self._diagnostic_trials(items, run, repetitions, diagnostic_id, snapshot, frozen)
+        finally:
+            _request_checkpoint.reset(token)
+        return {'id': diagnostic_id, 'source_run_id': run_id, 'repetitions': repetitions,
+                'evaluation_identity': judge['evaluation_identity'], 'questions': questions}
+
+    def _diagnostic_trials(self, items, run, repetitions, diagnostic_id, snapshot, frozen):
+        from .evaluation_stage import checkpoint_usage, perform_stage
+        from .policy import protected_question
+        from .providers import permanent_provider_error
+
+        questions = []
+        for item in items:
+            question_id = item['id']
+            protected = protected_question(item, item['raw'])
+            trials = []
+            for index in range(repetitions):
+                trial_id = f'{diagnostic_id}-{len(questions) + 1}-{index + 1}'
+                checkpoint = {'attempts': []}
+                def perform(phase, action):
+                    return perform_stage(checkpoint, phase, action, trial_id, automatic=False,
+                                         check_stop=lambda: None, on_state=lambda *_args, **_kwargs: None)
+
+                try:
+                    execution = perform('generation', lambda: self.runtime.answer(item['question'], run['config']))
+                    score = perform('judge', lambda: self.score_execution(item, execution))
+                    if type(score.get('passed')) is not bool:
+                        raise ValueError('本次没有有效判定')
+                    judgment = score.get('judge_result') or {}
+                    severe = judgment.get('safety_violation') is True or any(
+                        sample.get('safety_violation') is True for sample in judgment.get('samples', []))
+                    trial = {'passed': score['passed'], 'risk': protected and (not score['passed'] or severe),
+                             'judge_result': judgment}
+                except Exception as error:
+                    if permanent_provider_error(error):
+                        raise
+                    trial = {'passed': None, 'risk': None, 'error': str(error)}
+                trials.append({'id': trial_id, **trial, 'usage': checkpoint_usage(checkpoint)})
+            passed = sum(trial['passed'] is True for trial in trials)
+            unknown = sum(trial['passed'] is None for trial in trials)
+            risk = any(trial['risk'] is True for trial in trials)
+            display = frozen[question_id].get('coverage_slot') or f"Q{snapshot['question_ids'].index(question_id) + 1:02d}"
+            questions.append({'question_id': question_id, 'display_question_id': display,
+                              'distribution': f'{passed}/{repetitions}' if not unknown else None,
+                              'passed': passed, 'unknown': unknown, 'risk': None if protected and unknown and not risk else risk,
+                              'trials': trials})
+        return questions
+
     @frozen_run_judge
     def review_baseline_errors(self, run_id, question_ids=None, *, on_progress=None, stop_on_error=False):
         """Attach majority reviews to a completed Baseline, preserving its formal score."""
@@ -1078,13 +1164,27 @@ class EvaluationRunner:
             from .optimization import validate_intervention
             base={**DEFAULT_PIPELINE_CONFIG,**baseline['config']}
             for key in ('run_target','knowledge_identity'):base.pop(key,None)
-            from .diagnostics import standard_evidence
-            frozen = {q['id']: q for q in json.loads(baseline['dataset_snapshot_json']).get('questions', [])}
-            targets={ref:{**row['result'], 'standard_evidence': standard_evidence(frozen.get(row['question_id'], {}))} for row in self.store.bad_case_rows() if row['run_id']==baseline['id'] for ref in (row['id'],row['question_id'])}
+            from .agent_inputs import baseline_bad_case_rows
+            targets = {ref: row['result'] for row in baseline_bad_case_rows(self.store, baseline)
+                       for ref in (row['id'], row['question_id'])}
             reasoning=candidate['reasoning']
             actual={k:v for k,v in candidate['config'].items() if v!=base.get(k)}
             if actual!=reasoning.get('changed_parameters_vs_baseline', reasoning.get('changed_parameters')):raise ValueError('Candidate 配置与已审查干预不一致')
-            if reasoning.get('inherited_from') or reasoning.get('inherited_parameters'):
+            if saved_base := reasoning.get('round_base'):
+                from .agent_round_contract import round_base, validate_base
+                expected_base = round_base(base, experiment['candidates'], reasoning['round'],
+                                           identity=baseline['judge'].get('evaluation_identity'))
+                if saved_base != expected_base:
+                    raise ValueError('保存的轮次底座与合格 Winner 不一致')
+                validate_base({**reasoning, 'config_diff': reasoning['changed_parameters']}, saved_base)
+                effective = {**base, **saved_base['changes']}
+                diff = reasoning['changed_parameters']
+                expected_config = {**effective, **diff}
+                if expected_config.get('hybrid_search') is False and 'hybrid_alpha' not in diff:
+                    expected_config.pop('hybrid_alpha', None)
+                if {k: v for k, v in expected_config.items() if k in rules.PIPELINE_VALUES} != candidate['config']:
+                    raise ValueError('Candidate 配置与轮次底座和实际新增改动不一致')
+            elif reasoning.get('inherited_from') or reasoning.get('inherited_parameters'):
                 from .optimization import inherited_base
                 effective = inherited_base(reasoning, base, experiment['candidates'], reasoning['round'], experiment['result'].get('round_policy'))
                 if {**effective, **reasoning['changed_parameters']} != {**base, **candidate['config']}:
@@ -1098,8 +1198,14 @@ class EvaluationRunner:
                 if any(not any(c['config'].get(k)==v for c in sources) for k,v in actual.items()):raise ValueError('D参数缺少已验证来源')
             for source in sources:
                 r=source['reasoning']
-                validate_intervention({**r,'target_bad_cases':r.get('observed_evidence',[]),'why':r.get('proposal'),
-                    'config_diff':{k:v for k,v in source['config'].items() if v!=base.get(k)}},targets,base)
+                if r.get('round_base'):
+                    comparison = {**base, **r['round_base']['changes']}
+                    changes = r['changed_parameters']
+                else:
+                    comparison = base
+                    changes = {k:v for k,v in source['config'].items() if v!=base.get(k)}
+                validate_intervention({**r, 'target_bad_cases':r.get('observed_evidence',[]),
+                                       'why':r.get('proposal'), 'config_diff':changes}, targets, comparison)
         snapshot = json.loads(baseline["dataset_snapshot_json"])
         from .paid_run import current_paid_run
         limits = baseline['judge'].get('execution_snapshot',{}).get('request_limits')

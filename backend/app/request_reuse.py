@@ -28,6 +28,15 @@ def reuse_scope(store, run):
         _scope.reset(token)
 
 
+@contextmanager
+def bypass_reuse():
+    token = _scope.set(None)
+    try:
+        yield
+    finally:
+        _scope.reset(token)
+
+
 def reuse_result(kind, payload, action):
     scope = _scope.get()
     if scope is None:

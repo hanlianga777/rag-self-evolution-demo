@@ -150,17 +150,35 @@ def qualify_release(gates: dict, regression: dict, fixed_count: int, baseline_ba
     return {"qualified": all(checks.values()), "checks": checks}
 
 
-def delegated_gate_audit(gate, actor, reviews, *, current_experiment):
+def require_gate_request_actor(gate, actor, *, allow_self_check=False):
+    actors = rules.GATE_USER_ACTORS
+    if allow_self_check:
+        actors = actors | {rules.AUTHORIZATION[gate]['self_check_executor'].casefold()}
+    if actor.strip().casefold() not in actors:
+        raise ValueError(f"Gate {gate[-1]} 需要通过用户确认入口核对授权")
+
+
+def gate2_self_check_authorized(authorization):
+    actor = (authorization or {}).get('actor')
+    return bool(authorization and authorization.get('enabled') is True and authorization.get('authorized_at')
+                and isinstance(actor, str) and actor.strip()
+                and actor.strip().casefold() in rules.GATE_USER_ACTORS)
+
+
+def gate_audit(gate, actor, *, authorization=None, reviews=None):
     rule = rules.AUTHORIZATION[gate]
-    if reviews is None and actor != rule['executed_by']:
-        return {}
-    if (not rule['delegated'] or not current_experiment or actor != rule['executed_by']
-            or not isinstance(reviews, dict) or set(reviews) != set(rule['reviewers'])
-            or any(not isinstance(ref, str) or not ref.strip() for ref in reviews.values())):
-        raise ValueError(f"Gate {gate[-1]} 代行需要总指挥提供双审均通过的依据")
-    return {key: rule[key] for key in ('authorizer', 'executed_by', 'review_method')} | {
-        'review_evidence': {key: value.strip() for key, value in reviews.items()},
-    }
+    if not isinstance(actor, str) or not actor.strip():
+        raise ValueError('确认人不能为空')
+    actor = actor.strip()
+    if reviews is not None:
+        raise ValueError(f"Gate {gate[-1]} 已取消固定双审，须按当前用户授权确认")
+    if actor.casefold() == (rule['self_check_executor'] or '').casefold():
+        if not gate2_self_check_authorized(authorization):
+            raise ValueError('Gate 2 Codex 自检须有已保存的用户授权')
+        return rules.AGENT_GATE_AUDIT.copy()
+    if actor.casefold() == rules.AGENT_GATE_AUDIT['executed_by'].casefold() or actor == '总指挥':
+        raise ValueError('Gate 3 发布须由用户明确批准' if gate == 'gate3' else 'Gate 2 须由用户确认或经用户授权由 Codex 自检')
+    return {'authorizer': rule['authorizer'], 'executed_by': actor, 'review_method': rule['manual_review_method']}
 
 
 def composite_source_eligible(candidate: dict, identity: str) -> bool:

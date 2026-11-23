@@ -97,3 +97,21 @@ it("offers Gate 3 for an eligible new experiment", async () => {
   expect(document.querySelector(".confirm-dialog")).not.toBeNull();
   expect((fetch as any).mock.calls.every(([, init]: any) => !init?.method)).toBe(true);
 });
+
+
+it("labels a saved Gate 2 audit correction without relabeling original approvals", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
+  root = createRoot(document.body.appendChild(document.createElement("div")));
+  const render = async (correction?: object) => act(async () => root.render(<OperationProvider restore={false}>
+    <VersionsPage data={{ optimization: { id: "EXP", result: {
+      report_confirmation: { actor: "Codex", winner_id: "EXP-B" },
+      gate2_audit_correction: correction,
+    } } }} />
+  </OperationProvider>));
+  const gate = () => document.querySelectorAll(".human-gates article")[1]?.textContent;
+  await render();
+  expect(gate()).toContain("已确认实验报告");
+  expect(gate()).not.toContain("审计字段后补");
+  await render({ original_approval: { id: 590 } });
+  expect(gate()).toContain("已授权确认，审计字段后补");
+});

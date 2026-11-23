@@ -120,3 +120,18 @@ it("offers Gate 2 for an eligible new experiment", async () => {
   expect(document.querySelector(".confirm-dialog")).not.toBeNull();
   expect((fetch as any).mock.calls.every(([, init]: any) => !init?.method)).toBe(true);
 });
+
+
+it("shows why evidence ran out and the next diagnostic action for the remaining case", async () => {
+  await mount({ ...data, optimization: { ...data.optimization, candidates: [], result: {
+    generation_status: "insufficient_evidence",
+    decision_stop: { reason: "证据不足以继续", questions: { Q1: {
+      display_question_id: "Q15", fault: { stage: "进了 Final 但生成出错" },
+      reason: "无仍可提交且通过机制校验的未试配置", next_action: "表格结构化或数据处理，再独立复测",
+    } } },
+  } } });
+  const status = [...document.querySelectorAll("details")].find(item => item.textContent?.includes("证据不足以继续"));
+  expect(status?.textContent).toContain("Q15");
+  expect(status?.textContent).toContain("表格结构化");
+  expect((fetch as any).mock.calls.every(([, init]: any) => !init?.method)).toBe(true);
+});

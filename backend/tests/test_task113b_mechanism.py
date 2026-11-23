@@ -157,6 +157,11 @@ def test_ledger_is_saved_when_sandbox_finishes_and_sent_before_next_proposal(mon
             saved = {'1': {'status': 'saved', 'review': {'lessons': ['保存事实']}, 'case_facts': {}, 'parameter_findings': []}}
             db.execute("UPDATE experiments SET result_json=json_set(result_json,'$.round_conclusions',json(?)) WHERE id=?",
                        (json.dumps(saved), experiment))
+        from app.agent_inputs import baseline_bad_case_rows
+        [target_row] = baseline_bad_case_rows(store, store.evaluation_run(baseline['id']))
+        display = target_row['diagnostic_view']['display_question_id'] or 'Q1'
+        monkeypatch.setattr('app.optimization.load_retrieval_preview', lambda *_: {
+            'configs': [{'change': {'top_k': 6}, 'evidence_enters_final': [display]}]})
         monkeypatch.setattr('app.optimization.wait_for_off_peak', Mock())
         provider = Mock(spec=['complete'])
         provider.complete.side_effect = proposal
@@ -193,6 +198,8 @@ def test_continue_api_saves_per_target_checks_and_rejected_draft(monkeypatch):
             prompt = json.loads(user)
             output = drafts()
             output['prior_round_review']['summary'] = '无'
+            output['hypothesis_plan'] = {'hypothesis': '交付标准证据可以改善回答', 'test_candidate': 'A',
+                                         'if_true': {'action': 'D'}, 'if_false': {'action': 'stop'}}
             output['bad_case_summary'] = {'groups': prompt['bad_case_groups'], 'focus': '核对已保存证据',
                                           'conclusions': [{'id': 'B1', 'conclusion': '证据缺口'}]}
             output['candidates'][0]['config_diff'] = alternative if 'validation_rejection' in prompt else rejected
@@ -212,6 +219,8 @@ def test_continue_api_saves_per_target_checks_and_rejected_draft(monkeypatch):
         read_back = client.get(f'/api/experiments/{experiment}?light=true').json()
         assert len(read_back['candidates']) == 3
         assert read_back['evaluation_budget']['used'] == 0
+        plan = read_back['result']['hypothesis_chain']['1']
+        assert plan['candidate_id'].endswith('-R1-A') and plan['question_ids'] == ['Q1']
         assert all(c['reasoning']['mechanism_checks'][0]['decision'] == '放行' for c in read_back['candidates'])
         trace = client.get(f'/api/experiments/{experiment}/round-trace/1').json()
         assert trace['result']['validation_retries'][0]['mechanism_checks']['A'][0]['decision'] == '拒绝'

@@ -106,14 +106,18 @@ AGENT_PARAMETER_STAGES = {
 }
 AGENT_CONTEXT_PARAMETERS = ('top_k', 'rerank', 'retrieval_max_tokens')
 QUALIFICATION = {'version': RULES_VERSION, 'max_new_critical': 0, 'max_new_failures': 0, 'min_fixed': 1}
-# Legacy authorization is part of the saved evaluation rules fingerprint.
 AUTHORIZATION = {
-    'gate2': {'delegated': True, 'authorizer': '用户', 'executed_by': '总指挥',
-              'review_method': '预授权代确认', 'reviewers': ['claude', 'gpt']},
-    'gate3': {'delegated': True, 'authorizer': '用户', 'executed_by': '总指挥',
-              'review_method': '用户睡前授权代发布', 'reviewers': ['claude', 'gpt']},
+    'gate2': {'user_authorization_required': True, 'self_check_executor': 'Codex',
+              'authorizer': '用户', 'review_method': '用户授权自动执行', 'manual_review_method': '用户人工确认'},
+    'gate3': {'user_authorization_required': True, 'self_check_executor': None,
+              'authorizer': '用户', 'manual_review_method': '用户明确批准发布'},
 }
-AGENT_GATE_AUDIT = {'authorizer': '用户', 'executed_by': 'Codex', 'review_method': '用户授权自动执行'}
+GATE_USER_ACTORS = {'用户', '当前用户', 'local_user', 'human'}
+AGENT_GATE_AUDIT = {
+    'authorizer': AUTHORIZATION['gate2']['authorizer'],
+    'executed_by': AUTHORIZATION['gate2']['self_check_executor'],
+    'review_method': AUTHORIZATION['gate2']['review_method'],
+}
 LAUNCH = {'min_bad_cases': 5}
 CONSISTENCY_CHECK = {'questions': 10, 'min_agree': 9}
 

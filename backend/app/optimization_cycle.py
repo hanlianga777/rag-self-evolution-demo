@@ -6,11 +6,12 @@ import threading
 from datetime import datetime, timezone
 
 from . import rules
+from .agent_mechanism import CONTRACT as MECHANISM_CONTRACT
 from .evaluation import EvaluationRunner
 from .full_text import CORPUS_LOCK
 from .optimization import OptimizationAgent, ProposalValidationExhausted
 from .paid_schedule import wait_for_off_peak, unattended_authorization
-from .policy import MAX_EVALS, candidate_rank
+from .policy import MAX_EVALS, candidate_rank, gate2_self_check_authorized
 
 
 def _save_state(store, experiment_id, **state):
@@ -106,6 +107,19 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
         state.update(status=status, phase=phase, used=used, remaining=max(0, MAX_EVALS-used),
                      reserved_for_d=0 if experiment['result'].get('round_policy', {}).get('stop_rule') == STAGED_RULE else 1, last_error=error,
                      round=max([c['reasoning'].get('round', 1) for c in experiment['candidates']] or [0]))
+        if experiment['result'].get('mechanism_contract') == MECHANISM_CONTRACT:
+            from .agent_round_contract import check_commitment, previous_commitment
+
+            if phase == 'before_release' and status == 'recommended':
+                action, reason = 'D', '按合格方案数、轮次和剩余预算转入 D 决策'
+            elif status in {'stopped', 'qualified', 'agent_failed', 'analysis_exhausted', 'budget_exhausted', 'round_limit'}:
+                action, reason = 'stop', error or '按授权或实验预算停止本次循环'
+            else:
+                action = None
+            if action:
+                previous = previous_commitment(experiment['result'], state['round'] + 1)
+                if check := check_commitment(previous, action, reason=reason):
+                    state['hypothesis_terminal_check'] = check
         _save_state(store, experiment_id, **state)
         return dict(state)
 
@@ -119,11 +133,12 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                     store.skip_candidate(candidate['id'], '自动循环', '出现合格方案，已跳过（未运行）', automatic=True)
             from .agent_strategy import conclude_round
             conclude_round(store,runtime,experiment_id)
-            if not authorization.get('enabled'):
+            rule = rules.AUTHORIZATION['gate2']
+            if not gate2_self_check_authorized(authorization):
                 return save('qualified', 'review')
             winner = min(qualified, key=candidate_rank)
-            store.confirm_experiment_report(experiment_id, winner['id'], authorization['actor'],
-                                            audit_note='用户 2026-11-16 预先授权')
+            store.confirm_experiment_report(experiment_id, winner['id'], rule['self_check_executor'],
+                                            audit_note=authorization.get('audit_note'))
         if not current_contract and not authorization.get('enabled'):
             return save('qualified', 'review')
         check_cycle_stop(store,experiment_id)
@@ -246,8 +261,11 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                 def price_state(pause):
                     state['price_pause']=pause
                     save('running','analysis')
-                wait_for_off_peak(store,'cycle:'+experiment_id,price_state,lambda:check_cycle_stop(store,experiment_id))
-                agent.generate(experiment['baseline_run_id'], experiment_id=experiment_id)
+                if experiment['result'].get('mechanism_contract') != MECHANISM_CONTRACT:
+                    wait_for_off_peak(store,'cycle:'+experiment_id,price_state,lambda:check_cycle_stop(store,experiment_id))
+                generated = agent.generate(experiment['baseline_run_id'], experiment_id=experiment_id)
+                if stop := (generated or {}).get('result', {}).get('decision_stop'):
+                    return save('stopped', 'review', stop['reason'])
             except ProposalValidationExhausted as error:
                 if not full_rounds:
                     return save('analysis_exhausted','analysis',str(error))
@@ -417,8 +435,11 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                 def price_state(pause):
                     state['price_pause']=pause
                     save('running','analysis')
-                wait_for_off_peak(store,'cycle:'+experiment_id,price_state,lambda:check_cycle_stop(store,experiment_id))
-                agent.generate(experiment['baseline_run_id'], experiment_id=experiment_id)
+                if experiment['result'].get('mechanism_contract') != MECHANISM_CONTRACT:
+                    wait_for_off_peak(store,'cycle:'+experiment_id,price_state,lambda:check_cycle_stop(store,experiment_id))
+                generated = agent.generate(experiment['baseline_run_id'], experiment_id=experiment_id)
+                if stop := (generated or {}).get('result', {}).get('decision_stop'):
+                    return save('stopped', 'review', stop['reason'])
             except ProposalValidationExhausted as error:
                 failures = state.setdefault('proposal_generation_failures', [])
                 failures.append({'round':number+1, 'reason':str(error), 'sandbox_budget_used':0,

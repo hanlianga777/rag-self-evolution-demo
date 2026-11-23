@@ -50,10 +50,11 @@ def require_resume_snapshot(judge, current_judge=None, *, for_candidate_baseline
     changed = [field for field in ('rules_hash', 'search_space_version') if saved.get(field) != current[field]]
     # 109a–109g change planning/qualification, without changing Baseline or Judge
     # requests. Only known versions may anchor a new Candidate; resume stays strict.
-    known_upgrade = (for_candidate_baseline and current['rules_hash'] == 'bb96bee3ca3b'
+    known_upgrade = (for_candidate_baseline and current['rules_hash'] == 'a1b4d0991ca6'
                      and current['prompt_version']['agent_system'] == '96ad675251b7055547d9ada7cca7454acd6f2f4e7e50d83f9a177740388c649a')
     legacy_rules = saved['rules_hash'] in {'f0d368403ec9', '2aa1acc7b9c0'}
-    if known_upgrade and legacy_rules:
+    authorization_only = known_upgrade and saved['rules_hash'] == 'bb96bee3ca3b'
+    if known_upgrade and (legacy_rules or authorization_only):
         changed.remove('rules_hash')
     saved_prompts = saved['prompt_version']
     current_prompts = current['prompt_version']
@@ -70,7 +71,7 @@ def require_resume_snapshot(judge, current_judge=None, *, for_candidate_baseline
     elif (known_upgrade and legacy_rules and saved.get('search_space_version') == current['search_space_version']
             and saved_prompts.get('agent_system') == '4ca6578f34f254a015f1784c0c10cb5bfa0778a5dfe2c2cb70b31a2673747df7'):
         ignored_prompts = {'agent_system'}
-    elif (known_upgrade and saved['rules_hash'] == current['rules_hash'] and not changed
+    elif (known_upgrade and (authorization_only or saved['rules_hash'] == current['rules_hash']) and not changed
             and (saved.get('pipeline_config') or {}).get('prompt_strategy') == rules.BASELINE['prompt_strategy']
             and saved_prompts.get('agent_system') == '02b20fea1fdb4a999d785307ff26a2fc40c0c1c70d5d8ca893e1c315f7e0166e'):
         ignored_prompts = {'agent_system'}

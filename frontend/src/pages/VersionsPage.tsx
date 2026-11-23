@@ -86,12 +86,13 @@ export function VersionsPage({ data }: { data: any }) {
   const gate1Source = golden && [golden.id, gate1?.actor, gate1?.confirmed_at && versionTime(gate1.confirmed_at)].filter(Boolean).join(" · ");
   const d = candidates.find(candidate => candidate.reasoning?.candidate_label === "D");
   const approval = (gate: string) => matchingReview?.gates?.find((row: any) => row?.gate === gate && row.decision === "approved");
-  const reportApproval = approval("experiment_report");
+  const gate2Correction = data.optimization?.result?.gate2_audit_correction;
+  const reportApproval = approval("experiment_report") || gate2Correction?.original_approval;
   const releaseApproval = approval("human_release");
   const approvalLabel = (row: any) => [row.id != null ? `审批 ${row.id}` : "", row.actor || "", row.created_at ? versionTime(row.created_at) : ""].filter(Boolean).join(" · ");
   const gateStages = [
     { title: "题卷确认（Gate 1）", state: gate1State, source: gate1Source },
-    { title: "报告确认（Gate 2）", state: reportApproval || reportConfirmation || panelReleased && gate2Confirmed ? "已确认实验报告" : "待报告确认", source: reportApproval ? approvalLabel(reportApproval) : reportConfirmation ? [data.optimization?.id, reportConfirmation.actor, reportConfirmation.confirmed_at && versionTime(reportConfirmation.confirmed_at)].filter(Boolean).join(" · ") : undefined },
+    { title: "报告确认（Gate 2）", state: gate2Correction ? "已授权确认，审计字段后补" : reportApproval || reportConfirmation || panelReleased && gate2Confirmed ? "已确认实验报告" : "待报告确认", source: reportApproval ? approvalLabel(reportApproval) : reportConfirmation ? [data.optimization?.id, reportConfirmation.actor, reportConfirmation.confirmed_at && versionTime(reportConfirmation.confirmed_at)].filter(Boolean).join(" · ") : undefined },
     { title: "发布确认（Gate 3）", state: panelReleased ? "已确认并上线" : canRelease(panelCandidate || {}) ? "等待人工发布确认" : "暂无可发布方案", source: releaseApproval ? approvalLabel(releaseApproval) : panelReleased ? currentVersion?.id : panelCandidate?.id },
   ];
   const pendingReason = recommendationStatus === "Needs Report Confirmation" ? "待报告确认（Gate 2），暂无可发布方案。"

@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import rules
-from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, MAX_EVALS, delegated_gate_audit, qualification_description, search_space_contract, evaluate_regression, protected_question
+from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, MAX_EVALS, gate_audit, qualification_description, search_space_contract, evaluate_regression, protected_question
 from .paid_run import provider_task
 from .corpus import EMBEDDING_MODEL, CorpusStore, current_manifest, manifest_identity
 
@@ -160,9 +160,10 @@ def sandbox_attempts_used(candidate):
 class GovernanceStore:
     """Small persistence boundary; JSON keeps evidence and run snapshots immutable."""
 
-    def __init__(self, database_path: Path | str | None = None, *, migrate=True):
+    def __init__(self, database_path: Path | str | None = None, *, migrate=True, read_only=False):
+        self.read_only = read_only
         self.database_path = Path(database_path or DEFAULT_DATABASE)
-        if migrate:
+        if migrate and not read_only:
             self.database_path.parent.mkdir(parents=True, exist_ok=True)
             self.migrate()
         elif not self.database_path.is_file():
@@ -171,7 +172,7 @@ class GovernanceStore:
     @contextmanager
     def connection(self):
         from .sqlite_support import open_database
-        connection = open_database(self.database_path)
+        connection = open_database(self.database_path, read_only=self.read_only)
         connection.row_factory = sqlite3.Row
         try:
             yield connection
@@ -2906,6 +2907,10 @@ class GovernanceStore:
             if result.get('strategy_contract') in {'agent-strategy-3','agent-strategy-4'} and type(result.get('round')) is int:
                 strategies[str(result['round'])] = {key:result[key] for key in
                     ('prior_round_review','bad_case_summary','agent_strategy','history_decisions','mechanism_checks') if key in result}
+            if result.get('hypothesis_plan') is not None:
+                chain = dict(persisted.get('hypothesis_chain', {}))
+                chain[str(result['round'])] = result['hypothesis_plan']
+                result = {**result, 'hypothesis_chain': chain, 'decision_stop': None}
             connection.execute("UPDATE experiments SET status='completed', result_json=? WHERE id=?", (_json({**persisted, **result, 'prior_round_reviews':reviews, 'agent_strategies':strategies}), experiment_id))
 
     def restore_round_reviews(self, experiment_id):
@@ -3178,10 +3183,9 @@ class GovernanceStore:
                 raise ValueError('Experiment 不存在')
             if experiment['result'].get('report_confirmation'):
                 raise ValueError('报告已确认')
-            strict = experiment['result'].get('decision_contract_version') == '109c'
-            audit = rules.AGENT_GATE_AUDIT if strict else {}
-            if not strict and delegated_review is not None:
-                audit = delegated_gate_audit('gate2', actor, delegated_review, current_experiment=False)
+            from .paid_schedule import unattended_authorization
+            authorization = unattended_authorization(self)
+            audit = gate_audit('gate2', actor, authorization=authorization, reviews=delegated_review)
             self.require_current_baseline(experiment['baseline_run_id'], connection)
             candidates = experiment['candidates']
             if any(item['status'] not in {'evaluated','skipped'} or item['status']!='skipped' and item['result'].get('evaluation_complete') is False for item in candidates if item['reasoning'].get('candidate_label')!='D'):
@@ -3202,6 +3206,8 @@ class GovernanceStore:
             if audit_note:
                 confirmation['audit_note'] = audit_note
             confirmation.update(audit)
+            if audit == rules.AGENT_GATE_AUDIT:
+                confirmation['authorization'] = authorization
             result = {**experiment['result'], 'report_confirmation': confirmation}
             connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (_json(result), experiment_id))
             connection.execute('INSERT INTO approvals(gate,target_id,decision,actor,created_at) VALUES (?,?,?,?,?)', ('experiment_report', experiment_id, 'approved', actor, _now()))
@@ -3583,9 +3589,7 @@ class GovernanceStore:
             connection.execute("BEGIN IMMEDIATE")
             experiment = connection.execute("SELECT baseline_run_id, result_json FROM experiments WHERE id=?", (candidate["experiment_id"],)).fetchone()
             self.require_current_baseline(experiment["baseline_run_id"], connection)
-            strict = _load(experiment['result_json'], {}).get('decision_contract_version') == '109c'
-            audit = rules.AGENT_GATE_AUDIT if strict else delegated_gate_audit(
-                'gate3', actor, delegated_review, current_experiment=False)
+            audit = gate_audit('gate3', actor, reviews=delegated_review)
             if connection.execute("SELECT 1 FROM production_versions WHERE json_extract(snapshot_json, '$.candidate_id') = ?", (candidate_id,)).fetchone():
                 raise ValueError("Candidate 已发布")
             row = connection.execute("SELECT status, result_json, config_json FROM candidate_configs WHERE id = ?", (candidate_id,)).fetchone()
@@ -3757,15 +3761,20 @@ class GovernanceStore:
         return (self.optimization_trigger(trigger_id) or {}).get("status") == "human_confirmed"
 
     def experiment(self, experiment_id: str, *, light=False):
+        from .gate_audit_correction import E2_ID, gate2_correction
+
         with self.connection() as connection:
             row = connection.execute("SELECT * FROM experiments WHERE id = ?", (experiment_id,)).fetchone()
             candidates = connection.execute("SELECT * FROM candidate_configs WHERE experiment_id = ? ORDER BY id", (experiment_id,)).fetchall()
+            correction = gate2_correction(connection, experiment_id) if experiment_id == E2_ID else None
         if row is None:
             return None
         with self.connection() as connection:
             items = [{**dict(candidate), "config": _load(candidate["config_json"], {}), "reasoning": _load(candidate["reasoning_json"], {}), "result": self._candidate_result(connection,candidate,light=light)} for candidate in candidates]
         numbers = sorted({item.get("reasoning", {}).get("round") for item in items if isinstance(item.get("reasoning", {}).get("round"), int)})
         result = _load(row["result_json"], {})
+        if correction:
+            result['gate2_audit_correction'] = correction
         staged = result.get('round_policy', {}).get('stop_rule') == 'staged-v1'
         return {**dict(row), "result": result, "candidates": [{**item, "product_interruption":product_interruption(item), "release_state": self.release_state(item, peers=items)} for item in items], "rounds": [self._round_summary(items, number) for number in numbers], "evaluation_budget": {"used": sum(sandbox_attempts_used(item) for item in items), "max": MAX_EVALS, 'reserved_for_d': 0 if staged else 1}}
 

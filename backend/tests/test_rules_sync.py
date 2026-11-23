@@ -295,10 +295,14 @@ def test_gate3_saves_audit_without_dual_review_and_keeps_hard_gates(tmp_path, mo
     assert store.latest_approval('human_release', candidate) is None
 
     store.finish_candidate(candidate, 'evaluated', result)
+    for actor in ('Codex', '总指挥'):
+        with pytest.raises(ValueError, match='发布须由用户'):
+            store.publish_candidate(candidate, actor)
+        assert store.latest_approval('human_release', candidate) is None
     released = store.publish_candidate(candidate, 'local_user')
     audit = released['snapshot']['human_release']
     assert {key: audit[key] for key in ('authorizer', 'executed_by', 'review_method')} == {
-        'authorizer': '用户', 'executed_by': 'Codex', 'review_method': '用户授权自动执行',
+        'authorizer': '用户', 'executed_by': 'local_user', 'review_method': '用户明确批准发布',
     }
     assert 'review_evidence' not in audit
 

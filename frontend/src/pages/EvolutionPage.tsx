@@ -161,6 +161,8 @@ function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: 
   const invalidRecommendation = currentQualification(recordedRecommendation?.result)?.qualified === false;
   const savedRecommended = invalidRecommendation || recommendation.status && recommendation.status !== "Recommended" ? undefined : recordedRecommendation;
   const confirmation = experiment?.result?.report_confirmation || recommendation.report_confirmation;
+  const gate2Correction = experiment?.result?.gate2_audit_correction;
+  const decisionStop = experiment?.result?.decision_stop;
   const composite = experiment?.result?.composite || recommendation.composite;
   const compositeSchedule = experiment?.result?.composite_schedule;
   const compositeWaiting = ["scheduled", "waiting", "queued", "running"].includes(compositeSchedule?.status) || !!compositeSchedule?.price_pause?.paused;
@@ -374,7 +376,13 @@ function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: 
     {experiment?.result?.generation_status==='no_candidates' && <p className="workbench-status" role="status">本轮没有合法 Candidate，不能运行 Sandbox；未生成不代表优化成功。</p>}
     {experiment?.result?.rejected_candidates?.length>0 && <><p className="workbench-status">本轮保留 {currentRound.length} 个合法 Candidate，拒绝 {experiment.result.rejected_candidates.length} 个 Candidate；拒绝项不会进入 Sandbox。</p></>}
     <MechanismDecisions result={experiment?.result} round={displayRound}/>
-    {experiment?.result?.generation_status==='insufficient_evidence' && <p className="workbench-status" role="status">Candidate 依据不足：{experiment.result.insufficient_evidence || '暂无足够依据生成合格优化假设；待核实原始证据，不补造A/B/C。'}</p>}
+    {decisionStop && <details className="workbench-status" open>
+      <summary>{decisionStop.reason}</summary>
+      <ul>{Object.values(decisionStop.questions || {}).map((row: any) => <li key={row.display_question_id}>
+        {row.display_question_id} · {row.fault.stage} · {row.reason} · 建议{row.next_action}
+      </li>)}</ul>
+    </details>}
+    {!decisionStop && experiment?.result?.generation_status==='insufficient_evidence' && <p className="workbench-status" role="status">Candidate 依据不足：{experiment.result.insufficient_evidence || '暂无足够依据生成合格优化假设；待核实原始证据，不补造A/B/C。'}</p>}
     {data.workspace?.baseline_unavailable_reason && <p className="error-notice">{data.workspace.baseline_unavailable_reason}</p>}
     <p className="agent-identity sr-only">{evaluation.id ? `${archive ? "关联" : "当前"} Baseline：${baselineName(evaluation)}` : "当前有效 Baseline 尚未就绪。"}</p>
 
@@ -384,10 +392,12 @@ function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: 
       <section className="d-timeline" aria-label="Candidate D 决策">
         <Section title="报告确认（Gate 2）">
           <p>{confirmation ? `已确认优胜方案 ${schemeName(dWinner, confirmation.winner_id)}` : "等待已保存的报告确认"}</p>
+          {gate2Correction && <p>已授权确认，审计字段后补</p>}
           {confirmation && <details><summary>查看确认依据</summary><dl className="report-grid">
             <div><dt>实验</dt><dd>{experiment?.id}</dd></div>
             <div><dt>确认时间</dt><dd>{confirmation.confirmed_at || "未记录"}</dd></div>
             <div><dt>规则版本</dt><dd>{confirmation.rule_version || experiment?.result?.qualification_version || "未记录"}</dd></div>
+            {gate2Correction && <div><dt>审计更正</dt><dd>审批 {gate2Correction.original_approval.id} · {gate2Correction.corrected_by} · {gate2Correction.corrected_at}。{gate2Correction.reason}</dd></div>}
           </dl><a href="#versions">查看发布页的审批记录</a></details>}
         </Section>
         <ol className="d-stage-records" aria-label="D 的保存记录">
