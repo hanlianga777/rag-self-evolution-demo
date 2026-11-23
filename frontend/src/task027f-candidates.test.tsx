@@ -54,7 +54,7 @@ it('shows all ten saved checks between conclusion and tradeoff, with rejection d
  await mount();await click('回归与推荐');
  expect(document.querySelector('.story-round-switch')).toBeNull();expect(document.querySelector('.ui-fin-top h2')?.textContent).toContain('10 个已判定方案中 2 个合格');
  const table=document.querySelector('.regression-summary-table')!;expect(table.querySelectorAll('tbody tr')).toHaveLength(10);expect(table.querySelectorAll('tbody tr.qualified')).toHaveLength(2);
- expect(table.querySelector('thead')?.textContent).toBe('Candidate修好新增严重新增普通Hard Gate判定');expect(table.querySelector('tbody tr')?.textContent).toContain('R1-A');
+ expect(table.querySelector('thead')?.textContent).toBe('方案修好新增严重新增普通回归检查正式资格');expect(table.querySelector('tbody tr')?.textContent).toContain('R1-A');
  const fin=document.querySelector('.ui-fin')!;expect([...fin.children].map(e=>e.className)).toEqual(['ui-fin-top','panel regression-check','ui-fin-compare','ui-fin-others']);
  expect(document.querySelectorAll('.candidate-rejections > button')).toHaveLength(8);expect(document.querySelector('.ui-fin-others details')).toBeNull();expect(document.body.textContent).not.toContain('逐题追踪 ·');expect(document.querySelector('.ui-fin-reason')?.textContent).toContain('保存的采纳理由');
  await act(async()=>document.querySelector<HTMLButtonElement>('.candidate-rejections > button')!.click());expect(document.querySelector('[role=dialog]')?.textContent).toContain('逐题追踪');

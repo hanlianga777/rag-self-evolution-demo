@@ -1,7 +1,7 @@
 import { DrawerFooter, FullTextContext } from "./Primitives";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { useOperation } from "../operation";
 
 export function Drawer({ open, onOpenChange, title, children, className = "", guardEdits = false, editDirty, contentKey, showCloseFooter = true }: { open: boolean; onOpenChange: (value: boolean) => void; title: string; children: ReactNode; className?: string; guardEdits?: boolean; editDirty?: boolean; contentKey?: string; showCloseFooter?: boolean }) {
@@ -18,6 +18,10 @@ export function Drawer({ open, onOpenChange, title, children, className = "", gu
     if (node && open) registerDialogHost(node);
   }, [open, registerDialogHost, unregisterDialogHost]);
   return <><ConfirmDialog danger open={discard} onOpenChange={setDiscard} title="放弃未保存修改？" onConfirm={() => { setDirty(false); setDiscard(false); onOpenChange(false); }}><p>当前输入尚未保存。已保存的修订草案和审计记录会保留。</p></ConfirmDialog><Dialog.Root open={open} onOpenChange={changeOpen}><Dialog.Portal><Dialog.Overlay className="overlay" /><Dialog.Content onOpenAutoFocus={() => { previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }} onCloseAutoFocus={event => { event.preventDefault(); if (previousFocus.current?.isConnected) previousFocus.current.focus(); }} ref={setContentRef} onEscapeKeyDown={event => { const menu = Array.from(contentRef.current?.querySelectorAll<HTMLElement>("[popover]") || []).find(node => typeof node.hidePopover === "function" && node.matches(":popover-open")); if (menu) { event.preventDefault(); menu.hidePopover(); } }} onChangeCapture={() => { if (guardEdits && editDirty === undefined) setDirty(true); }} className={`drawer ${className}`}><div className="drawer-head"><Dialog.Title>{title}</Dialog.Title><Dialog.Description className="sr-only">详情内容；正文可独立滚动，按 Esc 关闭。</Dialog.Description><Dialog.Close className="icon-button" aria-label="关闭"><X size={18} /></Dialog.Close></div><div className="detail-content"><FullTextContext.Provider value={true}>{children}</FullTextContext.Provider></div>{showCloseFooter && <DrawerFooter><Dialog.Close className="secondary">关闭详情</Dialog.Close></DrawerFooter>}</Dialog.Content></Dialog.Portal></Dialog.Root></>;
+}
+
+export function QuestionDrawer({ questionLabel, ...drawer }: Omit<ComponentProps<typeof Drawer>, "title"> & { questionLabel?: string }) {
+  return <Drawer {...drawer} title={questionLabel ? `${questionLabel} · 题目详情` : "题目详情"}/>;
 }
 
 export function ConfirmDialog({ open, onOpenChange, title, children, busy, onConfirm, confirmLabel = "确认", disabled = false, danger = false }: { open: boolean; onOpenChange: (value: boolean) => void; title: string; children: ReactNode; busy?: boolean; onConfirm: () => void; confirmLabel?: string; disabled?: boolean; danger?: boolean }) {

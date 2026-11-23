@@ -13,7 +13,7 @@ async function mount(node:React.ReactNode){vi.stubGlobal('fetch',vi.fn(async (ur
 async function click(text:string){await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===text)!.click());}
 it('keeps report summary out of gate/case tabs and separates symptoms and causes without confidence',async()=>{
  await mount(<EvaluationPage data={{evaluation:run}}/>);
- await click('Hard Gate');expect(document.querySelector('.baseline-metrics')).toBeNull();expect(document.querySelector('.stage-stepper')).toBeNull();
+ await click('硬门槛');expect(document.querySelector('.baseline-metrics')).toBeNull();expect(document.querySelector('.stage-stepper')).toBeNull();
  await click('Bad Case 诊断');expect(document.querySelector('.baseline-conclusion')).toBeNull();
  expect(document.body.textContent).toContain('缺了什么');expect(document.querySelector('.ui-bcl')?.textContent).toContain('检索层');expect(document.body.textContent).not.toContain('诊断可信度');
  expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('版本尚未核实');expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('未知');expect(document.querySelector('.quality-audit')).toBeNull();expect(document.querySelector('.diagnosis-list tbody')?.textContent).not.toContain('评测争议');

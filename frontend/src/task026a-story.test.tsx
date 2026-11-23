@@ -38,13 +38,13 @@ it('preheats only the completed D full run, usable even while other pages are wa
 });
 it.each(['','?tab=qa','?tab=compare','?tab=monitoring'])('opens the requested verification tab and defaults to comparison (%s)',async(query)=>{
  location.hash='#verification'+query;await mount(<VerificationPage data={{}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
- const tabs=[...document.querySelectorAll('.tabs button')];expect(tabs.map(t=>t.textContent)).toEqual(['Before/After','实时问答','Monitoring']);
- expect(tabs.find(t=>t.getAttribute('aria-pressed')==='true')?.textContent).toBe(query.includes('qa')?'实时问答':query.includes('monitoring')?'Monitoring':'Before/After');
+ const tabs=[...document.querySelectorAll('.tabs button')];expect(tabs.map(t=>t.textContent)).toEqual(['回答对比','实时问答','线上反馈']);
+ expect(tabs.find(t=>t.getAttribute('aria-pressed')==='true')?.textContent).toBe(query.includes('qa')?'实时问答':query.includes('monitoring')?'线上反馈':'回答对比');
  await act(async()=>{location.hash='#verification?tab=qa';window.dispatchEvent(new HashChangeEvent('hashchange'));});expect(document.querySelector('.tabs [aria-pressed="true"]')?.textContent).toBe('实时问答');
 });
 it('shows real next-round inputs, one empty state and clickable remaining questions without writes',async()=>{
  location.hash='#verification?tab=monitoring';await mount(<VerificationPage data={{evaluation:{id:'base'},optimization:exp(),monitoring:{events:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
- expect(document.querySelectorAll('.feedback-loop-node')).toHaveLength(0);expect([...document.querySelectorAll('.monitoring-remaining .ui-q')].map(n=>n.textContent)).toEqual(['Q06','Q27']);expect(document.querySelector('.monitoring-stats')?.textContent).toContain('人工标注的 Bad Case 数0');
+ expect(document.querySelectorAll('.feedback-loop-node')).toHaveLength(0);expect([...document.querySelectorAll('.monitoring-remaining .ui-q')].map(n=>n.textContent)).toEqual(['Q06','Q27']);expect(document.querySelector('.monitoring-stats')?.textContent).toContain('已标注失败案例0');
  expect(document.querySelector('.feedback-empty')?.textContent).toBe('暂无线上问答记录。');expect(document.body.textContent).not.toMatch(/当前尚无实际问答记录|当前尚无反馈记录|符合现有触发规则/);
  await click('Q27');expect(location.hash).toBe('#verification?tab=compare&q=Q27');expect(document.querySelector('.tabs [aria-pressed="true"]')?.textContent).toBe('Before/After');expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method||init.method==='GET')).toBe(true);
 });

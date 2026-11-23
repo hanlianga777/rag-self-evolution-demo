@@ -54,7 +54,7 @@ it('preloads monitoring events once and switches its tab without requests',async
  const {VerificationPage}=await import('./pages/VerificationPage');
  const page={events:Array.from({length:50},(_,i)=>({id:`event-${i}`,question:`问题${i}`})),triggers:[]};
  const fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/api/monitoring')?page:url.includes('/api/monitoring?page=2')?{events:[{id:'event-last',question:'最后的反馈'}],triggers:[]}:url.includes('/api/versions')?[]:{})));vi.stubGlobal('fetch',fetcher);
- const data=await loadAppData(true,'verification');await render(<VerificationPage data={data} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);const count=fetcher.mock.calls.length;await click('Monitoring');expect(fetcher).toHaveBeenCalledTimes(count);
+ const data=await loadAppData(true,'verification');await render(<VerificationPage data={data} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);const count=fetcher.mock.calls.length;await click('线上反馈');expect(fetcher).toHaveBeenCalledTimes(count);
  expect(fetcher.mock.calls.some(([url]:any)=>url.endsWith('/api/monitoring?page=2&limit=50'))).toBe(true);expect(document.querySelectorAll('tbody tr')).toHaveLength(51);
 });
 it('separates saved formal blockers from confirmed regression without clearing pending risk',async()=>{

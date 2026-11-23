@@ -15,9 +15,9 @@ it('keeps the one-line page purpose through architecture tab switches',async()=>
  const root=createRoot(document.body.appendChild(document.createElement('div')));
  try{
   await act(async()=>root.render(<OverviewPage data={{}} navigate={()=>{}}/>));
-  expect(document.querySelector('.page-title .ui-kicker')?.textContent).toBe('这里用一屏讲清楚整套系统做成了什么：从同一套考卷上的 Baseline 出发，经过 Agent 在规则内的多轮受控试错，最终选出质量更高、速度更快、且没有弄坏任何原本答对题目的配置，并交由人工审批后发布上线。');
+  expect(document.querySelector('.page-title .ui-kicker')?.textContent).toBe('从 RAG（检索增强生成）知识库到评测、优化和人工发布，查看各环节当前进度。');
   await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='业务架构')!.click());
-  expect(document.querySelector('.page-title .ui-kicker')?.textContent).toBe('这里用一屏讲清楚整套系统做成了什么：从同一套考卷上的 Baseline 出发，经过 Agent 在规则内的多轮受控试错，最终选出质量更高、速度更快、且没有弄坏任何原本答对题目的配置，并交由人工审批后发布上线。');
+  expect(document.querySelector('.page-title .ui-kicker')?.textContent).toBe('从 RAG（检索增强生成）知识库到评测、优化和人工发布，查看各环节当前进度。');
   expect(document.querySelector('.ui-problems')).toBeNull();
   expect(document.querySelector('[role="img"][aria-label^="业务架构"]')).not.toBeNull();
   expect(fetch).not.toHaveBeenCalled();

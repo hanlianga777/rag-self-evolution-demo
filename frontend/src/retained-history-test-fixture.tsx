@@ -13,7 +13,14 @@ vi.mock('./components/Dialog', async importOriginal => {
   } };
 });
 export async function openRetainedHistory(kind: 'golden' | 'agent' = 'golden') {
-  const title = kind === 'golden' ? 'Golden 历史版本' : '历史实验 · 原 Candidate 与结果只读';
+  if (kind === 'golden') {
+    const button = [...document.querySelectorAll('button')].find(item => item.textContent === '查看题卷历史');
+    expect(button).toBeDefined();
+    await act(async () => button!.click());
+    expect(document.querySelector('[role="dialog"] h2')?.textContent).toBe('题卷历史 · 只读');
+    return;
+  }
+  const title = '历史实验 · 原 Candidate 与结果只读';
   expect(handlers.has(title)).toBe(true);
   await act(async () => handlers.get(title)!(true));
 }

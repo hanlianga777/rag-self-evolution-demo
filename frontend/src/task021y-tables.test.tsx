@@ -31,7 +31,7 @@ it('keeps the implemented clustering default without inventing parser, retrieval
   const text = document.querySelector('[aria-label="知识处理链路"]')?.textContent;
   expect(text).toBeDefined();
   expect(text).not.toMatch(/MinerU|qwen3|Hybrid/);
-  expect(text).toContain('主题聚类');
+  expect(text).toContain('按主题分组');
   expect(text).not.toMatch(/\d/);
 });
 
@@ -68,7 +68,7 @@ it('opens feedback details when clicking the truncated question inside its actio
   vi.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(20);
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ events: [event], triggers: [] }))));
   await mount(<VerificationPage data={{ monitoring: { events: [event] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
-  await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === 'Monitoring')!.click());
+  await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '线上反馈')!.click());
   await act(async () => (document.querySelector('.monitoring-table tbody button .ui-clamp,.monitoring-table tbody button .truncated-text') as HTMLElement).click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('保存的回答');
 });

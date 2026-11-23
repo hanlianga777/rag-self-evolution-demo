@@ -14,5 +14,5 @@ it('loads settings directly with no previous page or evaluation cache',async()=>
  await act(async()=>{root.render(<App/>);});
   await act(async()=>{await vi.dynamicImportSettled();});
  expect(document.querySelector('h1')?.textContent).toBe('Pipeline 配置');
- expect(document.body.textContent).toContain('Agent 可选参数');
+ expect(document.body.textContent).toContain('运行配置参数');
 });

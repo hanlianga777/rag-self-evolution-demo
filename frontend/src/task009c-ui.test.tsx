@@ -16,7 +16,7 @@ afterEach(() => { if (root) act(() => root.unmount()); document.body.innerHTML =
 const mount = async (node: React.ReactNode) => { root = createRoot(document.body.appendChild(document.createElement('div'))); await act(async () => root.render(node)); };
 const response = (value: any) => new Response(JSON.stringify(value));
 it('uses the shared vocabulary while preserving common RAG terms', () => {
- for (const [key, value] of Object.entries({ 'Hard Gate': 'Hard Gate', Overall: '综合分', Candidate: 'Candidate', Regression: 'Regression Check', Recommendation: '推荐 Candidate', Release: '发布', Production: '线上版本', Monitoring: '监控', Snapshot: '冻结版本', Slot: '题位', Coverage: '覆盖规划', 'Human Gate': '人工确认', positive: '正向（Positive）' })) expect(displayText(key)).toBe(value);
+ for (const [key, value] of Object.entries({ 'Hard Gate': 'Hard Gate', Overall: '综合分', Candidate: 'Candidate', Regression: 'Regression Check', Recommendation: '推荐 Candidate', Release: '发布', Production: '线上版本', Monitoring: '监控', Snapshot: '冻结版本', Slot: '题位', Coverage: '覆盖规划', 'Human Gate': '人工确认', positive: '正向' })) expect(displayText(key)).toBe(value);
  for (const key of ['Pipeline', 'Agent', 'Sandbox', 'HyDE', 'Rerank']) expect(displayText(key)).toBe(key);
  expect(parameterNames.hyde).toBe('HyDE'); expect(parameterNames.top_k).toBe('Top-K');
  expect(gateNames.safe_rejection_rate).toBe('安全拒答率');
@@ -77,7 +77,7 @@ it('uses an honest empty monitoring state and never invents records', async () =
  sessionStorage.clear();
  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ events: [], triggers: [] }))));
  await mount(<VerificationPage data={{ monitoring: { events: [], triggers: [] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
- await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === 'Monitoring')!.click());
+ await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '线上反馈')!.click());
  expect(document.querySelector('.feedback-empty')?.textContent).toContain('暂无线上问答记录');
  expect(document.querySelector('.monitoring-next-inputs')?.textContent).toContain('未修好题目未知');
  expect(document.querySelector('.monitoring-table')).toBeNull();
@@ -94,7 +94,7 @@ it('counts the frozen Golden paper instead of a newer unfinished work Run', asyn
  const snapshot = { id: 'GD-frozen', question_ids: ['a', 'b', 'c', 'd'] };
  vi.stubGlobal('fetch', vi.fn(async (url: string) => response(url.includes('/snapshots') ? [{ id: snapshot.id, status: 'approved', snapshot }] : { index: {}, knowledge: { identity: { corpus_snapshot_id: 'current' }, coverage: { final_k: 1, clusters: [] } } })));
  await mount(<KnowledgePage data={{ workspace: { current_golden_id: snapshot.id }, overview: { current_golden_id: snapshot.id, dataset: { approved: 0, total: 2 }, knowledge: {} }, documents: [] }} />);
- expect(document.querySelector('.ui-kf')?.textContent).toContain('主题聚类');
+ expect(document.querySelector('.ui-kf')?.textContent).toContain('按主题分组');
  expect(document.querySelector('.knowledge-page .disclosure')).toBeNull();
  expect(snapshot.question_ids).toHaveLength(4);
 });

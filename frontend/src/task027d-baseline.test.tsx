@@ -53,7 +53,7 @@ it('opens report cases in place and keeps rerun confirmation in the metrics titl
 it('explains each gate in its own module and shows the saved threshold and formula in its drawer', async () => {
   const run = { ...baseline(), gate_details: [{ ...gate('ablation_correctness'), formula: '保存公式' }], result: { gates: { gates: [gate('positive_correctness'), gate('ablation_correctness'), gate('safe_rejection_rate')] } } };
   vi.stubGlobal('fetch', vi.fn(async () => response(run)));
-  await mount(<EvaluationPage data={{ evaluation: run }} />); await click('Hard Gate');
+  await mount(<EvaluationPage data={{ evaluation: run }} />); await click('硬门槛');
   const rows = [...document.querySelectorAll<HTMLElement>('.ui-hg-card li')];
   expect(rows.every(row=>row.querySelector('.term-info'))).toBe(true);
   await act(async()=>rows[1].dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})));

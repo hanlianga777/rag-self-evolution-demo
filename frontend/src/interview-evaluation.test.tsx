@@ -23,11 +23,11 @@ it("keeps Baseline conclusions and saved identity inside the report, and preserv
   expect(document.querySelector(".baseline-metrics")?.textContent).toContain("10 / 11");
   expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("1 项 Hard Gate 未达标");
   expect(document.querySelectorAll(".baseline-metrics > div")).toHaveLength(4);
-  expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("消融（Ablation）正确性");
+  expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("消融正确性");
   expect(document.querySelector(".page-content")?.textContent).not.toContain("judge-only-model");
   expect(document.querySelector(".page-content")?.textContent).not.toContain("EVAL-stored");
   expect(document.body.textContent).not.toContain("EVAL-stored");
-  await click("Hard Gate");
+  await click("硬门槛");
   expect(document.querySelectorAll(".ui-hg-card li")).toHaveLength(11);
   expect(document.querySelectorAll(".ui-hg-card")[1]?.textContent).toContain("72%");
   expect(document.querySelector(".ui-hg-card ul")?.textContent).toContain("≥ 90%");

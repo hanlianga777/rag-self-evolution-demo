@@ -41,6 +41,6 @@ it('builds story from saved rounds, original question and the same critical para
 it('opens comparison from a question deep link without changing ordinary navigation defaults',async()=>{
  vi.stubGlobal('fetch',vi.fn(fetchSaved));history.replaceState(null,'','#verification?tab=compare&q=Q06');
  await mount(<VerificationPage data={data} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
- expect(document.querySelector('.tabs [aria-pressed=true]')?.textContent).toBe('Before/After');
+ expect(document.querySelector('.tabs [aria-pressed=true]')?.textContent).toBe('回答对比');
  expect(document.querySelector('.comparison-qhead')?.textContent).toContain('Q06');
 });

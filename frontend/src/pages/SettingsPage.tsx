@@ -35,6 +35,9 @@ export function SettingsPage({ data }: { data: any }) {
   const onlineConfig = pipeline?.active_version?.config || pipeline?.config;
   const changed = Object.keys(contract).filter(key => JSON.stringify(draft[key]) !== JSON.stringify(base[key]));
   const index = pipeline?.index || {}, knowledge = index.knowledge_config || {};
+  const indexId = index.knowledge_identity?.index_artifact_id || pipeline?.knowledge?.identity?.index_artifact_id;
+  const baselineIndexId = baseline.knowledge_identity?.index_artifact_id;
+  const baselineUsesAnotherIndex = !!indexId && !!baselineIndexId && indexId !== baselineIndexId;
   const facts = [
     ["解析", knowledge.parser ? `${knowledge.parser} ${knowledge.parser_mode || ""}` : data.documents?.[0]?.parser],
     ["分块", knowledge.chunk_strategy ? `父段落 ${knowledge.parent_tokens ?? "未记录"} / 知识片段 ${knowledge.child_tokens ?? "未记录"} / 重叠 ${knowledge.overlap_tokens ?? "未记录"} 字元` : data.documents?.[0]?.chunk_strategy],
@@ -55,7 +58,10 @@ export function SettingsPage({ data }: { data: any }) {
   return <PageShell className="page settings-page" header={<div className="page-title"><div><h1><IconTile name="pipeline" />Pipeline 配置</h1><p className="ui-kicker page-purpose">{pagePurpose.settings}</p></div><button className="secondary" onClick={() => setSpaceOpen(true)}>参数说明</button></div>}>
     {error && <p className="error-notice" role="alert">{error}</p>}
     {!pipeline && !error ? <LoadingSkeleton label="正在读取 Pipeline 配置" /> : <>
-    <Section title={<IconLabel name="data">技术选型</IconLabel>} action={<Badge>固定</Badge>}><dl className="frozen-facts">{facts.filter(([, value]) => value != null && value !== "").map(([name, value]) => <div key={String(name)}><dt>{name}</dt><dd>{name === "索引" && /FAISS/i.test(String(value)) ? "FAISS 向量索引" : String(value)}</dd></div>)}</dl></Section>
+    <Section title={<IconLabel name="data">技术选型</IconLabel>} action={<Badge>固定</Badge>}>
+      {baselineUsesAnotherIndex && <p>这里展示活动索引的技术选型。Baseline {pipeline.baseline_id || "未记录"} 绑定的索引为 <code>{baselineIndexId}</code>。
+        <a href="#evaluation?tab=report"> 查看基准的保存快照</a></p>}
+      <dl className="frozen-facts">{facts.filter(([, value]) => value != null && value !== "").map(([name, value]) => <div key={String(name)}><dt>{name}</dt><dd>{name === "索引" && /FAISS/i.test(String(value)) ? "FAISS 向量索引" : String(value)}</dd></div>)}</dl></Section>
     <Section title={<IconLabel name="pipeline">运行配置参数</IconLabel>} action={<Badge tone="accent">{Object.keys(contract).length} 项可选参数</Badge>}>
       <p>这是运行配置允许的取值。当前实验的 Agent 可调范围以工作台保存的规则为准。</p><a href="#evolution?tab=route">查看工作台规则</a>
 

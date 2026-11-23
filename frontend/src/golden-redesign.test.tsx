@@ -71,7 +71,7 @@ it("hides frozen editing controls and renders numbered answers and source eviden
   expect(document.querySelector(".frozen-question-details")?.textContent).toContain("设备手册 · p85");
   expect(document.querySelector(".golden-probe-result")?.textContent).toContain("题目与证据校验通过");
   expect(document.querySelector(".golden-probe-result")?.textContent).toContain("P1 召回观察");
-  for (const label of ["运行 Probe", "运行 QC"]) {
+  for (const label of ["运行检索探针", "运行质检"]) {
     const button = [...document.querySelectorAll("button")].find(button => button.textContent === label)!;
     expect(button).toBeDefined();
     expect(button.disabled).toBe(false);

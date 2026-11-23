@@ -15,7 +15,7 @@ const groupSections=[{number:'5.1',title:'电机'}];
 const topics=[{name:'小主题',size:1,quota:1,sections:[{number:'1.1',title:'安全说明'}],questions:null,clusters:[]},{name:'大主题',size:99,quota:2,sections:groupSections,questions:null,clusters:[{id:'one',name:'主要小节',size:99,quota:2,homogeneity:.8,sections:groupSections,questions:null}]}];
 const questions=[{id:'q1',slot:'Q01',question:'必须保留的题目原文',test_category:'positive',probe_status:'probe_passed',qc_status:'qc_passed',source_summary:'宇树_B2四足机器人用户手册_中文版.pdf · 第 8 页',scoring_summary:{required:2,auxiliary:1}}];
 const run={id:'gen',status:'completed',profile:{name:'mini',expected_count:1},question_ids:['q1'],artifacts:{hard_validation:{}}};
-const snapshot={id:'gd',created_at:'2026-11-04T11:55:33Z',snapshot:{generation_run_id:'gen',question_ids:['q1'],questions,profile:run.profile}};
+const snapshot={id:'gd', status: 'approved',created_at:'2026-11-04T11:55:33Z',snapshot:{generation_run_id:'gen',question_ids:['q1'],questions,profile:run.profile}};
 beforeEach(()=>{sessionStorage.clear();history.replaceState(null,'','/');vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/pipeline')?{knowledge,index:{child_count:100}}:url.endsWith('/knowledge/topics')?{has_frozen_exam:false,topics}:url.includes('/candidates?')?{rows:questions,total:1,candidate_index:questions}:[]))));});
 afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();});
 async function mount(node:React.ReactNode){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));}

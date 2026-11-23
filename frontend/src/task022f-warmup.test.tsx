@@ -43,7 +43,7 @@ it.each(['overview','knowledge','evolution','verification'])('warms page content
   await act(async()=>node.querySelector<HTMLAnchorElement>('a[href="#governance"]')!.click());
   expect(node.querySelector('.review-table')?.textContent).toContain('保存的问题');expect(node.querySelector('.golden-initial-skeleton')).toBeNull();
   await act(async()=>node.querySelector<HTMLAnchorElement>('a[href="#verification"]')!.click());
-  await act(async()=>[...node.querySelectorAll('button')].find(e=>e.textContent==='Before/After')!.click());
+  await act(async()=>[...node.querySelectorAll('button')].find(e=>e.textContent==='回答对比')!.click());
   expect(node.querySelector('.comparison-answers')?.textContent).toContain('已保存回答');expect(node.querySelector('.case-detail-skeleton')).toBeNull();
  }finally{releasePipeline();act(()=>root.unmount());node.remove();location.hash='';vi.unstubAllGlobals();invalidateReads();invalidateGolden();}
 });
@@ -60,7 +60,7 @@ it('loads a clicked destination immediately while a background read is pending a
   await act(async()=>root.render(<App/>));await act(async()=>new Promise(r=>setTimeout(r,100)));
   expect(reads).toContain('/api/pipeline');
   await act(async()=>node.querySelector<HTMLAnchorElement>('a[href="#governance"]')!.click());
-  expect(node.querySelector('.page-title h1')?.textContent).toContain('Golden Dataset');expect(node.querySelector('.page-loading')).toBeNull();
+  expect(node.querySelector('.page-title h1')?.textContent).toContain('黄金测试集');expect(node.querySelector('.page-loading')).toBeNull();
   act(()=>root.unmount());mounted=false;const count=reads.length;
   await act(async()=>{release();await new Promise(r=>setTimeout(r,150));});expect(reads).toHaveLength(count);
  }finally{release();if(mounted)act(()=>root.unmount());node.remove();location.hash='';vi.unstubAllGlobals();invalidateReads();invalidateGolden();}

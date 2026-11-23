@@ -26,7 +26,7 @@ import { cachedJson, errorMessage, getJson, postJson } from "../api";
 import { Badge, DrawerSection, Metric, Section, Status, TruncatedText } from "../components/Primitives";
 import { thinkingLabel } from "../components/PipelineFields";
 import { CaseAnswer } from "../components/CaseAnswer";
-import { ConfirmDialog, Drawer } from "../components/Dialog";
+import { ConfirmDialog, Drawer, QuestionDrawer } from "../components/Dialog";
 import { displayText, gateNames, gateEnglishNames, localShortTime } from "../display";
 import { useOperation } from "../operation";
 
@@ -253,7 +253,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
     </>}
 
     <Drawer className="workbench-drawer" open={!!selectedGate} onOpenChange={open => !open && setSelectedGate(null)} title={selectedGate ? gateNames[selectedGate.metric] || selectedGate.metric : "硬门槛详情"}><div className="drawer-body">{selectedGate && <><DrawerSection title="门槛是什么"><p>{gateDescription(selectedGate.metric)}</p><p>要求：{gateThreshold(selectedGate)}</p></DrawerSection><DrawerSection title="这次结果"><p>{gateValue(selectedGate)} · <Status value={selectedGate.status}/></p></DrawerSection><DrawerSection title="哪几题拉低了它"><div className="run-list gate-contributions">{(selectedGate.contributing_cases || []).filter((item:Row)=>selectedGate.metric.startsWith('latency_') ? item.value>selectedGate.threshold : item.value<selectedGate.threshold).map((item:Row)=><div key={item.question_id}><p>{cases.find(row=>row.question_id===item.question_id)?.question || '题目未记录'}</p><span>{format(item.value,selectedGate.metric.startsWith('latency_')?' 秒':'%')}</span><button className="text-button" onClick={()=>setSelectedCase(cases.find(row=>row.question_id===item.question_id) || null)}>查看案例</button></div>)}{!(selectedGate.contributing_cases || []).some((item:Row)=>selectedGate.metric.startsWith('latency_') ? item.value>selectedGate.threshold : item.value<selectedGate.threshold) && <p>没有保存的低于门槛题目。</p>}</div></DrawerSection></>}</div></Drawer>
-    <Drawer className="workbench-drawer" open={!!selectedCase} onOpenChange={open => !open && setSelectedCase(null)} title={selectedDetail ? `${productQuestionLabel(selectedDetail)} · 题目详情` : '题目详情'}><div className="drawer-body">{selectedDetail && (!run.cases ? error ? <p role="alert">案例详情读取失败：{error}</p> : <div className="case-detail-skeleton" role="status" aria-label="正在读取保存的案例详情">{[1,2,3].map(index=><span key={index} aria-hidden="true"/>)}</div> : <BaselineCaseDetails item={selectedDetail} snapshot={snapshot} config={config} gates={details} strategyLink={data.optimization?.baseline_run_id === run.id ? "#evolution?tab=route" : undefined} />)}</div></Drawer>
+    <QuestionDrawer className="workbench-drawer" open={!!selectedCase} onOpenChange={open => !open && setSelectedCase(null)} questionLabel={selectedDetail && productQuestionLabel(selectedDetail)}><div className="drawer-body">{selectedDetail && (!run.cases ? error ? <p role="alert">案例详情读取失败：{error}</p> : <div className="case-detail-skeleton" role="status" aria-label="正在读取保存的案例详情">{[1,2,3].map(index=><span key={index} aria-hidden="true"/>)}</div> : <BaselineCaseDetails item={selectedDetail} snapshot={snapshot} config={config} gates={details} strategyLink={data.optimization?.baseline_run_id === run.id ? "#evolution?tab=route" : undefined} />)}</div></QuestionDrawer>
   </PageShell>;
 }
 

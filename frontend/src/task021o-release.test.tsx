@@ -22,7 +22,7 @@ it('explains alternatives from saved repairs, regressions and gates rather than 
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='回归与推荐')!.click());
  const rows=[...document.querySelectorAll('.candidate-rejections > button')].map(e=>e.textContent);
  expect(rows[0]).toContain('新增 1 个 Bad Case');expect(document.querySelector('.ui-fin-others h3')?.textContent).toContain('落选原因');
- expect(rows[1]).toContain('回答耗时 P99 86.5 秒');expect(rows[1]).toContain('上限 60 秒');
+ expect(rows[1]).toContain('延迟高位（P99） 86.5 秒');expect(rows[1]).toContain('上限 60 秒');
  expect(document.querySelector('.ui-fin-compare thead')?.textContent).toContain('Winner · 合格');expect(document.querySelector('.ui-fin-compare tbody tr:last-child')?.textContent).toContain('Q04');
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='概览')!.click());expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('10 / 12');
 });

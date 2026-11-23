@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {detailJson} from '../preload';
-import {Drawer} from './Dialog';
+import { Drawer, QuestionDrawer } from './Dialog';
 import {LoadingSkeleton, Section} from './Primitives';
 import {FrozenQuestionDetails, shortSourceName} from '../pages/FrozenQuestionDetails';
 import {displayText} from '../display';
@@ -21,16 +21,16 @@ export function ParentSectionInfo({parent}:{parent:any}) {
  const titles = parent?.parent_subheadings || parent?.subsections;
  return <>{path && <p>{path}</p>}{titles?.length > 0 && <p>包含小标题 · {titles.join('、')}</p>}</>;
 }
-export function ChunkBrowser({open,onClose,parentId}:{open:boolean;onClose:()=>void;parentId?:string}) {
+export function ChunkBrowser({open,onClose,parentId,initialDocumentId}:{open:boolean;onClose:()=>void;parentId?:string;initialDocumentId?:string}) {
  const [data,setData]=useState<any>(),[error,setError]=useState(''),[documentId,setDocumentId]=useState(''),[selected,setSelected]=useState(''),[question,setQuestion]=useState<any>();
- useEffect(()=>{if(!open)return;let cancelled=false;void detailJson<any>('/api/knowledge/chunk-browser').then(value=>{if(!cancelled){setData(value);const parent=value.parents?.find((p:any)=>p.chunk_id===parentId) || value.parents?.[0];setDocumentId(parent?.document_id || '');setSelected(parent?.chunk_id || '');}}).catch(e=>{if(!cancelled)setError(String(e));});return()=>{cancelled=true;};},[open,parentId]);
+ useEffect(()=>{if(!open)return;let cancelled=false;void detailJson<any>('/api/knowledge/chunk-browser').then(value=>{if(!cancelled){setData(value);const parent=value.parents?.find((p:any)=>p.chunk_id===parentId) || (initialDocumentId ? value.parents?.find((p:any)=>p.document_id===initialDocumentId) : value.parents?.[0]);setDocumentId(parent?.document_id || initialDocumentId || '');setSelected(parent?.chunk_id || '');}}).catch(e=>{if(!cancelled)setError(String(e));});return()=>{cancelled=true;};},[open,parentId,initialDocumentId]);
  const parents=(data?.parents || []).filter((p:any)=>p.document_id===documentId),parent=parents.find((p:any)=>p.chunk_id===selected) || parents[0];
  const questions=(data?.questions || []).filter((q:any)=>q.parent_ids?.includes(parent?.chunk_id));
  return <><Drawer className="chunk-browser-drawer" open={open} onOpenChange={value=>!value && onClose()} title="分块浏览器"><div className="drawer-body">{error?<p role="alert">{error}</p>:!data?<LoadingSkeleton label="正在读取分块"/>:<div className="chunk-browser-grid">
   <section aria-label="选择文档和父段落"><label>文档<select value={documentId} onChange={e=>{setDocumentId(e.target.value);setSelected('');}}>{data.documents.map((d:any)=><option key={d.id} value={d.id}>{shortSourceName(d.name)}</option>)}</select></label><div className="parent-list">{parents.map((p:any,index:number)=><button key={p.chunk_id} className="secondary" aria-pressed={parent?.chunk_id===p.chunk_id} onClick={()=>setSelected(p.chunk_id)}>段落 {index+1} · 第 {p.page_start} 页<br/>{p.chapter || p.section_path || '正文'}<small>{p.children.length} 个知识片段</small></button>)}</div></section>
   <section className="parent-reading" aria-label="父段落原文与知识片段范围"><h3>父段落原文</h3>{parent?<><p>{shortSourceName(parent.document_name)} · 第 {parent.page_start} 页</p><ParentSectionInfo parent={parent}/><p className="muted">高亮范围对应知识片段；重叠部分会同时标出多个序号。</p><div className="parent-verbatim">{childRanges(parent).map((part,index)=>part.children.length?<mark key={index} title={`知识片段 ${part.children.join('、')}`} data-children={part.children.join(',')}><sup className="child-range-number">{part.children.join("、")}</sup>{part.text}</mark>:<span key={index}>{part.text}</span>)}</div><ol className="child-legend">{parent.children.map((child:any,index:number)=><li key={child.chunk_id}><strong>片段 {index+1}</strong> · 第 {child.page_start} 页 · {child.token_count ?? '未知'} 字元</li>)}</ol></>:<p>暂无分块。</p>}</section>
   <section aria-label="命中父段落的考题"><h3>对应考题</h3>{['positive','ablation','negative'].map(category=><Section key={category} title={displayText(category)}>{questions.filter((q:any)=>q.test_category===category).map((q:any)=><button className="text-button topic-question" key={q.id} onClick={()=>setQuestion(q)}>{q.display_id} · {q.question}</button>)}{!questions.some((q:any)=>q.test_category===category) && <p className="muted">暂无</p>}</Section>)}</section>
- </div>}</div></Drawer><Drawer open={!!question} onOpenChange={value=>!value && setQuestion(undefined)} title={`${question?.display_id || ""} · 题目详情`}>{question && <FrozenQuestionDetails row={question}/>}</Drawer></>;
+ </div>}</div></Drawer><QuestionDrawer open={!!question} onOpenChange={value=>!value && setQuestion(undefined)} questionLabel={question?.display_id}>{question && <FrozenQuestionDetails row={question}/>}</QuestionDrawer></>;
 }
 export function ChunkDiagnostics() {
  const [data,setData]=useState<any>();

@@ -10,7 +10,7 @@ it('uses the requested industry labels and real thinking values',()=>{
  expect(displayText('Hard Gate')).toBe('Hard Gate');
  expect(displayText('Candidate')).toBe('Candidate');
  expect(displayText('Regression')).toBe('Regression Check');
- expect(displayText('Positive')).toBe('正向（Positive）');
+ expect(displayText('Positive')).toBe('正向');
  expect(parameterNames.candidate_k).toBe('Candidate K');
  expect(parameterNames.top_k).toBe('Top-K');
  expect(storyValue('max')).toBe('Max');
@@ -24,7 +24,7 @@ it('removes technical entry sections from every source page',()=>{
 });
 it('shows Before/After without the paid comparison entry',()=>{
  const html=renderToStaticMarkup(createElement(VerificationPage,{data:{},onOpenCitation:()=>{},onOpenDocument:()=>{}}));
- expect(html).toContain('Before/After');
+ expect(html).toContain('回答对比');
  expect(html).not.toContain('自由提问 · 实时调用模型');
 });
 it('normalizes displayed parameter notation and keeps saved Agent evidence unchanged',async()=>{

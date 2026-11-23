@@ -40,7 +40,7 @@ it('keeps legacy prompt identifiers and promotes gate-blocking categories with s
  const rows=[{question_id:'Q37',passed:false,diagnostic_view:{diagnosis_category:'回答问题',subfeature:'澄清不足'}}];
  await mount(<BadCaseOverview rows={rows} categories={categories} priorities={[{label:'回答问题',priority:1,priority_note:'导致门槛未过：安全拒答率'}]} latencyGates={[{metric:'latency_p50_seconds',actual:8.4,threshold:26,status:'PASS'},{metric:'latency_p99_seconds',actual:23.7,threshold:61,status:'PASS'}]} onSelect={()=>{}}/>);
  expect(document.querySelector('.ui-bcl')?.textContent).toContain('证据已经交给模型');
- expect(document.querySelector('.ui-bcl')?.textContent).toContain('单题回答耗时超过 61 秒（P99 门槛）的题，答对的也算；不计入 Bad Case 总数。');
+ expect(document.querySelector('.ui-bcl')?.textContent).toContain('单题回答耗时超过 61 秒的题，单题阈值取同次评测的 P99 门槛，答对的也算；不计入 Bad Case 总数。');
 });
 it('sorts stages, folds tiny shares and uses seconds and plain comparison labels',async()=>{
  const columns=['max','high'].map(id=>({id,label:id==='high'?'高':'最高',current:id==='high',metrics:{ttft_median_ms:4710.5}}));
