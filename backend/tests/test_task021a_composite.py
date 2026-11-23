@@ -275,6 +275,48 @@ class RefinementTests(unittest.TestCase):
 
 
 class QualifiedFusionTests(unittest.TestCase):
+    def test_qualified_fusion_can_explore_without_inventing_a_repair_target(self):
+        winner = {'id':'R1-B', 'status':'evaluated', 'config':DEFAULT_PIPELINE_CONFIG,
+                  'result':{'evaluation_identity':'fixture'}}
+        peer = {'id':'R1-C', 'status':'evaluated',
+                'config':{**DEFAULT_PIPELINE_CONFIG, 'hybrid_alpha':0.7},
+                'result':{'evaluation_identity':'fixture'}}
+        source = {'candidate_id':peer['id'], 'qualified':True, 'fixed_question_ids':['q1']}
+        facts = {'remaining_failures':[{'question_id':'q2'}], 'protected_questions':[],
+                 'contrasts':[], 'history':[source],
+                 'parameter_profiles':{'hybrid_alpha':[{'value':0.7, 'observations':[]}]}}
+        change = {'parameter':'hybrid_alpha', 'source_type':'partial', 'source_candidates':[peer['id']],
+                  'target_question_ids':[], 'reason':'组合探索，未声明要修好剩余错题',
+                  'evidence_basis':'来源方案通过资格，q2 仍错',
+                  'expected_fixed_count':0, 'possible_broken_count':1,
+                  'side_effect_check':{'historical_effects':'未修好 q2', 'protected_overlap':[],
+                                       'winner_fixed_risk':'重查 q1', 'gate_risk':'检查 11 项门槛',
+                                       'mitigation':'完整 Sandbox'}}
+        value = {'combination_mode':'partial_fusion', 'proposed_config_diff':{'hybrid_alpha':0.7},
+                 'changes':[change]}
+        history = [winner, peer]
+
+        config, changes = validate_d_refinement(value, winner, history, DEFAULT_PIPELINE_CONFIG, facts)
+        self.assertEqual(config['hybrid_alpha'], 0.7)
+        self.assertEqual(changes[0]['evidence_class'], 'qualified_exploration')
+        self.assertFalse(changes[0]['target_repair_verified'])
+
+        mislabeled = {**value, 'changes':[{**change, 'source_type':'verified'}]}
+        _, changes = validate_d_refinement(mislabeled, winner, history, DEFAULT_PIPELINE_CONFIG, facts)
+        self.assertEqual(changes[0]['source_type'], 'partial')
+        self.assertIn({'field':'source_type', 'from':'verified', 'to':'partial'}, changes[0]['normalized_fields'])
+        self.assertFalse(changes[0]['target_repair_verified'])
+
+        for field, invalid in (('source_type', 'new_attempt'), ('expected_fixed_count', 1),
+                               ('target_question_ids', ['q1'])):
+            with self.subTest(field=field):
+                proposal = {**value, 'changes':[{**change, field:invalid}]}
+                with self.assertRaises(ValueError):
+                    validate_d_refinement(proposal, winner, history, DEFAULT_PIPELINE_CONFIG, facts)
+        source['qualified'] = False
+        with self.assertRaises(ValueError):
+            validate_d_refinement(value, winner, history, DEFAULT_PIPELINE_CONFIG, facts)
+
     def test_qualified_fusion_can_try_a_parameter_without_a_target_repair(self):
         winner = {'id':'R2-B', 'status':'evaluated', 'config':{**DEFAULT_PIPELINE_CONFIG, 'query_decompose':True},
                   'result':{'evaluation_identity':'fixture'}}

@@ -208,7 +208,14 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
         kind={'已验证':'verified','部分取用':'partial','新尝试':'new_attempt'}.get(row.get('source_type'),row.get('source_type'))
         if kind not in {'verified','partial','new_attempt'}:raise ValueError('改动来源标签须为已验证/部分取用/新尝试')
         targets=row.get('target_question_ids')
-        if not isinstance(targets,list) or not targets or not set(targets)<=remaining:raise ValueError('改动必须针对 Winner 剩余 Bad Case')
+        fusion = suggestion.get('combination_mode') == 'partial_fusion'
+        exploration_only = targets == [] and fusion and kind != 'new_attempt' and row.get('expected_fixed_count') == 0
+        if not isinstance(targets,list) or not set(targets)<=remaining or not targets and not exploration_only:
+            raise ValueError('改动必须针对 Winner 剩余 Bad Case，或标为无修复目标的合格方案组合探索')
+        normalized = []
+        if exploration_only and kind == 'verified':
+            normalized.append({'field':'source_type', 'from':kind, 'to':'partial'})
+            kind = 'partial'
         if any(not isinstance(row.get(k),str) or not row[k].strip() for k in ('evidence_basis','reason')):raise ValueError('改动须说明事实表证据位置和理由')
         side=row.get('side_effect_check')
         if (not isinstance(side,dict) or any(not isinstance(side.get(k),str) or not side[k].strip() for k in ('historical_effects','winner_fixed_risk','gate_risk','mitigation'))
@@ -225,7 +232,6 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
         # 保护题重叠是代码从事实表算出的集合（规则总表五.8：数字、题号由程序填写或校验，Agent 不能自己编）。
         # 模型抄错时按事实表规整：补上漏列的重叠题、去掉不在保护集合里的题（保留模型额外点名的保护题），并留审计。
         given=side['protected_overlap']
-        normalized=[]
         if not overlap<=set(given) or not set(given)<=protected:
             truth=sorted((set(given)&protected)|overlap)
             normalized.append({'field':'side_effect_check.protected_overlap','parameter':key,'from':list(given),'to':truth})
@@ -245,14 +251,18 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
                 source=sources[cid];source_config=pipeline_config(source['config'])
                 if type(source_config[key]) is not type(value) or source_config[key]!=value:raise ValueError('来源取值与D不一致')
                 record=next(r for r in facts['history'] if r['candidate_id']==cid)
+                bundle=parameter_diff(source_config,base)
+                if exploration_only and (not record['qualified'] or key not in bundle or cid == winner['id']):
+                    raise ValueError('无修复目标的组合探索须取用另一合格方案相对 Baseline 的实际改动')
                 if not set(record['fixed_question_ids']) & set(targets):
-                    if not (kind == 'partial' and suggestion.get('combination_mode') == 'partial_fusion' and record['qualified']):
+                    if not (kind == 'partial' and fusion and record['qualified']):
                         raise ValueError('已验证来源须曾修好针对的剩余 Bad Case')
                     qualification_only = True
-                bundle=parameter_diff(source_config,base)
                 whole=all(config[k]==v and type(config[k]) is type(v) for k,v in bundle.items())
                 if not whole and kind!='partial':raise ValueError('多参数来源只取一部分时，source_type须写partial（部分取用）')
+        evidence_class = 'qualified_exploration' if qualification_only else 'new_attempt' if kind == 'new_attempt' else 'repair_evidence'
         records.append({**row,'source_type':kind, **({'partial_contrast_verified':bool(valid_contrasts) and not qualification_only} if kind=='partial' else {}),
+                        'evidence_class':evidence_class,
                         **({'target_repair_verified':False} if qualification_only else {}),
                         **({'normalized_fields':normalized} if normalized else {})})
     return effective_config,records
