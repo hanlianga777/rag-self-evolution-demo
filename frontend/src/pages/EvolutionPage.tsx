@@ -9,6 +9,8 @@ import { Icon, IconLabel, IconTile } from "../ui/icons";
 import { HoverCard } from "../ui/HoverCard";
 import {DStory, DSideEffects, questionText, schemeName, completeResult, storyText, StoryText, recommendationReason, recommendationTradeoff, dProgressLabel, ChangedParameters, storyParameterNames, storyValue, shortQuestionId} from "../components/EvolutionStory";
 import { AgentOverview } from "../ui/evolution/AgentOverview";
+import { AgentNarrative } from "../ui/evolution/AgentNarrative";
+import { useAgentNarrative } from "../ui/evolution/narrative";
 import { FinalRecommendation } from "../ui/evolution/FinalRecommendation";
 import { EvolutionTimeline } from "../ui/evolution/EvolutionTimeline";
 import { QuestionBadge, QuestionList } from "../ui/Primitives";
@@ -129,6 +131,7 @@ function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: 
   const refreshed = useRef(new Set<string>());
   const [winnerId, setWinnerId] = useState("");
   const evaluation = data.evaluation || {};
+  const narrative = useAgentNarrative(experiment, evaluation);
   const identity = identityKey(data.workspace || data.evaluation);
   const currentIdentity = useRef(identity); currentIdentity.current = identity;
   useEffect(() => { setExperiment(data.optimization?.id ? data.optimization : null); setSelectedCandidate(null); setRawCandidate(undefined); setCandidateReport(null); setSelectedBadCase(null); setComparisonCase(null); setMatrixQuestion(undefined); setWinnerId(""); setSearchOpen(false); setAdvancedOpen(false); setSearchSpace(null); setError(""); setBusy(false); setConfirmationAction(null); }, [identity]);
@@ -386,6 +389,7 @@ function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: 
     {data.workspace?.baseline_unavailable_reason && <p className="error-notice">{data.workspace.baseline_unavailable_reason}</p>}
     <p className="agent-identity sr-only">{evaluation.id ? `${archive ? "关联" : "当前"} Baseline：${baselineName(evaluation)}` : "当前有效 Baseline 尚未就绪。"}</p>
 
+    {narrative && <AgentNarrative experiment={experiment} evaluation={evaluation} data={narrative} stage={stage} released={productionReleased}/>}
     {stage === "overview" && <AgentOverview experiment={experiment || data.optimization} model={{...evolutionModel, budget: budgetKnown ? budget : null}} evaluation={evaluation} chosenId={chosenView?.id} released={productionReleased} status={agentStatus} cases={processingCases} onCase={setSelectedBadCase}/>}
     {stage === "route" && <div className="route-timeline"><EvolutionTimeline key={experiment?.id} model={evolutionModel} experiment={experiment} onRoundChange={setRoundSelection} renderCandidate={id=>{const candidate=candidates.find(c=>c.id===id);return <CandidateCard key={id} experiment={experiment} route routeWinner={id===evolutionModel.winnerId && currentQualification(candidate.result)?.qualified !== false} candidate={candidate} readOnly={readOnly} primaryRun={id===displayedCandidates.find(item=>['generated','failed'].includes(item.status))?.id} baseline={evaluation.config || {}} onDetail={()=>setSelectedCandidate(candidate)} onSkip={()=>void action('跳过未运行 Candidate',()=>postJson(`/api/candidates/${id}/skip`,{actor:'当前用户'}))} running={activeOperation(id)} busy={busy || planningBlocked || policyBlocked || hasRunning || !!confirmation} targets={targetRows(candidate,badCases)} onTargets={()=>setTargetCandidate(candidate)} onRun={()=>void run(candidate)}/>;}} sandbox={round => <button className="text-button" onClick={() => { setRoundSelection(round); setStage("review"); }}>查看沙盒评测和逐题回归</button>}
       questionText={id => questionText(id, evaluation, badCases)} onOpen={id => setSelectedCandidate(candidates.find(candidate => candidate.id === id))} >

@@ -1,0 +1,131 @@
+.agent-narrative {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.agent-story-card {
+  min-width: 0;
+  padding: 16px 18px;
+  --curve-best: var(--ui-accent-2);
+  --curve-winner: var(--ui-amber);
+}
+.agent-story-card h2,
+.agent-story-card h3,
+.agent-story-card h4 {
+  margin: 0 0 10px;
+}
+.agent-story-card h2 { font-size: 19px; }
+.agent-story-card h3 { font-size: 15px; }
+.agent-story-card p { margin: 10px 0 0; }
+.agent-story-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 20px;
+  flex-wrap: wrap;
+}
+.agent-curve-legend {
+  display: flex;
+  gap: 6px 18px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+.agent-curve-legend span::before {
+  content: "";
+  display: inline-block;
+  width: 18px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-top: 3px solid var(--curve-best);
+}
+.agent-curve-legend .agent-legend-winner::before {
+  border-top: 3px dashed var(--curve-winner);
+}
+.agent-curve {
+  display: block;
+  width: 100%;
+  max-height: 168px;
+  margin: 0 auto 4px;
+}
+.agent-curve text {
+  fill: var(--ui-ink-2);
+  font-size: 15px;
+  font-family: inherit;
+}
+.agent-curve-grid { stroke: var(--ui-rule); }
+.agent-curve-best, .agent-curve-winner { stroke-width: 3; }
+.agent-curve-best { stroke: var(--curve-best); fill: var(--curve-best); }
+.agent-curve-winner { stroke: var(--curve-winner); fill: var(--curve-winner); }
+.agent-curve-winner line { stroke-dasharray: 7 5; }
+.agent-curve-winner rect { stroke: var(--ui-surface, #fff); stroke-width: 1.5; }
+.agent-story-table th, .agent-story-table td {
+  padding: 7px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.agent-curve-table th[scope="row"], .agent-curve-table td:nth-child(2),
+.agent-curve-table td:nth-child(3), .agent-curve-table td:nth-child(4) { white-space: nowrap; }
+.agent-curve-table summary, .agent-rejections summary {
+  color: var(--curve-best);
+  cursor: pointer;
+}
+.agent-story-card ul { margin: 4px 0; padding-left: 19px; }
+.agent-story-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.agent-story-grid.summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.agent-story-grid > div {
+  padding: 8px 10px;
+  border: 1px solid var(--ui-rule);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+.agent-story-grid dt { font-size: 12px; font-weight: 700; color: var(--ui-ink-2); }
+.agent-story-grid dd { margin: 3px 0 0; }
+.agent-story-grid + h3 { margin-top: 16px; }
+.agent-causal-chain { list-style: none; padding: 0; margin: 0; }
+.agent-causal-round {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+.agent-causal-round span { color: var(--ui-muted); font-size: 12px; }
+.agent-story-card .agent-causal-arrow {
+  margin: 8px 0 12px 10px;
+  color: var(--ui-ink-2);
+  font-size: 12px;
+}
+.agent-causal-arrow span { color: var(--curve-best); font-size: 16px; margin-right: 4px; }
+.agent-rejections { margin-top: 8px; }
+.agent-ledger-entry { justify-self: start; }
+.agent-ledger-cell {
+  padding: 4px 8px;
+  border: 1px solid var(--ui-rule);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--ui-ink);
+  background: var(--ui-surface, #fff);
+  white-space: nowrap;
+}
+.agent-ledger-cell[data-effect="修好"] { background: #e4f4ea; color: #155535; }
+.agent-ledger-cell[data-effect="弄坏"] { background: #fbe8e5; color: #8a2d24; }
+.agent-ledger-cell[data-effect="无效"] { background: #ebf0f6; color: #3c4c63; }
+.agent-ledger-cell[data-effect="组合不可归因"] { background: #fbefd9; color: #744a14; }
+.agent-ledger-evidence { display: grid; gap: 8px; margin-top: 14px; }
+.agent-ledger-evidence .agent-story-table { margin-top: 8px; }
+@media (max-width: 760px) {
+  .agent-story-grid, .agent-story-grid.summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 460px) {
+  .agent-story-card { padding: 12px; }
+  .agent-story-grid { grid-template-columns: 1fr; }
+  .agent-curve text { font-size: 22px; }
+}
+.agent-story-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.agent-story-table { width: 100%; }

@@ -1817,6 +1817,12 @@ def experiment(run_id: str, light: bool = False):
     return result
 
 
+@app.get("/api/agent/stability-retest")
+def agent_stability_retest():
+    from .agent_stability_read import saved_stability_retest
+    return saved_stability_retest()
+
+
 @app.get("/api/experiments/{run_id}/round-trace/{round_number}")
 @read_view()
 def experiment_round_trace(run_id: str, round_number: int):
