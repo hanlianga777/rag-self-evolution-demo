@@ -3150,10 +3150,9 @@ class GovernanceStore:
             if experiment['result'].get('report_confirmation'):
                 raise ValueError('报告已确认')
             strict = experiment['result'].get('decision_contract_version') == '109c'
-            if strict and audit_note and delegated_review is None:
-                raise ValueError('新实验 Gate 2 代确认须提交 Claude 和 GPT 双审依据')
-            audit = (delegated_gate_audit('gate2', actor, delegated_review, current_experiment=strict)
-                     if strict or delegated_review is not None else {})
+            audit = rules.AGENT_GATE_AUDIT if strict else {}
+            if not strict and delegated_review is not None:
+                audit = delegated_gate_audit('gate2', actor, delegated_review, current_experiment=False)
             self.require_current_baseline(experiment['baseline_run_id'], connection)
             candidates = experiment['candidates']
             if any(item['status'] not in {'evaluated','skipped'} or item['status']!='skipped' and item['result'].get('evaluation_complete') is False for item in candidates if item['reasoning'].get('candidate_label')!='D'):
@@ -3528,9 +3527,8 @@ class GovernanceStore:
             experiment = connection.execute("SELECT baseline_run_id, result_json FROM experiments WHERE id=?", (candidate["experiment_id"],)).fetchone()
             self.require_current_baseline(experiment["baseline_run_id"], connection)
             strict = _load(experiment['result_json'], {}).get('decision_contract_version') == '109c'
-            if strict and delegated_review is not None:
-                strict = self.current_baseline_identity(connection)['current_experiment_id'] == candidate['experiment_id']
-            audit = delegated_gate_audit('gate3', actor, delegated_review, current_experiment=strict)
+            audit = rules.AGENT_GATE_AUDIT if strict else delegated_gate_audit(
+                'gate3', actor, delegated_review, current_experiment=False)
             if connection.execute("SELECT 1 FROM production_versions WHERE json_extract(snapshot_json, '$.candidate_id') = ?", (candidate_id,)).fetchone():
                 raise ValueError("Candidate 已发布")
             row = connection.execute("SELECT status, result_json, config_json FROM candidate_configs WHERE id = ?", (candidate_id,)).fetchone()

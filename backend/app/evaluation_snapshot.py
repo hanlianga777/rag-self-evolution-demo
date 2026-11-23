@@ -74,6 +74,12 @@ def require_resume_snapshot(judge, current_judge=None, *, for_candidate_baseline
             and (saved.get('pipeline_config') or {}).get('prompt_strategy') == rules.BASELINE['prompt_strategy']
             and saved_prompts.get('agent_system') == '02b20fea1fdb4a999d785307ff26a2fc40c0c1c70d5d8ca893e1c315f7e0166e'):
         ignored_prompts = {'agent_system'}
+    # 109i changed TableCheck only. A completed Strict Baseline never used it.
+    if (known_upgrade and (saved.get('pipeline_config') or {}).get('prompt_strategy') == rules.STRICT
+            and (saved_prompts.get(rules.TABLE_CHECK), current_prompts[rules.TABLE_CHECK]) == (
+                '2b50bbbc1784401081198006d005527ac0fe7ca721adcdcf04f26fd5b2e9564b',
+                'e506611ea46bbef01cce6b226d6df1ed46a38b9010fe868984552ec83a3b12a6')):
+        ignored_prompts.add(rules.TABLE_CHECK)
     changed.extend(f'prompt_version.{name}' for name, fingerprint in current_prompts.items()
                    if name not in ignored_prompts and saved_prompts.get(name) != fingerprint)
     if changed:

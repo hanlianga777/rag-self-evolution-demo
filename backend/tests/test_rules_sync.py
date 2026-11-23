@@ -260,56 +260,7 @@ def test_current_qualification_counts_include_ordinary_regressions():
         assert result['qualified'] is qualified
 
 
-@pytest.mark.parametrize('stage', ['gate2', 'gate3'])
-def test_dual_review_binds_both_records_to_one_experiment_and_stage(stage, tmp_path, monkeypatch):
-    from copy import deepcopy
-    from app import rules
-    from app.policy import delegated_gate_audit
-    from gate_review_fixture import gate_reviews
-
-    target = 'EXP-123'
-    other_stage = 'gate3' if stage == 'gate2' else 'gate2'
-    actor = rules.AUTHORIZATION[stage]['executed_by']
-    reviews = gate_reviews(tmp_path, monkeypatch, target, stage)
-
-    def audit(payload, actor=actor, current_experiment=True):
-        return delegated_gate_audit(stage, actor, payload, current_experiment=current_experiment, experiment_id=target)
-
-    for signer in (actor, 'local_user', 'human', '其他'):
-        with pytest.raises(ValueError, match='双审'):
-            audit(None, signer)
-    with pytest.raises(ValueError, match='只读'):
-        audit(reviews, current_experiment=False)
-    for fields in ({'experiment_id': 'EXP-999'}, {'stage': other_stage}):
-        with pytest.raises(ValueError, match='双审'):
-            audit({**reviews, **fields})
-    for ref in (
-        {'verdict': '不通过'}, {'record': '指挥/互审/不存在.md'},
-        {'record': reviews['claude']['record']},
-        {'record': str(tmp_path / reviews['gpt']['record'])},
-    ):
-        invalid = deepcopy(reviews)
-        invalid['gpt'].update(ref)
-        with pytest.raises(ValueError, match='双审'):
-            audit(invalid)
-
-    path = tmp_path / reviews['gpt']['record']
-    original = path.read_text()
-    for content in (original.replace(target, target + '4'), original.replace(f'Gate {stage[-1]}', f'Gate {other_stage[-1]}'),
-                    original.replace('结论：通过', '结论：通过需复核'), original + 'EXP-999\n'):
-        path.write_text(content, encoding='utf-8')
-        with pytest.raises(ValueError, match='双审'):
-            audit(reviews)
-    path.write_text(original, encoding='utf-8')
-    saved = audit(reviews)
-    assert (saved['experiment_id'], saved['stage']) == (target, stage)
-    for reviewer in ('claude', 'gpt'):
-        record = reviews[reviewer]['record']
-        assert saved['review_evidence'][reviewer] == {
-            **reviews[reviewer], 'sha256': hashlib.sha256((tmp_path / record).read_bytes()).hexdigest()}
-
-
-def test_gate3_delegation_is_saved_in_release_snapshot(tmp_path, monkeypatch):
+def test_gate3_saves_audit_without_dual_review_and_keeps_hard_gates(tmp_path, monkeypatch):
     from app import governance, rules
     from app.policy import qualify_candidate
     import identity_fixture
@@ -338,24 +289,18 @@ def test_gate3_delegation_is_saved_in_release_snapshot(tmp_path, monkeypatch):
                    (experiment, candidate, 'Recommended',
                     json.dumps({'status': 'Recommended', 'recommended_candidate': candidate}), 'fixture'))
 
-    from gate_review_fixture import gate_reviews
-    authorization = rules.AUTHORIZATION['gate3']
-    for actor in ('local_user', 'human', authorization['executed_by']):
-        with pytest.raises(ValueError, match='双审'):
-            store.publish_candidate(candidate, actor)
-    with pytest.raises(ValueError, match='双审'):
-        store.publish_candidate(candidate, authorization['executed_by'], delegated_review={'gpt': '复核通过'})
+    store.finish_candidate(candidate, 'evaluated', {**result, 'gates': {'passed': False}})
+    with pytest.raises(ValueError, match='门槛'):
+        store.publish_candidate(candidate, 'local_user')
     assert store.latest_approval('human_release', candidate) is None
-    reviews = gate_reviews(tmp_path, monkeypatch, experiment, 'gate3')
-    released = store.publish_candidate(candidate, authorization['executed_by'], delegated_review=reviews)
+
+    store.finish_candidate(candidate, 'evaluated', result)
+    released = store.publish_candidate(candidate, 'local_user')
     audit = released['snapshot']['human_release']
-    for key in ('authorizer', 'executed_by', 'review_method'):
-        assert audit[key] == authorization[key]
-    assert (audit['experiment_id'], audit['stage']) == (experiment, 'gate3')
-    for reviewer in authorization['reviewers']:
-        evidence = audit['review_evidence'][reviewer]
-        assert evidence['record'] == reviews[reviewer]['record']
-        assert evidence['sha256'] == hashlib.sha256((tmp_path / evidence['record']).read_bytes()).hexdigest()
+    assert {key: audit[key] for key in ('authorizer', 'executed_by', 'review_method')} == {
+        'authorizer': '用户', 'executed_by': 'Codex', 'review_method': '用户授权自动执行',
+    }
+    assert 'review_evidence' not in audit
 
 
 @pytest.mark.parametrize('table', [
@@ -374,3 +319,18 @@ def test_tablecheck_request_has_general_column_rule(table):
     assert "不得把不同周期、条件或型号对应的项目混在一起" in prompt
     assert '36个月' not in prompt and '12个月' not in prompt
     assert table in context
+
+
+def test_109i_tablecheck_update_keeps_strict_baseline_usable_for_new_candidates():
+    from app.evaluation_snapshot import require_resume_snapshot, run_snapshot
+    from app.rules import STRICT, TABLE_CHECK
+
+    saved = run_snapshot({'id': 'frozen'}, {'prompt_strategy': STRICT}, {})
+    assert saved['prompt_version'][TABLE_CHECK] != '2b50bbbc1784401081198006d005527ac0fe7ca721adcdcf04f26fd5b2e9564b'
+    saved['prompt_version'][TABLE_CHECK] = '2b50bbbc1784401081198006d005527ac0fe7ca721adcdcf04f26fd5b2e9564b'
+    require_resume_snapshot({'run_snapshot': saved}, for_candidate_baseline=True)
+    with pytest.raises(ValueError, match='prompt_version.TableCheck'):
+        require_resume_snapshot({'run_snapshot': saved})
+    saved['pipeline_config']['prompt_strategy'] = TABLE_CHECK
+    with pytest.raises(ValueError, match='prompt_version.TableCheck'):
+        require_resume_snapshot({'run_snapshot': saved}, for_candidate_baseline=True)

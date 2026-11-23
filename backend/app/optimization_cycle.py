@@ -111,7 +111,7 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
 
     def advance_qualified(experiment, qualified):
         confirmation = experiment['result'].get('report_confirmation')
-        dual_review = experiment['result'].get('decision_contract_version') == '109c'
+        current_contract = experiment['result'].get('decision_contract_version') == '109c'
         authorization = unattended_authorization(store)
         if not confirmation:
             for candidate in experiment['candidates']:
@@ -119,12 +119,12 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                     store.skip_candidate(candidate['id'], '自动循环', '出现合格方案，已跳过（未运行）', automatic=True)
             from .agent_strategy import conclude_round
             conclude_round(store,runtime,experiment_id)
-            if dual_review or not authorization.get('enabled'):
+            if not authorization.get('enabled'):
                 return save('qualified', 'review')
             winner = min(qualified, key=candidate_rank)
             store.confirm_experiment_report(experiment_id, winner['id'], authorization['actor'],
                                             audit_note='用户 2026-11-16 预先授权')
-        if not dual_review and not authorization.get('enabled'):
+        if not current_contract and not authorization.get('enabled'):
             return save('qualified', 'review')
         check_cycle_stop(store,experiment_id)
         save('running', 'composite')
@@ -134,7 +134,7 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
         experiment = store.experiment(experiment_id, light=True)
         d = next((c for c in experiment['candidates'] if c['reasoning'].get('candidate_label')=='D'), None)
         if d is None or d['status']=='evaluated':
-            if dual_review and d:
+            if current_contract and d:
                 from .agent_strategy import conclude_round
                 save('running', 'composite_review')
                 conclude_round(store, runtime, experiment_id, final_d=True)

@@ -90,12 +90,14 @@ AGENT = {
 }
 AGENT['candidates_per_round'] = len(AGENT['candidate_labels'])
 QUALIFICATION = {'version': RULES_VERSION, 'max_new_critical': 0, 'max_new_failures': 0, 'min_fixed': 1}
+# Legacy authorization is part of the saved evaluation rules fingerprint.
 AUTHORIZATION = {
     'gate2': {'delegated': True, 'authorizer': '用户', 'executed_by': '总指挥',
               'review_method': '预授权代确认', 'reviewers': ['claude', 'gpt']},
     'gate3': {'delegated': True, 'authorizer': '用户', 'executed_by': '总指挥',
               'review_method': '用户睡前授权代发布', 'reviewers': ['claude', 'gpt']},
 }
+AGENT_GATE_AUDIT = {'authorizer': '用户', 'executed_by': 'Codex', 'review_method': '用户授权自动执行'}
 LAUNCH = {'min_bad_cases': 5}
 CONSISTENCY_CHECK = {'questions': 10, 'min_agree': 9}
 

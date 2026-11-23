@@ -57,7 +57,7 @@ it("requires every saved release eligibility guard and a separate rollback confi
   expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/api/versions/old/rollback"), expect.objectContaining({ method: "POST", body: JSON.stringify({ decision: "approved" }) }));
 });
 
-it("disables Gate 3 for a new experiment awaiting dual review", async () => {
+it("offers Gate 3 for an eligible new experiment", async () => {
   const candidate = { id: "EXP-A", reasoning: { candidate_label: "A" },
     release_state: { sandbox: true, qualified: true, recommended: true, round_complete: true } };
   vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
@@ -67,9 +67,8 @@ it("disables Gate 3 for a new experiment awaiting dual review", async () => {
     result: { decision_contract_version: "109c" },
   } }} /></OperationProvider>));
   const button = document.querySelector<HTMLButtonElement>(".ui-rel button.primary");
-  expect(button?.disabled).toBe(true);
-  expect(document.body.textContent).toContain("需 Claude 与 GPT 双审通过记录");
+  expect(button?.disabled).toBe(false);
   await act(async () => button!.click());
-  expect(document.querySelector(".confirm-dialog")).toBeNull();
+  expect(document.querySelector(".confirm-dialog")).not.toBeNull();
   expect((fetch as any).mock.calls.every(([, init]: any) => !init?.method)).toBe(true);
 });

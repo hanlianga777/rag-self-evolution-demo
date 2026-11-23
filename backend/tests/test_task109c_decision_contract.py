@@ -145,7 +145,7 @@ class DecisionContractTests(TestCase):
         self.assertEqual([row['affected_candidates'] for row in decisions if row['decision']=='例外探索'], [['A']])
         self.assertIn('先处理证据位置。', [row['lesson'] for row in decisions])
 
-    def test_gate2_cycle_waits_for_both_reviews_and_saves_delegation(self):
+    def test_gate2_cycle_confirms_qualified_winner_and_stops_before_release(self):
         from app.optimization_cycle import run_until_qualified
         from app.paid_schedule import set_unattended_authorization
 
@@ -158,32 +158,23 @@ class DecisionContractTests(TestCase):
         with self.store.connection() as db:
             db.execute("UPDATE candidate_configs SET status='skipped' WHERE experiment_id=?", (experiment_id,))
             db.execute("UPDATE candidate_configs SET status='evaluated',result_json=? WHERE id=?", (json.dumps(evaluated), winner))
+        unqualified = {**evaluated, 'qualification': {'qualified': False}}
+        with self.store.connection() as db:
+            db.execute("UPDATE candidate_configs SET result_json=? WHERE id=?", (json.dumps(unqualified), winner))
+        with self.assertRaisesRegex(ValueError, '合格'):
+            self.store.confirm_experiment_report(experiment_id, winner, 'human')
+        with self.store.connection() as db:
+            db.execute("UPDATE candidate_configs SET result_json=? WHERE id=?", (json.dumps(evaluated), winner))
         set_unattended_authorization(self.store, True, '用户')
-        with patch('app.agent_strategy.conclude_round'), patch.object(self.store, 'create_composite') as composite:
+        with patch('app.agent_strategy.conclude_round'), patch.object(self.store, 'create_composite', return_value={'status': 'declined'}) as composite:
             cycle = run_until_qualified(self.store, SimpleNamespace(provider=self.provider), experiment_id)
-            self.assertEqual((cycle['status'], cycle['phase']), ('qualified', 'review'))
-            composite.assert_not_called()
-        from gate_review_fixture import gate_reviews
-        from pytest import MonkeyPatch
-
-        for actor in ('local_user', 'human', '总指挥'):
-            with self.assertRaisesRegex(ValueError, '双审'):
-                self.store.confirm_experiment_report(experiment_id, winner, actor)
-        self.assertIsNone(self.store.latest_approval('experiment_report', experiment_id))
-        with TemporaryDirectory() as directory, MonkeyPatch.context() as monkeypatch:
-            reviews = gate_reviews(Path(directory), monkeypatch, experiment_id, 'gate2')
-            with self.assertRaisesRegex(ValueError, '双审'):
-                self.store.confirm_experiment_report(experiment_id, winner, '总指挥',
-                    delegated_review={**reviews, 'stage': 'gate3'})
-            confirmation = self.store.confirm_experiment_report(experiment_id, winner, '总指挥',
-                delegated_review=reviews)
-        self.assertEqual([confirmation[k] for k in ('authorizer','executed_by','review_method')],
-                         ['用户','总指挥','预授权代确认'])
+            self.assertEqual((cycle['status'], cycle['phase']), ('recommended', 'before_release'))
+            composite.assert_called_once_with(experiment_id, self.provider)
         saved = self.store.experiment(experiment_id)['result']['report_confirmation']
-        self.assertEqual(saved['stage'], 'gate2')
-        for reviewer in ('claude', 'gpt'):
-            self.assertEqual(saved['review_evidence'][reviewer]['record'], reviews[reviewer]['record'])
-            self.assertRegex(saved['review_evidence'][reviewer]['sha256'], '^[0-9a-f]{64}$')
+        self.assertEqual(saved['winner_id'], winner)
+        self.assertEqual([saved[key] for key in ('authorizer', 'executed_by', 'review_method')],
+                         ['用户', 'Codex', '用户授权自动执行'])
+        self.assertNotIn('review_evidence', saved)
         with self.store.connection() as db:
             self.assertEqual(db.execute("SELECT count(*) FROM approvals WHERE gate='human_release'").fetchone()[0], 0)
 

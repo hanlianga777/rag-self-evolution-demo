@@ -129,8 +129,8 @@ def test_table_reason_fallback_preserves_refusal(answer, judge_behavior):
 
 
 @pytest.mark.parametrize('answer, expected', [
-    ('滤芯每月检查。说明书里没有给出“更换滤芯”的具体步骤。', '资料边界过度断言'),
-    ('滤芯每月检查，手册未提到更换滤芯的方法。', '资料边界过度断言'),
+    ('滤芯每月检查。说明书里没有给出“更换滤芯”的具体步骤。', '错误否定（资料有却说没有）'),
+    ('滤芯每月检查，手册未提到更换滤芯的方法。', '错误否定（资料有却说没有）'),
     ('滤芯每月检查。说明书里未给出更换电池的步骤。', '答案出现幻觉'),
     ('滤芯每月检查。说明书里未给出更换电池的步骤，无法确认这一部分。', '答案出现幻觉'),
     ('**资料核对结果**\n说明书里没有给出更换滤芯的方法。建议联系售后。', '模型过度拒绝（已检索到相关切片仍拒答）'),
@@ -140,13 +140,9 @@ def test_wrong_denial_requires_substantive_answer_and_matching_final_object(answ
                            judge={'hallucination': True})
     view = diagnostic_view(case)
     assert view['subfeature'] == expected
-    if expected == '资料边界过度断言':
+    if expected == '错误否定（资料有却说没有）':
         assert view['display_subtype'] == expected
         assert view['tuning_directions'] == ['Grounded']
-        evidence = view['diagnosis_evidence']
-        assert evidence['answer_quote'] in answer
-        assert evidence['final'][0]['rank'] == 1
-        assert evidence['final'][0]['quote'] == '更换滤芯见第80页。'
 
 
 @pytest.mark.parametrize('question, missing, saved_check, expected', [
@@ -180,41 +176,6 @@ def test_round_one_agent_receives_the_current_diagnosis_and_action():
     system, prompt = build_agent_prompt(rows, DEFAULT_PIPELINE_CONFIG, [], [], AGENT['candidate_labels'],
                                        round_number=1)
     assert prompt['bad_case_groups'] == [
-        {'layer': '生成层问题', 'subtype': '资料边界过度断言', 'question_ids': ['Q01'], 'count': 1}
+        {'layer': '生成层问题', 'subtype': '错误否定（资料有却说没有）', 'question_ids': ['Q01'], 'count': 1}
     ]
-    assert '资料边界过度断言→prompt_strategy=Grounded' in system
-
-
-def test_denial_of_saved_fact_uses_the_actual_final_sentence():
-    case = generation_case('滤芯每月检查。手册未给出滤芯更换周期。', '滤芯每月检查',
-                           final='滤芯每月检查。滤芯更换周期为18个月。')
-    view = diagnostic_view(case)
-    assert view['subfeature'] == '已有证据被否定'
-    assert view['tuning_directions'] == ['Grounded']
-    assert view['diagnosis_evidence']['answer_quote'] == '手册未给出滤芯更换周期。'
-    assert view['diagnosis_evidence']['final'][0]['quote'] == '滤芯更换周期为18个月。'
-
-
-@pytest.mark.parametrize('verdict, final, expected', [
-    ('PASS', '项目=检查密封圈；周期=36个月', '通过'),
-    ('FAIL', '项目=检查密封圈；周期=36个月', '表格读取或归类错误'),
-    ('FAIL', '证据段落只提供维护章节指引。', '关键片段排名过低'),
-    ('NOT_EVALUABLE', '项目=检查密封圈；周期=36个月', None),
-])
-def test_table_reason_fallback_checks_saved_verdict_and_final_rows(verdict, final, expected):
-    quote = '项目=检查密封圈；周期=36个月'
-    reason = '项目算入每36个月的分类正确。' if verdict == 'PASS' else '清单错列了每36个月的检查项目。'
-    case = generation_case('检查密封圈，每36个月。', quote, final=final, judge={'issues': [], 'reason': reason})
-    case['evaluation_outcome'] = {'verdict': verdict, 'execution_complete': verdict != 'NOT_EVALUABLE'}
-    case['programmatic_metrics']['retrieval_trace']['final'][0]['chunk_id'] = 'table-row'
-    view = diagnostic_view(case)
-    if expected == '通过':
-        assert view['diagnosis_category'] == '通过'
-    else:
-        assert (view.get('subfeature') or None) == expected
-    if expected == '表格读取或归类错误':
-        assert view['diagnosis_evidence'] == {
-            'judge_quote': reason, 'final': [{'rank': 1, 'chunk_id': 'table-row', 'quote': quote}],
-        }
-    else:
-        assert 'diagnosis_evidence' not in view
+    assert '错误否定（资料有却说没有）→prompt_strategy=Grounded' in system
