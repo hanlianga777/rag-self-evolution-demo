@@ -41,19 +41,26 @@ import { CaseDetails, gateNames } from "./EvaluationPage";
 const rootCause = currentRoot;
 
 const archivedExperimentId = "EXP-20261120224619556715";
+const savedExperiments: Record<string, string> = {
+  "EXP-20261123010322145772": "E2",
+  "EXP-20261123150407867927": "E3",
+};
 
 export function EvolutionPage({ data }: { data: any }) {
   const current = data.optimization;
-  const [selection, select] = useState<"current" | "archive" | null>(null);
+  const [selection, select] = useState<string | null>(null);
   const selected = selection ?? (current?.id === archivedExperimentId ? "archive" : "current");
+  const archiveId = selected === "archive" ? archivedExperimentId : savedExperiments[selected] ? selected : undefined;
   const [archive, setArchive] = useState<any>(null);
   const [failure, setFailure] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const loadArchive = archiveId && (current?.id !== archiveId || current?.baseline_run_id !== data.evaluation?.id)
+    ? archiveId : undefined;
   useEffect(() => {
-    if (selected !== "archive" || (current?.id === archivedExperimentId && current.baseline_run_id === data.evaluation?.id)) return;
+    if (!loadArchive) return;
     let active = true;
     setFailure("");
-    void getJson<any>(`/api/experiments/${archivedExperimentId}?light=true`).then(async optimization => {
+    void getJson<any>(`/api/experiments/${loadArchive}?light=true`).then(async optimization => {
       const baseline = encodeURIComponent(optimization.baseline_run_id);
       const [evaluation, badCases] = await Promise.all([
         detailJson(`/api/evaluations/${baseline}`),
@@ -62,15 +69,18 @@ export function EvolutionPage({ data }: { data: any }) {
       if (active) setArchive({ optimization, evaluation, badCases });
     }).catch(reason => { if (active) setFailure(errorMessage(reason)); });
     return () => { active = false; };
-  }, [selected, current?.id, current?.baseline_run_id, data.evaluation?.id, attempt]);
+  }, [loadArchive, attempt]);
 
   const unavailable = selected === "current" && current?.id === archivedExperimentId;
-  const view = selected === "archive" && (current?.id !== archivedExperimentId || current?.baseline_run_id !== data.evaluation?.id)
-    ? archive && { ...data, ...archive }
+  const view = loadArchive
+    ? archive?.optimization.id === loadArchive && { ...data, ...archive }
     : unavailable ? { ...data, optimization: null } : data;
+  const currentLabel = savedExperiments[current?.id];
   const selector = <label className="agent-experiment-select">实验
-    <select aria-label="选择 Agent 实验" value={selected} onChange={event => select(event.target.value as "current" | "archive")}>
-      <option value="current">{current?.id && current.id !== archivedExperimentId ? `当前实验 · ${current.id}` : "当前实验 · 尚无新记录"}</option>
+    <select aria-label="选择 Agent 实验" value={selected} onChange={event => select(event.target.value)}>
+      <option value="current">{current?.id && current.id !== archivedExperimentId ? `当前实验 · ${currentLabel ? `${currentLabel} · ` : ""}${current.id}` : "当前实验 · 尚无新记录"}</option>
+      {Object.entries(savedExperiments).filter(([id]) => id !== current?.id || selected === id).map(([id, label]) =>
+        <option key={id} value={id}>{label} · {id}（只读）</option>)}
       <option value="archive">旧实验 · {archivedExperimentId}（只读）</option>
     </select>
   </label>;
@@ -78,7 +88,7 @@ export function EvolutionPage({ data }: { data: any }) {
     {failure ? <p role="alert">旧实验读取失败。{failure} <button onClick={() => setAttempt(attempt + 1)}>重试</button></p> : <LoadingSkeleton label="正在读取旧实验及对应 Baseline"/>}
   </PageShell>;
   return <EvolutionWorkspace key={`${selected}:${view.optimization?.id ?? ''}`} data={view} selector={selector}
-    readOnly={selected === "archive" || unavailable} archive={selected === "archive"} unavailable={unavailable}/>;
+    readOnly={!!archiveId || unavailable} archive={!!archiveId} unavailable={unavailable}/>;
 }
 
 function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: {

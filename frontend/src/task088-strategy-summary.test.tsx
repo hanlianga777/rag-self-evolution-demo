@@ -21,11 +21,11 @@ const strategy = { bad_case_summary: { groups: [
   { layer: '检索层问题', question_ids: ['Q20'], count: 1 },
 ] } };
 
-async function mount(result: object, candidates: object[], tab = 'route') {
+async function mount(result: object, candidates: object[], tab = 'route', experimentId = 'EXP') {
   history.replaceState(null, '', `#evolution?tab=${tab}`);
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}')));
   root = createRoot(document.body.appendChild(document.createElement('div')));
-  await act(async () => root.render(<EvolutionPage data={{ evaluation, optimization: { id: 'EXP', baseline_run_id: evaluation.id, result, candidates } }} />));
+  await act(async () => root.render(<EvolutionPage data={{ evaluation, optimization: { id: experimentId, baseline_run_id: evaluation.id, result, candidates } }} />));
 }
 
 afterEach(() => {
@@ -94,9 +94,14 @@ it('uses saved reassessments as the main A/B verdict and preserves the former ve
   expect(document.body.textContent).not.toContain('选择合格 Winner');
 });
 
-it('switches from a new experiment to the read-only archive with its own saved Baseline', async () => {
-  const archive = 'EXP-20261120224619556715';
-  await mount({}, [candidate]);
+const e2 = 'EXP-20261123010322145772';
+const e3 = 'EXP-20261123150407867927';
+it.each([
+  ['EXP', 'archive', 'EXP-20261120224619556715'],
+  [e3, e2, e2],
+  [e2, e3, e3],
+])('switches %s to %s with the selected experiment’s saved Baseline', async (current, archiveValue, archive) => {
+  await mount({}, [candidate], 'route', current);
   const requests: string[] = [];
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     expect(init?.method ?? 'GET').toBe('GET');
@@ -110,10 +115,12 @@ it('switches from a new experiment to the read-only archive with its own saved B
   }));
   const select = async (value: string) => act(async () => {
     const input = document.querySelector<HTMLSelectElement>('[aria-label="选择 Agent 实验"]')!;
+    expect(Array.from(input.options, option => option.value)).toContain(value);
     input.value = value;
     input.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  await select('archive');
+  await select(archiveValue);
+  expect(document.body.textContent).toContain(`旧实验只读 · ${archive}`);
   expect(document.body.textContent).toContain('Baseline ARCHIVED-BASE');
   expect(requests.some(url => url.includes('baseline_id=ARCHIVED-BASE'))).toBe(true);
   expect(document.body.textContent).not.toContain('跳过此 Candidate');
