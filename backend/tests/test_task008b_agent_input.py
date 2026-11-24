@@ -6,7 +6,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from app.optimization import build_agent_prompt
 from app.policy import DEFAULT_PIPELINE_CONFIG
@@ -156,6 +156,8 @@ class Task008bInputTests(unittest.TestCase):
         baseline, row = fixture()
         row['result']['standard_evidence'] = ['过时的标准文字']
         store = Mock()
+        store.connection = MagicMock()
+        store.connection.return_value.__enter__.return_value.execute.return_value.fetchone.return_value = None
         store.evaluation_run.return_value = baseline
         store.bad_case_rows.return_value = [row]
         store.experiment.return_value = {'baseline_run_id': 'base', 'candidates': []}

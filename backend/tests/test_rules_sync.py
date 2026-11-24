@@ -158,7 +158,7 @@ def test_109b_keeps_completed_strict_baseline_usable_with_saved_fingerprints():
         },
     }
     require_resume_snapshot(saved, for_candidate_baseline=True)
-    with pytest.raises(ValueError, match='search_space_version.*prompt_version.Grounded'):
+    with pytest.raises(ValueError, match='rules_hash.*prompt_version.agent_system'):
         require_resume_snapshot(saved)
     for name in ('Strict', 'judge'):
         old_hash = saved['run_snapshot']['prompt_version'][name]
@@ -173,6 +173,7 @@ def test_109g_keeps_the_previous_strict_baseline_usable_without_allowing_resume(
     from app.rules import BASELINE
 
     snapshot = run_snapshot({'id': 'frozen'}, {'prompt_strategy': BASELINE['prompt_strategy']}, {})
+    snapshot.update(rules_version='2026-11-20b', rules_hash='a1b4d0991ca6')
     snapshot['prompt_version']['agent_system'] = '02b20fea1fdb4a999d785307ff26a2fc40c0c1c70d5d8ca893e1c315f7e0166e'
     saved = {'run_snapshot': snapshot}
     require_resume_snapshot(saved, for_candidate_baseline=True)
@@ -255,12 +256,12 @@ def test_current_qualification_counts_include_ordinary_regressions():
     for new, fixed, qualified in [(['Q22'], ['Q01', 'Q02'], False), ([], [], False), ([], ['Q01'], True)]:
         regression = {'passed': True, 'comparison_complete': True,
                       'all_fixed_question_ids': fixed, 'new_regression_question_ids': new,
-                      'new_critical_failures': 0}
+                      'new_critical_failures': 0, 'severe_risk_question_ids': []}
         result = qualify_candidate({'passed': True}, regression, len(fixed), 5, 5, rule_version=rules.RULES_VERSION)
         assert result['qualified'] is qualified
 
 
-def test_gate3_saves_audit_without_dual_review_and_keeps_hard_gates(tmp_path, monkeypatch):
+def test_gate3_saves_audit_without_dual_review_and_keeps_hard_gates(tmp_path, monkeypatch, legacy_launch):
     from app import governance, rules
     from app.policy import qualify_candidate
     import identity_fixture
@@ -278,7 +279,7 @@ def test_gate3_saves_audit_without_dual_review_and_keeps_hard_gates(tmp_path, mo
     store.finish_evaluation_run(run_id, 'completed', {'gates': {'passed': True}})
     candidate = f'{experiment}-{label}'
     regression = {'passed': True, 'comparison_complete': True,
-                  'all_fixed_question_ids': ['Q1'], 'new_regression_question_ids': []}
+                  'all_fixed_question_ids': ['Q1'], 'new_regression_question_ids': [], 'severe_risk_question_ids': []}
     qualification = qualify_candidate({'passed': True}, regression, 1, 1, 0, rule_version=rules.RULES_VERSION)
     result = {'evaluation_run_id': run_id, 'evaluation_identity': baseline['judge']['evaluation_identity'],
               'gates': {'passed': True}, 'regression': regression, 'qualification': qualification,
@@ -330,11 +331,12 @@ def test_109i_tablecheck_update_keeps_strict_baseline_usable_for_new_candidates(
     from app.rules import STRICT, TABLE_CHECK
 
     saved = run_snapshot({'id': 'frozen'}, {'prompt_strategy': STRICT}, {})
-    assert saved['prompt_version'][TABLE_CHECK] != '2b50bbbc1784401081198006d005527ac0fe7ca721adcdcf04f26fd5b2e9564b'
+    assert TABLE_CHECK not in saved['prompt_version']
+    saved.update(rules_version='2026-11-20b', rules_hash='bb96bee3ca3b')
     saved['prompt_version'][TABLE_CHECK] = '2b50bbbc1784401081198006d005527ac0fe7ca721adcdcf04f26fd5b2e9564b'
     require_resume_snapshot({'run_snapshot': saved}, for_candidate_baseline=True)
-    with pytest.raises(ValueError, match='prompt_version.TableCheck'):
+    with pytest.raises(ValueError, match='rules_hash'):
         require_resume_snapshot({'run_snapshot': saved})
     saved['pipeline_config']['prompt_strategy'] = TABLE_CHECK
-    with pytest.raises(ValueError, match='prompt_version.TableCheck'):
+    with pytest.raises(ValueError, match='rules_hash'):
         require_resume_snapshot({'run_snapshot': saved}, for_candidate_baseline=True)

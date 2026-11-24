@@ -130,9 +130,14 @@ def test_ledger_is_saved_when_sandbox_finishes_and_sent_before_next_proposal(mon
         with store.connection() as db:
             # Older candidates omit fixed temperature while formal Baseline includes it.
             db.execute("UPDATE evaluation_runs SET config_json=json_set(config_json,'$.temperature',0) WHERE id=?", (baseline['id'],))
-        experiment = store.create_experiment(baseline['id'], decision_contract_v2=True, historical_experiment_id=legacy)
+        from app.agent_mechanism import candidate_effects
+        with store.connection() as db:
+            source = db.execute('SELECT * FROM experiments WHERE id=?', (legacy,)).fetchone()
+            source_candidate = db.execute('SELECT * FROM candidate_configs WHERE id=?', (f'{legacy}-R2-C',)).fetchone()
+            history = candidate_effects(db, source, source_candidate, json.loads(source_candidate['result_json']), historical=True)
         assert not store.experiment(legacy)['result'].get('parameter_effect_ledger')
-        history = store.experiment(experiment)['result']['parameter_effect_ledger']['historical']
+        experiment = store.create_experiment(baseline['id'], decision_contract_v2=True)
+        assert store.experiment(experiment)['result']['parameter_effect_ledger']['historical'] == []
         inherited = next(row for row in history if row['candidate_id'].endswith('-R2-C'))
         assert inherited['changes'] == {'min_score': 0.2}
         assert inherited['base_id'] == winner and inherited['status'] == '修好'

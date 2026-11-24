@@ -1,9 +1,9 @@
-"""Execution rules for the 2026-11-20 rulebook."""
+"""Execution rules for the 2026-11-24 rulebook."""
 
 import hashlib
 import json
 
-RULES_VERSION = '2026-11-20b'
+RULES_VERSION = '2026-11-24'
 STRICT = 'Strict'
 LOOSER = 'Looser'
 SAFE = 'Safe'
@@ -126,7 +126,7 @@ def canonical_hash(value):
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
-# Pipeline value domains also support reading and comparing historical runs.
+# Historical prompt templates remain available by name.
 THINKING_LEVELS = ("off", "low", "high", "max")
 PIPELINE_VALUES = {
     "candidate_k": (12, 24),
@@ -139,7 +139,7 @@ PIPELINE_VALUES = {
     "multi_query": (False, 2, 4, 6),
     "hyde": (True, False),
     "query_decompose": (False, True),
-    "prompt_strategy": (STRICT, LOOSER, SAFE, STEPWISE, GROUNDED, TABLE_CHECK),
+    "prompt_strategy": (STRICT, LOOSER, SAFE),
     "generation_thinking": THINKING_LEVELS,
     "retrieval_max_tokens": (False, 8192, 4096),
 }

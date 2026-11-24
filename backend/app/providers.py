@@ -323,6 +323,7 @@ class DeepSeekProvider:
             return action()  # Cache only the validated judgment, never a raw invalid reply.
         from .request_reuse import reuse_result
         result = reuse_result('generation' if _task.get() == 'answer' else 'retrieval', [request.full_url, json.loads(request.data)], action)
+        result['request_sha256'] = hashlib.sha256(request.data).hexdigest()
         if result.get('reused_from'):
             result.update(usage={}, input_tokens=0, output_tokens=0)
             if _answer_content.get(): _answer_content.get()(result['content'])

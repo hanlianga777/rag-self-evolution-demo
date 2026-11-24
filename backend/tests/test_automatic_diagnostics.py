@@ -98,8 +98,8 @@ def test_table_issue_requires_table_evidence_and_a_quantitative_issue(quote, kin
     assert view['subfeature'] == expected
     if expected == '表格读取或归类错误':
         assert view['display_subtype'] == expected
-        assert view['tuning_directions'] == ['TableCheck']
-        assert 'TableCheck' in view['repair_hint']
+        assert 'TableCheck' not in view['tuning_directions']
+        assert 'TableCheck' not in view['repair_hint']
 
 
 @pytest.mark.parametrize('quote, reason, expected', [
@@ -115,7 +115,7 @@ def test_table_reason_fallback_requires_table_quantity_and_classification(quote,
     assert view['subfeature'] == expected
     if expected == '表格读取或归类错误':
         assert view['display_subtype'] == expected
-        assert view['tuning_directions'] == ['TableCheck']
+        assert 'TableCheck' not in view['tuning_directions']
 
 
 @pytest.mark.parametrize('answer, judge_behavior', [
@@ -142,7 +142,7 @@ def test_wrong_denial_requires_substantive_answer_and_matching_final_object(answ
     assert view['subfeature'] == expected
     if expected == '错误否定（资料有却说没有）':
         assert view['display_subtype'] == expected
-        assert view['tuning_directions'] == ['Grounded']
+        assert 'Grounded' not in view['tuning_directions']
 
 
 @pytest.mark.parametrize('question, missing, saved_check, expected', [
@@ -161,7 +161,7 @@ def test_missed_subquestion_requires_multiple_questions_and_a_required_omission(
     assert view['subfeature'] == expected
     if expected == '漏子问':
         assert view['display_subtype'] == expected
-        assert view['tuning_directions'] == ['Stepwise']
+        assert 'Stepwise' not in view['tuning_directions']
 
 
 def test_round_one_agent_receives_the_current_diagnosis_and_action():
@@ -178,4 +178,4 @@ def test_round_one_agent_receives_the_current_diagnosis_and_action():
     assert prompt['bad_case_groups'] == [
         {'layer': '生成层问题', 'subtype': '错误否定（资料有却说没有）', 'question_ids': ['Q01'], 'count': 1}
     ]
-    assert '错误否定（资料有却说没有）→prompt_strategy=Grounded' in system
+    assert 'Grounded' not in system

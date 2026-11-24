@@ -82,6 +82,8 @@ GROUNDED_STRATEGY = STRICT_STRATEGY + "资料边界：你看到的只是检索�
 TABLECHECK_STRATEGY = STRICT_STRATEGY + "表格核对：问题涉及表格、维护周期、清单、数量统计或对比时，先把资料表格中与问题相关的每一行按'项目=对应列的值'逐行核对，按实际表头列名和单元格内容归类，不得把不同周期、条件或型号对应的项目混在一起；核对完再统计数量、给出清单；不确定某行属于哪一类时如实说明，不要猜。"
 PROMPT_STRATEGIES = {
     rules.STRICT: STRICT_STRATEGY, rules.LOOSER: LOOSER_STRATEGY, rules.SAFE: SAFE_STRATEGY,
+}
+LEGACY_PROMPT_STRATEGIES = {
     rules.STEPWISE: STEPWISE_STRATEGY, rules.GROUNDED: GROUNDED_STRATEGY, rules.TABLE_CHECK: TABLECHECK_STRATEGY,
 }
 NUMBERED_PROMPT_VERSIONS = frozenset({"generation-vnext-3", "generation-vnext-4"})
@@ -112,7 +114,7 @@ def generation_system_prompt(version, strategy):
             "Completeness": "在不超出证据的前提下覆盖用户问题的所有必要步骤；证据不足时明确说明。",
             "Abstention": "证据不足、风险不明或问题应拒答时，明确拒答或要求澄清；不得补造事实。",
             "Tiered": STRICT_STRATEGY,
-            **PROMPT_STRATEGIES,
+            **LEGACY_PROMPT_STRATEGIES, **PROMPT_STRATEGIES,
         }[strategy or rules.BASELINE["prompt_strategy"]]
     boundary = generation_boundary(version)
     if strategy == "Grounded" and version == "generation-vnext-4":
@@ -295,7 +297,7 @@ class AiService:
                 f"问题：{question}\n证据：\n{context}",
                 stream=True, temperature=rules.BASELINE['temperature'],
             )
-        return {"answer": response["content"], "reused_from": response.get("reused_from"), "mode": "live", "model": self.provider.settings.model, "latency_ms": round((time.perf_counter() - started_at) * 1000) + (response.get("generation_ms", 0) if response.get("reused_from") else 0), "timing_provenance": "检索本次实测，生成复用来源实测" if response.get("reused_from") else "本次实测", "ttft_ms": response["ttft_ms"], "retrieval": citations, "citation_markers": {f"[{n}]": int(n) - 1 for n in re.findall(r"\[([1-9]\d*)\]", response["content"]) if int(n) <= len(citations)}, "input_tokens": response["input_tokens"], "output_tokens": response["output_tokens"], "stages": stages, "token_usage": {"auxiliary_queries": auxiliary_usage, "generation": response.get("usage", {})}, **cost_fields(self.model, [*auxiliary_usage, *([response["usage"]] if response.get("usage") else [])]), **retrieval_fields}
+        return {"answer": response["content"], "generation_request_sha256": response.get("request_sha256"), "reused_from": response.get("reused_from"), "mode": "live", "model": self.provider.settings.model, "latency_ms": round((time.perf_counter() - started_at) * 1000) + (response.get("generation_ms", 0) if response.get("reused_from") else 0), "timing_provenance": "检索本次实测，生成复用来源实测" if response.get("reused_from") else "本次实测", "ttft_ms": response["ttft_ms"], "retrieval": citations, "citation_markers": {f"[{n}]": int(n) - 1 for n in re.findall(r"\[([1-9]\d*)\]", response["content"]) if int(n) <= len(citations)}, "input_tokens": response["input_tokens"], "output_tokens": response["output_tokens"], "stages": stages, "token_usage": {"auxiliary_queries": auxiliary_usage, "generation": response.get("usage", {})}, **cost_fields(self.model, [*auxiliary_usage, *([response["usage"]] if response.get("usage") else [])]), **retrieval_fields}
 
     @provider_task('query')
     def _retrieval_queries(self, question: str, config: dict, trace=None, stages=None) -> list[str]:
@@ -322,7 +324,11 @@ class AiService:
         if config.get('query_decompose', rules.BASELINE['query_decompose']):
             from .retrieval import prepare_decomposed_queries
             with measure(stages, 'query_decompose', parent='query_processing'):
-                subqueries, decomposition = prepare_decomposed_queries(question, self.decompose_query(question))
+                from .request_reuse import fixed_decomposition
+                raw, reference = fixed_decomposition(question, lambda: self.decompose_query(question))
+                subqueries, decomposition = prepare_decomposed_queries(question, raw)
+                if reference:
+                    decomposition['ref'] = reference
             queries.extend(subqueries); labels.extend('query_decompose' for _ in subqueries)
             if trace is not None: trace['query_decompose'] = decomposition
         # 增强生效遥测：记下每条辅助查询来自哪个增强手段，检索后统计它们带来了几条原问题查不到的新资料。
@@ -351,10 +357,19 @@ class AiService:
         if context.get('contract_version') == RUBRIC_VERSION:
             from .rubric_judge import DEFAULT_JUDGE_SAMPLES, aggregate_samples
             count = DEFAULT_JUDGE_SAMPLES
+            from .evaluation_stage import _request_checkpoint
+            checkpoint = _request_checkpoint.get()
+            durable = checkpoint is not None and checkpoint[1] == 'judge' and checkpoint[0].get('verdict_sample')
+            saved = checkpoint[0].setdefault('verdict_judgments', {}) if durable else {}
             samples, usage, recovery, reused = [], [], [], []
             for sample in range(1, count + 1):
-                parts = reuse_parts(question, expected, answer, category, context.get('negative_subtype'), context.get('final_texts', []), thinking_config('judge'), sample)
-                one = reuse_result('judge', parts, lambda:self._judge_uncached(question,expected,answer,category,context=context))
+                one = saved.get(str(sample))
+                if one is None:
+                    parts = reuse_parts(question, expected, answer, category, context.get('negative_subtype'), context.get('final_texts', []), thinking_config('judge'), sample)
+                    one = reuse_result('judge', parts, lambda:self._judge_uncached(question,expected,answer,category,context=context))
+                    if durable:
+                        saved[str(sample)] = one
+                        checkpoint[3]('running', phase='judge', durable=True)
                 if one.get('reused_from'):
                     reused.append(one['reused_from'])
                 else:
@@ -364,6 +379,8 @@ class AiService:
             result = {**aggregate_samples(category, samples), 'stages': [s for one in samples for s in (one.get('stages') or [])],
                       'token_usage': usage, 'response_recovery': recovery,
                       **(cost_fields(self.model, usage) if usage else {'estimated_cost': 0})}
+            if durable:
+                result['raw_responses'] = [sample.get('raw_provider_response') for sample in samples]
             if len(reused) == count:
                 result['reused_from'] = reused[0]
             return result

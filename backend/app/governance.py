@@ -12,7 +12,7 @@ from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import rules
+from . import rules, verdict
 from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, MAX_EVALS, gate_audit, qualification_description, search_space_contract, evaluate_regression, protected_question
 from .paid_run import provider_task
 from .corpus import EMBEDDING_MODEL, CorpusStore, current_manifest, manifest_identity
@@ -2799,6 +2799,22 @@ class GovernanceStore:
         return [{"name":name,"availability":"available","description":"运行时参数能力；具体动作仍须通过证据与配置验证",**rule}
                 for name,rule in search_space_contract().items()]
 
+    @staticmethod
+    def new_verdict_experiment(connection, baseline_run_id):
+        from .agent_mechanism import CONTRACT
+
+        saved = verdict.records(None, baseline_run_id, connection=connection)
+        passed = verdict.final_verdicts(baseline_run_id, connection=connection, saved=saved)
+        if sum(not value for value in passed.values()) < rules.LAUNCH['min_bad_cases']:
+            raise ValueError(f"Baseline 最终判定错题少于 {rules.LAUNCH['min_bad_cases']} 道，需按二.7 加难")
+        row = connection.execute('SELECT dataset_snapshot_json FROM evaluation_runs WHERE id=?',
+                                 (baseline_run_id,)).fetchone()
+        verdict.require_baseline(None, {'id': baseline_run_id, 'dataset_snapshot_json': row[0]},
+                                 connection=connection, saved=saved)
+        return {'verdict_version': rules.RULES_VERSION, 'mechanism_contract': CONTRACT,
+                'parameter_effect_ledger': {'current': [], 'historical': []},
+                'round_policy': {'stop_rule': 'staged-v1'}}
+
     def create_experiment(self, baseline_run_id: str, status: str = "analyzing", *,
                           decision_contract_v2=False, historical_experiment_id=None):
         from .agent_strategy import NEW_EXPERIMENT_STRATEGY
@@ -2806,22 +2822,16 @@ class GovernanceStore:
         experiment_id = f"EXP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         context = {} if status == 'direct_release' else dict(NEW_EXPERIMENT_STRATEGY)
         with self.connection() as connection:
-            if decision_contract_v2:
-                from .agent_mechanism import CONTRACT, candidate_effects
-                connection.execute('BEGIN IMMEDIATE')
-                self.require_current_baseline(baseline_run_id, connection)
-                history = []
+            connection.execute('BEGIN IMMEDIATE')
+            if status != 'direct_release':
                 if historical_experiment_id:
-                    source = connection.execute('SELECT * FROM experiments WHERE id=? AND baseline_run_id=?',
-                                                (historical_experiment_id, baseline_run_id)).fetchone()
-                    if source is None:
-                        raise ValueError('历史实验必须绑定同一个冻结 Baseline')
-                    for candidate in connection.execute("SELECT * FROM candidate_configs WHERE experiment_id=? AND status='evaluated' ORDER BY id",
-                                                        (historical_experiment_id,)):
-                        history.extend(candidate_effects(connection, source, candidate,
-                                                         _load(candidate['result_json'], {}), historical=True))
-                context.update(mechanism_contract=CONTRACT,
-                               parameter_effect_ledger={'current': [], 'historical': history})
+                    raise ValueError('E4 参数效果账本 historical 必须为空')
+                context.update(self.new_verdict_experiment(connection, baseline_run_id))
+            if decision_contract_v2:
+                from .agent_mechanism import CONTRACT
+                self.require_current_baseline(baseline_run_id, connection)
+                context['mechanism_contract'] = CONTRACT
+                context.setdefault('parameter_effect_ledger', {'current': [], 'historical': []})
             connection.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline_run_id, status, _json(context), _now()))
         return experiment_id
 
@@ -2839,7 +2849,11 @@ class GovernanceStore:
                     raise ValueError("Optimization Run 不属于该 Monitoring Trigger")
                 experiment_id = trigger["optimization_run_id"]
             if not experiment_id:
-                row = connection.execute("SELECT id FROM experiments WHERE baseline_run_id=? AND status!='direct_release' ORDER BY created_at DESC, rowid DESC LIMIT 1", (baseline_run_id,)).fetchone()
+                has_final = bool(verdict.records(self, baseline_run_id, connection=connection))
+                row = connection.execute("SELECT id FROM experiments WHERE baseline_run_id=? AND status!='direct_release'" +
+                    (" AND json_extract(result_json,'$.verdict_version')=?" if has_final else "") +
+                    " ORDER BY created_at DESC, rowid DESC LIMIT 1",
+                    (baseline_run_id, rules.RULES_VERSION) if has_final else (baseline_run_id,)).fetchone()
                 experiment_id = row["id"] if row else None
             existing = self.experiment(experiment_id,light=True) if experiment_id else None
             if experiment_id and (existing is None or existing["baseline_run_id"] != baseline_run_id):
@@ -2864,6 +2878,12 @@ class GovernanceStore:
             if candidates and not rounds:
                 raise ValueError("历史 Candidate 缺少有效 Round，无法继续优化")
             current_round = max(rounds, default=0)
+            if verdict.current(context):
+                verdict.require_empty_history(context.get('parameter_effect_ledger'))
+                if context.get('decision_stop'):
+                    raise ValueError('本实验已因证据不足停止')
+                if current_round >= rules.AGENT['max_rounds']:
+                    raise ValueError('本实验已达到最大轮次')
             current = [item for item in candidates if item["reasoning"].get("round") == current_round]
             finished = {'evaluated', 'skipped'} if strict else {'evaluated', 'failed'}
             if current and any(item["status"] not in finished for item in current):
@@ -2876,6 +2896,7 @@ class GovernanceStore:
             if used >= (MAX_EVALS if staged else MAX_EVALS - 1):
                 raise ValueError(f"evaluation budget exhausted: max_evals={MAX_EVALS}")
             if not experiment_id:
+                context.update(self.new_verdict_experiment(connection, baseline_run_id))
                 experiment_id = f"EXP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
                 connection.execute("INSERT INTO experiments (id, baseline_run_id, status, result_json, created_at) VALUES (?, ?, 'generating', '{}', ?)", (experiment_id, baseline_run_id, _now()))
             else:
@@ -2894,6 +2915,9 @@ class GovernanceStore:
             row = connection.execute("SELECT * FROM experiments WHERE id=?", (experiment_id,)).fetchone()
             self.require_current_baseline(row["baseline_run_id"], connection)
             persisted = _load(row["result_json"], {})
+            if verdict.current(persisted):
+                verdict.require_empty_history(persisted.get('parameter_effect_ledger'))
+                verdict.require_empty_history(result.get('parameter_effect_ledger'))
             if (row["status"] != "generating" or persisted.get("report_confirmation")
                     or (persisted.get("agent_generation") or {}).get("token") != generation_token):
                 raise ValueError("Optimization Context 已变化，不能保存本轮候选")
@@ -3026,8 +3050,14 @@ class GovernanceStore:
         def cases(run_id):
             return {item['question_id']: {'passed': item['passed'], 'severity': item['severity'], 'negative_subtype': item['negative_subtype']}
                     for item in connection.execute("SELECT question_id, json_extract(result_json,'$.passed') AS passed, json_extract(result_json,'$.severity') AS severity, json_extract(result_json,'$.negative_subtype') AS negative_subtype FROM evaluation_case_results WHERE run_id=?", (run_id,))}
-        before = read_once((*baseline_key, 'cases'), lambda: cases(result.get('baseline_run_id')))
-        after = cases(result.get('evaluation_run_id'))
+        if verdict.current(result):
+            before = {q: {'passed': int(value)} for q, value in verdict.final_verdicts(
+                result.get('baseline_run_id'), connection=connection).items()}
+            after = {q: {'passed': int(value)} for q, value in verdict.final_verdicts(
+                result.get('evaluation_run_id'), connection=connection).items()}
+        else:
+            before = read_once((*baseline_key, 'cases'), lambda: cases(result.get('baseline_run_id')))
+            after = cases(result.get('evaluation_run_id'))
         if not before or set(before) != set(after) or set(before) != set(golden) or any(type(v['passed']) is not int or v['passed'] not in (0, 1) for v in [*before.values(), *after.values()]):
             return unavailable
         severities = {q: 'critical' if protected_question(case, golden[q]) else 'ordinary'
@@ -3040,7 +3070,7 @@ class GovernanceStore:
     def _candidate_result(self, connection, row, *, light=False):
         result=_load(row['result_json'],{})
         reassessment = result.pop('qualification_reassessment', None)
-        if reassessment is not None:
+        if reassessment is not None and not verdict.current(result):
             result['old_qualification'] = result['qualification']
             result['qualification'] = reassessment
         result['regression_review'] = self._regression_review(connection, row, result)
@@ -3149,6 +3179,8 @@ class GovernanceStore:
             if experiment['status'] != 'direct_release' and identity['current_experiment_id'] != candidate['experiment_id']:
                 raise ValueError('Candidate 不属于当前 Optimization Run；旧实验仅供历史查看')
             result = _load(experiment['result_json'], {})
+            if verdict.current(result):
+                verdict.require_empty_history(result.get('parameter_effect_ledger'))
             if result.get('optimization_cycle',{}).get('status')=='running' and result['optimization_cycle'].get('stop_request'):
                 raise InterruptedError('用户停止运行，断点已保存')
             is_d = candidate['reasoning'].get('candidate_label') == 'D'
@@ -3228,6 +3260,8 @@ class GovernanceStore:
             raise ValueError('strategy_contract 无效：新实验必须保存 agent-strategy-4')
         if not requested or not requested['result'].get('report_confirmation'):
             raise ValueError('需要Gate 2人工确认合格Winner')
+        if verdict.current(requested['result']):
+            verdict.require_empty_history(requested['result'].get('parameter_effect_ledger'))
         self.restore_round_reviews(experiment_id)
         frozen_baseline = self.require_current_baseline(requested['baseline_run_id'])
         # Materialize facts even when the price window queues the actual suggestion.
@@ -3239,7 +3273,7 @@ class GovernanceStore:
             row=connection.execute('SELECT result_json FROM experiments WHERE id=?',(experiment_id,)).fetchone()
             state=_load(row[0],{})
             connection.execute('UPDATE experiments SET result_json=? WHERE id=?',(_json({**state,'d_facts':frozen_facts}),experiment_id))
-        if retryable_d_decision(requested['result'].get('composite')):
+        if requested['evaluation_budget']['used'] < MAX_EVALS and retryable_d_decision(requested['result'].get('composite')):
             wait_for_off_peak(self, 'composite:' + experiment_id,
                 lambda pause: save_composite_schedule(self, experiment_id, price_pause=pause))
         with CORPUS_LOCK, self.connection() as connection:
@@ -3284,26 +3318,28 @@ class GovernanceStore:
         prior_conclusions = round_conclusions_for_prompt(self,baseline,experiment['candidates'],
                                                         experiment['result'].get('round_conclusions'))
         strict = experiment['result'].get('decision_contract_version') == '109c'
-        d_groups = []
-        if strict:
-            frozen_questions = {q['id']:q for q in _load(baseline['dataset_snapshot_json'], {}).get('questions', [])}
-            d_groups = bad_case_groups(self.evaluation_case_results(winner['result']['evaluation_run_id']), questions=frozen_questions)
-        from .agent_inputs import prepare_baseline_rows, is_optimization_target
-        reviewed = prepare_baseline_rows(baseline, self.bad_case_rows(baseline['id']))
-        bad_cases = [row for row in reviewed if is_optimization_target(row)]
+        from .agent_inputs import baseline_bad_case_rows, prepare_baseline_rows, is_optimization_target
         from .agent_mechanism import CONTRACT, fault_stage, validate_mechanism
+        use_final = verdict.current(experiment['result'])
         mechanism_enabled = experiment['result'].get('mechanism_contract') == CONTRACT
+        frozen = _load(baseline['dataset_snapshot_json'], {})
+        winner_cases = verdict.final_cases(self, winner['result']['evaluation_run_id'], use_final=use_final) if strict or mechanism_enabled else []
+        frozen_questions = {q['id']: q for q in frozen.get('questions', [])}
+        d_groups = bad_case_groups(winner_cases, questions=frozen_questions) if strict else []
+        reviewed = baseline_bad_case_rows(self, baseline, use_final=use_final)
+        bad_cases = [row for row in reviewed if is_optimization_target(row)]
         mechanism_prompt = {}
         if mechanism_enabled:
             failed_winner_cases = [{'id': c['question_id'], 'question_id': c['question_id'], 'result': c}
-                                   for c in self.evaluation_case_results(winner['result']['evaluation_run_id'])
-                                   if c.get('passed') is False]
+                                   for c in winner_cases if c.get('passed') is False]
             winner_targets = {row['question_id']: row for row in prepare_baseline_rows(baseline, failed_winner_cases)}
             winner_base_changes = parameter_diff(winner['config'], base_config)
             ledger = experiment['result']['parameter_effect_ledger']
+            preview = (load_retrieval_preview(self, baseline['id'], foundation=frozen.get('corpus_fingerprint'))
+                       if use_final else load_retrieval_preview(self, baseline['id']))
             mechanism_prompt = {'fault_stages': {qid: fault_stage(row) for qid, row in winner_targets.items()},
                                 'parameter_stages': rules.AGENT_PARAMETER_STAGES, 'parameter_effect_ledger': ledger,
-                                'retrieval_preview': load_retrieval_preview(self, baseline['id']) or {}}
+                                'retrieval_preview': preview or {}}
         prompt_cases = [strategy_case(row) for row in bad_cases]
         for case in prompt_cases:
             category = case['diagnostic_view']['diagnosis_category']
@@ -3497,6 +3533,16 @@ class GovernanceStore:
             experiment = self.experiment(experiment_id,light=True)
             baseline = self.evaluation_run(experiment['baseline_run_id']) or {}
             identity = baseline.get('judge', {}).get('evaluation_identity')
+            if verdict.current(state):
+                for item in candidates:
+                    result = item['result']
+                    if item['status'] != 'evaluated':
+                        continue
+                    passed = verdict.final_verdicts(result.get('evaluation_run_id'), connection=connection)
+                    if result.get('verdict_version') != rules.RULES_VERSION or not passed:
+                        result['qualification'] = {'qualified': False}
+                    else:
+                        result['bad_case_count'] = sum(not value for value in passed.values())
             qualified = sorted([item for item in candidates if item['reasoning'].get('candidate_label') != 'D' and item['status'] == 'evaluated' and item['result'].get('qualification', {}).get('qualified') and policy_current(baseline.get('judge', {})) and identity and item['result'].get('evaluation_identity') == identity], key=candidate_rank)
             final = next((c for c in candidates if c['reasoning'].get('candidate_label') == 'D' and c['status'] == 'evaluated' and c['result'].get('evaluation_identity') == identity), None)
             decision = select_final_candidate(qualified, final)
@@ -3752,7 +3798,7 @@ class GovernanceStore:
             baseline = self.require_current_baseline(connection=connection)
             experiment_id = f"EXP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
             event = connection.execute("SELECT * FROM monitoring_events WHERE id=?", (row["event_id"],)).fetchone()
-            context = {**NEW_EXPERIMENT_STRATEGY, "trigger_id": trigger_id, "round": 0, "baseline_id": baseline["id"], "golden_id": baseline["dataset_version_id"], "corpus_fingerprint": _load(baseline["dataset_snapshot_json"], {}).get("corpus_fingerprint"), "baseline_config": baseline["config"], "monitoring_event": {**dict(event), "source": _load(event["source_json"], {}), "metrics": _load(event["metrics_json"], None)} if event else None}
+            context = {**NEW_EXPERIMENT_STRATEGY, **self.new_verdict_experiment(connection, baseline["id"]), "trigger_id": trigger_id, "round": 0, "baseline_id": baseline["id"], "golden_id": baseline["dataset_version_id"], "corpus_fingerprint": _load(baseline["dataset_snapshot_json"], {}).get("corpus_fingerprint"), "baseline_config": baseline["config"], "monitoring_event": {**dict(event), "source": _load(event["source_json"], {}), "metrics": _load(event["metrics_json"], None)} if event else None}
             connection.execute("INSERT INTO experiments (id, baseline_run_id, status, result_json, created_at) VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline["id"], "pending_agent", _json(context), _now()))
             connection.execute("UPDATE optimization_triggers SET status = ?, actor = ?, confirmed_at = ?, optimization_run_id = ? WHERE id = ?", ("human_confirmed", actor, _now(), experiment_id, trigger_id))
             connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("monitoring_trigger", trigger_id, "approved", actor, _now()))

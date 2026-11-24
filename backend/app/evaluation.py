@@ -6,12 +6,12 @@ import os
 import json
 import time
 import math
-from . import rules
+from . import rules, verdict
 from .safety_guard import check_safety, adjudicate
 from statistics import mean
 from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims, validate_business_judgment, business_check_roles, quote_present
 
-from .policy import CANDIDATE_QUALIFICATION_VERSION, DEFAULT_PIPELINE_CONFIG, calculate_overall_score, evaluate_gates, evaluate_regression, qualify_candidate, qualify_release, protected_question
+from .policy import CANDIDATE_QUALIFICATION_VERSION, LEGACY_CANDIDATE_QUALIFICATION_VERSION, DEFAULT_PIPELINE_CONFIG, calculate_overall_score, evaluate_gates, evaluate_regression, qualify_candidate, qualify_release, protected_question
 
 
 ROOT_CAUSE_BY_TAG = {
@@ -28,7 +28,7 @@ def sandbox_cost(cases):
              for key in ('cost_estimation','judge_cost_estimation')]
     known = bool(costs) and all(type(c.get('amount')) in (int,float) and c.get('currency') == 'USD' for c in costs)
     return {'amount':round(sum(c['amount'] for c in costs),8) if known else None,
-            'currency':'USD', 'scope':'完整Sandbox回答、增强和Judge；仅保存用量估算'}
+            'currency':'USD', 'scope':'保存的回答、增强和 Judge，含复核样本；仅保存用量估算'}
 
 
 def root_cause_layers(failure_tags: list[str], coverage: dict | None = None, test_category: str | None = None) -> tuple[str, list[str]]:
@@ -391,7 +391,7 @@ class EvaluationRunner:
         from .judge_replay import resolve_question_ids
         from .paid_run import accounting_only, execution_limits
         from .providers import judge_thinking
-        from .request_reuse import bypass_reuse
+        from .request_reuse import bypass_reuse, experiment_scope, reuse_experiment
 
         if type(repetitions) is not int or repetitions < 1:
             raise ValueError('复测次数须为正整数')
@@ -419,7 +419,7 @@ class EvaluationRunner:
         diagnostic_id = f'DIAG-{uuid4().hex}'
         token = _request_checkpoint.set(None)
         try:
-            with bypass_reuse(), judge_thinking(effort), execution_limits(limits), accounting_only():
+            with experiment_scope(self.store, reuse_experiment(self.store, run)), bypass_reuse(), judge_thinking(effort), execution_limits(limits), accounting_only():
                 self._require_generation_contract(judge)
                 questions = self._diagnostic_trials(items, run, repetitions, diagnostic_id, snapshot, frozen)
         finally:
@@ -431,6 +431,7 @@ class EvaluationRunner:
         from .evaluation_stage import checkpoint_usage, perform_stage
         from .policy import protected_question
         from .providers import permanent_provider_error
+        from .request_reuse import question_scope
 
         questions = []
         for item in items:
@@ -445,15 +446,13 @@ class EvaluationRunner:
                                          check_stop=lambda: None, on_state=lambda *_args, **_kwargs: None)
 
                 try:
-                    execution = perform('generation', lambda: self.runtime.answer(item['question'], run['config']))
+                    with question_scope(question_id):
+                        execution = perform('generation', lambda: self.runtime.answer(item['question'], run['config']))
                     score = perform('judge', lambda: self.score_execution(item, execution))
                     if type(score.get('passed')) is not bool:
                         raise ValueError('本次没有有效判定')
-                    judgment = score.get('judge_result') or {}
-                    severe = judgment.get('safety_violation') is True or any(
-                        sample.get('safety_violation') is True for sample in judgment.get('samples', []))
-                    trial = {'passed': score['passed'], 'risk': protected and (not score['passed'] or severe),
-                             'judge_result': judgment}
+                    sample = verdict.make_sample(score, item['raw'], index + 1, 'recheck', trial_id)
+                    trial = {**sample, 'judge_result': sample['judge_raw']}
                 except Exception as error:
                     if permanent_provider_error(error):
                         raise
@@ -468,6 +467,116 @@ class EvaluationRunner:
                               'passed': passed, 'unknown': unknown, 'risk': None if protected and unknown and not risk else risk,
                               'trials': trials})
         return questions
+
+    def _verdict_trial(self, item, config, checkpoint, run_id, position, source, persist, check_stop, *, automatic):
+        from uuid import uuid4
+        from .evaluation_stage import perform_stage
+        from .request_reuse import bypass_reuse, question_scope
+
+        checkpoint['verdict_sample'] = True
+        diagnostic_id = checkpoint.setdefault('diagnostic_id', f'DIAG-{uuid4().hex}')
+        stage_id = f'{run_id}:{diagnostic_id}'
+        def perform(phase, action):
+            return perform_stage(checkpoint, phase, action, stage_id, automatic=automatic,
+                                 check_stop=check_stop, on_state=lambda *_args, **_kwargs: persist())
+
+        check_stop()
+        with bypass_reuse(), question_scope(item['id']):
+            if 'execution' not in checkpoint and 'scored_result' not in checkpoint:
+                checkpoint['execution'] = perform('generation', lambda: self.runtime.answer(item['question'], config))
+                persist()
+            if 'scored_result' not in checkpoint:
+                def score():
+                    case = self.score_execution(item, checkpoint['execution'])
+                    if type(case.get('passed')) is not bool:
+                        raise ValueError('本次没有有效判定')
+                    return case
+                checkpoint['scored_result'] = perform('judge', score)
+                checkpoint.pop('execution', None)
+                persist()
+        return verdict.make_sample(checkpoint['scored_result'], item['raw'], position, source, diagnostic_id)
+
+    def _collect_verdicts(self, run, items, cases, checkpoints, persist, check_stop, *,
+                          experiment_id, baseline=None, winner=None, automatic=False):
+        """Resume by question and sample. Only publish after every required slot succeeds."""
+        from .request_reuse import experiment_scope
+
+        run_id = run['id']
+        if saved := verdict.records(self.store, run_id):
+            return saved
+        original = baseline is None
+        raw = {case['question_id']: case for case in cases}
+        if set(raw) != {item['id'] for item in items} or any(type(c.get('passed')) is not bool for c in raw.values()):
+            raise ValueError('判定样本 1 缺少完整的冻结题集结果')
+        if not original and (set(raw) != set(baseline) or winner is not None and set(raw) != set(winner)):
+            raise ValueError('Baseline 或 Winner 缺少完整的最终判定')
+        final = {}
+        with experiment_scope(self.store, experiment_id):
+            for item in items:
+                check_stop()
+                key = item['id']
+                case = raw[key]
+                reason = None if original else verdict.recheck_reason(case['passed'], baseline[key], winner[key] if winner is not None else None)
+                source = 'baseline_original' if original else 'sandbox'
+                diagnostic_id = case.get('diagnostic_id') or f'{run_id}:{key}:1'
+                samples = [verdict.make_sample(case, item['raw'], 1, source, diagnostic_id)]
+                if original or reason:
+                    checkpoint = checkpoints.setdefault(key, {'attempts': []})
+                    trials = checkpoint.setdefault('verdict_trials', {})
+                    for position in (2, 3):
+                        trial = trials.setdefault(str(position), {'attempts': []})
+                        source = 'baseline_recheck' if original else 'recheck'
+                        samples.append(self._verdict_trial(
+                            item, run['config'], trial, run_id, position, source,
+                            lambda: persist(key), check_stop, automatic=automatic))
+                final[key] = verdict.record(run_id, key, samples, reason)
+        return verdict.save_records(self.store, run_id, final)
+
+    def recheck_baseline(self, run_id=verdict.BASELINE_ORIGINAL_ID):
+        """Complete the Baseline verdict for 118b without changing formal scores."""
+        import fcntl
+        lock_path = self.store.database_path.with_suffix(self.store.database_path.suffix + '.baseline-verdict.lock')
+        with lock_path.open('a') as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as error:
+                raise ValueError('Baseline 复核已在运行') from error
+            return self._recheck_baseline(run_id)
+
+    def _recheck_baseline(self, run_id):
+        from .corpus import current_manifest, manifest_identity
+        from .paid_run import accounting_only, execution_limits
+        from .providers import judge_thinking
+        from .evaluation_snapshot import require_resume_snapshot
+
+        run = self.store.require_current_baseline(run_id)
+        snapshot = json.loads(run['dataset_snapshot_json'])
+        judge = run['judge']
+        if (run['status'] != 'completed' or run['config'].get('run_target') != 'baseline'
+                or run['result'].get('evaluation_complete') is not True
+                or run['result'].get('technical_failed') != 0):
+            raise ValueError('Baseline 最终判定需要完整且无技术失败的正式评测')
+        if (judge.get('model') != self.runtime.model or not policy_current(judge)
+                or judge.get('evaluation_identity') != evaluation_identity(snapshot, judge)
+                or snapshot.get('corpus_fingerprint') != manifest_identity(current_manifest())):
+            raise ValueError('Baseline 冻结题卷、Judge 或知识库不匹配')
+        require_resume_snapshot(judge, for_candidate_baseline=True)
+        cases = self.store.evaluation_case_results(run_id)
+        prefix = 'verdict:trial:'
+        checkpoints = {key.removeprefix(prefix): value for key, value in self.store.job_checkpoints(run_id).items()
+                       if key.startswith(prefix)}
+        effort = judge.get('judge_thinking', {}).get('reasoning_effort', 'off')
+        limits = judge.get('execution_snapshot', {}).get('request_limits')
+        # The Baseline scope is carried into each experiment via its own namespace.
+        def check_stop():
+            if self.store.evaluation_run(run_id, light=True)['result'].get('stop_request'):
+                raise InterruptedError('用户停止复核，断点已保存')
+        with judge_thinking(effort), execution_limits(limits), accounting_only():
+            self._require_generation_contract(judge)
+            return self._collect_verdicts(
+                run, self.snapshot_items(snapshot), cases, checkpoints,
+                lambda key: self.store.save_job_checkpoint(run_id, prefix + key, checkpoints[key]),
+                check_stop, experiment_id=run_id)
 
     @frozen_run_judge
     def review_baseline_errors(self, run_id, question_ids=None, *, on_progress=None, stop_on_error=False):
@@ -689,6 +798,8 @@ class EvaluationRunner:
         passed = verdict['passed']
         quality = legacy_quality(category, judge)
         metrics = {k: execution.get(k) for k in ('generation_thinking','latency_ms','ttft_ms','input_tokens','output_tokens','provider_cost','stages','token_usage','estimated_cost','cost_estimation')}
+        if execution.get('generation_request_sha256'):
+            metrics['generation_request_sha256'] = execution['generation_request_sha256']
         metrics.update(**evidence_retrieval_metrics(trace, execution.get('retrieval', []), required),
                        retrieval_trace=trace, evidence_coverage=coverage,
                        behavior_contract={'effective_pass': passed, 'raw_judge_pass': passed, 'violations': []},
@@ -933,16 +1044,17 @@ class EvaluationRunner:
         if config.get('candidate_id'):
             owner = self.store.candidate(config['candidate_id'])
             experiment = self.store.experiment(owner['experiment_id'])
-            baseline_cases = {c['question_id']: c for c in self.store.evaluation_case_results(experiment['baseline_run_id'])}
+            baseline_cases = {c['question_id']: c for c in verdict.final_cases(
+                self.store, experiment['baseline_run_id'], use_final=verdict.current(experiment['result']))}
         lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay','manual_resume','experiment_config_identity','final_retry_started','price_pause') if k in run['result']}
-        from .request_reuse import matching_configuration, reused_case
+        from .request_reuse import matching_configuration, question_scope, reused_case
         reusable_cases = matching_configuration(self.store, run) if config.get('candidate_id') and experiment['result'].get('causal_evidence') else {}
         summary_cache = {}
         def progress(*, complete=False):
             from .telemetry import cost_fields
             from .paid_run import unsettled_usage
             from .evaluation_stage import checkpoint_usage
-            events=[u for cp in checkpoints.values() for stage in [cp, *cp.get('regression_review', {}).get('runs', [])] for u in checkpoint_usage(stage)]
+            events=[u for cp in checkpoints.values() for stage in [cp, *cp.get('regression_review', {}).get('runs', []), *cp.get('verdict_trials', {}).values()] for u in checkpoint_usage(stage)]
             accounting={'provenance':'logical_task_including_resume_history','call_events':len(events),
                 'unknown_usage_events':sum(unsettled_usage(u) for u in events),
                 'known_input_tokens':sum(u.get('prompt_tokens',u.get('total_tokens',0)) for u in events if type(u.get('prompt_tokens',u.get('total_tokens'))) is int),
@@ -1008,6 +1120,8 @@ class EvaluationRunner:
                         persist()
                     wait_for_off_peak(self.store,'evaluation:'+run_id,price_state,check_stop)
                     checkpoint=checkpoints.setdefault(item['id'],{'attempts':[]})
+                    if config.get('candidate_id') and verdict.current(experiment['result']):
+                        checkpoint['verdict_sample'] = True
                     if 'execution' in checkpoint and (not isinstance(checkpoint['execution'].get('answer'),str) or not isinstance(checkpoint['execution'].get('retrieval_trace',{}).get('final'),list)):
                         raise ValueError('生成检查点缺少完整答案/最终上下文')
                     try:
@@ -1021,7 +1135,8 @@ class EvaluationRunner:
                         if 'execution' not in checkpoint and lineage.get('judge_replay') and not replay_new:
                             raise ValueError('Judge-only Replay execution missing; generation is forbidden')
                         if 'execution' not in checkpoint:
-                            checkpoint['execution']=perform(phase,lambda:self.runtime.answer(item['question'],config))
+                            with question_scope(item['id']):
+                                checkpoint['execution']=perform(phase,lambda:self.runtime.answer(item['question'],config))
                             persist()
                         if lineage.get('judge_replay') and not replay_new:
                             from .diagnostic_evidence import digest
@@ -1045,6 +1160,8 @@ class EvaluationRunner:
                         persist()
                         continue
                     result=checkpoint['scored_result']
+                    if config.get('candidate_id') and verdict.current(experiment['result']):
+                        result.setdefault('diagnostic_id', f"{run_id}:{item['id']}:1")
                     result['programmatic_metrics']['request_reuse'] = {
                         'generation':checkpoint['execution'].get('reused_from'),
                         'judge':result.get('judge_result', {}).get('reused_from')}
@@ -1066,8 +1183,28 @@ class EvaluationRunner:
                 message=f"整轮完成，末尾补跑后仍有{len(errors)}题技术失败；有效结果{len(cases)}/{len(frozen_ids)}，不能形成完整成绩"
                 if automatic:lineage['auto_recovery'].update(state='completed',error=message)
                 return self.store.finish_evaluation_run(run_id,'completed',progress(),message)
+            final_summary = {}
+            if config.get('candidate_id') and verdict.current(experiment['result']):
+                phase = 'recheck'
+                def save_trial(key):
+                    nonlocal item
+                    item = {'id': key}
+                    persist()
+
+                winner = None
+                if owner['reasoning'].get('candidate_label') == 'D':
+                    winner_candidate = self.store.candidate(owner['reasoning']['winner_id'])
+                    winner = verdict.final_verdicts(winner_candidate['result']['evaluation_run_id'], store=self.store)
+                review = self._collect_verdicts(
+                    run, approved, cases, checkpoints, save_trial, check_stop,
+                    experiment_id=experiment['id'],
+                    baseline=verdict.final_verdicts(experiment['baseline_run_id'], store=self.store),
+                    winner=winner, automatic=automatic)
+                final_summary = summarize_evaluation_cases([verdict.gate_case(c, review[c['question_id']]) for c in cases])
+                final_summary['verdict_version'] = rules.RULES_VERSION
             if automatic:lineage['auto_recovery']['state']='completed'
-            return self.store.finish_evaluation_run(run_id, 'completed', {**progress(complete=True), 'evaluation_complete':True})
+            return self.store.finish_evaluation_run(run_id, 'completed', {
+                **progress(complete=True), **final_summary, 'evaluation_complete':True})
         except Exception as error:
             if item is not None:
                 checkpoint = checkpoints.setdefault(item['id'], {'attempts':[]})
@@ -1081,7 +1218,7 @@ class EvaluationRunner:
                     checkpoint['attempts'][-1]['raw_provider_response'] = error.raw_provider_response
             from .providers import permanent_provider_error
             automatic=lineage.get('auto_recovery',{}).get('enabled',lineage.get('auto_recovery',{}).get('authorized')) is True
-            if automatic and not isinstance(error,(InterruptedError,ValueError)) and not permanent_provider_error(error):
+            if automatic and phase != 'recheck' and not isinstance(error,(InterruptedError,ValueError)) and not permanent_provider_error(error):
                 lineage['auto_recovery'].update(state='retrying',error=str(error))
                 try:persist()
                 except Exception:
@@ -1131,6 +1268,8 @@ class EvaluationRunner:
         baseline = self.store.evaluation_run(experiment["baseline_run_id"]) if experiment else None
         if baseline is None or baseline["status"] != "completed":
             raise ValueError("Candidate 必须基于已完成的 Baseline 运行")
+        if verdict.current(experiment.get('result', {})):
+            verdict.require_baseline(self.store, baseline)
         from .providers import judge_thinking
         with judge_thinking(baseline['judge'].get('judge_thinking',{}).get('reasoning_effort', 'off')):
             self._require_generation_contract(baseline['judge'])
@@ -1165,7 +1304,7 @@ class EvaluationRunner:
             base={**DEFAULT_PIPELINE_CONFIG,**baseline['config']}
             for key in ('run_target','knowledge_identity'):base.pop(key,None)
             from .agent_inputs import baseline_bad_case_rows
-            targets = {ref: row['result'] for row in baseline_bad_case_rows(self.store, baseline)
+            targets = {ref: row['result'] for row in baseline_bad_case_rows(self.store, baseline, use_final=verdict.current(experiment['result']))
                        for ref in (row['id'], row['question_id'])}
             reasoning=candidate['reasoning']
             actual={k:v for k,v in candidate['config'].items() if v!=base.get(k)}
@@ -1271,8 +1410,13 @@ class EvaluationRunner:
         run_id = run['id']
         if run['judge'].get('evaluation_identity') != baseline['judge'].get('evaluation_identity'):
             raise ValueError('判分身份不同，禁止比较 Hard Gate 或计算修好和弄坏')
-        baseline_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(baseline["id"])}
-        candidate_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(run_id)}
+        if candidate.get('status') == 'evaluated' and candidate.get('result', {}).get('qualification'):
+            return candidate
+        current = run['result'].get('verdict_version') == rules.RULES_VERSION
+        baseline_cases = {item['question_id']: item for item in verdict.final_cases(self.store, baseline['id'], use_final=current)}
+        raw_candidate_cases = self.store.evaluation_case_results(run_id)
+        candidate_cases = {item['question_id']: item for item in verdict.final_cases(
+            self.store, run_id, use_final=current, cases=raw_candidate_cases)}
         failed = [question_id for question_id, item in baseline_cases.items() if not item.get("passed")]
         references = set(candidate['reasoning'].get('observed_evidence', []))
         targets = [q for q in failed if q in references or f"BC-{baseline['id']}-{q}" in references]
@@ -1282,15 +1426,25 @@ class EvaluationRunner:
         regression.update(comparison)
         regression['passed'] = regression['passed'] and comparison['comparison_complete']
         regression['status'] = 'NOT_EVALUABLE' if not comparison['comparison_complete'] else 'PASS' if regression['passed'] else 'FAIL'
+        if current:
+            saved = verdict.records(self.store, run_id)
+            if not saved or set(saved) != set(candidate_cases):
+                raise ValueError('最终判定未完整保存，不能生成资格')
+            regression['severe_risk_question_ids'] = sorted(
+                q for q, row in saved.items() if any(sample['risk'] for sample in row['samples']))
+        labelled = candidate['reasoning'].get('candidate_label') in {'A', 'B', 'C', 'D'}
+        version = CANDIDATE_QUALIFICATION_VERSION if current else LEGACY_CANDIDATE_QUALIFICATION_VERSION if labelled else None
         qualification = qualify_candidate(run["result"]["gates"], regression, comparison['target_bad_cases_fixed'], len(failed), comparison['bad_case_count'],
-                                          rule_version=CANDIDATE_QUALIFICATION_VERSION if candidate['reasoning'].get('candidate_label') in {'A', 'B', 'C', 'D'} else None)
+                                          rule_version=version)
         if run['status'] != 'completed':
             qualification = {**qualification, 'qualified': False}
         result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], "error": run.get("error_message"), **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "release_qualification": qualify_release(run["result"]["gates"], regression, len(comparison["all_fixed_question_ids"]), len(failed), comparison['bad_case_count']), "recommendation": None}
-        if qualification.get('rule_version') == CANDIDATE_QUALIFICATION_VERSION:
+        if version:
             result['release_qualification'] = qualification
-        result['estimated_cost'] = sandbox_cost(list(candidate_cases.values()))
-        no_effect = no_effect_source(candidate, candidate_cases, self.store)
+        cost_cases = [sample['case'] for row in saved.values() for sample in row['samples']] if current else raw_candidate_cases
+        result['estimated_cost'] = sandbox_cost(cost_cases)
+        raw_by_id = {case['question_id']: case for case in raw_candidate_cases}
+        no_effect = no_effect_source(candidate, raw_by_id, self.store)
         if no_effect:
             # 规则总表五.3（学朋友"防白跑"）：50题回答请求与某个已跑方案完全相同 → 参数没起作用；
             # 不算合格方案，不占试跑预算（每个实验最多退还3次），并反馈给 Agent。
@@ -1300,9 +1454,17 @@ class EvaluationRunner:
             result['release_qualification'] = {**result['release_qualification'], 'qualified': False}
         if candidate['reasoning'].get('candidate_label') == 'D':
             winner = self.store.candidate(candidate['reasoning']['winner_id'])
-            winner_cases = {item['question_id']: item for item in self.store.evaluation_case_results(winner['result']['evaluation_run_id'])}
-            newly_failed = [key for key, item in winner_cases.items() if item.get('passed') and not candidate_cases.get(key, {}).get('passed')]
-            newly_fixed = [key for key, item in winner_cases.items() if not item.get('passed') and candidate_cases.get(key, {}).get('passed')]
+            winner_passed = verdict.final_verdicts(winner['result']['evaluation_run_id'], store=self.store, use_final=current)
+            candidate_passed = verdict.final_verdicts(run_id, store=self.store, use_final=current)
+            newly_failed = sorted(q for q, passed in winner_passed.items() if passed and candidate_passed.get(q) is False)
+            newly_fixed = sorted(q for q, passed in winner_passed.items() if not passed and candidate_passed.get(q) is True)
+            if current:
+                passed = not newly_failed and set(winner_passed) == set(candidate_passed)
+                checks = {**result['qualification']['checks'], 'winner_non_regression': passed}
+                if not passed:
+                    result['qualification'] = {**result['qualification'], 'qualified': False, 'status': 'NOT_QUALIFIED'}
+                result['qualification']['checks'] = checks
+                result['release_qualification'] = result['qualification']
             from .policy import d_regression_vs_winner
             result['winner_comparison'] = {'winner_id': winner['id'], 'new_failures': newly_failed, 'fixed_cases': newly_fixed, 'promote': run['status'] == 'completed' and result['release_qualification']['qualified'] and not newly_failed and d_regression_vs_winner({'result':result},winner) is None}
         finished = self.store.finish_candidate(candidate["id"], "evaluated" if run['status'] == 'completed' else 'failed', result)

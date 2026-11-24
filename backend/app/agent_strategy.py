@@ -3,7 +3,7 @@ import json
 import re
 from collections import Counter, defaultdict
 
-from . import rules
+from . import rules, verdict
 from .agent_inputs import case_comparisons, new_failure_ids
 from .paid_run import provider_task
 from .telemetry import collect_usage, cost_fields
@@ -182,7 +182,7 @@ def winner_comparison(store, d, winner):
     """D 相对 Winner 的程序事实：只改了哪些参数、相对 Winner 修好/新错哪些题。"""
     def outcomes(candidate):
         run = candidate['result'].get('evaluation_run_id')
-        return {c['question_id']: c.get('passed') for c in (store.evaluation_case_results(run) if run else [])}
+        return verdict.final_verdicts(run, store=store, use_final=verdict.current(candidate['result']))
     mine, theirs = outcomes(d), outcomes(winner)
     return {'winner_id': winner['id'],
             'changed_parameters_vs_winner': d['reasoning'].get('winner_config_diff', {}),
@@ -364,9 +364,10 @@ def round_conclusions_for_prompt(store, baseline, candidates, conclusions):
         if len(selected)!=len(plans):
             item['review'] = {'plans':[],'lessons':['复盘引用的保存方案缺失，待核对']}
             continue
-        candidate_cases = {c['id']:store.evaluation_case_results(c['result']['evaluation_run_id'])
-                           if c['result'].get('evaluation_run_id') else [] for c in selected}
-        facts = _round_case_facts(store.evaluation_case_results(baseline['id']),candidate_cases,
+        use_final = any(verdict.current(c['result']) for c in selected)
+        candidate_cases = {c['id']: verdict.final_cases(store, c['result'].get('evaluation_run_id'), use_final=use_final)
+                           for c in selected}
+        facts = _round_case_facts(verdict.final_cases(store, baseline['id'], use_final=use_final),candidate_cases,
                                   json.loads(baseline['dataset_snapshot_json']).get('questions',[]))
         try:
             item['review'] = _review_with_facts(review,selected,facts,any('case_reviews' in p for p in plans))
@@ -405,8 +406,10 @@ def conclude_round(store, runtime, experiment_id, *, final_d=False):
     evaluated = [c for c in current if c['status'] == 'evaluated']
     from .optimization import build_agent_prompt
     baseline = store.evaluation_run(experiment['baseline_run_id'])
-    baseline_cases = store.evaluation_case_results(baseline['id'])
-    candidate_cases = {c['id']:store.evaluation_case_results(c['result']['evaluation_run_id']) if c['result'].get('evaluation_run_id') else [] for c in evaluated}
+    use_final = verdict.current(experiment['result'])
+    baseline_cases = verdict.final_cases(store, baseline['id'], use_final=use_final)
+    candidate_cases = {c['id']: verdict.final_cases(store, c['result'].get('evaluation_run_id'), use_final=use_final)
+                       for c in evaluated}
     questions = json.loads(baseline['dataset_snapshot_json']).get('questions', [])
     case_facts = _round_case_facts(baseline_cases,candidate_cases,questions)
     causal = experiment['result'].get('causal_evidence') is True
@@ -419,7 +422,10 @@ def conclude_round(store, runtime, experiment_id, *, final_d=False):
               'previous_round_conclusions':round_conclusions_for_prompt(store,baseline,experiment['candidates'],
                   {n:r for n,r in experiment['result'].get('round_conclusions',{}).items() if n!=str(number)})}
     if 'parameter_effect_ledger' in experiment['result']:
-        prompt['parameter_effect_ledger'] = experiment['result']['parameter_effect_ledger']
+        ledger = experiment['result']['parameter_effect_ledger']
+        if use_final:
+            verdict.require_empty_history(ledger)
+        prompt['parameter_effect_ledger'] = ledger
     system = ('你是RAG优化Agent。只读本实验保存事实，撰写解释，输出JSON。case_comparisons是程序事实。'
               '标准证据在最终资料的位置与辅助查询新增命中是不同的记录。引用时以对应字段为准，缺失写未知。'
               'plans逐一覆盖已跑过的Candidate（跳过的不算），每项给candidate_id。实际修好、新错、预测命中题号和数量由程序填写。'

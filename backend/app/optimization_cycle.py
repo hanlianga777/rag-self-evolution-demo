@@ -386,6 +386,8 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
             check_cycle_stop(store,experiment_id)
             experiment = store.experiment(experiment_id, light=True)
             store.require_current_baseline(experiment['baseline_run_id'])
+            if stop := experiment['result'].get('decision_stop'):
+                return save('stopped', 'review', stop['reason'])
             if experiment['result'].get('report_confirmation'):
                 return finish(experiment, _qualified_abc(experiment), 'composite')
             abc = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}]
@@ -409,7 +411,7 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
             experiment = store.experiment(experiment_id, light=True)
             qualified = _qualified_abc(experiment)
             used = experiment['evaluation_budget']['used']
-            decision = staged_decision(number, len(qualified), used) if number else 'next_round'
+            decision = staged_decision(number, len(qualified), used)
             state['staged_decision'] = {'round': number, 'qualified': [c['id'] for c in qualified], 'used': used, 'decision': decision}
             # 用户指定"先跑到第 N 轮"（2026-11-18 17:52：先跑第二轮，不做 D）：N 轮之前一律进下一轮，跑完第 N 轮就停。
             run_to = experiment['result'].get('round_policy', {}).get('user_run_to_round')

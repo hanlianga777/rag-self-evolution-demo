@@ -1,6 +1,7 @@
 import json
 import unittest
 from copy import deepcopy
+from unittest.mock import patch
 from app.product_diagnostics import product_diagnostics
 
 
@@ -20,7 +21,8 @@ class ComparisonTests(unittest.TestCase):
             def evaluation_run(self,key):return next(r for r in [current,old,replay] if r['id']==key)
             def evaluation_case_results(self,key):return []
             def bad_case_rows(self,run_id):return []
-        result=product_diagnostics(Store(),current,[])
+        with patch('app.verdict.records', return_value={}):
+            result=product_diagnostics(Store(),current,[])
         self.assertEqual([c['id'] for c in result['thinking_comparison']['columns']],['replayed-max','current'])
         self.assertEqual(result['thinking_comparison']['judge_thinking'],'low')
         self.assertEqual([current,old,replay],saved)

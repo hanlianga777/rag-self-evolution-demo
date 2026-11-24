@@ -85,7 +85,8 @@ def retrieval_facts(case, question=None, config=None, review=None):
     return {'standard_evidence_positions': '不适用（负向题（Negative）不定位标准证据）' if case.get('test_category') == 'negative' and positions == MISSING else positions,
             'candidate_k': saved_config.get('candidate_k', MISSING), 'top_k': saved_config.get('top_k', MISSING),
             'unmet_required_points': unmet,
-            'baseline_review': {'conclusion': '单遍判错' if case.get('passed') is False else '单遍判对'}}
+            'baseline_review': {'conclusion': ('最终判' if 'final_passed' in case else '单遍判') +
+                          ('错' if case.get('passed') is False else '对')}}
 
 
 def prepare_baseline_rows(baseline, rows):
@@ -99,7 +100,7 @@ def prepare_baseline_rows(baseline, rows):
         case = {**row['result']}
         for key in ('baseline_review', 'baseline_review_label', 'regression_review'):
             case.pop(key, None)
-        case['baseline_review_label'] = '单遍判错'
+        case['baseline_review_label'] = '最终判错' if 'final_passed' in case else '单遍判错'
         case['optimization_target'] = case.get('passed') is False
         if question is not None:
             case['standard_evidence'] = standard_evidence(question) or case.get('standard_evidence', [])
@@ -109,12 +110,25 @@ def prepare_baseline_rows(baseline, rows):
     return prepared
 
 
-def baseline_bad_case_rows(store, baseline):
-    """Canonical single-pass failures for pages, priority tables and Agent inputs."""
+def baseline_bad_case_rows(store, baseline, *, use_final=True):
+    """Canonical failures for pages, priority tables and Agent inputs."""
     if not baseline:
         return []
-    return prepare_baseline_rows(baseline, [row for row in store.bad_case_rows(baseline['id'])
-                                            if row['run_id'] == baseline['id']])
+    from . import verdict
+
+    run_id = baseline['id']
+    rows = {row['question_id']: row for row in store.bad_case_rows(run_id) if row['run_id'] == run_id}
+    if use_final and verdict.records(store, run_id):
+        rows = {
+            case['question_id']: {
+                **rows.get(case['question_id'], {}),
+                'id': f"BC-{run_id}-{case['question_id']}", 'run_id': run_id,
+                'question_id': case['question_id'], 'result': case,
+                'category': case.get('primary_root_cause'), 'severity': case.get('severity'),
+            }
+            for case in verdict.final_cases(store, run_id) if case['final_passed'] is False
+        }
+    return prepare_baseline_rows(baseline, rows.values())
 
 
 def case_comparisons(baseline_cases, candidate_cases, questions=None, *, include_facts=False):

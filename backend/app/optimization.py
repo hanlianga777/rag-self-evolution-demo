@@ -14,12 +14,12 @@ from collections import Counter
 
 from .providers import ProviderRequestError, provider_error_details
 from .diagnostics import diagnostic_view
-from .diagnostic_categories import DIAGNOSTIC_CATEGORIES, GENERATION_REPAIRS
+from .diagnostic_categories import DIAGNOSTIC_CATEGORIES
 from .agent_inputs import prepare_baseline_rows, retrieval_facts, is_optimization_target, is_unstable_case, baseline_bad_case_rows, new_failure_ids
 from .paid_run import provider_task
 from .paid_schedule import wait_for_off_peak, clear_run_now
 from .telemetry import collect_usage, measure, cost_fields
-from . import rules
+from . import rules, verdict
 from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, GATE_DEFINITIONS, MAX_EVALS, canonicalize_config, qualification_description, search_space_contract, validate_candidate_config
 
 
@@ -332,14 +332,19 @@ def enhancement_latency_deltas(baseline_config, baseline_result, candidates):
     return rows
 
 
-def load_retrieval_preview(store, baseline_run_id):
-    """读取 retrieval_headroom.py --preview-for-baseline 生成的预演表；没有就返回 None（旧实验不受影响）。"""
+def load_retrieval_preview(store, baseline_run_id, *, foundation=None):
+    """读取 retrieval_headroom.py --preview-for-baseline 生成的预演表。"""
     try:
         path = Path(store.database_path).parent / 'retrieval_preview' / f'{baseline_run_id}.json'
         data = json.loads(path.read_text(encoding='utf-8')) if path.is_file() else None
     except (OSError, ValueError, AttributeError):
         return None
-    return data if isinstance(data, dict) and data.get('baseline_run_id') == baseline_run_id else None
+    if not isinstance(data, dict) or data.get('baseline_run_id') != baseline_run_id:
+        return None
+    if foundation is not None and (data.get('rules_version') != rules.RULES_VERSION
+                                   or data.get('knowledge_identity') != foundation):
+        return None
+    return data
 
 
 def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, labels, *, baseline_gates=None, evaluation_budget=None, failed_parameter_signatures=None,
@@ -351,8 +356,6 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
                                for option in allowed['prompt_strategy']['options'])
     qualification = qualification_description()
     agent_rule = rules.AGENT
-    generation_actions = '；'.join(f'生成层·{subfeature}→prompt_strategy={strategy}'
-                                   for subfeature, strategy in GENERATION_REPAIRS.items())
     system = ('你是RAG优化Agent。根据保存的错题诊断提出优化方案。'
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
               '先读程序生成的基线诊断摘要、速度事实、逐题变化及已被证明有害的改动清单gate_harming_changes。本轮方案标签见goal.candidate_labels，direction由你根据事实自行确定，不预设方向。同轮修改参数互斥。不得照搬gate_harming_changes。'
@@ -361,7 +364,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
               f'query_decompose把一问多件事的问题拆成子问题分别检索，针对桥接题、跨段题。{search_space_contract()["generation_thinking"]["description"]}。'
               f'Baseline 温度 {rules.BASELINE["temperature"]} 下判定稳定，回答文字仍可能不同。生成层和安全题可从 Prompt Strategy 和交付资料入手。每个方案相对其底座最多改 {MAX_CHANGED_PARAMETERS} 个参数。'
               '诊断→动作对照（优先参考）：检索层·查不到（标准证据没进候选或最终资料）→扩大candidate_k、放宽top_k、降低min_score，或开query_rewrite/multi_query/hyde；检索层·排序遗漏（证据在候选里但没进最终资料）→调rerank、top_k、min_score；型号、错误码等精确词查错→hybrid_alpha调向关键词；被相似型号干扰（答成别的型号的数值）→提高min_score、保持rerank、减小top_k；'
-              f'{generation_actions}；生成层·套话结尾→prompt_strategy={rules.GROUNDED}；'
+              '生成层·标准证据已齐但仍读错→核对现有参数是否有对应手段；'
               '安全边界·该拒不拒、型号不明就给步骤、被注入带偏→prompt_strategy=Safe；检索层·一问两件事的桥接或跨段题→query_decompose；安全边界·该拒没拒或过度拒答→prompt_strategy、min_score；性能·太慢→retrieval_max_tokens、top_k。每套方案先写明主攻哪一层哪一类问题（按bad_case_groups里题数最多、拖低门槛平均分最多的类别优先），再选对应动作；同轮方案主攻不同类别，或同一类别的不同动作，并说明每个动作为什么只修这些题、不修其他题。'
               'prior_sandbox_results里带no_effect的方案：整卷回答与已跑结果完全相同，说明它改的参数在当前条件下没有改变交给模型的资料，不要再提出同类无效改动。'
               '每道错题的bad_cases[].issue_tags列出它同时存在的全部问题（检索层/生成层/安全边界/性能，可多个），diagnosis_category只是排优先级用的主原因；设计方案时要兼顾同一题的全部标签，不要只看主原因。'
@@ -620,6 +623,24 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
         audit.update(failed_field="candidates", actual_value=result.get("candidates") if isinstance(result, dict) else result, expected_type="array", allowed_values=None)
         raise ValueError("Agent 输出必须包含 candidates 数组")
     audit["parsed_candidates"] = result['candidates']
+    if verdict.current(audit):
+        verdict.require_empty_history(audit.get('parameter_effect_ledger'))
+        verdict.require_empty_history(result.get('parameter_effect_ledger'))
+        offered = result['candidates']
+        if len(offered) < len(labels):
+            reason = result.get('insufficient_evidence')
+            if not isinstance(reason, str) or not reason.strip():
+                raise ValueError('少于本轮方案数量时须填写 insufficient_evidence')
+            if not offered:
+                audit.update(response_contract_version='agent-response-2', response_status='empty',
+                             returned_candidate_count=0, generated_candidate_count=0, response_warnings=[])
+                return {**result, 'decision_stop': {'round': round_number, 'reason': reason.strip()}}, []
+            selected = [c.get('id') for c in offered if isinstance(c, dict)]
+            if len(selected) != len(offered) or any(not isinstance(label, str) for label in selected):
+                raise ValueError('Candidate 标签必须为字符串')
+            if len(set(selected)) != len(selected) or not set(selected) <= set(labels):
+                raise ValueError('Candidate 标签必须唯一且属于本轮允许标签')
+            labels = [label for label in labels if label in selected]
     candidates = [normalize_agent_candidate(c) for c in result['candidates']]
     full_rounds = audit.get('round_policy', {}).get('mode') == 'full_rounds'
     for candidate in candidates:
@@ -873,7 +894,21 @@ class OptimizationAgent:
             runtime = SimpleNamespace(generation_contract=generation_contract(), model=settings.model)
             EvaluationRunner(self.store, runtime)._require_generation_contract(self.store.evaluation_run(baseline_run_id)['judge'])
         baseline = self.store.evaluation_run(baseline_run_id)
-        audited_cases = baseline_bad_case_rows(self.store, baseline)
+        trigger = self.store.optimization_trigger(trigger_id)
+        explicit_id = experiment_id or (trigger or {}).get("optimization_run_id")
+        existing_id = explicit_id or self.store.current_baseline_identity()["current_experiment_id"]
+        existing = self.store.experiment(existing_id) if existing_id else None
+        if existing and not verdict.current(existing.get('result', {})) and verdict.records(self.store, baseline_run_id):
+            if explicit_id:
+                raise ValueError('旧实验仅供历史查看，请新建实验')
+            existing = existing_id = None
+        confirmed_context = (existing or {}).get("result", {})
+        use_final = existing is None or verdict.current(confirmed_context)
+        if use_final:
+            verdict.require_empty_history(confirmed_context.get('parameter_effect_ledger'))
+        if existing and use_final:
+            verdict.require_baseline(self.store, baseline)
+        audited_cases = baseline_bad_case_rows(self.store, baseline, use_final=use_final)
         audited_cases = [{**item, 'category':item['diagnostic_view']['primary_root_cause']} for item in audited_cases]
         from .evaluation_contract import business_verdict
         failures = [item for item in audited_cases if business_verdict(item['result'])=='FAIL' or (item['result'].get('evaluation_outcome') or {}).get('contract_version')!='business-vnext-1' and item['result'].get('passed') is False]
@@ -886,10 +921,6 @@ class OptimizationAgent:
                 'status':'ready_for_experiment' if ready else plan.get('status','capability_gap'),
                 'next_action':'sandbox_full_snapshot' if ready else plan.get('next_action','repair_sources_or_trace'),
                 'experiment_plan':plan,'gaps':view.get('diagnostic_gaps',[]),'blockers':plan.get('blockers',[])})
-        trigger = self.store.optimization_trigger(trigger_id) if trigger_id else None
-        existing_id = experiment_id or (trigger or {}).get("optimization_run_id") or self.store.current_baseline_identity()["current_experiment_id"]
-        existing = self.store.experiment(existing_id) if existing_id else None
-        confirmed_context = (existing or {}).get("result", {})
         from .paid_run import current_paid_run
         if confirmed_context.get('paid_run') and current_paid_run() is None:
             from .paid_policy import restore_paid_context
@@ -899,7 +930,6 @@ class OptimizationAgent:
         event = None
         if existing and existing["baseline_run_id"] == baseline_run_id and trigger and trigger["status"] == "human_confirmed" and trigger["optimization_run_id"] == existing_id:
             event = next((item for item in self.store.monitoring_events() if item["id"] == trigger["event_id"] and item["bad_case"] and item["determinable"]), None)
-        baseline = self.store.evaluation_run(baseline_run_id)
         base_config = {**DEFAULT_PIPELINE_CONFIG, **baseline["config"]}
         base_config.pop("run_target", None)
         base_config.pop("knowledge_identity", None)
@@ -908,10 +938,13 @@ class OptimizationAgent:
         if not existing or existing['status']!='generating':
             clear_run_now(self.store,'agent:'+experiment_id)
         from .agent_mechanism import CONTRACT, fault_stage, faults_for_cases, saved_passed
-        v2 = confirmed_context.get('mechanism_contract') == CONTRACT
+        experiment = self.store.experiment(experiment_id)
+        context = experiment['result']
+        v2 = context.get('mechanism_contract') == CONTRACT
+        use_final = verdict.current(context)
         if not bad_cases and not v2:
             reason='暂无足够依据生成合格优化假设：没有具备实际证据与Trace的可验证Baseline目标；Monitoring事件须先补齐同等证据'
-            self.store.save_agent_round(experiment_id, [], {'generation_status':'insufficient_evidence','insufficient_evidence':reason,'generated_candidate_count':0,'round':round_number,'provider_called':False,'all_bad_case_audit':[{k:v for k,v in row.items() if k!='result_json'} for row in audited_cases]}, generation_token=generation_token)
+            self.store.save_agent_round(experiment_id, [], {'generation_status':'insufficient_evidence','insufficient_evidence':reason,'generated_candidate_count':0,'round':round_number,'provider_called':False, **({'decision_stop': {'round': round_number, 'reason': reason}} if use_final else {}), 'all_bad_case_audit':[{k:v for k,v in row.items() if k!='result_json'} for row in audited_cases]}, generation_token=generation_token)
             return self.store.experiment(experiment_id)
         failed_questions={row['question_id'] for row in bad_cases}
         verified=[c for c in prior_candidates if c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified')]
@@ -919,8 +952,6 @@ class OptimizationAgent:
         fixed=failed_questions & set(best['result'].get('all_fixed_question_ids',[])) if best else set()
         processing_progress={'baseline_failed_question_ids':sorted(failed_questions),'verified_configuration_id':best['id'] if best else None,
             'fixed_question_ids':sorted(fixed),'remaining_question_ids':sorted(failed_questions-fixed),'status':'unfinished' if failed_questions-fixed else 'verified_complete'}
-        experiment = self.store.experiment(experiment_id)
-        context = experiment["result"]
         # Only this experiment's observed runs may inform a new round.
         trigger_id = trigger_id or context.get("trigger_id")
         monitoring_context = {"trigger": self.store.optimization_trigger(trigger_id), "event": event or context.get("monitoring_event"), "confirmed_baseline_id": context.get("baseline_id"), "golden_id": context.get("golden_id"), "corpus_fingerprint": context.get("corpus_fingerprint")} if trigger_id else None
@@ -935,6 +966,10 @@ class OptimizationAgent:
         reserved_for_d = experiment['evaluation_budget']['reserved_for_d']
         evaluation_budget = {"used": completed, "max": MAX_EVALS, "reserved_for_d": reserved_for_d,
                              "remaining":MAX_EVALS-completed,"remaining_for_abc":max(0,MAX_EVALS-completed-reserved_for_d)}
+        if use_final and verdict.records(self.store, baseline_run_id):
+            from .evaluation import summarize_evaluation_cases
+            baseline = {**baseline, 'result': {**baseline['result'],
+                       **summarize_evaluation_cases(verdict.gate_cases(self.store, baseline_run_id))}}
         gate_results = baseline["result"].get("gates")
         persisted_gates = (gate_results or {}).get("gates")
         failed_gates = [gate for gate in persisted_gates if gate.get("passed") is False] if isinstance(persisted_gates, list) else None
@@ -949,7 +984,7 @@ class OptimizationAgent:
         frozen=json.loads(baseline.get('dataset_snapshot_json') or '{}')
         questions={q['id']:q for q in frozen.get('questions',[])}
         def saved_cases(run_id):
-            rows=self.store.evaluation_case_results(run_id) if run_id else []
+            rows=verdict.final_cases(self.store, run_id, use_final=use_final)
             for row in rows:
                 golden=questions.get(row['question_id'],{})
                 match=re.search(r'(?:^Q|[-_])(\d{2,3})$',row['question_id'])
@@ -957,7 +992,8 @@ class OptimizationAgent:
             return rows
         baseline_cases = saved_cases(baseline_run_id)
         candidate_cases = {c['id']: saved_cases(c.get('result', {}).get('evaluation_run_id')) for c in prior_candidates}
-        retrieval_preview = load_retrieval_preview(self.store, baseline_run_id)
+        retrieval_preview = (load_retrieval_preview(self.store, baseline_run_id, foundation=frozen.get('corpus_fingerprint'))
+                             if use_final else load_retrieval_preview(self.store, baseline_run_id))
         if v2:
             from .agent_round_contract import (STOP_REASON, available_labels, check_commitment, inherited_repairs,
                                                previous_commitment, round_base, round_opportunities)
@@ -1039,7 +1075,7 @@ class OptimizationAgent:
                           parameter_stages=rules.AGENT_PARAMETER_STAGES)
             system += ('每个目标必须按实际底座查看 fault_stages，再按 parameter_stages 选动作。'
                        '预计修好的题必须同时列入target_bad_cases。'
-                       '放行需要同一底座、同题、同一完整改动的预演或账本依据。历史账本只作试验线索，组合结果不能单独归因。'
+                       '放行需要同一底座、同题、同一完整改动的预演或本实验账本依据。组合结果不能单独归因。'
                        '跨层作用需在方案的 cross_layer_mechanisms 对象内按题号写出中间机制，且同底座检索预演必须支持；'
                        '单改提示词不能补回未进最终资料的证据。标准证据已齐全时不能仅用召回或排序参数修复生成错误。')
             from .agent_strategy import bad_case_groups
@@ -1066,6 +1102,10 @@ class OptimizationAgent:
         audit['case_comparisons'] = prompt.get('case_comparisons', {})
         audit['best_case_comparison'] = prompt.get('best_case_comparison', [])
         audit['strategy_contract'] = context.get('strategy_contract')
+        if verdict.current(context):
+            audit['verdict_version'] = rules.RULES_VERSION
+            system += ('证据不足以继续时可以少于本轮可用方案数，candidates 可以为空。'
+                       '请在 insufficient_evidence 中说明证据不足的原因。')
         audit['decision_contract_version'] = context.get('decision_contract_version')
         if audit['decision_contract_version'] == '109c' and round_number > 1:
             previous_round = round_conclusions[str(round_number - 1)]
@@ -1163,7 +1203,7 @@ class OptimizationAgent:
                     audit['provider_raw_text']=content
                     self._checkpoint(experiment_id,generation_token,{**audit,'validation_stage':'persistence'})
             audit["validation_stage"] = "persistence"
-            self.store.save_agent_round(experiment_id, batch, {**result, **audit, "generation_status":"partial" if audit["rejected_candidates"] else "completed" if batch else "no_candidates", "requested_candidate_count":len(labels), "generated_candidate_count":len(batch), "validation_stage": "completed", "round": round_number, "evaluation_budget": evaluation_budget}, generation_token=generation_token)
+            self.store.save_agent_round(experiment_id, batch, {**result, **audit, "generation_status":"insufficient_evidence" if result.get("decision_stop") else "partial" if audit["rejected_candidates"] else "completed" if batch else "no_candidates", "requested_candidate_count":len(labels), "generated_candidate_count":len(batch), "validation_stage": "completed", "round": round_number, "evaluation_budget": evaluation_budget}, generation_token=generation_token)
             return self.store.experiment(experiment_id)
         except Exception as error:
             if isinstance(error,ProposalValidationExhausted):

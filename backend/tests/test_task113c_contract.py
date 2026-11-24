@@ -128,7 +128,7 @@ def test_diagnostic_retest_bypasses_existing_reuse_and_is_isolated(tmp_path):
     [row] = result['questions']
     assert row['distribution'] == '2/3'
     assert row['risk'] is True
-    assert [trial['risk'] for trial in row['trials']] == [True, True, False]
+    assert [trial['risk'] for trial in row['trials']] == [True, False, False]
     assert len({trial['id'] for trial in row['trials']}) == 3
     assert generation.call_count == judge.call_count == 3
     with store.connection() as db:

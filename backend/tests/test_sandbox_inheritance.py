@@ -22,7 +22,7 @@ class SandboxInheritanceTests(unittest.TestCase):
         with controlled_run(paid):baseline=self.runner.run_baseline()
         exp=self.store.create_experiment(baseline['id'],'completed')
         base={k:v for k,v in baseline['config'].items() if k!='run_target'}
-        configs=[{**base,'prompt_strategy':'Grounded'},{**base,'query_rewrite':True,'multi_query':2},
+        configs=[{**base,'prompt_strategy':'Looser'},{**base,'query_rewrite':True,'multi_query':2},
                  {**base,'hyde':True}]
         for label,config in zip('ABC',configs):
             self.store.save_candidate(exp,'R1-'+label,config,{'round':1,'candidate_label':label})

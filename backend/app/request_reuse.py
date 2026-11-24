@@ -7,6 +7,8 @@ from contextvars import ContextVar
 from copy import deepcopy
 
 _scope = ContextVar('evaluation_reuse_scope', default=None)
+_experiment = ContextVar('evaluation_experiment_scope', default=None)
+_question = ContextVar('evaluation_question_scope', default=None)
 # Serial evaluation workers share one process. Keep check/call/save atomic there.
 _lock = threading.RLock()
 
@@ -15,15 +17,72 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
+def run_experiment(store, run):
+    candidate_id = run['config'].get('candidate_id')
+    candidate = store.candidate(candidate_id) if candidate_id else None
+    return candidate['experiment_id'] if candidate else None
+
+
+def reuse_experiment(store, run):
+    from .verdict import current
+
+    experiment_id = run_experiment(store, run)
+    if experiment_id:
+        experiment = store.experiment(experiment_id, light=True)
+        if experiment and current(experiment['result']):
+            return experiment_id
+    return None
+
+
+@contextmanager
+def experiment_scope(store, experiment_id):
+    token = _experiment.set((store, experiment_id) if experiment_id else None)
+    try:
+        yield
+    finally:
+        _experiment.reset(token)
+
+
+@contextmanager
+def question_scope(question_id):
+    token = _question.set(question_id)
+    try:
+        yield
+    finally:
+        _question.reset(token)
+
+
+def fixed_decomposition(question, action):
+    experiment = _experiment.get()
+    question_id = _question.get()
+    if experiment is None or question_id is None:
+        return action(), None
+    store, experiment_id = experiment
+    key = f'verdict:decompose:{question_id}'
+    with _lock:
+        saved = store.job_checkpoint(experiment_id, key)
+        if saved is None:
+            saved = {'question_sha256': digest(question), 'subquestions': action()}
+            store.save_job_checkpoint(experiment_id, key, saved)
+        if saved['question_sha256'] != digest(question):
+            raise ValueError('冻结题目与实验拆问记录不一致')
+    return saved['subquestions'], {'experiment_id': experiment_id, 'key': key}
+
+
 @contextmanager
 def reuse_scope(store, run):
     snapshot = json.loads(run['dataset_snapshot_json'])
-    identity = digest([snapshot, run['config'].get('knowledge_identity'), run['judge']])
+    experiment_id = reuse_experiment(store, run)
+    values = [snapshot, run['config'].get('knowledge_identity'), run['judge']]
+    if experiment_id:
+        values.append(experiment_id)
+    identity = digest(values)
     with store.connection() as db:
         db.execute('CREATE TABLE IF NOT EXISTS model_request_reuse (identity TEXT, kind TEXT, request_hash TEXT, origin TEXT, result_json TEXT, PRIMARY KEY(identity,kind,request_hash))')
     token = _scope.set((store, identity, run['id']))
     try:
-        yield
+        with experiment_scope(store, experiment_id):
+            yield
     finally:
         _scope.reset(token)
 
@@ -79,10 +138,13 @@ def matching_configuration(store, run):
     from .policy import ALLOWED_SEARCH_SPACE
     def configuration(config):
         return {k:v for k,v in config.items() if k in ALLOWED_SEARCH_SPACE or k == 'knowledge_identity'}
+    experiment_id = reuse_experiment(store, run)
     with store.connection() as db:
         ids = [r[0] for r in db.execute("SELECT id FROM evaluation_runs WHERE status='completed' AND dataset_version_id=? AND id<>? ORDER BY created_at,id", (run['dataset_version_id'],run['id']))]
     for key in ids:
         source = store.evaluation_run(key)
+        if experiment_id and run_experiment(store, source) != experiment_id:
+            continue
         if (source['dataset_snapshot_json'] == run['dataset_snapshot_json'] and source['judge'] == run['judge']
                 and configuration(source['config']) == configuration(run['config'])
                 and source['result'].get('evaluation_complete') is True and source['result'].get('technical_failed') == 0):

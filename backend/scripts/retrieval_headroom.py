@@ -246,7 +246,9 @@ def main(argv=None):
     if args.preview_for_baseline:
         target = database.resolve().parent / 'retrieval_preview' / f'{args.preview_for_baseline}.json'
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(json.dumps(build_preview(args.preview_for_baseline, items, results), ensure_ascii=False, indent=1), encoding='utf-8')
+        preview = build_preview(args.preview_for_baseline, items, results)
+        preview.update(rules_version=rules.RULES_VERSION, knowledge_identity=identity)
+        target.write_text(json.dumps(preview, ensure_ascii=False, indent=1), encoding='utf-8')
         summary['preview_file'] = str(target)
     return {'knowledge_identity': identity, 'baseline_config': {k: baseline[k] for k in RETRIEVAL_KEYS}, 'questions': len(items), 'configs': len(results), **summary}
 

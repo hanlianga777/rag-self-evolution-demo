@@ -55,8 +55,8 @@ class ResumeTests(unittest.TestCase):
         self.assertEqual(frozen['golden_version'], 'fixture-golden')
         self.assertEqual(frozen['knowledge_identity'], json.loads(run['dataset_snapshot_json'])['corpus_fingerprint'])
         versions = frozen['prompt_version']
-        self.assertEqual(set(versions), {'Strict', 'Looser', 'Safe', 'Stepwise', 'Grounded', 'TableCheck', 'judge', 'agent_system'})
-        self.assertEqual(len(set(versions.values())), 8)
+        self.assertEqual(set(versions), {'Strict', 'Looser', 'Safe', 'judge', 'agent_system'})
+        self.assertEqual(len(set(versions.values())), 5)
         self.assertTrue(all(len(value) == 64 for value in versions.values()))
 
     def test_baseline_resume_reports_current_rules_and_prompt_changes(self):

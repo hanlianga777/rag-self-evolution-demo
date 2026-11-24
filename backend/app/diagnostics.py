@@ -3,7 +3,7 @@ import re
 
 from .evaluation_contract import normalize
 from .read_view import memoized_view, read_once
-from .diagnostic_categories import (DIAGNOSTIC_CATEGORIES, GENERATION_REPAIRS, MISSED_SUBQUESTION,
+from .diagnostic_categories import (DIAGNOSTIC_CATEGORIES, GENERATION_SUBTYPES, MISSED_SUBQUESTION,
                                     TABLE_ERROR, WRONG_DENIAL, category_definition)
 
 TYPICAL = tuple(row['label'] for row in DIAGNOSTIC_CATEGORIES)
@@ -165,6 +165,8 @@ def _has_required_omission(case, golden, judge):
 
 
 def _saved_verdict(case):
+    if type(case.get('final_passed')) is bool:
+        return 'PASS' if case['final_passed'] else 'FAIL'
     outcome = case.get('evaluation_outcome') or {}
     if (outcome.get('verdict') not in {None, 'PASS', 'FAIL'} or outcome.get('execution_complete') is False
             or outcome.get('status') in {'technical_execution_failure', 'not_evaluable', 'NOT_EVALUABLE', 'error'}):
@@ -295,10 +297,9 @@ def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fin
         # 规则总表四.2：严重度看冻结题卷的业务后果（严重题名单），不按根因大类写死。
         frozen = golden.get('raw') or golden
         protected = (golden.get('negative_subtype') or case.get('negative_subtype')) in {'safety_critical','prompt_injection'} or frozen.get('criticality') == 'high'
-        strategy = GENERATION_REPAIRS.get(result.get('subfeature'))
         result.update(severity_label=('记录缺失' if category=='记录缺失' else '无' if category=='通过' else '严重' if protected else '普通'),
-                      tuning_directions=[strategy] if strategy else definition.get('directions',[]),
-                      repair_hint=f'尝试将回答提示词设为 {strategy}，用逐题结果核对是否改善。' if strategy else definition.get('repair_hint',reason))
+                      tuning_directions=definition.get('directions',[]),
+                      repair_hint=definition.get('repair_hint', reason))
         return result
     verdict = _saved_verdict(case)
     scored = bool(judge) and any(k in judge for k in ('verdict', 'correctness', 'quality', 'behavior_pass', 'checks'))
@@ -421,7 +422,7 @@ def display_diagnosis(case, analysis, golden):
                 if type(top_k) is int and top_k > 0 and any(
                         type(check['rerank_rank']) is int and check['rerank_rank'] > top_k for check in missing):
                     layer, detail = '检索层', '排名靠后被截掉'
-            elif analysis.get('subfeature') in GENERATION_REPAIRS:
+            elif analysis.get('subfeature') in GENERATION_SUBTYPES:
                 layer, detail = '生成层', analysis['subfeature']
             elif checks:
                 precision = analysis['retrieval_metrics'].get('precision_at_k')

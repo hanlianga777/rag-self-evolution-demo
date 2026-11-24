@@ -1635,11 +1635,22 @@ def bad_cases(light: bool = False, baseline_id: str | None = None):
 @app.get("/api/bad-cases/{case_id}")
 @read_view()
 def bad_case(case_id: str):
+    from . import verdict
+    from .agent_inputs import baseline_bad_case_rows
+
     with store.connection() as connection:
         row = connection.execute('SELECT * FROM bad_cases WHERE id=?',(case_id,)).fetchone()
-    if row is None:raise HTTPException(status_code=404, detail="Bad case not found")
-    item = {**dict(row),'result':{**json.loads(row['result_json']),'run_id':row['run_id'],'question_id':row['question_id']}}
-    run = store.evaluation_run(row['run_id'])
+    run_id = row['run_id'] if row else None
+    if run_id is None and case_id.startswith('BC-EVAL-'):
+        run_id = 'EVAL-' + case_id.removeprefix('BC-EVAL-').partition('-')[0]
+    run = store.evaluation_run(run_id) if run_id else None
+    item = None
+    if run and verdict.records(store, run_id):
+        item = next((r for r in baseline_bad_case_rows(store, run) if r['id'] == case_id), None)
+    elif row:
+        item = {**dict(row),'result':{**json.loads(row['result_json']),'run_id':run_id,'question_id':row['question_id']}}
+    if item is None:
+        raise HTTPException(status_code=404, detail="Bad case not found")
     return {**case_list_row(item),'dataset_snapshot':json.loads(run['dataset_snapshot_json']) if run else {}}
 
 
@@ -2101,10 +2112,13 @@ def evaluation_run(run_id: str, light: bool = False):
     if run is None:
         raise HTTPException(status_code=404, detail="Evaluation run not found")
     run=persisted_evaluation_progress(run)
+    from . import verdict
     from .agent_inputs import prepare_baseline_rows
+    use_final = verdict.current(run['result'])
     cases = [{**row['result'], 'diagnostic_view': row['diagnostic_view']} for row in prepare_baseline_rows(run,
-             [{'question_id': case['question_id'], 'result': case} for case in store.evaluation_case_results(run_id)])]
-    return {**run, "diagnostic_categories":DIAGNOSTIC_CATEGORIES,"product_diagnostics":product_diagnostics(store,run,cases), "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases,"requires_policy_upgrade":requires_foundation_upgrade(run.get("judge",{})), "gate_details": gate_details(cases, run.get("result", {}).get("gates", {}).get("gates", []), statistics_version=run.get("judge", {}).get("gate_statistics_version"))}
+             [{'question_id': case['question_id'], 'result': case} for case in verdict.final_cases(store, run_id, use_final=use_final)])]
+    gate_inputs = verdict.gate_cases(store, run_id) if use_final else cases
+    return {**run, "diagnostic_categories":DIAGNOSTIC_CATEGORIES,"product_diagnostics":product_diagnostics(store,run,cases), "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases,"requires_policy_upgrade":requires_foundation_upgrade(run.get("judge",{})), "gate_details": gate_details(gate_inputs, run.get("result", {}).get("gates", {}).get("gates", []), statistics_version=run.get("judge", {}).get("gate_statistics_version"))}
 
 
 @app.get('/api/evaluations/{run_id}/comparison-cases')
@@ -2112,18 +2126,19 @@ def evaluation_run(run_id: str, light: bool = False):
 @read_view()
 def comparison_cases(run_id: str):
     if store.superseded_evaluation(run_id):raise HTTPException(404, 'Evaluation run not found')
+    from . import verdict
     with store.connection() as connection:
         run = connection.execute("SELECT id,status,dataset_version_id,judge_json,config_json FROM evaluation_runs WHERE id=?", (run_id,)).fetchone()
         if run is None:raise HTTPException(404, 'Evaluation run not found')
         rows = connection.execute("""SELECT question_id,
             json_extract(result_json,'$.question') question,
-            json_extract(result_json,'$.test_category') test_category,
-            json_extract(result_json,'$.passed') passed
+            json_extract(result_json,'$.test_category') test_category
             FROM evaluation_case_results WHERE run_id=? ORDER BY id""", (run_id,)).fetchall()
+        passed = verdict.final_verdicts(run_id, connection=connection)
     return {'id':run['id'], 'status':run['status'], 'dataset_version_id':run['dataset_version_id'],
             'judge':{'evaluation_identity':json.loads(run['judge_json']).get('evaluation_identity')},
             'config':json.loads(run['config_json']),
-            'cases':[{**dict(row), 'passed':bool(row['passed']) if row['passed'] is not None else None} for row in rows]}
+            'cases':[{**dict(row), 'passed': passed.get(row['question_id'])} for row in rows]}
 
 
 @app.get('/api/evaluations/{run_id}/cases/{question_id}')
@@ -2131,11 +2146,14 @@ def comparison_cases(run_id: str):
 @read_view()
 def comparison_case(run_id: str, question_id: str):
     if store.superseded_evaluation(run_id):raise HTTPException(404, 'Evaluation run not found')
-    # Read one saved case, never hydrate the full evaluation or generate an answer.
+    from . import verdict
     with store.connection() as connection:
         run = connection.execute('SELECT status,dataset_version_id,dataset_snapshot_json,config_json FROM evaluation_runs WHERE id=?', (run_id,)).fetchone()
     case = store.evaluation_case_result(run_id, question_id) if run else None
     if case is None:raise HTTPException(404, 'Saved case not found')
+    stored_verdict = verdict.records(store, run_id).get(question_id)
+    if stored_verdict:
+        case = verdict.decision_case(case, stored_verdict, stored_verdict['final_passed'])
     snapshot = json.loads(run['dataset_snapshot_json'])
     question = next((row for row in snapshot.get('questions', []) if (row.get('id') or row.get('question_id')) == question_id), {})
     if not case.get('diagnostic_view'):
@@ -2143,8 +2161,11 @@ def comparison_case(run_id: str, question_id: str):
         prepared = prepare_baseline_rows({'dataset_snapshot_json':run['dataset_snapshot_json'], 'config':json.loads(run['config_json'])}, [{'question_id':question_id, 'result':case}])[0]
         case = {**case, 'diagnostic_view':prepared['diagnostic_view']}
     notes = independent_case_notes(run_id, run['dataset_version_id'], question, case) if run['status'] == 'completed' else []
+    detail = ({**stored_verdict, 'samples': [{k: v for k, v in s.items() if k != 'case'}
+                                          for s in stored_verdict['samples']]}
+              if stored_verdict else None)
     return {'status':run['status'], 'case':case, 'independent_review_notes':notes,
-            'question':{key:question[key] for key in ('reference_answer','expected_response','business_requirements') if key in question}}
+            **({'verdict': detail} if detail else {}), 'question':{key:question[key] for key in ('reference_answer','expected_response','business_requirements') if key in question}}
 
 
 @app.post('/api/evaluations/{run_id}/stop', dependencies=[Depends(require_trusted_origin)])

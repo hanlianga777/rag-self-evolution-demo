@@ -78,7 +78,8 @@ def test_2026_11_20b_qualification(new, fixed, complete, qualifies):
     comparison = {**regression(0, len(new)), 'comparison_complete': complete,
                   'new_regression_question_ids': new, 'all_fixed_question_ids': fixed}
     assert qualify_candidate(GATES_OK, comparison, 0, 5, 5)['qualified'] is True
-    result = qualify_candidate(GATES_OK, comparison, 0, 5, 5, rule_version=rules.QUALIFICATION['version'])
+    from app.policy import LEGACY_CANDIDATE_QUALIFICATION_VERSION
+    result = qualify_candidate(GATES_OK, comparison, 0, 5, 5, rule_version=LEGACY_CANDIDATE_QUALIFICATION_VERSION)
     assert result['rule_version'] == '2026-11-20b'
     assert result['qualified'] is qualifies
 

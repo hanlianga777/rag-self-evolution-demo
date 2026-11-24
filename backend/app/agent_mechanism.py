@@ -33,6 +33,8 @@ def rank(value):
 
 
 def saved_passed(case):
+    if type(case.get('final_passed')) is bool:
+        return case['final_passed']
     outcome = case.get('evaluation_outcome') or {}
     if outcome.get('contract_version') == VERSIONS['scoring_policy']:
         return {'PASS': True, 'FAIL': False}.get(business_verdict(case))
@@ -250,15 +252,23 @@ def candidate_effects(db, experiment, candidate, result, *, historical=False):
     changes = parameter_diff(json.loads(candidate['config_json']), compare_config)
     run_id = result.get('evaluation_run_id')
 
+    from . import verdict
+    use_final = verdict.current(json.loads(experiment['result_json'])) and not historical
     def cases(rid):
         if not rid:
             return {}
-        return {r['question_id']: json.loads(r['result_json']) for r in db.execute(
-            'SELECT question_id, result_json FROM evaluation_case_results WHERE run_id=?', (rid,))}
+        rows = [{'question_id': r['question_id'], **json.loads(r['result_json'])} for r in db.execute(
+            'SELECT question_id, result_json FROM evaluation_case_results WHERE run_id=?', (rid,))]
+        return {c['question_id']: c for c in verdict.final_cases(None, rid, connection=db, use_final=use_final, cases=rows)}
 
-    bad_cases = {r[0] for r in db.execute('SELECT question_id FROM bad_cases WHERE run_id=?', (base_id,))}
-    before = cases(compare_run)
-    after = cases(run_id) if identity and result.get('evaluation_identity') == identity else {}
+    baseline_cases = cases(base_id) if use_final else None
+    bad_cases = ({key for key, case in baseline_cases.items() if saved_passed(case) is False} if use_final else
+                 {r[0] for r in db.execute('SELECT question_id FROM bad_cases WHERE run_id=?', (base_id,))})
+    before = baseline_cases if use_final and compare_run == base_id else cases(compare_run)
+    comparable = identity and result.get('evaluation_identity') == identity
+    if use_final:
+        comparable = comparable and verdict.current(result)
+    after = cases(run_id) if comparable else {}
     source = {'experiment_id': experiment['id'], 'candidate_id': candidate['id'],
               'round': 'D' if reasoning.get('candidate_label') == 'D' else reasoning.get('round'),
               'baseline_run_id': base_id, 'base_id': compare_id, 'base_run_id': compare_run, 'base_config': compare_config,

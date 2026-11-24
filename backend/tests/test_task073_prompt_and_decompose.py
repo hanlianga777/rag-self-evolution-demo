@@ -2,22 +2,25 @@
 from hashlib import sha256
 
 from app.policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, FRIEND_BASELINE_CONFIG, search_space_contract, validate_candidate_config
-from app.ai_service import GENERATION_PROMPT_VERSION, PROMPT_STRATEGIES, STRICT_STRATEGY, generation_system_prompt
+from app.ai_service import GENERATION_PROMPT_VERSION, LEGACY_PROMPT_STRATEGIES, PROMPT_STRATEGIES, STRICT_STRATEGY, generation_system_prompt
 from app.optimization import build_agent_prompt
 
 
 def test_prompt_variants_extend_strict():
     assert set(ALLOWED_SEARCH_SPACE['prompt_strategy']) == set(PROMPT_STRATEGIES) == {
-        'Strict', 'Looser', 'Safe', 'Stepwise', 'Grounded', 'TableCheck',
+        'Strict', 'Looser', 'Safe',
     }
     assert all(text.startswith(STRICT_STRATEGY) for text in PROMPT_STRATEGIES.values())
 
 
 def test_candidate_may_change_prompt_and_decompose():
-    for strategy in ('Looser', 'Safe', 'Stepwise', 'Grounded', 'TableCheck'):
+    for strategy in ('Looser', 'Safe'):
         assert strategy in search_space_contract()['prompt_strategy']['allowed']
         assert generation_system_prompt(GENERATION_PROMPT_VERSION, strategy).endswith(PROMPT_STRATEGIES[strategy])
         assert validate_candidate_config({**FRIEND_BASELINE_CONFIG, 'prompt_strategy': strategy})['valid']
+    for strategy, prompt in LEGACY_PROMPT_STRATEGIES.items():
+        assert generation_system_prompt(GENERATION_PROMPT_VERSION, strategy).endswith(prompt)
+        assert not validate_candidate_config({**FRIEND_BASELINE_CONFIG, 'prompt_strategy': strategy})['valid']
     assert validate_candidate_config({**FRIEND_BASELINE_CONFIG, 'query_decompose': True})['valid']
     assert not validate_candidate_config({**FRIEND_BASELINE_CONFIG, 'prompt_strategy': 'Loose'})['valid']
 
@@ -47,6 +50,6 @@ def test_agent_can_name_safety_critical_and_injection_questions_in_prompt_strate
     ])
     assert data['prompt_strategy_risk_questions'] == {'safety_critical': ['critical'], 'prompt_injection': ['injection']}
     for strategy in ('Grounded', 'Stepwise', 'TableCheck'):
-        assert f'→prompt_strategy={strategy}' in system
+        assert strategy not in system
     assert '换提示词会影响整卷回答' in system
     assert '在risks里按题号点名安全关键题和提示注入题' in system

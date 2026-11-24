@@ -42,9 +42,6 @@ PARAMETER_EXPLANATIONS = {
         'Baseline 分级回答',
         '有据直接答、答全要点，减少过度拒答',
         '安全结论在前、拒绝绕过和注入，型号或状态不明先追问',
-        '逐个子问检查答案和证据，避免漏答，保持分级回答的拒答标准',
-        '按当前资料说明缺失内容，避免错误否定和套话结尾',
-        '按表头逐行核对，避免表格归类和计数错误',
     ]),
     'candidate_k': ('第一轮查找时先捞回多少段资料，留给后面排序挑选。捞得多不容易漏掉关键证据，但排序更费时。', ['常规范围', '扩大范围，适合证据分散在多处的题']),
     'top_k': ('排序后真正交给模型写回答的资料段数。给得多要点更全，但模型要读得更多、回答更慢，也更容易被无关内容干扰。', ['精简', '更全，稍慢']),
@@ -114,11 +111,12 @@ def protected_question(case, golden=None):
 
 
 CANDIDATE_QUALIFICATION_VERSION = rules.QUALIFICATION['version']
+LEGACY_CANDIDATE_QUALIFICATION_VERSION = '2026-11-20b'
 
 
 def qualification_description():
     rule = rules.QUALIFICATION
-    return (f"{len(GATE_DEFINITIONS)} 项门槛全过，新增严重错题不超过 {rule['max_new_critical']} 道，"
+    return (f"{len(GATE_DEFINITIONS)} 项门槛全过、无严重违规，"
             f"相对 Baseline 新错不超过 {rule['max_new_failures']} 道，至少修好 {rule['min_fixed']} 道")
 
 
@@ -129,13 +127,15 @@ def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int
         "regression": regression.get("passed") is True,
     }
     version = {}
-    if rule_version == CANDIDATE_QUALIFICATION_VERSION:
+    if rule_version in {CANDIDATE_QUALIFICATION_VERSION, LEGACY_CANDIDATE_QUALIFICATION_VERSION}:
         fixed = regression.get('all_fixed_question_ids')
         new = regression.get('new_regression_question_ids')
         checks.update(comparison_complete=regression.get('comparison_complete') is True,
                       zero_new_failures=isinstance(new, list) and len(new) <= rules.QUALIFICATION['max_new_failures'],
                       at_least_one_fixed=isinstance(fixed, list) and len(fixed) >= rules.QUALIFICATION['min_fixed'])
         version['rule_version'] = rule_version
+    if rule_version == CANDIDATE_QUALIFICATION_VERSION:
+        checks['no_severe_risk'] = regression.get('severe_risk_question_ids') == []
     qualified = all(checks.values())
     return {**version, "qualified": qualified, "status": "QUALIFIED" if qualified else "NOT_QUALIFIED", "checks": checks,
             "target_bad_cases_fixed": target_bad_cases_fixed if counts_valid else None,

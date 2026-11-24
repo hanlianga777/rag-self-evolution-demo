@@ -20,7 +20,7 @@ class ResponseTests(unittest.TestCase):
                 self.assertEqual(trace['status'],'completed' if count==3 else 'analysis_exhausted')
                 self.assertEqual(audit['provider_raw_text'],raw)
                 if count<3:
-                    self.assertIn('每轮必须恰好提供A/B/C三套方案',audit['validation_error'])
+                    self.assertIn('每轮必须恰好提供A/B/C',audit['validation_error'])
                     self.assertEqual(experiment['evaluation_budget']['used'],0)
 
     def test_invalid_candidate_rejects_entire_round_with_reason(self):

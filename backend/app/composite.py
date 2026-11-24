@@ -3,7 +3,7 @@ import json
 from itertools import combinations
 
 from .agent_inputs import evidence_positions, new_failure_ids
-from . import rules
+from . import rules, verdict
 from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, FIXED_PIPELINE_PARAMETERS, GATE_DEFINITIONS, PARAMETER_EXPLANATIONS, validate_candidate_config
 
 D_FACTS_VERSION = 'winner-refinement-3'
@@ -29,11 +29,17 @@ def parameter_diff(config, base):
 
 
 def build_d_facts(store, baseline, winner, history):
-    """Read saved single-pass cases/trace only; never call retrieval or a model."""
+    """Read the saved decision evidence for the Winner and its comparison runs."""
     questions = {q['id']:q for q in json.loads(baseline['dataset_snapshot_json']).get('questions', [])}
     base = pipeline_config(baseline['config'])
-    baseline_cases = {c['question_id']:c for c in store.evaluation_case_results(baseline['id'])}
-    cases = {c['id']:{r['question_id']:r for r in store.evaluation_case_results(c['result'].get('evaluation_run_id'))} for c in history}
+    use_final = verdict.current(winner['result'])
+    if use_final:
+        from .evaluation import summarize_evaluation_cases
+        baseline = {**baseline, 'result': {**baseline['result'],
+                   **summarize_evaluation_cases(verdict.gate_cases(store, baseline['id']))}}
+    baseline_cases = {c['question_id']: c for c in verdict.final_cases(store, baseline['id'], use_final=use_final)}
+    cases = {c['id']: {r['question_id']:r for r in verdict.final_cases(
+        store, c['result'].get('evaluation_run_id'), use_final=use_final)} for c in history}
     win_cases = cases.get(winner['id'], {})
 
     def positions(cid, qid):

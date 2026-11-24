@@ -48,41 +48,19 @@ def require_resume_snapshot(judge, current_judge=None, *, for_candidate_baseline
         raise ValueError('续跑原记录缺少 rules_hash 或 prompt_version，无法验证启动快照')
     current = _versions(current_judge if current_judge is not None else judge)
     changed = [field for field in ('rules_hash', 'search_space_version') if saved.get(field) != current[field]]
-    # 109a–109g change planning/qualification, without changing Baseline or Judge
-    # requests. Only known versions may anchor a new Candidate; resume stays strict.
-    known_upgrade = (for_candidate_baseline and current['rules_hash'] == 'a1b4d0991ca6'
-                     and current['prompt_version']['agent_system'] == '96ad675251b7055547d9ada7cca7454acd6f2f4e7e50d83f9a177740388c649a')
-    legacy_rules = saved['rules_hash'] in {'f0d368403ec9', '2aa1acc7b9c0'}
-    authorization_only = known_upgrade and saved['rules_hash'] == 'bb96bee3ca3b'
-    if known_upgrade and (legacy_rules or authorization_only):
-        changed.remove('rules_hash')
     saved_prompts = saved['prompt_version']
     current_prompts = current['prompt_version']
-    ignored_prompts = set()
-    # 109b expanded the search space for new Candidates. The saved Strict
-    # Baseline still has to match the Judge and its generation prompt.
-    if (known_upgrade and legacy_rules and (saved.get('pipeline_config') or {}).get('prompt_strategy') == rules.BASELINE['prompt_strategy']
-            and (saved.get('search_space_version'), current['search_space_version']) == (
-                '48ce7c816182ef9701d14ba944f35b2f658c84128f97b5f876906e3e6e9dbc3e',
-                '272daae6a9c4061157e9665b43f016086180c2fa5d44111d79ac9ba7e195e0de')
-            and saved_prompts.get('agent_system') == '3a6d515d2a3b78f0acf3cf020436468d80f665f411b3f40e8824b505c014172a'):
-        changed.remove('search_space_version')
-        ignored_prompts = {'agent_system'} | ({rules.STEPWISE, rules.GROUNDED, rules.TABLE_CHECK} - saved_prompts.keys())
-    elif (known_upgrade and legacy_rules and saved.get('search_space_version') == current['search_space_version']
-            and saved_prompts.get('agent_system') == '4ca6578f34f254a015f1784c0c10cb5bfa0778a5dfe2c2cb70b31a2673747df7'):
-        ignored_prompts = {'agent_system'}
-    elif (known_upgrade and (authorization_only or saved['rules_hash'] == current['rules_hash']) and not changed
-            and (saved.get('pipeline_config') or {}).get('prompt_strategy') == rules.BASELINE['prompt_strategy']
-            and saved_prompts.get('agent_system') == '02b20fea1fdb4a999d785307ff26a2fc40c0c1c70d5d8ca893e1c315f7e0166e'):
-        ignored_prompts = {'agent_system'}
-    # 109i changed TableCheck only. A completed Strict Baseline never used it.
-    if (known_upgrade and (saved.get('pipeline_config') or {}).get('prompt_strategy') == rules.STRICT
-            and (saved_prompts.get(rules.TABLE_CHECK), current_prompts[rules.TABLE_CHECK]) == (
-                '2b50bbbc1784401081198006d005527ac0fe7ca721adcdcf04f26fd5b2e9564b',
-                'e506611ea46bbef01cce6b226d6df1ed46a38b9010fe868984552ec83a3b12a6')):
-        ignored_prompts.add(rules.TABLE_CHECK)
+    # A completed Strict Baseline can anchor the new verdict contract when its
+    # frozen answer and Judge templates match. Resumes still compare every field.
+    strict_baseline = (for_candidate_baseline
+                       and saved.get('rules_version') in {None, '2026-11-20', '2026-11-20b'}
+                       and saved.get('rules_hash') in {'f0d368403ec9', '2aa1acc7b9c0', 'bb96bee3ca3b', 'a1b4d0991ca6'}
+                       and (saved.get('pipeline_config') or {}).get('prompt_strategy') == rules.STRICT)
+    if strict_baseline:
+        changed.clear()
+        current_prompts = {name: current_prompts[name] for name in (rules.STRICT, 'judge')}
     changed.extend(f'prompt_version.{name}' for name, fingerprint in current_prompts.items()
-                   if name not in ignored_prompts and saved_prompts.get(name) != fingerprint)
+                   if saved_prompts.get(name) != fingerprint)
     if changed:
         raise ValueError('续跑启动快照已变化：' + '、'.join(changed))
 

@@ -6,6 +6,7 @@ from app.providers import DeepSeekProvider,ProviderInvalidResponse
 from app.config import Settings
 from app.evaluation import EvaluationRunner
 from app.evaluation_contract import validate_business_judgment
+from app.diagnostics import _current_corpus
 P=Path(__file__).resolve().parents[1]/'reports/baseline50-interruption-20261020'
 class EvidenceRoleTests(unittest.TestCase):
     def setUp(self):
@@ -17,8 +18,8 @@ class EvidenceRoleTests(unittest.TestCase):
             j=json.loads(raw);before=copy.deepcopy(j);self.assertEqual(self.validate(j)['verdict'],'FAIL');self.assertEqual(j,before)
             case=EvaluationRunner(None,None)._score_business({**self.q,'raw':self.q,'evidence':self.q.get('evidence',[])},self.e,j,self.q['reference_answer'])
             self.assertFalse(case['passed']);self.assertEqual(case['primary_root_cause'],'Retrieval')
+    @patch('app.diagnostics._current_corpus', new=_current_corpus)
     def test_current_corpus_mismatch_keeps_saved_text_diagnosis_and_actual_fail(self):
-        from app.diagnostics import _current_corpus
         _, identity = _current_corpus(self.e['retrieval_trace'])
         self.assertIsNone(identity, 'historical trace must not be relabeled as the current isolated Corpus')
         original_execution = copy.deepcopy(self.e)
