@@ -24,7 +24,7 @@ it('maps saved gate values, thresholds and verdicts to cards while preserving mo
   const before = JSON.stringify(run);
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(run))));
   await mount(<EvaluationPage data={{ evaluation: run }} />);
-  await click([...document.querySelectorAll('button')].find(button => button.textContent === '硬门槛')!);
+  await click([...document.querySelectorAll('button')].find(button => button.textContent === 'Hard Gate')!);
   expect(document.querySelectorAll('.ui-hg-card')).toHaveLength(4);
   const items = [...document.querySelectorAll<HTMLElement>('.ui-hg-card li')];
   expect(items[0].querySelector('.ui-hg-name')?.textContent).toContain('正确性 Correctness');
@@ -107,7 +107,7 @@ it('refreshes an unevaluated gate verdict when saved results arrive', async () =
   let current = evaluation('NOT_EVALUABLE');
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(current))));
   await mount(<EvaluationPage data={{ evaluation: current }} />);
-  await click([...document.querySelectorAll('button')].find(button => button.textContent === '硬门槛')!);
+  await click([...document.querySelectorAll('button')].find(button => button.textContent === 'Hard Gate')!);
   expect(document.querySelector('.ui-hg-dot')?.getAttribute('aria-label')).toBe('未判定');
   current = evaluation('FAIL');
   await act(async () => root.render(<EvaluationPage data={{ evaluation: current }} />));

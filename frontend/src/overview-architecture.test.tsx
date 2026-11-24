@@ -12,7 +12,7 @@ it("renders project results and the new architecture tabs without writes", async
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OverviewPage data={{}} navigate={() => {}} />));
   expect(document.querySelector(".ui-vc")).toBeNull();
-  expect(document.querySelector(".page-content")?.firstElementChild?.classList.contains("overview-kpi-grid")).toBe(true);
+  expect(document.querySelector(".page-content")?.firstElementChild?.classList.contains("ui-ov")).toBe(true);
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "业务架构")!.click());
   expect(document.querySelector(".ui-problems")).toBeNull();
   const business = document.querySelector('[role="img"][aria-label^="业务架构"]');

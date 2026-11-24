@@ -108,7 +108,7 @@ export function BusinessArchitecture() {
     <Wire id={ID} d={`M${col(2) + 40 + W + 4} ${g0 + H / 2} H${col(3) + 36}`} />
     <Node x={col(3) + 40} y={g0} w={W} h={H} icon="report" title="质检 QC" lines={["模型检查题目质量", "问题按轻重分级"]} />
     <Wire id={ID} d={`M${col(3) + 40 + W + 4} ${g0 + H / 2} H${col(4) + 36}`} />
-    <Node x={col(4) + 40} y={g0} w={W} h={H} icon="approval" title="题卷确认" lines={["人只看红线问题清单", "冻结后每轮都用它"]} badge="Gate 1" />
+    <Node x={col(4) + 40} y={g0} w={W} h={H} icon="approval" title="题卷冻结" lines={["人只看红线问题清单", "冻结后每轮都用它"]} badge="Gate 1" />
     <Wire id={ID} accent d={drop(col(4) + 40 + W / 2, g0 + H, B2.top + B2.h + 20, mid(0), e0)} />
     <Tag x={(mid(0) + col(4)) / 2 + 40} y={B2.top + B2.h + 24} text="冻结的考卷" accent />
 
@@ -148,7 +148,7 @@ export function BusinessArchitecture() {
     <Wire id={ID} accent d={`M${col(4) + W + 4} ${o0 + H / 2} H${col(5) - 5}`} />
     <Node x={col(5)} y={o0} w={W} h={H} icon="merge" title="Candidate D" lines={["合并合格方案的有效参数", "事先预测、事后对账"]} focus />
     <Wire id={ID} d={`M${col(5) + W + 4} ${o0 + H / 2} H${col(6) - 5}`} />
-    <Node x={col(6)} y={o0} w={W} h={H} icon="report" title="报告确认" lines={["人看各方案报告", "和推荐理由"]} badge="Gate 2" />
+    <Node x={col(6)} y={o0} w={W} h={H} icon="report" title="实验报告确认" lines={["人看各方案报告", "和推荐理由"]} badge="Gate 2" />
     <Wire id={ID} d={`M${mid(6)} ${o0 + H + 4} V${B5.a0 - 5}`} />
 
     {/* 05 发布与监控（从右往左） */}
@@ -158,7 +158,7 @@ export function BusinessArchitecture() {
     <Wire id={ID} d={`M${col(5) - 4} ${B5.a0 + H / 2} H${col(4) + W + 5}`} />
     <Node x={col(4)} y={B5.a0} w={W} h={H} icon="verify" title="线上问答" lines={["回答附引用出处", "记录检索和耗时"]} />
     <Wire id={ID} d={`M${col(4) - 4} ${B5.a0 + H / 2} H${col(3) + W + 5}`} />
-    <Node x={col(3)} y={B5.a0} w={W} h={H} icon="status" title="线上反馈" lines={["人工标注 Bad Case", "盯耗时和引用"]} />
+    <Node x={col(3)} y={B5.a0} w={W} h={H} icon="status" title="Monitoring" lines={["人工标注 Bad Case", "盯耗时和引用"]} />
     <Wire id={ID} d={`M${col(3) - 4} ${B5.a0 + H / 2} H${col(2) + W + 5}`} />
     <Node x={col(2)} y={B5.a0} w={W} h={H} icon="loop" title="提交优化线索" lines={["人工确认后", "回到考卷候选池"]} />
     <rect x={col(0)} y={B5.a0} width={W * 2 + STEP - W - 18} height={H} rx={10} fill="none" stroke={C.rule} strokeDasharray="4 3" />

@@ -27,10 +27,10 @@ it("restores compact Baseline summary without treating aggregate Gate success as
   expect((fetch as any).mock.calls.every((call: any[]) => !call[1]?.method || call[1].method === "GET")).toBe(true);
 });
 it("orders business evidence before diagnosis and preserves negative anchors and stored primary", async () => {
-  await render(<CaseDetails item={{ question_id: "q", question: "业务问题", test_category: "negative", passed: false, primary_root_cause: "Generation", model_answer: "回答", programmatic_metrics: { retrieval_trace: { candidates: [], final: [] }, evidence_coverage: { candidate_recall: { any_hit: false }, final_context: { any_hit: false }, diagnostic_basis: "保存的证据观察" } } }} snapshot={{ questions: [{ id: "q", acceptable_evidence: [{ source_chunk_ids: ["child"], evidence_key_points: ["业务材料锚点"] }] }] }} config={{}} gates={[]} />);
+  await render(<CaseDetails item={{ question_id: "q", question: "业务问题", test_category: "negative", primary_root_cause: "Generation", model_answer: "回答", programmatic_metrics: { retrieval_trace: { candidates: [], final: [] }, evidence_coverage: { candidate_recall: { any_hit: false }, final_context: { any_hit: false }, diagnostic_basis: "保存的证据观察" } } }} snapshot={{ questions: [{ id: "q", acceptable_evidence: [{ source_chunk_ids: ["child"], evidence_key_points: ["业务材料锚点"] }] }] }} config={{}} gates={[]} />);
   const heads = [...document.querySelectorAll(".case-details > section > h3")].map(h => h.textContent);
   expect(heads.indexOf("答案对比")).toBeLessThan(heads.indexOf("必答要点与检索路径"));
-  expect(heads.indexOf("必答要点与检索路径")).toBeLessThan(heads.indexOf("本次诊断"));
+  expect(heads.indexOf("必答要点与检索路径")).toBeLessThan(heads.indexOf("优化方向"));
   expect(document.querySelectorAll(".case-details > section")[2].textContent).toContain("不适用（负向题不定位标准证据）");
   expect(document.querySelectorAll(".evidence-path")).toHaveLength(0);
   expect(document.querySelector(".case-answer-stack")?.textContent).toContain("回答");
@@ -67,7 +67,7 @@ it("keeps partial technical exceptions separate from business failures on all Ba
   expect(document.body.textContent).toContain("已完成 49 / 50");
   expect(document.body.textContent).toContain("评测尚不完整");
   expect(document.body.textContent).not.toContain("Baseline 群组Gate通过");
-  for(const label of ["硬门槛","Bad Case 诊断"]){
+  for(const label of ["Hard Gate","Bad Case 诊断"]){
     await act(async()=>[...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent===label)!.click());
     expect(document.body.textContent).toContain("评测尚不完整");
   }

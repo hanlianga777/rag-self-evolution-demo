@@ -36,7 +36,7 @@ export function HoverCard({ content, children, delay = 120, className = "" }: { 
   useEffect(() => () => clear(), []);
 
   return <>
-    <span ref={ref} className={`ui-hover-trigger ${className}`.trim()} onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide} onClick={() => { clear(); setOpen(value => !value); }} aria-describedby={open ? id : undefined}>{children}</span>
+    <span ref={ref} className={`ui-hover-trigger ${className}`.trim()} onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide} aria-describedby={open ? id : undefined}>{children}</span>
     {open && createPortal(<div ref={floatRef} id={id} role="tooltip" className="ui-float dark" style={{ top: position?.top ?? -9999, left: position?.left ?? -9999 }}>{content}</div>, document.body)}
   </>;
 }

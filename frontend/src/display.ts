@@ -15,10 +15,10 @@ const translations: Record<string, string> = {
   "pending_agent": "待启动 Agent", "human_confirmed": "已人工确认", "no_candidates": "未生成 Candidate",
   "no_effective_composite": "无有效组合",
   "round_completed": "本轮评测完成",
-  "owner_delegated": "所有者委托 AI 审核", "owner_delegated_confirmed": "所有者委托 AI 批准", "owner_delegated_approved": "校验通过", "ai_agent": "AI 代理",
+  "owner_delegated": "所有者委托 AI 审核", "owner_delegated_confirmed": "所有者委托 AI 批准", "owner_delegated_approved": "机器合格", "ai_agent": "AI 代理",
   "unclassified": "待分类", "Ordinary": "普通", "ordinary": "普通", "Critical": "严重", "critical": "严重", "STRICT": "严格", "FALLBACK": "回退", "ON": "开启", "OFF": "关闭",
   "Query": "查询处理", "Retrieval": "检索", "Generation": "回答生成",
-  "Pending": "等待中", "pending": "等待中", "needs_human_review": "待确认", "machine_qualified": "校验通过",
+  "Pending": "等待中", "pending": "等待中", "needs_human_review": "待确认", "machine_qualified": "机器合格",
   "expected_improvement": "预期收益", "root_cause": "技术根因", "new_failures": "新增 Bad Case",
   "Completed": "已完成", "Running": "运行中", "Queued": "排队中", "Evaluating": "评测中",
   "completed": "已完成", "running": "运行中", "queued": "排队中", "evaluating": "评测中",
@@ -27,13 +27,13 @@ const translations: Record<string, string> = {
   "Recommended": "推荐", "Archived": "已归档", "Passed": "通过", "Failed": "未通过", "PASS": "通过", "FAIL": "未通过",
   "Rejected": "已拒绝", "Demo Active": "已启用", "Retrieval Failure": "检索失败",
   "Retrieval Noise": "检索噪声", "Over-Rejection": "过度拒答",
-  "High": "High", "Medium": "Medium", "Low": "Low", "Positive": "正向", "Ablation": "消融",
+  "High": "High", "Medium": "Medium", "Low": "Low", "Positive": "正向（Positive）", "Ablation": "消融（Ablation）",
   "Negative": "负向（Negative）", "AI Generated": "AI 生成", "Human Added": "人工补充",
   "Evaluation": "评测", "Optimization": "优化", "Bad Cases": "Bad Case", "Agent Analysis": "Agent 分析", "Experiments": "实验",
   "Qualified": "合格", "Not Qualified": "不合格", "qualified": "合格", "not_qualified": "不合格",
   "Generated": "已生成", "generated": "已生成", "Evaluated": "已评测", "evaluated": "已评测", "Released": "已发布", "released": "已发布",
   "40 Cases": "40 个案例", "A / B / C": "A / B / C",
-  "Overall Score": "综合分", "Overall": "综合分", "Correctness": "正确性", "Faithfulness": "忠实度", "Recall": "召回率", "P95 Latency": "P95 延迟",
+  "Overall Score": "综合分", "Overall": "综合分", "Correctness": "正确性", "Faithfulness": "忠实性", "Recall": "召回率", "P95 Latency": "P95 延迟",
   "Relevant": "相关", "Irrelevant": "不相关", "Not Configured": "未配置", "Configured": "已配置",
   "Recall First": "召回优先", "Balanced": "均衡策略", "Performance First": "性能优先",
   "Quality": "质量", "Safety": "安全", "Latency": "延迟", "Regression": "Regression Check", "Result": "结果",
@@ -50,7 +50,7 @@ const translations: Record<string, string> = {
   "Today 14:32": "今天 14:32", "Today 14:12": "今天 14:12", "Today 14:36": "今天 14:36", "Yesterday": "昨天", "Mon": "周一",
   "PDF text parser": "PDF 文本解析器", "512 tokens / 80 overlap": "512 tokens / 80 重叠", "Logical isolation · no containers": "逻辑隔离 · 不使用容器",
   "not_run": "未运行", "not_evaluable": "不可评测", "NOT_EVALUABLE": "不可评测",
-  "positive": "正向", "ablation": "消融", "negative": "负向（Negative）",
+  "positive": "正向（Positive）", "ablation": "消融（Ablation）", "negative": "负向（Negative）",
   "alias_entity": "实体别名", "colloquial": "口语化表达", "cross_chunk": "跨 Chunk", "weak_keywords": "弱关键词", "weak_clues": "弱线索",
   "clarify": "需要澄清", "insufficient_evidence": "证据不足", "prompt_injection_resistance": "提示注入抵抗", "safe_rejection": "安全拒答",
   "prompt_injection": "提示注入", "safety_critical": "安全关键",
@@ -97,10 +97,10 @@ export function narrativeText(value: string): string {
 
 // These are display names only; metric keys and saved rules stay unchanged.
 export const gateNames: Record<string, string> = {
-  positive_correctness: "正向正确性", positive_faithfulness: "正向忠实度", positive_completeness: "正向完整性",
-  ablation_correctness: "消融正确性", ablation_faithfulness: "消融忠实度", ablation_completeness: "消融完整性",
+  positive_correctness: "正向（Positive）正确性", positive_faithfulness: "正向（Positive）忠实性", positive_completeness: "正向（Positive）完整性",
+  ablation_correctness: "消融（Ablation）正确性", ablation_faithfulness: "消融（Ablation）忠实性", ablation_completeness: "消融（Ablation）完整性",
   safe_rejection_rate: "安全拒答率", safety_critical_accuracy: "安全关键准确率", prompt_injection_resistance: "提示注入抵抗",
-  latency_p50_seconds: "延迟中位数（P50）", latency_p99_seconds: "延迟高位（P99）",
+  latency_p50_seconds: "回答耗时 P50", latency_p99_seconds: "回答耗时 P99",
 };
 export const gateEnglishNames: Record<string, string> = {
   positive_correctness: "Positive Correctness", positive_faithfulness: "Positive Faithfulness", positive_completeness: "Positive Completeness",
@@ -127,25 +127,6 @@ export function questionSource(row: any): string {
 
 // 2026-11-19 用户要求：Pipeline 参数统一用英文名（对齐 Colin / 扣子）
 export const parameterNames:Record<string,string> = {"candidate_k": "Candidate K", "top_k": "Top-K", "min_score": "Min Score", "hybrid_search": "Hybrid Search", "hybrid_alpha": "Hybrid Alpha", "generation_thinking": "Thinking", "query_decompose": "Query Decompose", "retrieval_max_tokens": "Max Context Tokens", "rerank": "Rerank", "query_rewrite": "Query Rewrite", "multi_query": "Multi-Query", "hyde": "HyDE", "metadata_filter": "Metadata Filter", "alias_mapping": "Alias Mapping", "prompt_strategy": "Prompt Strategy", "temperature": "Temperature"};
-
-export const parameterDisplayNames: Record<string, string> = {
-  candidate_k: "候选数",
-  top_k: "保留条数",
-  min_score: "最低相关分",
-  hybrid_search: "混合检索",
-  hybrid_alpha: "语义与关键词权重",
-  generation_thinking: "思考档位",
-  query_decompose: "问题拆解",
-  retrieval_max_tokens: "最多资料 Token",
-  rerank: "重排",
-  query_rewrite: "问题改写",
-  multi_query: "多问法检索",
-  hyde: "假设答案检索",
-  metadata_filter: "元数据筛选",
-  alias_mapping: "别名映射",
-  prompt_strategy: "回答策略",
-  temperature: "采样温度",
-};
 
 const pipelineValueNames: Record<string, string> = {
   off: "Off", low: "Low", medium: "Medium", high: "High", max: "Max",

@@ -3,6 +3,7 @@ import {act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {SettingsPage} from './pages/SettingsPage';
+import {OverviewPage} from './pages/OverviewPage';
 import {VerificationPage} from './pages/VerificationPage';
 import {invalidatePipeline} from './pipelineCache';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
@@ -29,14 +30,17 @@ const data={evaluation:{id:'base',status:'completed',config:{top_k:4},result:{to
 const run=(id:string)=>({id,status:'completed',dataset_version_id:'golden',judge:{evaluation_identity:'judge'},config:{top_k:id==='base'?4:6},cases:[id==='base'?before:after,{question_id:'Q06',question:'另一道题',passed:false}]});
 const fetchSaved=async(input:string)=>new Response(JSON.stringify(input.endsWith('/comparison-cases')?run(input.includes('/base/')?'base':'after'):{case:input.includes('/base/')?before:after}));
 it('builds story from saved rounds, original question and the same critical parameter as comparison',async()=>{
- vi.stubGlobal('fetch',vi.fn(fetchSaved));history.replaceState(null,'','#verification?tab=compare&q=Q04');
- await mount(<VerificationPage data={data} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
- expect(document.querySelector('.comparison-qhead')?.textContent).toContain('保存的原题');
- expect(document.querySelector('.comparison-cfg')?.textContent).toContain('Top-K4 → 6');
+ vi.stubGlobal('fetch',vi.fn(fetchSaved));await mount(<OverviewPage data={data} navigate={()=>{}}/>);
+ expect(document.querySelector('.ui-ovs-turns')?.textContent).toContain('Round 1');
+ expect(document.querySelector('.ui-ovs-turns')?.textContent).toContain('多修好 Q04');
+ expect(document.querySelector('.ui-ovs-fixed')?.textContent).toContain('保存的原题');
+ expect(document.querySelector('.ui-ovs-fixed-c')?.textContent).toBe('Top-K 4 → 6');
+ await act(async()=>document.querySelector<HTMLButtonElement>('.ui-ovs-turns button')!.click());expect(location.hash).toBe('#evolution?tab=route');
+ await act(async()=>document.querySelector<HTMLButtonElement>('.ui-ovs-fixed button')!.click());expect(location.hash).toBe('#verification?tab=compare&q=Q04');
 });
 it('opens comparison from a question deep link without changing ordinary navigation defaults',async()=>{
  vi.stubGlobal('fetch',vi.fn(fetchSaved));history.replaceState(null,'','#verification?tab=compare&q=Q06');
  await mount(<VerificationPage data={data} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
- expect(document.querySelector('.tabs [aria-pressed=true]')?.textContent).toBe('回答对比');
+ expect(document.querySelector('.tabs [aria-pressed=true]')?.textContent).toBe('Before/After');
  expect(document.querySelector('.comparison-qhead')?.textContent).toContain('Q06');
 });

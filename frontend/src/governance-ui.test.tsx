@@ -17,7 +17,7 @@ it("shows frozen reanchored evidence and the saved recall diagnosis", async () =
   const row = { id: "reanchor-Q10", slot: "Q10", question: "充电顺序？", test_category: "positive", stage: "golden", review_status: "approved", probe_status: "probe_passed", qc_status: "qc_passed", probe: { score: 100 }, raw: {} };
   const run = { id: "GGEN-reanchor", status: "completed", profile: { expected_count: 1 }, question_ids: [row.id], artifacts: {} };
   const question = { id: row.id, question: row.question, reference_answer: "冻结答案", evidence: [], business_requirements: { sources: [{ chunk_id: "DOC-002-V2-C-00015", document_name: "B2用户手册", page_start: 8, quote: "冻结证据原文" }] } };
-  const snapshot = { id: "GD-reanchor", status: 'approved', snapshot: { generation_run_id: run.id, question_ids: [row.id], questions: [question], reanchor: { probe_results: { [row.id]: { observation: { question_validity_reason: "硬校验通过", retrieval_observation: "默认配置下指定证据未召回（检索召回探针）", score: null } } } } } };
+  const snapshot = { id: "GD-reanchor", snapshot: { generation_run_id: run.id, question_ids: [row.id], questions: [question], reanchor: { probe_results: { [row.id]: { observation: { question_validity_reason: "硬校验通过", retrieval_observation: "默认配置下指定证据未召回（检索召回探针）", score: null } } } } } };
   const fetcher = vi.fn((url: string, init?: RequestInit) => Promise.resolve(new Response(JSON.stringify(url.includes("/candidates?") ? goldenFixture(url, [row]) : url.includes("snapshots") ? [snapshot] : url.includes("/questions/") ? row : []))));
   vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
@@ -34,7 +34,7 @@ it("shows frozen reanchored evidence and the saved recall diagnosis", async () =
 
 it("opens the current reanchored frozen paper without a current Corpus generation run", async () => {
   const question = { id: "reanchor-Q10", display_id: "Q10", question: "冻结充电题", test_category: "positive" };
-  const snapshot = { id: "GD-reanchor", status: 'approved', snapshot: { generation_run_id: "historical-run", profile: { expected_count: 1 }, question_ids: [question.id], questions: [question], reanchor: { qc_reuse: { [question.id]: { qc_status: "qc_passed" } } } } };
+  const snapshot = { id: "GD-reanchor", snapshot: { generation_run_id: "historical-run", profile: { expected_count: 1 }, question_ids: [question.id], questions: [question], reanchor: { qc_reuse: { [question.id]: { qc_status: "qc_passed" } } } } };
   vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.includes("snapshots") ? [snapshot] : [])))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ workspace: { current_golden_id: snapshot.id }, generationRuns: [], dataset: [], snapshots: [snapshot] }} />));
@@ -47,7 +47,7 @@ it("opens the current reanchored frozen paper without a current Corpus generatio
 it("keeps a newer working run visible after a reanchored paper was frozen", async () => {
   const row = { id: "new-Q01", slot: "Q01", question: "新的待审核题", test_category: "positive", raw: {} };
   const run = { id: "new-run", status: "completed", profile: { expected_count: 1 }, question_ids: [row.id], artifacts: {} };
-  const snapshot = { id: "GD-old", status: 'approved', snapshot: { generation_run_id: "old-run", question_ids: ["old-Q01"], questions: [{ id: "old-Q01", question: "旧冻结题" }], reanchor: {} } };
+  const snapshot = { id: "GD-old", snapshot: { generation_run_id: "old-run", question_ids: ["old-Q01"], questions: [{ id: "old-Q01", question: "旧冻结题" }], reanchor: {} } };
   vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.includes("/candidates?") ? goldenFixture(url, [row]) : url.includes("snapshots") ? [snapshot] : [])))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ workspace: { current_golden_id: snapshot.id }, generationRuns: [run], dataset: [row], snapshots: [snapshot] }} />));
@@ -59,14 +59,14 @@ it("keeps a newer working run visible after a reanchored paper was frozen", asyn
 it("counts the frozen delegated paper without claiming human review", async () => {
   const run = { id: "GGEN-owner-fixture", status: "completed", profile: { expected_count: 1 }, question_ids: ["owner-Q01"], artifacts: {} };
   const row = { id: "owner-Q01", slot: "Q01", question: "fixture", test_category: "positive", stage: "golden", review_status: "approved", probe_status: "probe_passed", qc_status: "qc_passed", qualification_status: "owner_delegated_approved" };
-  const snapshot = { id: "GD-owner-fixture", status: 'approved', source: "owner_delegated", snapshot: { generation_run_id: run.id, question_ids: [row.id], approval_mode: "owner_delegated" } };
+  const snapshot = { id: "GD-owner-fixture", source: "owner_delegated", snapshot: { generation_run_id: run.id, question_ids: [row.id], approval_mode: "owner_delegated" } };
   vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.includes("/candidates?") ? goldenFixture(url, [row]) : url.includes("snapshots") ? [snapshot] : [])))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [row], snapshots: [snapshot] }} />));
   expect(document.querySelector(".ui-gp-left > strong")?.textContent).toBe("1 题");
   expect(document.querySelectorAll(".review-table tbody tr")).toHaveLength(1);
   expect(document.querySelector(".golden-metrics")).toBeNull();
-  expect([...document.querySelectorAll(".ui-gp-steps li.done")].map(node => node.textContent)).toEqual(["覆盖规划未知 个主题", "出题1/1", "硬校验1/1", "检索探针1/1", "质检1/1", "题卷确认（Gate 1）签署未记录"]);
+  expect([...document.querySelectorAll(".ui-gp-steps li.done")].map(node => node.textContent)).toEqual(["覆盖规划未知 个主题", "出题1/1", "硬校验1/1", "Probe1/1", "QC1/1", "Gate 1人工审核"]);
   expect(document.querySelector('.ui-gp .ui-badge')?.textContent || document.querySelector('.ui-gp')?.textContent).toContain("已冻结");
   await act(async () => document.querySelector<HTMLElement>(".review-table tbody tr")!.click());
   expect(document.querySelector(".frozen-question-details")?.textContent).toContain("fixture");
@@ -79,7 +79,7 @@ it("labels delegated review details accurately without claiming human review", a
   const row = { id: "owner-Q01", question: "fixture", test_category: "positive", stage: "golden", review_status: "approved", qualification_status: "owner_delegated_approved", evidence: [], review_history: [{ actor: "Codex", decision: "owner_delegated_confirmed" }] };
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<CandidateWorkspace row={row} peers={[row]} operation={{ watchRevision: () => {} } as any} busy={false} onReview={vi.fn()} onRun={vi.fn()} onRefresh={vi.fn()} />));
-  expect(document.querySelector(".review-workspace")?.textContent).toContain("校验通过");
+  expect(document.querySelector(".review-workspace")?.textContent).toContain("机器合格");
   await act(async () => ([...document.querySelectorAll(".candidate-menu button")].find(button => button.textContent === "质量审计记录") as HTMLButtonElement).click());
   await act(async () => ([...document.querySelectorAll(".audit-tabs button")].find(button => button.textContent === "修订") as HTMLButtonElement).click());
   expect(document.querySelector(".audit-workspace")?.textContent).toContain("审核历史");
@@ -146,7 +146,7 @@ it("refreshes the open Drawer and table before reporting Revision complete", asy
   await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody tr[role=button]")!.click());
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
   expect(document.querySelector(".review-table tbody")?.textContent).toContain("新题");
-  expect(tableValue("检索探针")).toBe("100");
+  expect(tableValue("Probe")).toBe("100");
   expect(document.querySelector(".candidate-workspace .quality-grid")?.textContent).toContain("通过");
   expect(document.querySelector(".candidate-workspace .workspace-badges")?.textContent).not.toContain("QC 通过");
   expect(document.querySelector(".ui-run")?.textContent).toContain("已完成");
@@ -166,14 +166,14 @@ it("refreshes single Probe and QC results in both table and open Drawer", async 
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [base] }} />));
   await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody tr[role=button]")!.click());
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".quality-grid button")].find(button => button.textContent === "运行检索探针")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".quality-grid button")].find(button => button.textContent === "运行 Probe")!.click());
  await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
-  expect(tableValue("检索探针")).toBe("100");
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".quality-grid button")].find(button => button.textContent === "运行质检")!.click());
+  expect(tableValue("Probe")).toBe("100");
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".quality-grid button")].find(button => button.textContent === "运行 QC")!.click());
  await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   expect(qc).toBe(true);
-  expect(tableValue("检索探针")).toBe("100");
-  expect(tableValue("质检")).toBe("95");
+  expect(tableValue("Probe")).toBe("100");
+  expect(tableValue("QC")).toBe("95");
   expect(document.querySelector(".review-workspace")?.textContent).toContain("通过");
   await act(async () => root.unmount());
 });
@@ -279,10 +279,10 @@ it("shows Gate 1 complete without a separate Snapshot action", async () => {
   const questions = Array.from({ length: 20 }, (_, index) => ({ id: `V1-${index + 1}`, slot: `Q${String(index + 1).padStart(2, "0")}`, question: "测试题", test_category: "positive", legacy_question_type: "v1_mini", review_status: "approved", probe_status: "probe_passed", qc_status: "qc_passed", stage: "golden", evidence: [] }));
   vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/documents") ? [] : goldenFixture(url, questions)), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(row => row.id), artifacts: {} }], dataset: questions, snapshots: [{ id: "GD-20", status: 'approved', snapshot: { generation_run_id: "GGEN-20", question_ids: questions.map(row => row.id) } }] }} />));
+  await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(row => row.id), artifacts: {} }], dataset: questions, snapshots: [{ id: "GD-20", snapshot: { generation_run_id: "GGEN-20", question_ids: questions.map(row => row.id) } }] }} />));
   expect(document.querySelector(".ui-gp")?.textContent).toContain("已冻结");
   expect(document.querySelector(".ui-gp-steps li:last-child")?.classList.contains("done")).toBe(true);
-  expect(document.querySelector(".ui-gp-steps li:last-child small")?.textContent).toBe("签署未记录");
+  expect(document.querySelector(".ui-gp-steps li:last-child small")?.textContent).toBe("人工审核");
   expect(document.querySelectorAll(".snapshot-next button")).toHaveLength(0);
   await act(async () => root.unmount());
 });
@@ -401,7 +401,7 @@ it("starts Q09 independently and keeps Q01 as read-only context", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(item => item.id), artifacts: {} }], dataset: questions }} />));
   await act(async () => (document.querySelector<HTMLElement>('.review-table tbody tr[aria-label^="Q09"]')!).click());
-  expect(document.body.textContent).toContain("关联 正向：Q01");
+  expect(document.body.textContent).toContain("关联 正向（Positive）：Q01");
   await act(async () => ([...document.querySelectorAll(".candidate-actionbar button")].find(button => button.textContent === "编辑") as HTMLButtonElement).click());
   expect(document.querySelector(".revision-pair input[type='checkbox']")).toBeNull();
   expect(document.querySelectorAll(".draft-workspace")).toHaveLength(0);
@@ -478,7 +478,7 @@ it.each([48,49,50])('machine filter shows all %i qualified candidates locally an
   }));
   const root=createRoot(document.body.appendChild(document.createElement('div')));
   await act(async()=>root.render(<GovernancePage data={{generationRuns:[run],dataset:rows}}/>));
-  const button=[...document.querySelectorAll<HTMLButtonElement>('.review-filters button')].find(b=>b.textContent?.startsWith('校验通过'))!;
+  const button=[...document.querySelectorAll<HTMLButtonElement>('.review-filters button')].find(b=>b.textContent?.startsWith('机器合格'))!;
   expect(button.textContent).toContain(String(count));
   await act(async()=>button.click());expect(document.querySelectorAll('.review-table tbody tr')).toHaveLength(count);
   await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('.review-filters button')].find(b=>b.textContent?.startsWith('全部'))!.click());

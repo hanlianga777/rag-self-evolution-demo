@@ -18,7 +18,7 @@ it('keeps the knowledge flow generic when index measurements exist',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({knowledge,index:knowledge.index}))));
  const root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<KnowledgePage data={{documents:[]}}/>));
  const flow=document.querySelector('.ui-kf')!;
- expect(flow.textContent).toContain('父段落');expect(flow.textContent).toContain('知识片段');expect(flow.textContent).toContain('按主题分组');expect(flow.textContent).not.toMatch(/\d/);
+ expect(flow.textContent).toContain('Parent 分块');expect(flow.textContent).toContain('Child 分块');expect(flow.textContent).toContain('主题聚类');expect(flow.textContent).not.toMatch(/\d/);
  expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);await act(async()=>root.unmount());
 });
 
@@ -27,7 +27,7 @@ it('keeps the knowledge flow generic when index measurements are absent',async()
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({knowledge,index:knowledge.index}))));
  const root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<KnowledgePage data={{documents:[]}}/>));
  const flow=document.querySelector('.ui-kf')!;
- expect(flow.textContent).toContain('父段落');expect(flow.textContent).toContain('知识片段');expect(flow.textContent).toContain('按主题分组');expect(flow.textContent).not.toMatch(/\d/);
+ expect(flow.textContent).toContain('Parent 分块');expect(flow.textContent).toContain('Child 分块');expect(flow.textContent).toContain('主题聚类');expect(flow.textContent).not.toMatch(/\d/);
  expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);await act(async()=>root.unmount());
 });
 
@@ -38,7 +38,7 @@ it("groups pipeline configuration by purpose and marks parameters by their contr
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<SettingsPage data={{ documents: [{ parser: "PyMuPDF", chunk_strategy: "Section-aware" }], versions: [{ status: "active", snapshot: { generation_model: "generation-model" } }], readiness: { status: "ready", model: "provider-model" }, evaluation: { judge: { model: "judge-model", temperature: 0.9, execution_snapshot: { generation_model: "generation-model", temperature: 0.2 } } } }} />));
   expect(document.querySelector(".light-stepper")).toBeNull();
-  expect([...document.querySelectorAll(".settings-page h2")].map(item => item.textContent)).toEqual(["技术选型", "运行配置参数"]);
+  expect([...document.querySelectorAll(".settings-page h2")].map(item => item.textContent)).toEqual(["技术选型", "Agent 可选参数"]);
   expect(document.querySelector('[data-parameter="top_k"]')?.textContent).not.toContain("Baseline 未采集");
   expect(document.body.textContent).toContain("Baseline 待评测");
   expect(document.querySelector(".provider-status-row")).toBeNull();
@@ -83,7 +83,7 @@ it("keeps compact pool toolbar and stashes selections across browse mode", async
   expect(toolbar.textContent).toContain("创建Golden");
   expect(titleToolbar.querySelector('[aria-label="候选质量筛选"]')).not.toBeNull();
   expect(titleToolbar.querySelector('input[aria-label="搜索候选池"]')).not.toBeNull();
-  expect(document.querySelector(".candidate-pool-table")?.textContent).toContain("校验通过");
+  expect(document.querySelector(".candidate-pool-table")?.textContent).toContain("机器合格");
   expect(document.querySelector('input[type="checkbox"]')).toBeNull();
   const click = async (text:string) => act(async () => { [...toolbar.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent===text)!.click(); });
   await click("创建Golden");
@@ -117,7 +117,7 @@ it("shows a completed failed Probe as pending action rather than not started", a
   vi.stubGlobal("fetch", vi.fn(async (url:string) => new Response(JSON.stringify(goldenFixture(url,[row])))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{generationRuns:[run], snapshots:[], dataset:[row], documents:[]}} />));
-  const probe = [...document.querySelectorAll(".ui-gp-steps li")].find(item=>item.querySelector("strong")?.textContent==="检索探针")!;
+  const probe = [...document.querySelectorAll(".ui-gp-steps li")].find(item=>item.querySelector("strong")?.textContent==="Probe")!;
   expect(probe.textContent).toContain("0/1");
   expect(probe.textContent).toContain("待处理");
   expect(probe.textContent).not.toContain("待开始");

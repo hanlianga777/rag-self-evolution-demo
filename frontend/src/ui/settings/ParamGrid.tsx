@@ -32,7 +32,7 @@ export function ParamGrid({ groups, onChange, legend = { baseline: "Baseline", o
         <h3><IconLabel name={group.icon}>{group.name}</IconLabel></h3>
         {group.items.map(item => <div key={item.key} className={`ui-pg-row${item.changed ? " changed" : ""}${item.onlineChanged ? " online-changed" : ""}`} data-parameter={item.key}>
           <div className="ui-pg-name">
-            <span>{item.label} <code>{item.key}</code></span>
+            <span>{item.label}</span>
             {item.note && <HoverCard content={item.note}><span className="ui-pg-info" tabIndex={0} aria-label={`${item.label}说明`}><Icon name="info" size={13} /></span></HoverCard>}
           </div>
           {item.fixedValue !== undefined ? <span>{item.fixedValue}（固定）</span> : <div className="ui-pg-seg" role="radiogroup" aria-label={item.label}>

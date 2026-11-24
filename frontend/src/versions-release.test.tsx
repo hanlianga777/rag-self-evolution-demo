@@ -9,31 +9,6 @@ import { VersionsPage } from "./pages/VersionsPage";
 let root: ReturnType<typeof createRoot>;
 afterEach(() => { if (root) act(() => root.unmount()); document.body.innerHTML = ""; sessionStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-it("shows Gate 1 from the current approved snapshot and preserves a saved signature", async () => {
-  const other = { id: "old", status: "approved", snapshot: { question_ids: ["old-q"] } };
-  const current = { id: "current", status: "approved", snapshot: { question_ids: ["q1", "q2", "q3"] } };
-  vi.stubGlobal("fetch", vi.fn(async (url: string) =>
-    new Response(JSON.stringify(url.includes("/governance/snapshots") ? [other, current] : {}))));
-  root = createRoot(document.body.appendChild(document.createElement("div")));
-  const gate = () => document.querySelector(".human-gates article")?.textContent;
-  const render = async (id: string, snapshots?: any[]) => {
-    await act(async () => root.render(<OperationProvider restore={false}>
-      <VersionsPage data={{ workspace: { current_golden_id: id }, snapshots }} />
-    </OperationProvider>));
-  };
-
-  await render(current.id);
-  expect(gate()).toContain("题卷已批准（快照状态 approved，3 题），原始 Gate 1 签署记录未保存");
-  expect(gate()).toContain(current.id);
-  await render(current.id, [{ ...current, snapshot: { gate1: { actor: "题卷审核人", confirmed_at: "2026-10-01T00:00:00Z" } } }]);
-  expect(gate()).toContain("题卷审核人");
-  expect(gate()).not.toContain("签署记录未保存");
-  await render(current.id, [{ ...current, snapshot: {} }]);
-  expect(gate()).toContain("快照状态 approved，题数未记录");
-  await render("missing", [other, current]);
-  expect(gate()).toContain("当前冻结记录未读取");
-});
-
 it("offers one human release action after recommendation without posting before confirmation", async () => {
   const candidate = { id: "EXP-fixture-A", reasoning: { candidate_label: "A" }, release_state: { sandbox: true, qualified: true, recommended: true, round_complete: true, human_release: false } };
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/versions?page=1&limit=50") ? [] : url.endsWith("/optimization") ? { candidates: [candidate] } : {}))));
@@ -96,22 +71,4 @@ it("offers Gate 3 for an eligible new experiment", async () => {
   await act(async () => button!.click());
   expect(document.querySelector(".confirm-dialog")).not.toBeNull();
   expect((fetch as any).mock.calls.every(([, init]: any) => !init?.method)).toBe(true);
-});
-
-
-it("labels a saved Gate 2 audit correction without relabeling original approvals", async () => {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
-  root = createRoot(document.body.appendChild(document.createElement("div")));
-  const render = async (correction?: object) => act(async () => root.render(<OperationProvider restore={false}>
-    <VersionsPage data={{ optimization: { id: "EXP", result: {
-      report_confirmation: { actor: "Codex", winner_id: "EXP-B" },
-      gate2_audit_correction: correction,
-    } } }} />
-  </OperationProvider>));
-  const gate = () => document.querySelectorAll(".human-gates article")[1]?.textContent;
-  await render();
-  expect(gate()).toContain("已确认实验报告");
-  expect(gate()).not.toContain("审计字段后补");
-  await render({ original_approval: { id: 590 } });
-  expect(gate()).toContain("已授权确认，审计字段后补");
 });

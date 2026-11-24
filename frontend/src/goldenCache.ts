@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { getJson, readCacheToken } from "./api";
 // Session memory, at most 128 views; no time-based eviction. Revisit revalidates silently.
 const values = new Map<string, { value: any; scope: ReturnType<typeof readCacheToken>; version?: string }>();
@@ -31,18 +30,3 @@ export function goldenFetch<T>(identity: string, path: string, load?: () => Prom
   return pending.get(key)!.promise;
 }
 export function invalidateGolden() { epoch++; values.clear(); pending.clear(); }
-
-export function useApprovedGolden(id: string | undefined, supplied?: any[]) {
-  const path = "/api/governance/snapshots?light=true";
-  const [loaded, setLoaded] = useState<{ id: string; rows: any[] }>();
-  useEffect(() => {
-    if (!id || supplied) return;
-    let active = true;
-    void goldenFetch<any[]>(id, path).then(rows => {
-      if (active) setLoaded({ id, rows });
-    }).catch(() => {});
-    return () => { active = false; };
-  }, [id, supplied]);
-  const rows = supplied || (loaded?.id === id ? loaded?.rows : undefined);
-  return Array.isArray(rows) ? rows.find(row => row.id === id && row.status === "approved") : undefined;
-}

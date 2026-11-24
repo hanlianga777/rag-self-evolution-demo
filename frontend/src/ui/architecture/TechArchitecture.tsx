@@ -58,7 +58,7 @@ function ParamNode({ x, y, w, h, step }: { x: number; y: number; w: number; h: n
 }
 
 export function TechArchitecture({ judgeSamples }: { layers?: unknown; judgeSamples?: number } = {}) {
-  const pages = ["概览", "知识库", "黄金测试集", "Pipeline 配置", "Baseline", "Agent 工作台", "发布", "问答验证"];
+  const pages = ["概览", "知识库", "Golden Dataset", "Pipeline 配置", "Baseline", "Agent 工作台", "发布", "问答验证"];
   const pw = (AW - 7 * 10) / 8;
   const svc = [
     { title: "评测治理", icon: "golden" as IconName, lines: ["考卷生命周期 · 判分", "Hard Gate · Bad Case 归因"] },

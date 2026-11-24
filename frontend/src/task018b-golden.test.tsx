@@ -21,17 +21,13 @@ it('hides retired scoring points (no 必答/加分/禁止), shows friend questio
  expect(document.body.textContent).not.toContain('DOC-001-C-00180');
  await act(async()=>root.unmount());
 });
-it('keeps frozen quality checks read-only and lets unfrozen candidates run them', async()=>{
+it('runs the selected quality check through the existing callback without enabling frozen edits', async()=>{
  const onRun=vi.fn(),root=createRoot(document.body.appendChild(document.createElement('div')));
- const row = {id:'Q-quality',question:'问题',probe_status:'probe_passed'};
- await act(async()=>root.render(<FrozenQuestionDetails row={row} onRun={onRun}/>));
- expect(document.querySelector('.golden-quality-results button')).toBeNull();
- expect(onRun).not.toHaveBeenCalled();
- await act(async()=>root.render(<FrozenQuestionDetails row={row} frozen={false} onRun={onRun}/>));
- for(const label of ['运行检索探针','运行质检']) { await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent===label)!.click());
+ await act(async()=>root.render(<FrozenQuestionDetails row={{id:'Q-frozen',question:'问题',probe_status:'probe_passed'}} onRun={onRun}/>));
+ for(const label of ['运行 Probe','运行 QC']) { await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent===label)!.click());
  await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
  }
- expect(onRun.mock.calls).toEqual([['Q-quality','probe'],['Q-quality','qc']]);
+ expect(onRun.mock.calls).toEqual([['Q-frozen','probe'],['Q-frozen','qc']]);
  await act(async()=>root.unmount());
 });
 it('keeps a Probe execution error separate from a completed question score',async()=>{
@@ -39,7 +35,7 @@ it('keeps a Probe execution error separate from a completed question score',asyn
  await act(async()=>root.render(<FrozenQuestionDetails row={{id:'error',question:'问题',probe_status:'needs_revision',probe:{score:0,reason:'检索服务不可用',probe_details:{probe_execution_status:'failed'}}}}/>));
  const probe=document.querySelector('.golden-probe-result')!;
  expect(probe.textContent).toContain('执行失败');
- expect(probe.textContent).not.toContain('检索探针 · 0');
+ expect(probe.textContent).not.toContain('Probe · 0');
  expect(probe.textContent).not.toContain('未通过');
  await act(async()=>root.unmount());
 });

@@ -113,5 +113,5 @@ it('reports a stale backend machine-filter mismatch rather than an empty success
   vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({rows:[],total:0,candidate_index:[{id:'Q1',qualification_status:'owner_delegated_approved'}],data_version:'v1'}))));
   function List(){const page=usePagedCandidates('stale','/api/governance/candidates?status=machine&group=all');return <p>{page.error || (page.rows.length ? 'ok' : '暂无数据')}</p>;}
   root=createRoot(document.body.appendChild(document.createElement('div')));
-  await act(async()=>root.render(<List/>));expect(document.body.textContent).toContain('校验通过统计与列表不一致');
+  await act(async()=>root.render(<List/>));expect(document.body.textContent).toContain('机器合格统计与列表不一致');
 });

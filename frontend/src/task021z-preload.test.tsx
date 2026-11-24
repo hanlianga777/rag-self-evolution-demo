@@ -19,7 +19,7 @@ it('preloads every Golden row and the pool; filters and tabs reuse memory with m
  expect(document.querySelectorAll('.review-table tbody tr')).toHaveLength(50);
  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,200));});
  await act(async()=>new Promise(resolve=>setTimeout(resolve,200)));const count=fetcher.mock.calls.length;
- for(const label of ['正向','消融','负向','校验通过','全部']){
+ for(const label of ['正向','消融','负向','机器合格','全部']){
   const button=[...document.querySelectorAll<HTMLButtonElement>('.review-filters button')].find(b=>b.textContent?.startsWith(label))!;
   await act(async()=>button.click());
   expect(document.querySelectorAll('.review-table tbody tr')).toHaveLength(Number(button.textContent?.match(/(\d+)$/)?.[1]));
@@ -83,7 +83,7 @@ it('paginates more than 200 version and feedback records locally after all backe
  await act(async()=>new Promise(resolve=>setTimeout(resolve,200)));let count=fetcher.mock.calls.length;
  root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<VersionsPage data={release}/>));count=fetcher.mock.calls.length;expect(document.querySelectorAll('tbody tr')).toHaveLength(200);expect([...document.querySelectorAll('button')].some(b=>b.textContent?.includes('查看全部'))).toBe(false);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('tbody tr')).toHaveLength(5);
- await act(async()=>root.render(<VerificationPage data={feedback} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>));await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='线上反馈')!.click());expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(200);
+ await act(async()=>root.render(<VerificationPage data={feedback} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>));await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Monitoring')!.click());expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(200);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(5);expect(fetcher).toHaveBeenCalledTimes(count);
 });
 
@@ -107,7 +107,7 @@ it('refreshes feedback when a new answer is saved, so opening its tab stays loca
  await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'新保存的合成问答');input.dispatchEvent(new Event('input',{bubbles:true}));});
  await act(async()=>document.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
  await act(async()=>new Promise(resolve=>setTimeout(resolve,200)));const count=fetcher.mock.calls.length;
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='线上反馈')!.click());
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Monitoring')!.click());
  expect(document.querySelector('.monitoring-table')?.textContent).toContain('新保存的合成问答');expect(fetcher).toHaveBeenCalledTimes(count);
 });
 
@@ -121,7 +121,7 @@ it('refreshes the resident candidate pool after a saved quality change before sw
  });vi.stubGlobal('fetch',fetcher);
  root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<GovernancePage data={{generationRuns:[run],dataset:[row()]}}/>));
  await act(async()=>document.querySelector<HTMLElement>('.review-table tbody tr')!.click());
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='运行质检')!.click());
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='运行 QC')!.click());
  await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
  await act(async()=>document.querySelector<HTMLButtonElement>('.candidate-workspace [aria-label="关闭"]')!.click());
  await act(async()=>new Promise(resolve=>setTimeout(resolve,200)));const count=fetcher.mock.calls.length;

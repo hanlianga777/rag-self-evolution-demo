@@ -1,12 +1,7 @@
-import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
-import { detailJson } from '../preload';
-import { completeResult } from './EvolutionStory';
-import { savedSnapshot } from '../evaluationProgress';
-import { TableVerdict } from './Primitives';
 import { currentQualification, formerQualification, qualificationWord } from '../candidateQualification';
-import { currentRoot, caseData } from './EvaluationDiagnosis';
+import { currentRoot } from './EvaluationDiagnosis';
 import { schemeName, shortQuestionId, storyText } from './EvolutionStory';
-import { formatValue, parameterNames, parameterDisplayNames, parameterDisplayValue } from './PipelineFields';
+import { formatValue, parameterNames } from './PipelineFields';
 import { Section } from './Primitives';
 
 const layerNames: Record<string, string> = {
@@ -168,197 +163,50 @@ export function qualificationReasons(result: any): string {
   ].filter(Boolean).join('、');
 }
 
-const comparisonMetrics = ['改了什么', '门槛通过数', '答对数', '修好', '新错',
-  '主攻问题', '回归检查', '延迟中位数（P50）', '延迟高位（P99）', '证据可信度', '推荐价值', '是否合格'];
+function comparisonValues(candidate: any, baseline: any) {
+  const statuses: Record<string, string> = { running: '运行中', queued: '排队中', failed: '运行失败', evaluated: '未完成' };
+  const status = statuses[candidate?.status] || '未运行';
+  if (status === '未运行') return Array<string>(6).fill(status);
+  const change = changesText(candidate, baseline);
+  if (evaluatedCandidate(candidate)) {
+    const result = candidate.result;
+    return [change, gatesText(result), scoreText(result), questions(result.all_fixed_question_ids),
+      questions(newFailures(result)), qualificationLabel(result)];
+  }
+  return [change, ...Array<string>(5).fill(status)];
+}
 
-export function CandidateOverviewTable({ evaluation, candidates, rounds, experiment, selectedRound, onRoundChange, targets = [], onOpen, onQuestion, onAdvanced }: {
-  evaluation: any; candidates: any[]; rounds: { round: number }[]; experiment?: any; targets?: any[];
-  selectedRound: number; onRoundChange: (round: number) => void;
-  onOpen?: (candidate: any) => void;
-  onQuestion?: (id: string, candidate?: any) => void;
-  onAdvanced?: () => void;
+export function CandidateOverviewTable({ evaluation, candidates, rounds }: {
+  evaluation: any; candidates: any[]; rounds: { round: number }[];
 }) {
   const roundNumbers = [...new Set([
     ...rounds.map(item => item.round),
     ...candidates.filter(item => item.reasoning?.candidate_label !== 'D').map(item => item.reasoning?.round || 1),
   ])].filter(Number.isInteger).sort((a, b) => a - b);
   const numbers = roundNumbers.length ? roundNumbers : [1];
-  const round = selectedRound && numbers.includes(selectedRound) ? selectedRound : numbers.at(-1)!;
-  const [mobileColumn, setMobileColumn] = useState(0);
-  const active = ['A', 'B', 'C'].map(label => candidates.find(item =>
-    (item.reasoning?.round || 1) === round && item.reasoning?.candidate_label === label));
-  const d = candidates.find(item => item.reasoning?.candidate_label === 'D');
-  const schemes = [undefined, ...active, d];
-  const labels = ['Baseline', ...['A', 'B', 'C'].map(label => `R${round}-${label}`), 'D'];
-  const baselineResult = completeResult(evaluation);
-  const latency = (result: any, key: string) => {
-    const value = result?.metrics?.[key] ?? result?.gates?.gates?.find((gate: any) => gate.metric === key)?.actual ?? result?.comparison_metrics?.[key];
-    return Number.isFinite(value) ? `${value.toFixed(1)} 秒` : '未采集';
-  };
-  const links = (ids: string[] | undefined, candidate: any) => onQuestion && Array.isArray(ids) && ids.length
-    ? <span className="compare-question-links">{[...new Set(ids)].map(id =>
-        <button className="text-button" key={id} onClick={event => { event.currentTarget.focus(); onQuestion(id, candidate); }}>{shortQuestionId(id)}</button>)}</span>
-    : questions(ids);
-  const columns: ReactNode[][] = [
-    ['基准配置', baselineResult ? gatesText(baselineResult) : '未完成', baselineResult ? scoreText(baselineResult) : '未完成', '—', '—',
-      '—', '基准评测', latency(baselineResult, 'latency_p50_seconds'), latency(baselineResult, 'latency_p99_seconds'), '基准评测', '对照基准', '基准评测'],
-    ...schemes.slice(1).map(candidate => {
-      if (!candidate) return Array<string>(comparisonMetrics.length).fill('未运行');
-      const status: Record<string, string> = { running: '运行中', queued: '排队中', failed: '运行失败', evaluated: '未完成', skipped: '已跳过' };
-      const result = completeResult(candidate);
-      const savedProgress = candidate.result;
-      const progress = Number.isFinite(savedProgress?.completed) && Number.isFinite(savedProgress?.total)
-        ? ` · ${savedProgress.completed}/${savedProgress.total}` : '';
-      const pending = (savedProgress?.price_pause?.paused ? '已暂停' : status[candidate.status] || '未运行') + progress;
-      const changes = parameterChanges(candidate, evaluation.config || {});
-      return [
-        changes.length ? <ul className="compare-parameters">{changes.map(({key, from, to}) =>
-          <li key={key}>{parameterDisplayNames[key] || key} <code>{key}</code><br/>{from === undefined ? '当时未保存' : parameterDisplayValue(from, key)} → <strong>{parameterDisplayValue(to, key)}</strong></li>)}</ul> : changesText(candidate, evaluation.config || {}),
-        result ? gatesText(result) : pending,
-        result ? scoreText(result) : pending,
-        result ? links(result.all_fixed_question_ids, candidate) : pending,
-        result ? links(newFailures(result), candidate) : pending,
-        targetText(candidate, experiment, targets),
-        result?.regression?.status === 'PASS' ? '通过' : result?.regression?.status === 'FAIL' ? '未通过' : '未保存',
-        latency(result, 'latency_p50_seconds'), latency(result, 'latency_p99_seconds'),
-        result ? candidateEvidence(candidate, experiment) : pending,
-        result ? candidateValue(candidate, experiment) : pending,
-        result ? <QualificationVersions result={result}/> : pending,
-      ];
-    }),
+  const byLabel = new Map(candidates.map(item => [
+    schemeName(item).replace(/^Candidate ([ABC])$/, 'R1-$1').replace(/^Candidate D$/, 'D'), item,
+  ]));
+  const labels = ['Baseline', ...numbers.flatMap(round => ['A', 'B', 'C'].map(label => `R${round}-${label}`)), 'D'];
+  const baselineStatus = !evaluation.id || evaluation.status === 'not_run' ? '未运行' : evaluation.status === 'running' ? '运行中'
+    : evaluation.status === 'failed' ? '运行失败' : '未知';
+  const baselineResult = evaluation.status === 'completed' && evaluation.result?.evaluation_complete !== false ? evaluation.result : undefined;
+  const columns = [
+    ['—', baselineResult ? gatesText(baselineResult) : baselineStatus, baselineResult ? scoreText(baselineResult) : baselineStatus, '—', '—', '—'],
+    ...labels.slice(1).map(label => comparisonValues(byLabel.get(label), evaluation.config || {})),
   ];
-  const name = (index: number) => schemes[index] && onOpen
-    ? <button className="text-button" onClick={() => onOpen(schemes[index])}>{labels[index]}</button>
-    : labels[index];
-  return <Section title="跨方案总表" action={onAdvanced && <button className="text-button" onClick={onAdvanced}>查看高级指标</button>}>
-    {numbers.length > 1 && <label className="compare-select">对比轮次 <select value={round} onChange={event => onRoundChange(Number(event.target.value))}>
-      {numbers.map(value => <option key={value} value={value}>第 {value} 轮</option>)}
-    </select></label>}
-    {d && <p>方案 D 基于 {schemeName(candidates.find(item => item.id === d.reasoning?.winner_id), d.reasoning?.winner_id)}，切换轮次时保留同一 D。</p>}
-    <div className="table-scroll candidate-overview-scroll candidate-overview-desktop" tabIndex={0} role="region" aria-label="Baseline 与当轮方案">
+  return <Section title="跨方案总表">
+    <div className="table-scroll candidate-overview-scroll" tabIndex={0} role="region" aria-label="Baseline 与各轮 Candidate">
       <table className="candidate-overview-table" aria-label="跨方案总表">
-        <thead><tr><th scope="col">指标</th>{labels.map((label, index) => <th key={label} scope="col">{name(index)}</th>)}</tr></thead>
-        <tbody>{comparisonMetrics.map((label, index) => <tr key={label}>
-          <th scope="row">{label}</th>{columns.map((column, offset) => <td key={labels[offset]} className={[1, 2, 7, 8].includes(index) ? 'num' : undefined}>{column[index]}</td>)}
+        <thead><tr><th scope="col">指标</th>{labels.map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+        <tbody>{['改了什么', '门槛通过数', '答对数', '修好', '新错', '是否合格'].map((label, index) => <tr key={label}>
+          <th scope="row">{label}</th>{columns.map((column, offset) => <td key={labels[offset]}>{index === 5 && evaluatedCandidate(byLabel.get(labels[offset]))
+            ? <QualificationVersions result={byLabel.get(labels[offset]).result}/>
+            : <SummaryText text={column[index]}/>}</td>)}
         </tr>)}</tbody>
       </table>
     </div>
-    <div className="candidate-overview-mobile">
-      <label className="compare-select">查看方案 <select value={mobileColumn} onChange={event => setMobileColumn(Number(event.target.value))}>
-        {labels.map((label, index) => <option key={label} value={index}>{label}</option>)}
-      </select></label>
-      <article className="ui-card"><h3>{name(mobileColumn)}</h3><dl className="compare-mobile-values">
-        {comparisonMetrics.map((label, index) => <div key={label}><dt>{label}</dt><dd>{columns[mobileColumn][index]}</dd></div>)}
-      </dl></article>
-    </div>
-    {onQuestion && evaluation.id && <SavedVerdictMatrix key={JSON.stringify([evaluation.id, ...schemes.map(item => item?.result?.evaluation_run_id)])}
-      evaluation={evaluation} schemes={schemes} labels={labels} onQuestion={onQuestion}/>}
   </Section>;
-}
-
-function SavedVerdictMatrix({ evaluation, schemes, labels, onQuestion }: {
-  evaluation: any; schemes: any[]; labels: string[]; onQuestion: (id: string, candidate?: any) => void;
-}) {
-  const openQuestion = (event: MouseEvent<HTMLButtonElement>, id: string, candidate?: any) => {
-    event.currentTarget.focus();
-    onQuestion(id, candidate);
-  };
-  const [open, setOpen] = useState(false);
-  const [scope, setScope] = useState('changed');
-  const [runs, setRuns] = useState<any[]>();
-  const [observations, setObservations] = useState<Array<string[] | null>>();
-  const [scanning, setScanning] = useState(false);
-  const snapshot = savedSnapshot(evaluation);
-  const ids = [completeResult(evaluation) ? evaluation.id : undefined, ...schemes.slice(1).map(item => completeResult(item)?.evaluation_run_id)];
-  useEffect(() => {
-    if (!open || !ids[0]) return;
-    let active = true;
-    void Promise.all(ids.map(id => id
-      ? detailJson<any>(`/api/evaluations/${encodeURIComponent(id)}/comparison-cases`).catch(() => null) : null))
-      .then(values => {
-        if (!active) return;
-        const baseline = values[0];
-        setRuns(values.map((value, index) => value?.id === ids[index] && value?.status === 'completed' &&
-          (index === 0 || baseline?.dataset_version_id && baseline.judge?.evaluation_identity &&
-            value.dataset_version_id === baseline.dataset_version_id &&
-            value.judge?.evaluation_identity === baseline.judge.evaluation_identity &&
-            baseline.config?.knowledge_identity?.corpus_snapshot_id &&
-            value.config?.knowledge_identity?.corpus_snapshot_id === baseline.config.knowledge_identity.corpus_snapshot_id) ? value : null));
-      });
-    return () => { active = false; };
-  }, [open]);
-  const baselineCases: any[] = runs?.[0]?.cases || [];
-  const scores = runs?.map(run => new Map<string, boolean | null>((run?.cases || []).map((row: any) => [row.question_id, row.passed]))) || [];
-  const annotation = new Map<string, any>((snapshot.questions || []).map((row: any) => [row.id || row.question_id, row]));
-  const negative = baselineCases.filter(row => (annotation.get(row.question_id)?.test_category ?? annotation.get(row.question_id)?.evaluation_group ?? row.test_category) === 'negative');
-  const subtype = (id: string) => annotation.get(id)?.negative_subtype ?? annotation.get(id)?.raw?.negative_subtype;
-  const safety = negative.filter(row => subtype(row.question_id) === 'safety_critical');
-  const injection = negative.filter(row => subtype(row.question_id) === 'prompt_injection');
-  const knownSubtype = negative.length > 0 && negative.every(row => typeof subtype(row.question_id) === 'string');
-  const changed = baselineCases.filter(row => typeof row.passed === 'boolean' && scores.slice(1).some(column =>
-    typeof column.get(row.question_id) === 'boolean' && column.get(row.question_id) !== row.passed));
-  const observedQuestions = baselineCases.filter((row: any) =>
-    ['positive', 'ablation'].includes(annotation.get(row.question_id)?.test_category ?? annotation.get(row.question_id)?.evaluation_group ?? row.test_category));
-  const scan = async () => {
-    setScanning(true);
-    const estimates = await Promise.all(ids.map(async (id, index) => {
-      if (!id || !runs?.[index] || !observedQuestions.length || baselineCases.length !== completeResult(evaluation)?.total) return null;
-      try {
-        const run = await detailJson<any>(`/api/evaluations/${encodeURIComponent(id)}`);
-        if (run.id !== id || !completeResult(run) || run.dataset_version_id !== runs[index].dataset_version_id
-            || run.judge?.evaluation_identity !== runs[index].judge?.evaluation_identity) return null;
-        const answers = new Map<string, string>((run.cases || []).map((row: any) => [row.question_id, caseData(row).model_answer]));
-        if (!observedQuestions.every(row => typeof answers.get(row.question_id) === 'string' && answers.get(row.question_id)?.trim())) return null;
-        return observedQuestions.filter(row => answers.get(row.question_id)?.includes('说明书没有')).map(row => row.question_id);
-      } catch { return null; }
-    }));
-    setObservations(estimates);
-    setScanning(false);
-  };
-  const rows = scope === 'negative' ? negative : scope === 'safety' ? safety : scope === 'injection' ? injection : changed;
-  return <details className="saved-verdict-matrix" onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary>逐题回归与风险题</summary>
-    {!ids[0] ? <p>等待已完成的基准评测。</p> : !runs ? <p role="status">正在读取保存的逐题判定…</p> : !runs[0] ? <p>基准逐题结果未读取。</p> : <>
-      <p>对照同题卷、知识库和判分身份。安全和注入题属于负向题，题数有重叠。</p>
-      <label className="compare-select">逐题范围 <select value={scope} onChange={event => setScope(event.target.value)}>
-        <option value="changed">结果变化（{changed.length}）</option>
-        <option value="negative">负向（{negative.length}）</option>
-        <option value="safety">安全关键（{knownSubtype ? safety.length : '未采集'}）</option>
-        <option value="injection">提示注入（{knownSubtype ? injection.length : '未采集'}）</option>
-      </select></label>
-      <div className="table-scroll" tabIndex={0} role="region" aria-label="逐题回归矩阵"><table className="candidate-overview-table">
-        <thead><tr><th scope="col">题号</th>{labels.map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
-        <tbody>{rows.map(row => <tr key={row.question_id}>
-          <th scope="row"><button className="text-button" onClick={event => openQuestion(event, row.question_id)}>{shortQuestionId(row.question_id)}</button></th>
-          {labels.map((label, index) => {
-            const verdict = scores[index]?.get(row.question_id);
-            const change = index && typeof verdict === 'boolean' && typeof row.passed === 'boolean' && verdict !== row.passed;
-            const severity = schemes[index]?.result?.regression_review?.case_severities?.[row.question_id];
-            return <td key={label}>{typeof verdict === 'boolean'
-              ? <button className="text-button" aria-label={`${label} ${shortQuestionId(row.question_id)} 题目详情`} onClick={event => openQuestion(event, row.question_id, schemes[index])}>
-                  <TableVerdict value={verdict} pass="PASS" fail="FAIL"/>{change ? verdict ? ' · 修好' : severity === 'critical' ? ' · 严重新错' : severity === 'ordinary' ? ' · 普通新错' : ' · 新错' : null}
-                </button>
-              : ids[index] ? '未采集' : '未运行'}</td>;
-          })}
-        </tr>)}</tbody>
-        {scope !== 'changed' && rows.length > 0 && <tfoot><tr><th scope="row">通过 / 题数</th>{labels.map((label, index) => {
-          const verdicts = rows.map(row => scores[index]?.get(row.question_id));
-          return <td className="num" key={label}>{verdicts.every(value => typeof value === 'boolean')
-            ? `${verdicts.filter(Boolean).length} / ${rows.length}` : '未采集'}</td>;
-        })}</tr></tfoot>}
-      </table></div>
-      <div className="phrase-observation">
-        <h3>话术观察</h3>
-        <p>按正向与消融题的保存回答，统计包含「说明书没有」原词的答案。每题计一次。字面匹配第 1 版。</p>
-        {observations ? <ul>{labels.map((label, index) => <li key={label}>{label} · {observations[index]
-          ? <>{observations[index]!.length}/{observedQuestions.length} 题 {observations[index]!.map(id =>
-            <button className="text-button" key={id} onClick={event => openQuestion(event, id, schemes[index])}>{shortQuestionId(id)}</button>)}</>
-          : "未采集"}</li>)}</ul>
-          : <button className="text-button" disabled={scanning} onClick={() => void scan()}>{scanning ? "读取保存回答…" : "查看「说明书没有」计数"}</button>}
-      </div>
-      {!rows.length && <p>{(scope === 'safety' || scope === 'injection') && !knownSubtype ? '冻结题卷的负向子类未完整读取。' : '当前范围无可展示题目。'}</p>}
-    </>}
-  </details>;
 }
 
 export function candidateEvidence(candidate: any, experiment: any) {

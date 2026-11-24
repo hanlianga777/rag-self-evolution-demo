@@ -43,15 +43,13 @@ it.each([
   ['有本方案的检索预演', { audit: { retrieval_preview } }, '预演：改后 Q20、Q30 的证据会进入资料'],
   ['无检索预演', {}, '预计修好 Q16、Q20'],
   ['只有其他配置的检索预演', { retrieval_preview: { ...retrieval_preview, configs: retrieval_preview.configs.slice(0, 1) } }, '预计修好 Q16、Q20'],
-])('路线保留方案依据，指标集中在对比页（%s）', async (_case, saved, basis) => {
+])('拼装五行首屏（%s）', async (_case, saved, basis) => {
   await mount({ ...saved, agent_strategies: { 1: strategy } }, [candidate]);
   expect([...document.querySelectorAll('.candidate-card-summary .summary-text')].map(line => line.textContent)).toEqual([
     'Candidate A · 扩大召回', 'Candidate K 12 → 24；Top-K 4 → 6', '检索层 2 题：Q16、Q20', basis,
+    '修好 Q16、Q20 · 新错 无 · 43/50 · 门槛 11/11',
   ]);
   expect(document.querySelector('.candidate-card details')?.textContent).toContain('检查靠后的证据');
-  expect(document.querySelector('.candidate-card .candidate-result-line')).toBeNull();
-  await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '查看沙盒评测和逐题回归')!.click());
-  expect(document.querySelector('.candidate-overview-table')?.textContent).toContain('43/50');
 });
 
 it('汇总各轮和未运行的方案，只显示完成评测的成绩', async () => {
@@ -60,21 +58,19 @@ it('汇总各轮和未运行的方案，只显示完成评测的成绩', async (
     { ...candidate, id: 'EXP-R2-B', status: 'evaluated', reasoning: { candidate_label: 'B', round: 2 }, result: { evaluation_complete: false } }];
   await mount({}, candidates, 'candidate-comparison');
   const table = document.querySelector('[aria-label="跨方案总表"]');
-  const headings = () => Array.from(table!.querySelectorAll('thead th'), cell => cell.textContent);
-  const values = (label: string) => Array.from(
-    Array.from(table!.querySelectorAll('tbody tr')).find(row => row.querySelector('th')?.textContent === label)!.querySelectorAll('td'),
-    cell => cell.textContent,
-  );
-  expect(headings()).toEqual(['指标', 'Baseline', 'R2-A', 'R2-B', 'R2-C', 'D']);
-  expect(values('答对数')).toEqual(['41/50', '未运行', '未完成', '未运行', '未运行']);
-  const round = document.querySelector<HTMLSelectElement>('.compare-select select')!;
-  await act(async () => { round.value = '1'; round.dispatchEvent(new Event('change', {bubbles:true})); });
-  expect(headings()).toEqual(['指标', 'Baseline', 'R1-A', 'R1-B', 'R1-C', 'D']);
-  expect(values('门槛通过数')).toEqual(['10/11', '11/11', '已跳过', '未运行', '未运行']);
-  expect(values('答对数')).toEqual(['41/50', '43/50', '已跳过', '未运行', '未运行']);
-  expect(values('修好')[1]).toBe('Q16Q20');
-  expect(values('新错')[1]).toBe('无');
-  expect(values('是否合格')[1]).toBe('合格规则版本：当时未保存');
+  expect([...table?.querySelectorAll('thead th') ?? []].map(cell => cell.textContent)).toEqual([
+    '指标', 'Baseline', 'R1-A', 'R1-B', 'R1-C', 'R2-A', 'R2-B', 'R2-C', 'D',
+  ]);
+  expect([...table?.querySelectorAll('tbody tr:first-child td') ?? []].map(cell => cell.textContent)).toEqual([
+    '—', 'Candidate K 12 → 24；Top-K 4 → 6', '未运行', '未运行', '未运行', 'Candidate K 12 → 24；Top-K 4 → 6', '未运行', '未运行',
+  ]);
+  expect([...table?.querySelectorAll('tbody tr') ?? []].slice(1).map(row => [...row.querySelectorAll('td')].map(cell => cell.textContent))).toEqual([
+    ['10/11', '11/11', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
+    ['41/50', '43/50', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
+    ['—', 'Q16、Q20', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
+    ['—', '无', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
+    ['—', '合格规则版本：当时未保存', '未运行', '未运行', '未运行', '未完成', '未运行', '未运行'],
+  ]);
 });
 
 it('uses saved reassessments as the main A/B verdict and preserves the former verdict in route and review', async () => {
@@ -124,6 +120,5 @@ it('switches from a new experiment to the read-only archive with its own saved B
   expect(document.body.textContent).not.toContain('运行本轮 A/B/C Sandbox');
   await select('current');
   expect(document.body.textContent).not.toContain('旧实验只读');
-  await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '查看沙盒评测和逐题回归')!.click());
-  expect(document.querySelector('.candidate-overview-table')?.textContent).toContain('43/50');
+  expect(document.querySelector('.candidate-result-line')?.textContent).toContain('43/50');
 });

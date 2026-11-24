@@ -32,10 +32,10 @@ it("shows only changed parameters on the release main screen and opens full conf
   await render(<VersionsPage data={{ versions: [production, { id: "baseline-v1", status: "archived", config: { prompt_strategy: "Grounded", rerank: false } }] }} />);
   expect(document.querySelector(".release-diff")?.textContent).toContain("Grounded");
   expect(document.querySelector(".release-diff")?.textContent).toContain("Abstention");
-  expect(document.querySelector(".page-content")?.textContent).not.toContain("重排");
+  expect(document.querySelector(".page-content")?.textContent).not.toContain("Rerank");
   expect(document.querySelector(".release-panel-layout details")).toBeNull();
   await click("查看发布快照");
-  expect(document.querySelector(".drawer")?.textContent).toContain("重排");
+  expect(document.querySelector(".drawer")?.textContent).toContain("Rerank");
   expect(document.querySelector(".drawer pre")).toBeNull();
 });
 
@@ -65,8 +65,8 @@ it("orders verification tabs and reduces Monitoring to question, state, judgemen
   const monitoring = { events: [{ id: "MON-internal", question: "新问题", answer: "实际回答", determinable: false, source: { production_version_id: "PROD-source" }, metrics: { latency_ms: 33 } }], triggers: [] };
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(monitoring))));
   await render(<VerificationPage data={{ monitoring }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
-  expect([...document.querySelectorAll(".tabs > button")].map(node => node.textContent)).toEqual(["回答对比", "实时问答", "线上反馈"]);
-  await click("线上反馈");
+  expect([...document.querySelectorAll(".tabs > button")].map(node => node.textContent)).toEqual(["Before/After", "实时问答", "Monitoring"]);
+  await click("Monitoring");
   expect([...document.querySelectorAll(".monitoring-table th")].map(node => node.textContent)).toEqual(["时间", "问题", "耗时", "引用数", "标注状态", "操作"]);
   expect(document.querySelector(".monitoring-table")?.textContent).not.toContain("33 ms");
   expect(document.querySelector(".stage-stepper")).toBeNull();
@@ -85,7 +85,7 @@ it("requires human judgement and confirmation before starting only the linked Mo
     return new Response(JSON.stringify(value));
   }));
   await render(<VerificationPage data={{ workspace: { current_baseline_id: "B1" }, monitoring: monitoring(), optimization: { id: "EXP-prior", candidates: [{ id: "prior-A" }] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
-  await click("线上反馈");
+  await click("Monitoring");
   expect(posts).toHaveLength(0);
   await click("Bad Case");
   expect(posts).toHaveLength(0);

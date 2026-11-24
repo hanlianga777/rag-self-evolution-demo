@@ -21,7 +21,7 @@ it('uses one finite filter per dimension, real counts and resets on returning to
  expect(document.querySelector('.diagnosis-filters [role=combobox]')).toBeNull();
  const retrieval=[...document.querySelectorAll<HTMLButtonElement>('[aria-label="Bad Case 分类"] button')].find(b=>b.textContent?.includes('检索层'))!;
  await act(async()=>retrieval.click());expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(1);
- await click('硬门槛');await click('Bad Case 诊断');expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(2);
+ await click('Hard Gate');await click('Bad Case 诊断');expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(2);
  expect(document.body.textContent).not.toContain('恢复全部');expect(document.body.textContent).not.toContain('每类首例');
 });
 it('links multiple saved candidate hypotheses to the same actual problem and keeps raw rationale in the visible audit',async()=>{
@@ -40,6 +40,6 @@ it('compares a pending release against current Production rather than unrelated 
 });
 it('shows the real feedback chain with a compact empty state and no pretend monitoring rows',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({events:[],triggers:[]}))));
- await mount(<VerificationPage data={{monitoring:{events:[],triggers:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);await click('线上反馈');
- expect(document.querySelectorAll('.feedback-loop-node')).toHaveLength(0);expect(document.querySelector('.feedback-next-inputs')?.textContent).toContain('评测、回归和人工发布确认');expect(document.querySelector('.monitoring-table')).toBeNull();expect(document.querySelector('.feedback-empty')?.textContent).toContain('暂无线上问答记录');expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method || init.method==='GET')).toBe(true);
+ await mount(<VerificationPage data={{monitoring:{events:[],triggers:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);await click('Monitoring');
+ expect(document.querySelectorAll('.feedback-loop-node')).toHaveLength(0);expect(document.querySelector('.feedback-next-inputs')?.textContent).toContain('重新走评测、回归和三道 Gate');expect(document.querySelector('.monitoring-table')).toBeNull();expect(document.querySelector('.feedback-empty')?.textContent).toContain('暂无线上问答记录');expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method || init.method==='GET')).toBe(true);
 });

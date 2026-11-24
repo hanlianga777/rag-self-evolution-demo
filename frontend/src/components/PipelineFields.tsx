@@ -1,10 +1,10 @@
 import { DataTable } from "./DataTable";
 import { useState } from "react";
-import { displayText, parameterDisplayNames, pipelineValue } from "../display";
+import { displayText, parameterNames, pipelineValue } from "../display";
 import { TruncatedText } from "./Primitives";
 import { Drawer } from "./Dialog";
 
-export { parameterNames, parameterDisplayNames } from "../display";
+export { parameterNames } from "../display";
 
 type SearchRule = { type: string; allowed: unknown[]; description?: string; options?: {value: unknown; description: string}[] };
 
@@ -27,26 +27,16 @@ export function formatValue(value: unknown, key?: string): string {
   return pipelineValue(value, key) ?? "未采集";
 }
 
-export function parameterDisplayValue(value: unknown, key: string) {
-  const rendered = formatValue(value, key);
-  const labels: Record<string, string> = {
-    Strict: "严格（Strict）", Looser: "宽松（Looser）", Safe: "安全（Safe）",
-    ON: "开启", OFF: "关闭", Off: "关闭（Off）", Low: "低（Low）",
-    High: "高（High）", Max: "最高（Max）", Unlimited: "不限",
-  };
-  return labels[rendered] || rendered;
-}
-
 export function SearchSpaceTable({ contract, baseline }: { contract: Record<string, SearchRule>; baseline: Record<string, unknown> }) {
-  return <div className="table-scroll"><DataTable className="search-space-table"><thead><tr><th>参数</th>{Object.keys(baseline).length > 0 && <th className="parameter-value">当前 Baseline</th>}<th className="parameter-value">允许范围</th><th>依赖关系</th><th>说明</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td className="muted"><span>{parameterDisplayNames[key] || key}</span> <code>{key}</code></td>{Object.keys(baseline).length > 0 && <td className="parameter-value muted"><TruncatedText lines={2}>{parameterDisplayValue(baseline[key], key)}</TruncatedText></td>}<td className="parameter-value muted"><TruncatedText lines={2}>{rule.allowed.map(value => parameterDisplayValue(value, key)).join(" / ")}</TruncatedText></td><td className="muted"><TruncatedText lines={2}>{key === "top_k" ? "候选数不能小于保留条数" : key === "hybrid_alpha" ? "混合检索已开启" : "—"}</TruncatedText></td><td className="muted"><TruncatedText lines={2}>{searchSpaceHelp(key, rule) || "—"}</TruncatedText></td></tr>)}</tbody></DataTable></div>;
+  return <div className="table-scroll"><DataTable className="search-space-table"><thead><tr><th>参数</th>{Object.keys(baseline).length > 0 && <th className="parameter-value">当前 Baseline</th>}<th className="parameter-value">允许范围</th><th>依赖关系</th><th>说明</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td className="muted"><TruncatedText lines={2}>{parameterNames[key] || key}</TruncatedText></td>{Object.keys(baseline).length > 0 && <td className="parameter-value muted"><TruncatedText lines={2}>{key === "generation_thinking" ? thinkingLabel(baseline[key]) : formatValue(baseline[key], key)}</TruncatedText></td>}<td className="parameter-value muted"><TruncatedText lines={2}>{rule.allowed.map(value => formatValue(value, key)).join(" / ")}</TruncatedText></td><td className="muted"><TruncatedText lines={2}>{key === "top_k" ? "Candidate K 不能小于 Top-K" : key === "hybrid_alpha" ? "Hybrid Search 已开启" : "—"}</TruncatedText></td><td className="muted"><TruncatedText lines={2}>{searchSpaceHelp(key, rule) || "—"}</TruncatedText></td></tr>)}</tbody></DataTable></div>;
 }
 
 export const parameterGroups: Record<string, string[]> = { Query: ["query_rewrite", "multi_query", "hyde", "query_decompose", "alias_mapping"], Retrieval: ["candidate_k", "top_k", "min_score", "hybrid_search", "hybrid_alpha", "metadata_filter", "retrieval_max_tokens"], Rerank: ["rerank"], Generation: ["prompt_strategy", "generation_thinking", "temperature"] };
 export function ParameterDiff({ before = {}, after = {} }: { before?: Record<string, unknown>; after?: Record<string, unknown> }) {
   const [open, setOpen] = useState(false);
   const keys = Object.values(parameterGroups).flat().filter(key => key in before || key in after);
-  const changed = keys.filter(key => JSON.stringify(before[key]) !== JSON.stringify(after[key]));
-  const render = (selected: string[]) => Object.entries(parameterGroups).map(([name, members]) => { const rows = members.filter(key => selected.includes(key)); return rows.length ? <section className="parameter-group drawer-section" key={name}><h3>{displayText(name)}</h3><div className="table-scroll"><DataTable><thead><tr><th>参数</th><th>调整前</th><th>调整后</th></tr></thead><tbody>{rows.map(key => <tr key={key} className={changed.includes(key) ? "parameter-changed" : ""}><td>{parameterDisplayNames[key] || key} <code>{key}</code></td><td className={typeof before[key] === "number" ? "num" : "muted"}>{before[key] === undefined ? "当时未保存" : parameterDisplayValue(before[key], key)}</td><td className={typeof after[key] === "number" ? "num" : "muted"}>{changed.includes(key) ? <strong>{after[key] === undefined ? "当时未保存" : parameterDisplayValue(after[key], key)}</strong> : parameterDisplayValue(after[key], key)}</td></tr>)}</tbody></DataTable></div></section> : null; });
+  const changed = keys.filter(key => before[key] !== after[key]);
+  const render = (selected: string[]) => Object.entries(parameterGroups).map(([name, members]) => { const rows = members.filter(key => selected.includes(key)); return rows.length ? <section className="parameter-group drawer-section" key={name}><h3>{displayText(name)}</h3><div className="table-scroll"><DataTable><thead><tr><th>参数</th><th>Before</th><th>After</th></tr></thead><tbody>{rows.map(key => <tr key={key} className={changed.includes(key) ? "parameter-changed" : ""}><td className="muted">{parameterNames[key] || key}</td><td className={typeof before[key] === "number" ? "num" : "muted"}>{formatValue(before[key], key)}</td><td className={typeof after[key] === "number" ? "num" : "muted"}>{formatValue(after[key], key)}</td></tr>)}</tbody></DataTable></div></section> : null; });
   return <div className="parameter-diff">{render(changed)}{!changed.length && <p className="muted">{keys.length ? "两个保存配置的参数一致。" : "未保存可比较的配置。"}</p>}{keys.length > changed.length && <><button className="text-button" onClick={() => setOpen(true)}>{changed.length} 项变化 · 未变参数 {keys.length - changed.length}</button><Drawer open={open} onOpenChange={setOpen} title="完整配置与未变参数"><div className="drawer-body">{render(keys)}</div></Drawer></>}</div>;
 }
 

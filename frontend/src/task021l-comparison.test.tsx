@@ -5,7 +5,7 @@ import {afterEach,expect,it,vi} from 'vitest';
 import {SavedAnswerComparison} from './components/SavedAnswerComparison';
 import {ComparisonAnswer, citationText} from './components/ComparisonAnswer';
 import {comparisonPoints, explanation, metricRows} from './components/comparisonData';
-import {EvolutionPage} from './pages/EvolutionPage';
+import {OverviewPage} from './pages/OverviewPage';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
 let root:ReturnType<typeof createRoot>;
 async function mount(node:React.ReactNode){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));}
@@ -46,10 +46,8 @@ it('never guesses highlights or missing metrics, and derives the critical parame
  expect(citationText('按《操作_说明.pdf》“存放”（第8页），原文。',[source]).text).toContain('按');
 });
 it('counts qualified D alongside the qualified saved round candidate',async()=>{
- const candidates = ['C', 'D'].map(candidate_label => ({ id: candidate_label, status: 'evaluated', reasoning: { round: 3, candidate_label }, result: { total: 2, bad_case_count: 0, qualification: { qualified: true } } }));
- await mount(<EvolutionPage data={{ optimization: { id: 'exp', candidates, recommendation: { status: 'Recommended', recommended_candidate: 'D' } } }} />);
- await act(async () => [...document.querySelectorAll<HTMLButtonElement>('.tabs button')].find(button => button.textContent === '回归与推荐')!.click());
- expect(document.querySelector('.ui-fin h2')?.textContent).toContain('2 个已判定方案中 2 个合格');
+ await mount(<OverviewPage data={{optimization:{candidates:[{id:'C',status:'evaluated',reasoning:{round:3,candidate_label:'C'},result:{qualification:{qualified:true}}},{id:'D',status:'evaluated',reasoning:{candidate_label:'D'},result:{qualification:{qualified:true}}}]}}} navigate={()=>{}}/>);
+ await act(async()=>document.querySelector<HTMLButtonElement>('.ui-ov-step-wrap:nth-child(4) button')!.focus()); expect(document.body.textContent).toContain('2 个合格 Candidate');
 });
 it('handles repeated chapters, alternate document titles and multiple page references without deleting surrounding prose',()=>{
  const evidence=[source,{...source,document:'宇树_B2电池与充电器使用说明_中文版.pdf',page_start:12,section_path:'检查'},{...source,document:'宇树_B2四足机器人用户手册_中文版.pdf',page_start:18,section_path:'检查表'}];

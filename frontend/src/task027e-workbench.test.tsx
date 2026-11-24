@@ -12,7 +12,7 @@ beforeEach(()=>{
  experiment.id='exp';experiment.recommendation={recommended_candidate:d.id};
  d.reasoning.changes=[{parameter:'top_k',source_candidates:[experiment.candidates[3].id,experiment.candidates[5].id]}];
  for(const c of experiment.candidates){c.result.total_cases=50;c.result.gates.passed_count=c.result.qualification.qualified?11:10;c.result.gates.total=11;if(c.reasoning.candidate_label!=='D'){c.reasoning.core_idea=`这一轮${c.reasoning.candidate_label}的保存思路。`;c.reasoning.hypothesis=`这项设计用来验证${c.reasoning.candidate_label}的假设。第二句话不摘录。`;}}
- data={workspace:{},optimization:experiment,evaluation:{id:'base',status:'completed',config:sampleBaselineConfig,result:{total:50,bad_case_count:6}},badCases:[4,6,24,27,29,38].map(n=>({id:`case${n}`,run_id:'base',question_id:`Q${String(n).padStart(2,'0')}`,result:{passed:false,question:`保存问题${n}`,diagnostic_view:{diagnosis_category:'检索层问题'}}})),overview:{production:{provenance:'published',snapshot:{candidate_id:d.id,human_release:{decision:'approved'}}}}};
+ data={workspace:{},optimization:experiment,evaluation:{id:'base',status:'completed',config:sampleBaselineConfig,result:{total:50,bad_case_count:6}},badCases:[4,6,24,27,29,38].map(n=>({id:`case${n}`,run_id:'base',question_id:`Q${String(n).padStart(2,'0')}`,result:{passed:false,question:`保存问题${n}`,diagnostic_view:{diagnosis_category:'检索层问题'}}})),overview:{production:{provenance:'published',snapshot:{candidate_id:d.id}}}};
 });
 afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();});
 async function mount(){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<EvolutionPage data={data}/>));}

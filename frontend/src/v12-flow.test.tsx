@@ -66,10 +66,10 @@ it("keeps Gate 1 available when every question is approved but the current run h
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, rows) : []), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [{ id: "OLD", snapshot: { generation_run_id: "G1", question_ids: ["old-question"] } }] }} />));
-  expect(document.querySelector(".ui-gp-steps li:last-child")?.textContent).toBe("题卷确认（Gate 1）待人工确认");
+  expect(document.querySelector(".ui-gp-steps li:last-child")?.textContent).toBe("Gate 1人工审核");
   expect(document.querySelector(".ui-gp-steps li:last-child")?.classList.contains("done")).toBe(false);
   expect(document.querySelector(".ui-gp")?.textContent).toContain("尚未冻结");
-  const confirm = [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "冻结黄金测试集")!;
+  const confirm = [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "冻结 Golden Dataset")!;
   expect(confirm).toBeTruthy();
   await act(async () => document.querySelector<HTMLInputElement>(".review-batch input")!.click());
   expect(confirm.disabled).toBe(false);
@@ -150,15 +150,11 @@ for (const count of [10, 12, 19]) {
   });
 }
 
-it("keeps a partial Run out of frozen metrics and routes to the test paper", async () => {
+it("keeps the Overview target at 20 and points a partial Run to refill", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
-  const navigate = vi.fn();
-  await act(async () => root.render(<OverviewPage data={{ overview: { knowledge: { identity: { corpus_snapshot_id: 'active' } }, dataset: { total: 10, expected_count: 20, generation_status: "needs_regeneration", approved: 0, pending_review: 10 } }, workspace: {} }} navigate={navigate} />));
-  const grid = document.querySelector('.overview-kpi-grid')!;
-  expect(grid.children[1].textContent).toContain('待人工确认题卷');
-  expect(grid.textContent).not.toContain('已冻结');
-  await act(async () => document.querySelector<HTMLButtonElement>('.overview-current button')!.click());
-  expect(navigate).toHaveBeenCalledWith('governance');
+  await act(async () => root.render(<OverviewPage data={{ overview: { dataset: { total: 10, expected_count: 20, generation_status: "needs_regeneration", approved: 0, pending_review: 10 } }, workspace: {} }} navigate={() => {}} />));
+  expect(document.querySelector('[aria-label="从知识到线上改善"]')?.textContent).toContain("0 / 20");
+  expect(document.querySelector(".ui-ov-action")?.textContent).toBe("补齐失败题（10）");
   await act(async () => root.unmount());
 });
 
@@ -232,7 +228,6 @@ it("confirms an evaluated qualified winner and then offers composite D", async (
 
 it.each([{ max: 13, canContinue: true }, { max: 12, canContinue: false }])("keeps saved partial rounds and requires a full next batch plus D reserve ($max slots)", async ({ max, canContinue }) => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ rules: { agent: { candidates_per_round: 3 } }, search_space: {} }))));
   const experiment = { id: "EXP2", candidates: [], recommendation: { result: { status: "No Qualified Candidate" } }, evaluation_budget: { used: 9, max, reserved_for_d: 1 }, rounds: [{ round: 3, complete: true, evaluated: 2, total: 2 }] };
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ optimization: experiment, evaluation: {}, badCases: [] }} />));

@@ -19,7 +19,7 @@ it("colors Not Qualified as a failed state", async () => {
 
 it("keeps only the selected governance workspace visible", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root.render(<GovernancePage data={{ dataset: [], generationRuns: [], snapshots: [{ id: 'old', status: 'approved', snapshot: { question_ids: [] } }] }} />));
+  await act(async () => root.render(<GovernancePage data={{ dataset: [], generationRuns: [], snapshots: [] }} />));
   expect(document.body.textContent).toContain("当前测试集");
   expect(document.body.textContent).not.toContain("历史 Candidate（未验证）");
   await openRetainedHistory();
@@ -34,8 +34,7 @@ it("shows one Evolution stage instead of four stacked cards", async () => {
   expect(document.querySelector(".agent-overview")).not.toBeNull(); expect(document.querySelectorAll(".tabs button")).toHaveLength(3);
   expect(document.body.textContent).not.toContain("Sandbox 对比");
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "进化路线")!.click());
-  expect(document.querySelector(".route-timeline")).not.toBeNull();
-  expect(document.querySelector(".agent-overview")).toBeNull();
+  expect(document.body.textContent).toContain("Sandbox 对比");
   expect(document.querySelector(".diagnosis-cards")).toBeNull();
   await act(async () => root.unmount());
 });

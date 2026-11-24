@@ -10,10 +10,10 @@ import { PageShell } from "../components/PageShell";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiUrl, errorMessage, getJson, cachedJson, postJson } from "../api";
 import { LoadingSkeleton, CustomSelect, Section, ShortId, Status, Badge, TruncatedText } from "../components/Primitives";
-import { ConfirmDialog, Drawer, QuestionDrawer } from "../components/Dialog";
+import { ConfirmDialog, Drawer } from "../components/Dialog";
 import { displayText, presentationText, isMachineQualified, localShortTime } from "../display";
 import { useOperation } from "../operation";
-import { BusinessImportPanel, CoverageSummary, CurrentCoveragePreview } from "./BusinessImportPanel";
+import { BusinessImportPanel, CurrentCoveragePreview } from "./BusinessImportPanel";
 import { FrozenQuestionDetails, goldenQuality, questionSources } from "./FrozenQuestionDetails";
 import "./golden-workspace.css";
 import { CandidateWorkspace } from "./CandidateWorkspace";
@@ -40,7 +40,6 @@ export function GovernancePage({ data }: { data: any }) {
   const [tab, setTab] = usePageTab("governance", ["run", "import"] as const, "run");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyId, setHistoryId] = useState<string>();
-  const [historyQuestion, setHistoryQuestion] = useState<Candidate>();
   const [historySnapshots, setHistorySnapshots] = useState<Candidate[]>([]);
   const [historyError, setHistoryError] = useState("");
   const refreshTicket = useRef(0);
@@ -74,16 +73,13 @@ export function GovernancePage({ data }: { data: any }) {
   const paged = usePagedCandidates(JSON.stringify([cacheIdentity, workRun?.id, workRun?.profile?.name]), listPath, !reanchored && !!(workRun?.question_ids?.length || workRun?.artifacts?.hard_validation?.slot_persistence_v1));
   const latestReview = useRef(paged.refresh); latestReview.current = paged.refresh;
   const review: Candidate[] = paged.rows, currentIndex: Candidate[] = paged.candidate_index || [], listing = paged.loading;
-  const fullSnapshot = reanchored || currentGolden?.snapshot?.reviewed_import && currentGolden.snapshot;
-  const formalDetailsLoaded = !fullSnapshot || fullSnapshot.questions?.every((row: Candidate) => typeof row.question === "string" && (!!reanchored || "evidence" in row || typeof row.reference_answer === "string"));
+  const reanchorDetailsLoaded = !reanchored || reanchored.questions?.every((row: Candidate) => typeof row.question === "string");
   useEffect(() => {
-    if (formalDetailsLoaded) return;
+    if (reanchorDetailsLoaded) return;
     let cancelled = false;
-    void goldenFetch<Candidate[]>(cacheIdentity, "/api/governance/snapshots").then(value => {
-      if (!cancelled && Array.isArray(value)) setSnapshots(value);
-    }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); });
+    void goldenFetch<Candidate[]>(cacheIdentity, "/api/governance/snapshots").then(value => { if (!cancelled) setSnapshots(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); });
     return () => { cancelled = true; };
-  }, [currentGolden?.id, cacheIdentity, formalDetailsLoaded]);
+  }, [currentGolden?.id, cacheIdentity, reanchorDetailsLoaded]);
   const historyVersions = [...snapshots, ...runs.filter(run => !snapshots.some(snapshot => snapshot.snapshot?.generation_run_id === run.id))];
   const versionNumbers = new Map([...historyVersions].reverse().sort((a, b) => (Date.parse(a.created_at) || 0) - (Date.parse(b.created_at) || 0)).map((version, index) => [version.id, index + 1]));
   const historyVersion = historyVersions.find(version => version.id === historyId) || historyVersions.find(version => (version.snapshot?.generation_run_id || version.id) === workRun?.id) || currentGolden || historyVersions[0];
@@ -113,7 +109,7 @@ export function GovernancePage({ data }: { data: any }) {
   const goldenCategoriesComplete = goldenGroups.length === goldenCount && goldenGroups.every((group: string) => ["positive", "ablation", "negative"].includes(group));
   const expectedCount = workRun?.profile?.expected_count || ["positive", "ablation", "negative"].reduce((total, category) => total + (workRun?.profile?.[category] || 0), 0) || 20;
   const currentIds: string[] = workRun?.question_ids || [];
-  const gate1Snapshot = snapshots.find(snapshot => snapshot.status === "approved" && snapshot.snapshot?.generation_run_id === workRun?.id && JSON.stringify(snapshot.snapshot?.question_ids) === JSON.stringify(currentIds));
+  const gate1Snapshot = snapshots.find(snapshot => snapshot.snapshot?.generation_run_id === workRun?.id && JSON.stringify(snapshot.snapshot?.question_ids) === JSON.stringify(currentIds));
   const savedTopicCount = workRun?.artifacts?.hard_validation?.frozen_plan?.clusters?.length;
   const [coverage, setCoverage] = useState<Candidate | null | undefined>(null);
   useEffect(() => {
@@ -128,11 +124,7 @@ export function GovernancePage({ data }: { data: any }) {
   const frozenDate = localShortTime(gate1Snapshot?.snapshot?.gate1?.confirmed_at || gate1Snapshot?.created_at);
   const plannedSlots = new Map((workRun?.artifacts?.question_plan || []).map((row: Candidate) => [row.question_id, row.coverage_slot]));
   const frozenRows: Candidate[] = reanchored?.questions?.map((question: Candidate) => ({ ...question, raw: question, slot: question.display_id, stage: "golden", review_status: "approved", qualification_status: "human_approved", probe_status: question.probe_status, qc_status: reanchored.reanchor.qc_reuse?.[question.id]?.qc_status ?? question.qc_status, probe: reanchored.reanchor.probe_results?.[question.id]?.observation ?? question.probe })) || [];
-  const current: Candidate[] = currentIds.map(id => {
-    const row = frozenRows.find(row => row.id === id) || currentIndex.find(row => row.id === id) || review.find(row => row.id === id) || items.find(row => row.id === id);
-    const saved = frozen ? gate1Snapshot?.snapshot?.questions?.find((question: Candidate) => question.id === id && typeof question.question === "string") : undefined;
-    return saved ? { ...row, ...saved, raw: { ...row?.raw, ...saved }, stage: "golden", review_status: "approved", slot: saved.display_id || row?.slot } : row;
-  }).filter((row): row is Candidate => !!row).map(row => ({ ...row, slot: row.slot || row.raw?.coverage_slot || plannedSlots.get(row.id) }));
+  const current: Candidate[] = currentIds.map(id => frozenRows.find(row => row.id === id) || currentIndex.find(row => row.id === id) || review.find(row => row.id === id) || items.find(row => row.id === id)).filter((row): row is Candidate => !!row).map(row => ({ ...row, slot: row.slot || row.raw?.coverage_slot || plannedSlots.get(row.id) }));
   const historical = items.filter(row => !currentIds.includes(row.id) && row.stage !== "golden");
   const selected = poolDetail?.id === selectedId ? poolDetail : current.find(row => row.id === selectedId) || items.find(row => row.id === selectedId);
   const candidateContentKey = JSON.stringify([selected?.id, selected?.question, selected?.reference_answer, selected?.evidence, selected?.raw?.revision_version]);
@@ -203,7 +195,7 @@ export function GovernancePage({ data }: { data: any }) {
     { key: "positive", label: "正向（Positive）", count: current.filter(row => row.test_category === "positive").length, match: (row: Candidate) => row.test_category === "positive" },
     { key: "ablation", label: "消融（Ablation）", count: current.filter(row => row.test_category === "ablation").length, match: (row: Candidate) => row.test_category === "ablation" },
     { key: "negative", label: "负向（Negative）", count: current.filter(row => row.test_category === "negative").length, match: (row: Candidate) => row.test_category === "negative" },
-    { key: "pending", label: "校验通过", count: current.filter(row => isMachineQualified(row.qualification_status)).length, match: (row: Candidate) => isMachineQualified(row.qualification_status) },
+    { key: "pending", label: "机器合格", count: current.filter(row => isMachineQualified(row.qualification_status)).length, match: (row: Candidate) => isMachineQualified(row.qualification_status) },
   ] as const, [current, failedSlots]);
   const riskFilters = [
     { key: "probe-risk", label: "Probe 未通过", match: (row: Candidate) => row.probe_status === "needs_revision" },
@@ -283,22 +275,19 @@ export function GovernancePage({ data }: { data: any }) {
           evidence_details: [{ chunks: (question.business_requirements?.sources || []).map((source: Candidate) => ({ ...source, chunk_text: source.quote })) }],
           probe: observation || { score: null, question_validity_reason: "硬校验通过；沿用已保存的题目审核。", retrieval_observation: "详见本题已保存的检索诊断记录。" },
           qc: { ...result.qc, association: snapshot.reanchor.qc_reuse?.[row.id] } };
-      } else if (frozen && currentIds.includes(row.id)) {
-        result = { ...result, ...row, raw: { ...result.raw, ...row.raw }, evidence_details: result.evidence_details,
-          probe: row.probe ?? result.probe, qc: row.qc ?? result.qc };
       }
       if (ticket === poolTicket.current) { setPoolDetail(result); setRevisions(result.revision_history || []); setDetailStatus(""); }
     }
     catch (reason) { if (ticket === poolTicket.current) setDetailStatus(errorMessage(reason)); }
 
   };
-  const loadingWorkspace = !metadataLoaded || checkingSnapshot || !!reanchored && !formalDetailsLoaded || !!workRun && !current.length && listing;
-  return <PageShell className={`page governance-page governance-${tab} ${!workRun && tab === "run" ? "is-empty" : ""}`} header={<div className="page-title"><div><h1><IconTile name="golden" />黄金测试集</h1><p className="ui-kicker page-purpose">{pagePurpose.governance}</p></div></div>} tabs={<div className="tabs"><button data-label="当前测试集" aria-pressed={tab === "run"} className={tab === "run" ? "active" : ""} onClick={() => setTab("run")}>当前测试集</button><button data-label="候选池" aria-pressed={tab === "import"} className={tab === "import" ? "active" : ""} onClick={() => setTab("import")}>候选池</button></div>} resetKey={tab}>
+  const loadingWorkspace = !metadataLoaded || checkingSnapshot || !reanchorDetailsLoaded || !!workRun && !current.length && listing;
+  return <PageShell className={`page governance-page governance-${tab} ${!workRun && tab === "run" ? "is-empty" : ""}`} header={<div className="page-title"><div><h1><IconTile name="golden" />Golden Dataset</h1><p className="ui-kicker page-purpose">{pagePurpose.governance}</p></div></div>} tabs={<div className="tabs"><button data-label="当前测试集" aria-pressed={tab === "run"} className={tab === "run" ? "active" : ""} onClick={() => setTab("run")}>当前测试集</button><button data-label="候选池" aria-pressed={tab === "import"} className={tab === "import" ? "active" : ""} onClick={() => setTab("import")}>候选池</button></div>} resetKey={tab}>
 
-{!loadingWorkspace && tab === "run" && <div className="header-actions page-data-actions">{historyVersions.length > 0 && <button className="secondary" onClick={() => setHistoryOpen(true)}>查看题卷历史</button>}{!frozen && workRun?.status === "needs_regeneration" && <button className="primary" disabled={busy} onClick={() => setRegenerateConfirm(true)}>补齐失败题（{expectedCount - current.length}）</button>}</div>}
+{!loadingWorkspace && tab === "run" && <div className="header-actions page-data-actions">{!frozen && workRun?.status === "needs_regeneration" && <button className="primary" disabled={busy} onClick={() => setRegenerateConfirm(true)}>补齐失败题（{expectedCount - current.length}）</button>}</div>}
 {!loadingWorkspace && !frozen && tab === "run" && workRun?.status !== "needs_regeneration" && <div className="golden-new-run-actions"><label className="profile-selector"><CustomSelect ariaLabel="测试集 Profile" value={profile} onChange={value => setProfile(value as typeof profile)} options={profileOptions} /></label><button className="secondary" disabled={busy || running || qualityRunning} onClick={() => setNewRunConfirm(true)}>新建测试集</button></div>}
     {error && <p className="error-notice" role="alert">{error}</p>}
-    {loadingWorkspace ? <div className="golden-skeleton golden-initial-skeleton" role="status" aria-label="正在读取黄金测试集"><span>{checkingSnapshot ? "正在读取当前冻结题卷…" : "正在读取题卷…"}</span>{[1, 2, 3, 4, 5, 6].map(index => <span key={index} aria-hidden="true" />)}</div> : tab === "run" && <div className="golden-workspace">
+    {loadingWorkspace ? <div className="golden-skeleton golden-initial-skeleton" role="status" aria-label="正在读取 Golden Dataset"><span>{checkingSnapshot ? "正在读取当前冻结题卷…" : "正在读取题卷…"}</span>{[1, 2, 3, 4, 5, 6].map(index => <span key={index} aria-hidden="true" />)}</div> : tab === "run" && <div className="golden-workspace">
 
 
 
@@ -308,31 +297,25 @@ export function GovernancePage({ data }: { data: any }) {
         { label: displayText("Coverage"), done: !!(gate1Snapshot || workRun?.artifacts?.coverage_plan?.length), value: topicCount != null ? `${topicCount} 个主题` : !workRun ? "待规划" : coverage === null ? <LoadingSkeleton label="正在读取覆盖主题" /> : "未知 个主题" },
         { label: displayText("Question Generation"), done: current.length === expectedCount, value: `${current.length}/${expectedCount}` },
         { label: displayText("Hard Validation"), done: current.length === expectedCount, value: `${current.length}/${expectedCount}` },
-        { label: "检索探针", done: current.length === expectedCount && current.every(row => row.probe_status === "probe_passed"), value: reanchored
-          ? `${current.filter(row => row.probe).length}/${expectedCount} 已记录`
-          : current.some(row => !row.probe_status) ? "部分质检记录待读取"
-          : `${current.filter(row => row.probe_status === "probe_passed").length}/${expectedCount}${current.some(row => row.probe_status === "needs_revision") ? " 待处理" : ""}` },
-        { label: "质检", done: current.length === expectedCount && current.every(row => row.qc_status === "qc_passed"), value: current.some(row => !row.qc_status) ? "部分质检记录待读取"
-          : `${current.filter(row => row.qc_status === "qc_passed").length}/${expectedCount}${current.some(row => row.qc_status === "qc_failed") ? " 待处理" : ""}` },
-        { label: "题卷确认（Gate 1）", done: !!gate1Snapshot, value: frozen ? gate1Snapshot?.snapshot?.gate1?.confirmed_at ? "已保存确认时间" : "签署未记录" : "待人工确认", accent: true },
+        { label: "Probe", done: current.length === expectedCount && current.every(row => row.probe_status === "probe_passed"), value: reanchored ? `${current.filter(row => row.probe).length}/${expectedCount} 已记录` : `${current.filter(row => row.probe_status === "probe_passed").length}/${expectedCount}${current.some(row => row.probe_status === "needs_revision") ? " 待处理" : ""}` },
+        { label: "QC", done: current.length === expectedCount && current.every(row => row.qc_status === "qc_passed"), value: `${current.filter(row => row.qc_status === "qc_passed").length}/${expectedCount}${current.some(row => row.qc_status === "qc_failed") ? " 待处理" : ""}` },
+        { label: "Gate 1", done: !!gate1Snapshot, value: "人工审核", accent: true },
       ]} frozen={{ ok: frozen, text: frozen ? `已冻结 · ${frozenDate}` : "尚未冻结" }} />
       {workRun ? <Section title={<IconLabel name="golden">题目审核</IconLabel>}>
         <div className="review-filters" aria-label="题目筛选">{filters.filter(item => item.key !== "attention" || item.count > 0).filter(item => !frozen || item.key !== "pending").map(item => <button key={item.key} aria-pressed={filter === item.key} className={filter === item.key ? "active" : ""} onClick={() => setFilter(item.key)}>{item.label} {item.count}</button>)}        <small className="muted golden-review-role" role="status">{syncing || listing ? "正在同步…" : ""}</small></div>
 
         {(syncing || listing) && !listRows.length ? <div className="golden-skeleton" role="status" aria-label="正在读取候选题">{[1,2,3,4].map(index => <span key={index} aria-hidden="true" />)}</div> : <QuestionTable rows={["all", "attention"].includes(filter) ? [...visible, ...failedSlots.map(slot => ({ id: `missing-${slot}`, slot, question: "生成失败，待补齐", failed: true }))].sort((a, b) => String(a.slot || "").localeCompare(String(b.slot || ""))) : visible} onDetail={row => row.failed ? (setErrorSlot(row.slot), setRunErrorOpen(true)) : void openPoolDetail(row)} paging={reanchored ? undefined : paged} resetKey={filter} coveragePlan={workRun?.artifacts?.hard_validation?.frozen_plan} />}
         {paged.error && <p role="alert" className="error-notice">{paged.error} <button className="text-button" onClick={() => void paged.refresh()}>重试</button></p>}
-        {current.length === expectedCount && workRun.status === "completed" && !gate1Snapshot && !checkingSnapshot && <div className="review-batch gate-one-action"><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> {workRun?.human_gate?.status === "ready" ? "我确认冻结当前黄金测试集" : "我已人工审核当前完整题集"}</label><button className="primary" aria-description={batchReason} disabled={busy || !!batchReason} onClick={() => void action(() => workRun?.human_gate?.status === "ready" ? postJson(`/api/governance/generation-runs/${workRun.id}/snapshot`, {}) : postJson("/api/governance/review-batch", { question_ids: currentIds, confirmed_manual_review: true }), workRun?.human_gate?.status === "ready" ? "冻结黄金测试集" : "审核黄金测试集")}>{workRun?.human_gate?.status === "ready" ? "冻结黄金测试集" : "确认人工审核"}</button></div>}
-      </Section> : <Section title={<IconLabel name="golden">题目审核</IconLabel>}><p className="muted">尚未生成工作题卷，可生成题目或从候选池创建测试集。</p></Section>}
+        {current.length === expectedCount && workRun.status === "completed" && !gate1Snapshot && !checkingSnapshot && <div className="review-batch gate-one-action"><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> {workRun?.human_gate?.status === "ready" ? "我确认冻结当前 Golden Dataset" : "我已人工审核当前完整题集"}</label><button className="primary" aria-description={batchReason} disabled={busy || !!batchReason} onClick={() => void action(() => workRun?.human_gate?.status === "ready" ? postJson(`/api/governance/generation-runs/${workRun.id}/snapshot`, {}) : postJson("/api/governance/review-batch", { question_ids: currentIds, confirmed_manual_review: true }), workRun?.human_gate?.status === "ready" ? "冻结 Golden 测试集" : "审核 Golden 测试集")}>{workRun?.human_gate?.status === "ready" ? "冻结 Golden Dataset" : "确认人工审核"}</button></div>}
+      </Section> : <Section title={<IconLabel name="golden">题目审核</IconLabel>}><p className="muted">尚未生成工作 Run，可生成题目或从候选池创建测试集。</p><CurrentCoveragePreview profile={profile} corpusFingerprint={data.workspace?.current_corpus_fingerprint} documents={data.documents || []} /></Section>}
     </div>}
     <ConfirmDialog open={regenerateConfirm} onOpenChange={setRegenerateConfirm} title="确认补齐失败题" busy={busy} onConfirm={() => { setRegenerateConfirm(false); void regenerate(); }}><p>仅补齐当前测试集的失败题，会调用模型并产生费用，并继续执行 Probe / QC。</p><p>不会影响当前线上版本。</p></ConfirmDialog>
     <ConfirmDialog open={newRunConfirm} onOpenChange={setNewRunConfirm} title="新建测试集" busy={busy} onConfirm={() => { setNewRunConfirm(false); void createMini(); }}><p>新测试集：{profileOptions.find(option => option.value === profile)?.label}</p><p>{frozen ? "当前题卷已冻结。" : "当前工作集尚未完成最终确认。"}新建测试集将调用模型并产生费用，是否继续？</p></ConfirmDialog>
 
-    {!loadingWorkspace && <div className="golden-pool" hidden={tab !== "import"}><BusinessImportPanel refreshVersion={poolVersion} readOnly={frozen} profiles={profiles} items={items} onCreated={refreshAfterMutation} onDetail={row => void openPoolDetail(row)} initialProfile={profile} currentQuestionIds={currentIds} coveragePlan={workRun?.artifacts?.hard_validation?.frozen_plan} corpusFingerprint={data.workspace?.current_corpus_fingerprint} />{workRun || frozen
-      ? <CoverageSummary run={workRun} questions={current} documents={data.documents || []} persistedPlan={gate1Snapshot?.snapshot?.coverage_plan}/>
-      : !frozen && <CurrentCoveragePreview profile={profile} corpusFingerprint={data.workspace?.current_corpus_fingerprint} documents={data.documents || []}/>}</div>}
+    {!loadingWorkspace && <div className="golden-pool" hidden={tab !== "import"}><BusinessImportPanel refreshVersion={poolVersion} readOnly={frozen} profiles={profiles} items={items} onCreated={refreshAfterMutation} onDetail={row => void openPoolDetail(row)} initialProfile={profile} currentQuestionIds={currentIds} coveragePlan={workRun?.artifacts?.hard_validation?.frozen_plan} corpusFingerprint={data.workspace?.current_corpus_fingerprint} /></div>}
 
-    <Drawer showCloseFooter={false} open={historyOpen} onOpenChange={setHistoryOpen} title="题卷历史 · 只读"><div className="drawer-body snapshot-history">
-      <Section title="题卷版本"><div className="run-list">{historyVersions.map(version => <div key={version.id} className="snapshot-version-row" aria-current={version.id === historyVersion?.id ? "true" : undefined}>
+    <Drawer showCloseFooter={false} open={historyOpen} onOpenChange={setHistoryOpen} title="Golden 历史版本"><div className="drawer-body snapshot-history">
+      <Section title="Golden 版本"><div className="run-list">{historyVersions.map(version => <div key={version.id} className="snapshot-version-row" aria-current={version.id === historyVersion?.id ? "true" : undefined}>
         <HoverCard content={version.id}><strong tabIndex={0}>第 {versionNumbers.get(version.id)} 版 · {localShortTime(version.created_at)} · {(version.snapshot?.question_ids || version.question_ids)?.length ?? "未知"} 题</strong></HoverCard>
         <Status value={version.status} />{version.id === currentGolden?.id && <Badge tone="accent">当前使用</Badge>}
         <button className="secondary ui-action-sm" onClick={() => setHistoryId(version.id)}>查看</button>
@@ -340,14 +323,10 @@ export function GovernancePage({ data }: { data: any }) {
       {historyVersion && <Section title="选中版本题目" action={<div className="header-actions snapshot-history-toolbar" aria-label="选中版本操作">
         {([['markdown', 'Markdown'], ['csv', 'CSV'], ['json', 'JSON']] as const).map(([format, label]) => historyExportable ? <a className="secondary ui-action-sm" key={format} href={apiUrl(`/api/governance/generation-runs/${historyRunId}/export?format=${format}`)} download>导出 {label}</a> : <HoverCard key={format} content={!historyRunId ? "没有关联的工作集，无法导出。" : "题目尚未齐全，无法导出。"}><span tabIndex={0}><button className="secondary ui-action-sm" disabled>导出 {label}</button></span></HoverCard>)}
 
-      </div>}><div className="snapshot-version-preview">{(historyError || historyCandidates.error) ? <p role="alert">{historyError || historyCandidates.error}</p> : historyComplete ? <QuestionTable rows={historyDisplayRows} onDetail={setHistoryQuestion} /> : historyCandidates.loading || historyVersion.snapshot && !historySnapshots.length ? <LoadingSkeleton label="正在读取选中版本" /> : <p>该版本未保存完整题目。</p>}</div></Section>}
-      <Section title="历史 Candidate（未验证）"><section><h3 className="disclosure-heading">{historical.length} 道历史 {displayText("Candidate")}</h3><p className="muted">仅供追溯，不参与当前 Golden、Baseline 或发布判断。</p><QuestionTable rows={historical.length <= 200 ? historical : historical.slice(historyPage * 200, historyPage * 200 + 200)} onDetail={setHistoryQuestion} />{historical.length > 200 && <div className="history-pagination"><button className="secondary" disabled={historyPage === 0} onClick={() => setHistoryPage(page => page - 1)}>上一页</button><span>{historyPage + 1} / {Math.max(1, Math.ceil(historical.length / 200))}</span><button className="secondary" disabled={(historyPage + 1) * 200 >= historical.length} onClick={() => setHistoryPage(page => page + 1)}>下一页</button></div>}</section></Section>
+      </div>}><div className="snapshot-version-preview">{(historyError || historyCandidates.error) ? <p role="alert">{historyError || historyCandidates.error}</p> : historyComplete ? <QuestionTable rows={historyDisplayRows} onDetail={row => { setHistoryOpen(false); void openPoolDetail(row); }} /> : <LoadingSkeleton label="正在读取选中版本" />}</div></Section>}
+      <Section title="历史 Candidate（未验证）"><section><h3 className="disclosure-heading">{historical.length} 道历史 {displayText("Candidate")}</h3><p className="muted">仅供追溯，不参与当前 Golden、Baseline 或发布判断。</p><QuestionTable rows={historical.length <= 200 ? historical : historical.slice(historyPage * 200, historyPage * 200 + 200)} onDetail={row => setSelectedId(row.id)} />{historical.length > 200 && <div className="history-pagination"><button className="secondary" disabled={historyPage === 0} onClick={() => setHistoryPage(page => page - 1)}>上一页</button><span>{historyPage + 1} / {Math.max(1, Math.ceil(historical.length / 200))}</span><button className="secondary" disabled={(historyPage + 1) * 200 >= historical.length} onClick={() => setHistoryPage(page => page + 1)}>下一页</button></div>}</section></Section>
     </div></Drawer>
-    <QuestionDrawer showCloseFooter={false} open={!!historyQuestion} onOpenChange={open => !open && setHistoryQuestion(undefined)}
-      questionLabel={historyQuestion?.display_id || historyQuestion?.slot || "历史题"}>
-      {historyQuestion && <FrozenQuestionDetails frozen={historyVersion?.status === "approved" && !!historyVersion.snapshot} row={{ ...historyQuestion, raw: { ...historyQuestion, ...historyQuestion.raw } }} />}
-    </QuestionDrawer>
-    <QuestionDrawer showCloseFooter={false} guardEdits editDirty={candidateDirty} contentKey={candidateContentKey} open={!!selected} onOpenChange={open => { if (!open) { poolTicket.current++; setSelectedId(null); } }} questionLabel={selected?.slot || selected?.display_id} className={`candidate-workspace${frozen ? " frozen-question-workspace" : ""}`}>{detailStatus ? <div className="drawer-body">{detailStatus.startsWith("正在读取") ? <LoadingSkeleton label={detailStatus} /> : <p role="alert">{detailStatus}</p>}</div> : frozen ? selected ? <FrozenQuestionDetails row={selected} showSource={new Set(current.map(row => row.raw?.source)).size > 1} /> : null : <CandidateWorkspace key={candidateContentKey} row={selected} peers={current} revision={revisions.find(item => item.question_ids?.includes(selected?.id))} rerunSlot={qualityRerun?.slots?.[selected?.slot]} busy={busy} readOnly={partial || !currentIds.includes(selected?.id || "")} readOnlyReason={!currentIds.includes(selected?.id || "") ? "来源候选题只读；匹配 Profile 与 覆盖规划 题位 后创建待审核副本。" : undefined} onRun={questionAction} onReview={reviewAction} onRefresh={refreshAfterMutation} operation={operation} onDirtyChange={setCandidateDirty} />}</QuestionDrawer>
+    <Drawer showCloseFooter={false} guardEdits editDirty={candidateDirty} contentKey={candidateContentKey} open={!!selected} onOpenChange={open => { if (!open) { poolTicket.current++; setSelectedId(null); } }} title={selected ? `${selected.slot || "历史题"} · ${displayText(selected.test_category)}` : "候选题审核"} className={`candidate-workspace${frozen ? " frozen-question-workspace" : ""}`}>{detailStatus ? <div className="drawer-body">{detailStatus.startsWith("正在读取") ? <LoadingSkeleton label={detailStatus} /> : <p role="alert">{detailStatus}</p>}</div> : frozen ? selected ? <FrozenQuestionDetails row={selected} showSource={new Set(current.map(row => row.raw?.source)).size > 1} busy={busy} onRun={questionAction} /> : null : <CandidateWorkspace key={candidateContentKey} row={selected} peers={current} revision={revisions.find(item => item.question_ids?.includes(selected?.id))} rerunSlot={qualityRerun?.slots?.[selected?.slot]} busy={busy} readOnly={partial || !currentIds.includes(selected?.id || "")} readOnlyReason={!currentIds.includes(selected?.id || "") ? "来源候选题只读；匹配 Profile 与 覆盖规划 题位 后创建待审核副本。" : undefined} onRun={questionAction} onReview={reviewAction} onRefresh={refreshAfterMutation} operation={operation} onDirtyChange={setCandidateDirty} />}</Drawer>
     <Drawer showCloseFooter={false} open={runErrorOpen} onOpenChange={setRunErrorOpen} title="题目处理情况"><div className="drawer-body"><Section title="哪些题未完成"><p>{errorSlot || '本次处理'} 尚未形成可供审核的题目，不能当作有效测试结果。</p></Section><Section title="卡在哪一步"><p>{stageName[qualityRerun?.slots?.[qualityRerun?.slot]?.failed_stage || qualityRerun?.stage || workRun?.artifacts?.hard_validation?.failed_stage || workRun?.status] || '处理阶段未知'}尚未通过。</p></Section><Section title="接下来怎么做"><p>回到题目列表补齐失败题；已完成的题目继续保留。</p></Section></div></Drawer>
   </PageShell>;
 }
@@ -363,13 +342,13 @@ const tableSources = (summary?: string) => summary?.split(/[；;]/).map(source =
 export function QuestionTable({ rows, onDetail, paging, resetKey, coveragePlan }: { rows: Candidate[]; onDetail: (row: Candidate) => void; paging?: any; resetKey?: string; coveragePlan?: any }) {
   const hover = useHoverPrefetch();
   const optional = [
-    {label:'业务主题',width:90,style:'muted',value:(row:Candidate)=>row.business_topic || row.raw?.business_topic || questionClassification(row, coveragePlan).topic || "未记录"},
+    {label:'主题簇',width:90,style:'muted',value:(row:Candidate)=>questionClassification(row, coveragePlan).topic},
     {label:'负向子类',width:86,style:'muted',value:(row:Candidate)=>questionClassification(row).negative},
     {label:'考查环节',width:86,style:'muted',value:(row:Candidate)=>questionClassification(row).stage},
     {label:'出处',width:160,style:'muted',value:(row:Candidate)=>{const sources=tableSources(row.source_summary || questionSources(row))?.filter(source => source !== "保存记录缺少来源");return sources?.length?`${sources[0]}${sources.length>1?` +${sources.length-1}`:''}`:'未记录';}},
     {label:'出题方式',width:76,style:'muted',value:(row:Candidate)=>row.raw?.generation_method || row.generation_method || '未记录'},
-    {label:'检索探针', help:'Probe',width:65,style:'num',value:(row:Candidate)=>goldenQuality(row, 'probe')},
-    {label:'质检', help:'QC',width:54,style:'num',value:(row:Candidate)=>goldenQuality(row, 'qc')},
+    {label:'Probe',width:65,style:'num',value:(row:Candidate)=>goldenQuality(row, 'probe')},
+    {label:'QC',width:54,style:'num',value:(row:Candidate)=>goldenQuality(row, 'qc')},
   ];
-  return <ScrollablePagedTable className="review-table" resetKey={resetKey} loading={paging?.loading} hasMore={paging?.hasMore} onMore={paging?.loadMore}><DataTable><colgroup><col style={{width:60}}/><col style={{width:60}}/><col/>{optional.map(column=><col key={column.label} style={{width:column.width}}/>)}<col style={{width:32}}/></colgroup><thead><tr><th>题号</th><th>题型</th><th>问题</th>{optional.map(column=><th key={column.label} className={column.style}>{column.label}{qualityHelp(column.help || column.label)}</th>)}<th aria-label="打开详情"/></tr></thead><tbody>{rows.slice(0, paging?.visibleCount ?? rows.length).map(row => <tr key={row.id} tabIndex={0} role="button" aria-label={`${row.slot || "题目"} · ${presentationText(row.question || "")}`} {...hover(row.failed ? [] : [`/api/governance/questions/${row.id}`])} onClick={event => { event.currentTarget.focus(); onDetail(row); }} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onDetail(row); } }}><td className="id">{row.slot || row.raw?.coverage_slot || row.id}</td><td className="muted">{({positive:"正向",ablation:"消融",negative:"负向"} as Record<string,string>)[row.test_category] || displayText(row.test_category || (row.failed ? "生成失败" : "类型未记录"))}</td><td><TruncatedText lines={1}>{presentationText(row.question || "")}</TruncatedText></td>{optional.map(column=><td key={column.label} className={column.style}>{<TruncatedText lines={1}>{column.label === "出处" ? <HoverCard content={row.source_summary || questionSources(row)}><span>{column.value(row) ?? "未记录"}</span></HoverCard> : column.value(row) ?? "未记录"}</TruncatedText>}</td>)}<td><span className="ui-row-go"><Icon name="go" size={15}/></span></td></tr>)}{!rows.length && !paging?.loading && !paging?.error && <tr><td colSpan={4+optional.length} className="empty-state">还没有符合筛选条件的题目。<p>题目完成生成与校验后会显示在这里。</p></td></tr>}</tbody></DataTable></ScrollablePagedTable>;
+  return <ScrollablePagedTable className="review-table" resetKey={resetKey} loading={paging?.loading} hasMore={paging?.hasMore} onMore={paging?.loadMore}><DataTable><colgroup><col style={{width:60}}/><col style={{width:60}}/><col/>{optional.map(column=><col key={column.label} style={{width:column.width}}/>)}<col style={{width:32}}/></colgroup><thead><tr><th>题号</th><th>题型</th><th>问题</th>{optional.map(column=><th key={column.label} className={column.style}>{column.label}{qualityHelp(column.label)}</th>)}<th aria-label="打开详情"/></tr></thead><tbody>{rows.slice(0, paging?.visibleCount ?? rows.length).map(row => <tr key={row.id} tabIndex={0} role="button" aria-label={`${row.slot || "题目"} · ${presentationText(row.question || "")}`} {...hover(row.failed ? [] : [`/api/governance/questions/${row.id}`])} onClick={() => onDetail(row)} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onDetail(row); } }}><td className="id">{row.slot || row.raw?.coverage_slot || row.id}</td><td className="muted">{({positive:"正向",ablation:"消融",negative:"负向"} as Record<string,string>)[row.test_category] || displayText(row.test_category || (row.failed ? "生成失败" : "类型未记录"))}</td><td><TruncatedText lines={1}>{presentationText(row.question || "")}</TruncatedText></td>{optional.map(column=><td key={column.label} className={column.style}>{<TruncatedText lines={1}>{column.label === "出处" ? <HoverCard content={row.source_summary || questionSources(row)}><span>{column.value(row) ?? "未记录"}</span></HoverCard> : column.value(row) ?? "未记录"}</TruncatedText>}</td>)}<td><span className="ui-row-go"><Icon name="go" size={15}/></span></td></tr>)}{!rows.length && !paging?.loading && !paging?.error && <tr><td colSpan={4+optional.length} className="empty-state">还没有符合筛选条件的题目。<p>题目完成生成与校验后会显示在这里。</p></td></tr>}</tbody></DataTable></ScrollablePagedTable>;
 }

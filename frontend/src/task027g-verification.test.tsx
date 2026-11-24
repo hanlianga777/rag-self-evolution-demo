@@ -39,7 +39,7 @@ it('combines saved feedback and local-only answers, counting linked answers once
  localStorage.setItem(CONVERSATIONS_STORAGE_KEY,JSON.stringify([{id:'c',title:'会话',updatedAt:time,messages:[{id:'a',role:'assistant',createdAt:time,question:'已有关联问题',content:'已有回答',latencyMs:2000},{id:'b',role:'assistant',createdAt:time,question:'仅本机问题',content:'本机回答',latencyMs:4000,evidence:[evidence(12,'b')]}]}]));
  location.hash='#verification?tab=monitoring';const fetcher=vi.fn(async()=>new Response('{}'));vi.stubGlobal('fetch',fetcher);
  await mount(<VerificationPage data={{monitoring:{events},optimization:{candidates:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
- expect(document.querySelector('.tabs [aria-pressed=true]')?.textContent).toBe('线上反馈');
+ expect(document.querySelector('.tabs [aria-pressed=true]')?.textContent).toBe('Monitoring');
  expect([...document.querySelectorAll('.monitoring-stats strong')].map(n=>n.textContent)).toEqual(['2','2.0 秒','100%','1']);
  expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(2);
  expect([...document.querySelectorAll('.monitoring-table th')].map(n=>n.textContent)).toEqual(['时间','问题','耗时','引用数','标注状态','操作']);
@@ -49,7 +49,7 @@ it('combines saved feedback and local-only answers, counting linked answers once
 it('labels the three release gates and keeps only the two secondary review actions',async()=>{
  const d={id:'exp-D',reasoning:{candidate_label:'D'},config:{top_k:6},result:{gates:{passed:true,passed_count:11,total:11},new_regression_question_ids:[],all_fixed_question_ids:['Q04']}};
  await mount(<VersionsPage data={{versions:[{id:'p',status:'active',provenance:'published',config:d.config,snapshot:{candidate_id:d.id,human_release:{decision:'approved'}}},{id:'old',status:'archived'}],optimization:{candidates:[d]}}}/>);
- expect([...document.querySelectorAll('.human-gates h3')].map(n=>n.textContent)).toEqual(['题卷确认（Gate 1）','报告确认（Gate 2）','发布确认（Gate 3）']);
+ expect([...document.querySelectorAll('.human-gates h3')].map(n=>n.textContent)).toEqual(['Gate 1 · 题卷红线','Gate 2 · 实验报告','Gate 3 · 发布确认']);
  expect([...document.querySelectorAll('.ui-rel-actions button')].map(n=>n.textContent)).toEqual(['查看评测报告','查看发布快照']);
  expect(document.querySelectorAll('.ui-rel-actions button.secondary svg')).toHaveLength(2);
  expect(document.querySelector('.release-history-table button.secondary')?.textContent).toBe('回滚至此版本');

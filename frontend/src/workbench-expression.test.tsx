@@ -28,7 +28,7 @@ it('links saved evidence and hypothesis to actual parameter changes without eval
  const data={evaluation,badCases:[technical,audit],optimization:{id:'EXP',candidates:[candidate]}};const before=JSON.stringify(data);await mount(<EvolutionPage data={data}/>);
  expect(document.querySelector('.agent-case-destinations')).toBeNull();
  await click('进化路线');expect(document.querySelector('.candidate-card-body')?.textContent).toContain('保存的召回假设');expect(document.querySelector('.diagnosis-distribution')).toBeNull();expect(JSON.stringify(data)).toBe(before);
- await act(async()=>document.querySelector<HTMLElement>('.ui-evo-card')!.click());expect(document.querySelector('[role=dialog]')?.textContent).toContain('候选数 candidate_k');expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('仅评测核验问题');
+ await act(async()=>document.querySelector<HTMLElement>('.ui-evo-card')!.click());expect(document.querySelector('[role=dialog]')?.textContent).toContain('Candidate K');expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('仅评测核验问题');
  expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method || init.method==='GET')).toBe(true);
 });
 it.each(['evaluated','failed'])('does not infer a final recommendation from %s records with missing decision',async(status)=>{

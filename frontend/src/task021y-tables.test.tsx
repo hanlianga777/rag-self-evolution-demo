@@ -31,7 +31,7 @@ it('keeps the implemented clustering default without inventing parser, retrieval
   const text = document.querySelector('[aria-label="知识处理链路"]')?.textContent;
   expect(text).toBeDefined();
   expect(text).not.toMatch(/MinerU|qwen3|Hybrid/);
-  expect(text).toContain('按主题分组');
+  expect(text).toContain('主题聚类');
   expect(text).not.toMatch(/\d/);
 });
 
@@ -68,39 +68,7 @@ it('opens feedback details when clicking the truncated question inside its actio
   vi.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(20);
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ events: [event], triggers: [] }))));
   await mount(<VerificationPage data={{ monitoring: { events: [event] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
-  await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '线上反馈')!.click());
-  const region = document.querySelector<HTMLElement>('[role="region"][aria-label="线上问答记录表"]')!;
-  expect(region.tabIndex).toBe(0);
-  const trigger = region.querySelector<HTMLButtonElement>('.monitoring-question')!;
-  expect(trigger.type).toBe('button');
-  await act(async () => trigger.querySelector<HTMLElement>('.monitoring-question-label')!.click());
+  await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === 'Monitoring')!.click());
+  await act(async () => (document.querySelector('.monitoring-table tbody button .ui-clamp,.monitoring-table tbody button .truncated-text') as HTMLElement).click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('保存的回答');
-  await act(async () => document.querySelector<HTMLButtonElement>('[role="dialog"] [aria-label="关闭"]')!.click());
-  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
-  expect(document.activeElement).toBe(trigger);
-});
-
-it('opens the matching frozen question inside feedback and returns focus when Escape closes it', async () => {
-  const event = { id: 'feedback', question: '线上问题', source: { dataset_version_id: 'golden', question_id: 'q1' } };
-  const row = { id: 'q1', display_id: 'Q01', question: '冻结问题原文', reference_answer: '保存的参考答案' };
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith('/api/governance/snapshots')
-    ? [{ id: 'old', status: 'approved', snapshot: { question_ids: [row.id], questions: [{ ...row, reference_answer: '旧版答案' }] } },
-      { id: 'golden', status: 'approved', snapshot: { question_ids: [row.id], questions: [row] } }]
-    : {}))));
-  await mount(<VerificationPage data={{
-    workspace: { current_golden_id: 'golden' },
-    evaluation: { dataset_version_id: 'golden', dataset_snapshot: { question_ids: [row.id], questions: [{ id: row.id }] } },
-    monitoring: { events: [event] },
-  }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
-  await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === '线上反馈')!.click());
-  await act(async () => document.querySelector<HTMLButtonElement>('.monitoring-question')!.click());
-  const trigger = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')]
-    .find(button => button.textContent?.includes('查看冻结题'))!;
-  await act(async () => trigger.click());
-  const details = [...document.querySelectorAll('[role="dialog"]')].at(-1);
-  expect(details?.textContent).toContain('Q01 · 题目详情');
-  expect(details?.textContent).toContain(row.reference_answer);
-  await act(async () => document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
-  expect(document.activeElement === trigger).toBe(true);
 });

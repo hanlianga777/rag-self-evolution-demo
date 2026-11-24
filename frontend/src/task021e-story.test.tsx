@@ -18,7 +18,7 @@ const experiment=(extra:any={})=>({id:'experiment',candidates:[{...winner,id:'EX
 it('keeps question labels distinct, hides technical IDs and translates parameters and metrics',()=>{
  const text=storyText(`${questionId}/Q29，DOC-001-C-00096，top_k=6，rerank=query_only，hybrid_alpha=0.6，hyde，safe_rejection，safe_rejection_rate，latency_p99_seconds`);
  expect(text).toContain('Q24/Q29');expect(text).toContain('相关说明段落');
- for(const name of ['Top-K 6','Rerank：Query Only','Hybrid Alpha','HyDE','安全拒答率','延迟高位（P99）'])expect(text).toContain(name);
+ for(const name of ['Top-K 6','Rerank：Query Only','Hybrid Alpha','HyDE','安全拒答率','回答耗时 P99'])expect(text).toContain(name);
  expect(text).not.toMatch(/CSV-|DOC-|top_k|rerank|query_only|safe_rejection|hybrid_alpha|hyde|latency_p99_seconds/);
  expect(storyText('safe_rejection')).toBe('安全拒答率');
  expect(storyText('p99=65.614秒，Top4截断')).toBe('P99 65.614 秒，Top-K 4 截断');

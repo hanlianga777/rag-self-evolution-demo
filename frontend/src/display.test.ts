@@ -19,7 +19,7 @@ describe("displayText", () => {
     expect(displayText("live")).toBe("服务回答");
     expect(displayText("not_run")).toBe("未运行");
     expect(displayText("RETRIEVAL_INCOHERENT")).toBe("检索不一致（保留人工审核）");
-    expect(displayText("Ablation")).toBe("消融");
+    expect(displayText("Ablation")).toBe("消融（Ablation）");
     expect(displayText("approved")).toBe("已批准");
     expect(displayText("rejected")).toBe("已拒绝");
   });

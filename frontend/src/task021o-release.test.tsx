@@ -22,7 +22,7 @@ it('explains alternatives from saved repairs, regressions and gates rather than 
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='回归与推荐')!.click());
  const rows=[...document.querySelectorAll('.candidate-rejections > button')].map(e=>e.textContent);
  expect(rows[0]).toContain('新增 1 个 Bad Case');expect(document.querySelector('.ui-fin-others h3')?.textContent).toContain('落选原因');
- expect(rows[1]).toContain('延迟高位（P99） 86.5 秒');expect(rows[1]).toContain('上限 60 秒');
+ expect(rows[1]).toContain('回答耗时 P99 86.5 秒');expect(rows[1]).toContain('上限 60 秒');
  expect(document.querySelector('.ui-fin-compare thead')?.textContent).toContain('Winner · 合格');expect(document.querySelector('.ui-fin-compare tbody tr:last-child')?.textContent).toContain('Q04');
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='概览')!.click());expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('10 / 12');
 });
@@ -49,7 +49,7 @@ it('marks the production config separately from the baseline draft after release
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/pipeline')?{active_version_id:'production-new',active_version:{provenance:'published',snapshot:{candidate_id:'EXP-D'}},config:{candidate_k:24,top_k:6,generation_thinking:'high'},baseline_config:{candidate_k:12,top_k:4,generation_thinking:'max'},search_space:{candidate_k:{allowed:[12,24]},top_k:{allowed:[4,6]},generation_thinking:{allowed:['high','max']}}}:{}))));
  await mount(<SettingsPage data={{workspace:{active_version:'production-new'}}}/>);
  expect(document.querySelector('.ui-pg-legend')?.textContent).toContain('蓝点：当前线上');
- for(const [key,value] of [['candidate_k','24'],['top_k','6'],['generation_thinking','高（High）']]) {
+ for(const [key,value] of [['candidate_k','24'],['top_k','6'],['generation_thinking','High']]) {
   const row=document.querySelector(`[data-parameter="${key}"]`)!;
   expect(row.querySelector('.dot.online')?.closest('button')?.textContent).toBe(value);
   expect(row.querySelector('.dot.base')?.closest('button')).not.toBe(row.querySelector('.dot.online')?.closest('button'));

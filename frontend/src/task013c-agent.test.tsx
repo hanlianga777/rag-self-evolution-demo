@@ -47,7 +47,7 @@ it('keeps every single-pass failed question as a target even with a legacy exclu
  expect(document.querySelector('.agent-case-destinations')).toBeNull();
 });
 it('keeps unfinished planning in the flat toolbar after a Sandbox exists and keeps idle progress out of the header',async()=>{
- await mount(experiment([candidate('A','failed',{evaluation_run_id:'saved-run',evaluation_complete:false},{product_interruption:true})],{result:{strategy_contract:{version:'saved'}},coverage_plan:{status:'incomplete',covered_count:0,total:1,binding:'binding',matrix:[{question_id:'CSV-20261101100758945425-41',candidates:[],gap:'本轮剩余A/B/C容量不足，需明确调整规划，不能宣称完成'}]}}));
+ await mount(experiment([candidate('A','failed',{evaluation_run_id:'saved-run',evaluation_complete:false},{product_interruption:true})],{coverage_plan:{status:'incomplete',covered_count:0,total:1,binding:'binding',matrix:[{question_id:'CSV-20261101100758945425-41',candidates:[],gap:'本轮剩余A/B/C容量不足，需明确调整规划，不能宣称完成'}]}}));
  expect(document.querySelector('.page-title')?.textContent).not.toContain('查看 Sandbox 进度');
  expect(document.querySelector('.page-title')?.textContent).not.toContain('补齐本轮规划');
  expect(document.querySelector('.agent-secondary-actions')?.textContent).toContain('补齐本轮规划');

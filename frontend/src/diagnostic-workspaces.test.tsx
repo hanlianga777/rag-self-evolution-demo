@@ -54,16 +54,15 @@ it('preloads monitoring events once and switches its tab without requests',async
  const {VerificationPage}=await import('./pages/VerificationPage');
  const page={events:Array.from({length:50},(_,i)=>({id:`event-${i}`,question:`问题${i}`})),triggers:[]};
  const fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/api/monitoring')?page:url.includes('/api/monitoring?page=2')?{events:[{id:'event-last',question:'最后的反馈'}],triggers:[]}:url.includes('/api/versions')?[]:{})));vi.stubGlobal('fetch',fetcher);
- const data=await loadAppData(true,'verification');await render(<VerificationPage data={data} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);const count=fetcher.mock.calls.length;await click('线上反馈');expect(fetcher).toHaveBeenCalledTimes(count);
+ const data=await loadAppData(true,'verification');await render(<VerificationPage data={data} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);const count=fetcher.mock.calls.length;await click('Monitoring');expect(fetcher).toHaveBeenCalledTimes(count);
  expect(fetcher.mock.calls.some(([url]:any)=>url.endsWith('/api/monitoring?page=2&limit=50'))).toBe(true);expect(document.querySelectorAll('tbody tr')).toHaveLength(51);
 });
 it('separates saved formal blockers from confirmed regression without clearing pending risk',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const result={comparison_version:'offline',regression:{status:'FAIL',new_critical_failures:0,new_ordinary_failures:2},formal_blocking_question_ids:['q1','q2'],confirmed_regression_question_ids:[],pending_regression_question_ids:['q1'],disputed_regression_question_ids:['q2'],unclassified_regression_question_ids:[]};
- await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[{id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result}]}}}/>);await click('回归与推荐');
+ await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[{id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result}]}}}/>);await click('进化路线');
  expect(document.querySelector('.ui-ct-more')).toBeNull();
- const cells = [...document.querySelectorAll('.regression-summary-table tbody td')].map(cell => cell.textContent);
- expect(cells.slice(2, 5)).toEqual(['0', '2', '未通过']);expect(document.body.textContent).not.toMatch(/已确认失败|待复核|争议|未分类/);expect(document.body.textContent).toContain('未通过');expect(result.pending_regression_question_ids).toEqual(['q1']);expect(result.disputed_regression_question_ids).toEqual(['q2']);
+ expect(document.querySelector('.sandbox-core-table')?.textContent).toContain('正式阻断 · 严重 0 / 普通 2');expect(document.body.textContent).not.toMatch(/已确认失败|待复核|争议|未分类/);expect(document.body.textContent).toContain('未通过');expect(result.pending_regression_question_ids).toEqual(['q1']);expect(result.disputed_regression_question_ids).toEqual(['q2']);
 });
 it('uses saved root evidence in the compact diagnosis column and keeps absent evidence pending',async()=>{
  const {DiagnosisTable}=await import('./components/EvaluationDiagnosis');

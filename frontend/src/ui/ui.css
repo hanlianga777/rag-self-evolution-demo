@@ -24,7 +24,7 @@
   --ui-surface: #ffffff;
   --ui-ink: #1d1d1f;
   --ui-ink-2: #424245;
-  --ui-muted: #6b6b70;
+  --ui-muted: #6e6e73;
   --ui-faint: #aeaeb2;
   --ui-rule: #e5e5ea;
   --ui-rule-2: #f0f0f3;
@@ -34,7 +34,7 @@
   --ui-accent: #0071e3;    /* 唯一强调色 */
   --ui-accent-2: #0062c4;
   --ui-accent-tint: #eaf3fe;
-  --ui-green: #217333;
+  --ui-green: #248a3d;     /* 只用于小圆点、✓、细线 */
   --ui-green-tint: #f0f0f3;
   --ui-green-mark: #eaf3fe;
   --ui-red: #d70015;       /* 只用于小圆点、✕、失败文字 */
@@ -138,7 +138,6 @@ td { border-bottom-color: var(--ui-rule-2); }
 .ui-float.dark b, .ui-float.dark strong { color: #fff; font-weight: 600; }
 .ui-float.pinned { outline: 2px solid var(--ui-navy-3); outline-offset: 0; }
 .ui-hover-trigger { display: inline-flex; }
-.ui-hover-trigger [tabindex="0"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* —— StatTransition：44 → 48 —— */
 .ui-transition { display: inline-flex; align-items: baseline; gap: 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -450,7 +449,7 @@ td { border-bottom-color: var(--ui-rule-2); }
 .ui-status.bad::before { background: var(--ui-red); }
 .ui-status.amber::before { background: var(--ui-amber); }
 .ui-status.good, .ui-status.bad, .ui-status.amber, .ui-status.neutral { background: transparent; color: var(--ui-ink-2); }
-.ui-status.navy { background: var(--ui-accent-tint); color: var(--ui-accent-2); padding: 5px 10px; }
+.ui-status.navy { background: var(--ui-accent-tint); color: var(--ui-accent); padding: 5px 10px; }
 .ui-status.solid { background: var(--ui-accent); color: #fff; padding: 5px 10px; }
 .ui-status.navy::before, .ui-status.solid::before { background: currentColor; }
 
@@ -472,7 +471,7 @@ td { border-bottom-color: var(--ui-rule-2); }
 .ui-evo-card.winner { border-color: var(--ui-accent); }
 .ui-evo-dot.win { background: var(--ui-accent); border-color: var(--ui-accent); }
 .ui-param.key { background: var(--ui-accent-tint); border-color: var(--ui-accent); }
-.ui-param.key small { color: var(--ui-accent-2); }
+.ui-param.key small { color: var(--ui-accent); }
 .ui-rel-side.to { background: var(--ui-accent-tint); box-shadow: inset 0 0 0 1.5px var(--ui-accent); }
 .ui-rel-steps li.ok { background: var(--ui-rule-2); }
 .ui-rel-steps li.ok i { background: var(--ui-green); }
