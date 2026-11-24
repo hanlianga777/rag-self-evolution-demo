@@ -165,7 +165,7 @@ def test_ledger_is_saved_when_sandbox_finishes_and_sent_before_next_proposal(mon
         from app.agent_inputs import baseline_bad_case_rows
         [target_row] = baseline_bad_case_rows(store, store.evaluation_run(baseline['id']))
         display = target_row['diagnostic_view']['display_question_id'] or 'Q1'
-        monkeypatch.setattr('app.optimization.load_retrieval_preview', lambda *_: {
+        monkeypatch.setattr('app.optimization.load_retrieval_preview', lambda *_, **__: {
             'configs': [{'change': {'top_k': 6}, 'evidence_enters_final': [display]}]})
         monkeypatch.setattr('app.optimization.wait_for_off_peak', Mock())
         provider = Mock(spec=['complete'])
@@ -195,7 +195,7 @@ def test_continue_api_saves_per_target_checks_and_rejected_draft(monkeypatch):
         rejected = drafts()['candidates'][0]['config_diff']
         variants = [alternative, *[c['config_diff'] for c in drafts()['candidates'][1:]]]
         preview = {'configs': [{'change': change, 'evidence_enters_final': [display]} for change in variants]}
-        monkeypatch.setattr('app.optimization.load_retrieval_preview', lambda *_: preview)
+        monkeypatch.setattr('app.optimization.load_retrieval_preview', lambda *_, **__: preview)
         monkeypatch.setattr('app.optimization.wait_for_off_peak', Mock())
         provider = Mock(spec=['complete'])
 

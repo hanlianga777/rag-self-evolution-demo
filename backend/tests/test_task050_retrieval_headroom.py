@@ -3,8 +3,9 @@ import importlib.util
 from pathlib import Path
 from unittest.mock import Mock
 
+from app.corpus import manifest_identity
 from app.ai_service import AiService
-from app.policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG
+from app.policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, FRIEND_BASELINE_CONFIG
 
 spec = importlib.util.spec_from_file_location('retrieval_headroom', Path(__file__).resolve().parents[1] / 'scripts/retrieval_headroom.py')
 rh = importlib.util.module_from_spec(spec)
@@ -40,6 +41,29 @@ def test_single_variants_change_exactly_one_retrieval_param_and_skip_baseline_va
     assert all(len(v) == 1 for v in variants)
     assert {'candidate_k': 24} in variants and {'candidate_k': 12} not in variants
     assert not any('generation_thinking' in v for v in variants)
+
+
+def test_frozen_preview_has_index_identity_and_legal_combinations(tmp_path):
+    from types import SimpleNamespace
+    from app.optimization import load_retrieval_preview
+
+    identity = {'pipeline_version_id': 'KP-test', 'chunk_artifact_id': 'CHUNK-test',
+                'sources': {'DOC-test': 'test-hash'}}
+    manifest = {'knowledge_identity': identity, 'sources': identity['sources']}
+    store = SimpleNamespace(database_path=tmp_path / 'demo.db')
+    items = rh.golden_questions(CSV)
+    baseline = FRIEND_BASELINE_CONFIG
+    variants = rh.retrieval_variants(baseline)
+    assert {'candidate_k': 24, 'min_score': 0.1} in variants
+    assert {'query_decompose': True, 'multi_query': 6} in variants
+    assert {'hybrid_search': False} in variants
+    assert not any(v.get('hybrid_search') is False and 'hybrid_alpha' in v for v in variants)
+    results = rh.scan(items, baseline, variants, fake_retrieve)
+    rh.save_preview(store.database_path, 'EVAL-1', items, results, identity)
+    loaded = load_retrieval_preview(store, 'EVAL-1', foundation=manifest_identity(manifest))
+    assert loaded['knowledge_identity'] == identity
+    assert len(loaded['configs']) == len(variants)
+    assert load_retrieval_preview(store, 'EVAL-1', foundation={**identity, 'chunk_artifact_id': 'other'}) is None
 
 
 def test_summary_counts_gap_fixed_and_lost():

@@ -332,7 +332,11 @@ def enhancement_latency_deltas(baseline_config, baseline_result, candidates):
     return rows
 
 
-def load_retrieval_preview(store, baseline_run_id, *, foundation=None):
+_UNBOUND_PREVIEW = object()
+PREVIEW_REQUIRED = '前置条件未满足：需先按当前规则和知识库生成检索预演'
+
+
+def load_retrieval_preview(store, baseline_run_id, *, foundation=_UNBOUND_PREVIEW):
     """读取 retrieval_headroom.py --preview-for-baseline 生成的预演表。"""
     try:
         path = Path(store.database_path).parent / 'retrieval_preview' / f'{baseline_run_id}.json'
@@ -341,10 +345,23 @@ def load_retrieval_preview(store, baseline_run_id, *, foundation=None):
         return None
     if not isinstance(data, dict) or data.get('baseline_run_id') != baseline_run_id:
         return None
-    if foundation is not None and (data.get('rules_version') != rules.RULES_VERSION
-                                   or data.get('knowledge_identity') != foundation):
-        return None
+    if foundation is not _UNBOUND_PREVIEW:
+        if (foundation is None or data.get('rules_version') != rules.RULES_VERSION
+                or data.get('knowledge_identity') != foundation):
+            return None
     return data
+
+
+def require_retrieval_preview(preview, base_changes):
+    from .agent_mechanism import PREVIEW_KEYS
+
+    configs = (preview or {}).get('configs')
+    if not isinstance(configs, list) or any(
+            not isinstance(config, dict) or not isinstance(config.get('change'), dict) for config in configs):
+        raise ValueError(PREVIEW_REQUIRED)
+    retrieval_base = {key: value for key, value in base_changes.items() if key in PREVIEW_KEYS}
+    if retrieval_base and not any(config.get('change') == retrieval_base for config in configs):
+        raise ValueError(f'{PREVIEW_REQUIRED}（当前 Winner 底座未覆盖）')
 
 
 def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, labels, *, baseline_gates=None, evaluation_budget=None, failed_parameter_signatures=None,
@@ -942,6 +959,24 @@ class OptimizationAgent:
         context = experiment['result']
         v2 = context.get('mechanism_contract') == CONTRACT
         use_final = verdict.current(context)
+        requires_preview = v2 or use_final
+        frozen = json.loads(baseline.get('dataset_snapshot_json') or '{}')
+        retrieval_preview = (load_retrieval_preview(self.store, baseline_run_id, foundation=frozen.get('corpus_fingerprint'))
+                             if requires_preview else load_retrieval_preview(self.store, baseline_run_id))
+        if v2:
+            from .agent_round_contract import (STOP_REASON, available_labels, check_commitment, inherited_repairs,
+                                               previous_commitment, round_base, round_opportunities)
+
+            base = round_base(base_config, prior_candidates, round_number, identity=baseline['judge'].get('evaluation_identity'))
+        if requires_preview:
+            try:
+                require_retrieval_preview(retrieval_preview, base['changes'] if v2 else {})
+            except ValueError as error:
+                self.store.save_agent_trace(experiment_id, 'failed', {
+                    'generation_status': 'failed', 'validation_stage': 'retrieval_preview_precondition',
+                    'validation_error': str(error), 'provider_called': False, 'round': round_number,
+                }, str(error), generation_token=generation_token)
+                raise
         if not bad_cases and not v2:
             reason='暂无足够依据生成合格优化假设：没有具备实际证据与Trace的可验证Baseline目标；Monitoring事件须先补齐同等证据'
             self.store.save_agent_round(experiment_id, [], {'generation_status':'insufficient_evidence','insufficient_evidence':reason,'generated_candidate_count':0,'round':round_number,'provider_called':False, **({'decision_stop': {'round': round_number, 'reason': reason}} if use_final else {}), 'all_bad_case_audit':[{k:v for k,v in row.items() if k!='result_json'} for row in audited_cases]}, generation_token=generation_token)
@@ -981,7 +1016,6 @@ class OptimizationAgent:
         failed_signatures.update(parameter_signature(base_config,{key:value for key,value in c['config'].items() if value!=base_config.get(key)})
                                  for c in prior_candidates if c['status'] in {'failed','evaluated'} and not c.get('result',{}).get('qualification',{}).get('qualified'))
         audit['failed_parameter_signatures'] = sorted(failed_signatures)
-        frozen=json.loads(baseline.get('dataset_snapshot_json') or '{}')
         questions={q['id']:q for q in frozen.get('questions',[])}
         def saved_cases(run_id):
             rows=verdict.final_cases(self.store, run_id, use_final=use_final)
@@ -992,13 +1026,7 @@ class OptimizationAgent:
             return rows
         baseline_cases = saved_cases(baseline_run_id)
         candidate_cases = {c['id']: saved_cases(c.get('result', {}).get('evaluation_run_id')) for c in prior_candidates}
-        retrieval_preview = (load_retrieval_preview(self.store, baseline_run_id, foundation=frozen.get('corpus_fingerprint'))
-                             if use_final else load_retrieval_preview(self.store, baseline_run_id))
         if v2:
-            from .agent_round_contract import (STOP_REASON, available_labels, check_commitment, inherited_repairs,
-                                               previous_commitment, round_base, round_opportunities)
-
-            base = round_base(base_config, prior_candidates, round_number, identity=baseline['judge'].get('evaluation_identity'))
             cases = baseline_cases if base['id'] == 'Baseline' else candidate_cases[base['id']]
             covered = {row['question_id'] for row in failures}
             unlinked = [row for row in cases if row['question_id'] not in covered and saved_passed(row) is False]

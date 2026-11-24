@@ -33,13 +33,16 @@ def scored(passed, answer='原样本', *, category='positive', subtype=None, ris
 
 
 class OfflineEvaluation:
-    def __init__(self, tmp_path, monkeypatch, first):
+    def __init__(self, tmp_path, monkeypatch, first, *, evidence=None):
         manifest = {'sources': []}
         monkeypatch.setattr(governance, 'current_manifest', lambda: manifest)
         monkeypatch.setattr(corpus, 'current_manifest', lambda: manifest)
         self.store = GovernanceStore(tmp_path / 'verdict.db')
         self.items = [{'id': key, 'question': key, 'test_category': c['test_category'],
                        'negative_subtype': c['negative_subtype']} for key, c in first.items()]
+        if evidence:
+            for item in self.items:
+                item['evidence'] = evidence
         self.questions = {item['id']: item for item in self.items}
         self.snapshot = {'id': 'GD-118a', 'corpus_fingerprint': corpus.manifest_identity(manifest),
                          'question_ids': list(first), 'questions': self.items}
@@ -372,3 +375,73 @@ def test_zero_proposals_with_explanation_enters_stop_branch(env):
     assert staged_decision(4, 1, MAX_EVALS - 1) == 'composite'
     assert staged_decision(4, 1, MAX_EVALS) == 'finish_winner'
     assert staged_decision(2, 0, MAX_EVALS) == 'agent_failed'
+
+
+@pytest.mark.parametrize('scenario', ['missing_identity', 'viable', 'no_viable_config'])
+def test_current_agent_distinguishes_preview_precondition_from_stop(tmp_path, monkeypatch, scenario):
+    from app.optimization import OptimizationAgent
+
+    first = {f'Q{i:02d}': scored(False) for i in range(1, 6)}
+    env = OfflineEvaluation(tmp_path, monkeypatch, first, evidence=[{'source_chunk_ids': ['standard']}])
+    env.stable_baseline()
+    experiment = env.store.create_experiment(env.base)
+    target = tmp_path / 'retrieval_preview' / f'{env.base}.json'
+    target.parent.mkdir()
+    preview = {'baseline_run_id': env.base, 'configs': [{
+        'change': {'candidate_k': 24},
+        'evidence_enters_final': ['Q01'] if scenario == 'viable' else [],
+    }]}
+    if scenario != 'missing_identity':
+        preview.update(rules_version=rules.RULES_VERSION, knowledge_identity=env.snapshot['corpus_fingerprint'])
+    target.write_text(json.dumps(preview), encoding='utf-8')
+    monkeypatch.setattr('app.optimization.wait_for_off_peak', Mock())
+    provider = Mock(spec=['complete'])
+    provider.complete.side_effect = RuntimeError('offline fixture reached proposal')
+    agent = OptimizationAgent(env.store, provider)
+    if scenario == 'missing_identity':
+        with pytest.raises(ValueError, match='前置条件未满足：需先按当前规则和知识库生成检索预演'):
+            agent.generate(env.base, experiment_id=experiment)
+        assert env.store.experiment(experiment)['status'] == 'failed'
+        assert 'decision_stop' not in env.store.experiment(experiment)['result']
+        provider.complete.assert_not_called()
+    elif scenario == 'viable':
+        with pytest.raises(ValueError, match='offline fixture reached proposal'):
+            agent.generate(env.base, experiment_id=experiment)
+        provider.complete.assert_called_once()
+        assert 'decision_stop' not in env.store.experiment(experiment)['result']
+    else:
+        result = agent.generate(env.base, experiment_id=experiment)['result']
+        assert result['decision_stop']['reason'] == '证据不足以继续'
+        provider.complete.assert_not_called()
+
+
+@pytest.mark.parametrize('entry', ['next_round', 'composite'])
+def test_current_planning_blocks_uncovered_winner(env, monkeypatch, entry):
+    from app.optimization import OptimizationAgent
+
+    env.stable_baseline()
+    experiment = env.store.create_experiment(env.base)
+    base = env.raw_cases(env.base)
+    args = env.start_candidate(experiment, 'A', {**base, 'Q1': scored(True)}, top_k=6)
+    winner = env.finish_candidate(args, {'Q1': [scored(True), scored(True)]})
+    assert winner['result']['qualification']['qualified'] is True
+    preview_dir = env.store.database_path.parent / 'retrieval_preview'
+    preview_dir.mkdir()
+    (preview_dir / f'{env.base}.json').write_text(json.dumps({
+        'baseline_run_id': env.base, 'rules_version': rules.RULES_VERSION,
+        'knowledge_identity': env.snapshot['corpus_fingerprint'],
+        'configs': [{'change': {'candidate_k': 24}}],
+    }), encoding='utf-8')
+    provider = Mock(spec=['complete'])
+    if entry == 'composite':
+        env.store.confirm_experiment_report(experiment, winner['id'], '用户')
+        plan = lambda: env.store.create_composite(experiment, provider)
+    else:
+        plan = lambda: OptimizationAgent(env.store, provider).generate(env.base, experiment_id=experiment)
+    with pytest.raises(ValueError, match='前置条件未满足：需先按当前规则和知识库生成检索预演.*Winner'):
+        plan()
+    saved = env.store.experiment(experiment)
+    assert 'decision_stop' not in saved['result']
+    assert 'composite' not in saved['result']
+    assert saved['status'] != 'generating'
+    provider.complete.assert_not_called()

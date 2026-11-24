@@ -18,6 +18,7 @@
   参考口径：可修空间 ≥ --min-fixable（默认 5）道，且至少有一个符合 Agent 改动上限的配置能补回 ≥3 道、同时弄丢的题 ≤1 道 → GO。
 
 PYTHONPATH=backend python3 backend/scripts/retrieval_headroom.py --csv 指挥/报告/049-新题卷定稿.csv --output 指挥/报告/050-检索可修空间.csv
+PYTHONPATH=backend python3 backend/scripts/retrieval_headroom.py --preview-for-baseline <Baseline run ID>
   --smoke：只扫 3 道题 × 2 个配置，先确认能跑通（几乎不花钱）。
 """
 import argparse
@@ -25,6 +26,7 @@ import csv
 import io
 import json
 import os
+import tempfile
 from itertools import combinations
 from statistics import median_low
 
@@ -64,6 +66,42 @@ def single_variants(baseline, space):
         for value in space.get(key, ()):
             if value != baseline.get(key):
                 variants.append({key: value})
+    return variants
+
+
+def frozen_questions(snapshot):
+    items = []
+    for question in snapshot['questions']:
+        group = question['test_category']
+        if group not in {'positive', 'ablation'}:
+            continue
+        qid = question['display_id']
+        quotes = {}
+        for entry in question['evidence']:
+            for chunk in entry['source_chunk_ids']:
+                quotes.setdefault(chunk, []).extend(entry['evidence_key_points'])
+        if not quotes:
+            raise ValueError(f'{qid} 没有标准证据切块，无法扫描')
+        items.append({'qid': qid, 'group': group, 'method': question.get('construction_type') or '',
+                      'question': question['question'], 'golden': list(quotes), 'quotes': quotes})
+    return items
+
+
+def retrieval_variants(baseline):
+    from app.policy import ALLOWED_SEARCH_SPACE, validate_candidate_config
+
+    singles = single_variants(baseline, ALLOWED_SEARCH_SPACE)
+    variants = []
+    for size in range(1, rules.AGENT['max_changed_parameters'] + 1):
+        for group in combinations(singles, size):
+            change = {key: value for item in group for key, value in item.items()}
+            if len(change) != size:
+                continue
+            config = {**baseline, **change}
+            if config.get('hybrid_search') is False and 'hybrid_alpha' not in change:
+                config.pop('hybrid_alpha', None)
+            if validate_candidate_config(config)['valid']:
+                variants.append(change)
     return variants
 
 
@@ -173,22 +211,42 @@ def build_preview(baseline_run_id, items, results):
             'configs': configs}
 
 
+def save_preview(database, baseline_run_id, items, results, identity):
+    target = database.resolve().parent / 'retrieval_preview' / f'{baseline_run_id}.json'
+    target.parent.mkdir(parents=True, exist_ok=True)
+    preview = build_preview(baseline_run_id, items, results)
+    preview.update(rules_version=rules.RULES_VERSION, knowledge_identity=identity)
+    with tempfile.NamedTemporaryFile(mode='w', dir=target.parent, encoding='utf-8', delete_on_close=False) as stream:
+        json.dump(preview, stream, ensure_ascii=False, indent=1)
+        stream.close()
+        Path(stream.name).replace(target)
+    return target
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--csv', type=Path, required=True)
+    parser.add_argument('--csv', type=Path, help='独立扫描使用的题卷；正式预演使用冻结 Baseline 题卷')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--database', type=Path)
     parser.add_argument('--smoke', action='store_true')
     parser.add_argument('--preview-for-baseline', help='把逐配置预演结果存成 Agent 输入：data/retrieval_preview/<Baseline run ID>.json')
-    parser.add_argument('--pairs', type=int, default=4, help='单参数收益最大的前 N 个两两组合再扫')
+    parser.add_argument('--pairs', type=int, default=4, help='独立扫描中单参数收益最大的前 N 个两两组合再扫')
     parser.add_argument('--min-fixable', type=int, default=5)
     args = parser.parse_args(argv)
-    from app.config import load_values
-    database = args.database or Path(load_values().get('RAG_DEMO_DB_PATH') or Path(__file__).resolve().parents[1] / 'data/demo.db')
-    os.environ['RAG_DEMO_DB_PATH'] = str(database.resolve())
-    os.environ['RAG_SAFE_START'] = '1'
-    from app.main import ai_service
+    if not args.csv and not args.preview_for_baseline:
+        parser.error('请指定 --csv 或 --preview-for-baseline')
+    from app.ai_service import AiService
+    from app.config import load_settings, load_values
+    from app.corpus import CorpusStore
+    from app.corpus_management import require_consistent_switch
+    from app.governance import GovernanceStore
     from app.policy import ALLOWED_SEARCH_SPACE, FRIEND_BASELINE_CONFIG
+    from app.providers import DeepSeekProvider
+    database = args.database or Path(load_values().get('RAG_DEMO_DB_PATH') or Path(__file__).resolve().parents[1] / 'data/demo.db')
+    corpus = CorpusStore()
+    require_consistent_switch(corpus.index_dir, database)
+    store = GovernanceStore(database, read_only=True)
+    ai_service = AiService(store, corpus, DeepSeekProvider(load_settings()), os.getenv('RAG_FORCE_MOCK') == '1')
     if not ai_service.live_enabled:
         raise SystemExit('需要真实的 embedding / rerank / DeepSeek 配置；当前是 Mock，扫描结果没有意义')
     baseline = dict(FRIEND_BASELINE_CONFIG)  # 2026-11-18：Baseline 用朋友式朴素默认配置
@@ -197,7 +255,15 @@ def main(argv=None):
     identity = index_info.get('knowledge_identity')
     if not identity:
         raise SystemExit('当前活动索引没有知识身份，扫描会落到旧版索引；请先确认 062 的 v3 索引已生效')
-    items = golden_questions(args.csv.read_bytes())
+    if args.preview_for_baseline:
+        run = store.require_current_baseline(args.preview_for_baseline)
+        snapshot = json.loads(run['dataset_snapshot_json'])
+        if snapshot['corpus_fingerprint'] != identity or run['config'].get('knowledge_identity') != identity:
+            raise ValueError('正式 Baseline 与活动索引的知识身份不同，无法生成检索预演')
+        baseline = {key: run['config'][key] for key in ALLOWED_SEARCH_SPACE if key in run['config']}
+        items = frozen_questions(snapshot)
+    else:
+        items = golden_questions(args.csv.read_bytes())
 
     def retrieve(question, config):
         return ai_service.retrieve_context(question, {**config, 'knowledge_identity': identity})[0]
@@ -207,6 +273,15 @@ def main(argv=None):
     if args.smoke:
         items, variants = items[:3], [{'candidate_k': wide_k}]
         return {'smoke': True, 'knowledge_identity': identity, 'index_chunks': len(ai_service.corpus.chunks()), 'baseline_config': baseline, 'results': scan(items, baseline, variants, retrieve)}
+    if args.preview_for_baseline:
+        results = scan(items, baseline, retrieval_variants(baseline), retrieve)
+        if args.output:
+            write_table(args.output, items, results)
+        if ai_service.corpus.index_info().get('knowledge_identity') != identity:
+            raise ValueError('扫描期间活动索引知识身份已变化，无法发布预演')
+        target = save_preview(database, args.preview_for_baseline, items, results, identity)
+        return {'knowledge_identity': identity, 'baseline_config': baseline, 'questions': len(items), 'configs': len(results),
+                'preview_file': str(target), **summarize(results, min_fixable=args.min_fixable)}
     singles = single_variants(baseline, ALLOWED_SEARCH_SPACE)
     results = scan(items, baseline, singles, retrieve)
     best = [r for r in summarize(results)['best_configs'] if r['net'] > 0][:args.pairs]
@@ -243,13 +318,6 @@ def main(argv=None):
     summary = summarize(results, min_fixable=args.min_fixable)
     if args.output:
         write_table(args.output, items, results)
-    if args.preview_for_baseline:
-        target = database.resolve().parent / 'retrieval_preview' / f'{args.preview_for_baseline}.json'
-        target.parent.mkdir(parents=True, exist_ok=True)
-        preview = build_preview(args.preview_for_baseline, items, results)
-        preview.update(rules_version=rules.RULES_VERSION, knowledge_identity=identity)
-        target.write_text(json.dumps(preview, ensure_ascii=False, indent=1), encoding='utf-8')
-        summary['preview_file'] = str(target)
     return {'knowledge_identity': identity, 'baseline_config': {k: baseline[k] for k in RETRIEVAL_KEYS}, 'questions': len(items), 'configs': len(results), **summary}
 
 

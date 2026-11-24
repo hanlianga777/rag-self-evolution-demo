@@ -3248,8 +3248,9 @@ class GovernanceStore:
 
     @provider_task('agent')
     def create_composite(self, experiment_id: str, provider=None, authorize_provider=None):
+        from .agent_mechanism import CONTRACT, fault_stage, validate_mechanism
         from .composite import build_d_facts, validate_d_refinement, pipeline_config, parameter_diff, retryable_d_decision
-        from .optimization import load_retrieval_preview, parse_agent_json, strategy_case, strategy_candidate
+        from .optimization import load_retrieval_preview, parse_agent_json, require_retrieval_preview, strategy_case, strategy_candidate
         from .telemetry import collect_usage, cost_fields
         from .full_text import CORPUS_LOCK
         from .paid_schedule import wait_for_off_peak, save_composite_schedule
@@ -3301,6 +3302,13 @@ class GovernanceStore:
                 decision = {'status': 'no_effective_composite', 'winner_id': winner['id'], 'outcome':'declined', 'facts':facts, 'reason': '没有同身份的保存结果，或D预算不足', 'provider_calls': 0}
                 connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (_json({**experiment['result'], 'composite': decision}), experiment_id))
             else:
+                use_final = verdict.current(experiment['result'])
+                mechanism_enabled = experiment['result'].get('mechanism_contract') == CONTRACT
+                frozen = _load(baseline['dataset_snapshot_json'], {})
+                if mechanism_enabled or use_final:
+                    winner_base_changes = parameter_diff(winner['config'], base_config)
+                    preview = load_retrieval_preview(self, baseline['id'], foundation=frozen.get('corpus_fingerprint'))
+                    require_retrieval_preview(preview, winner_base_changes)
                 if provider is None:
                     raise ValueError('智能组合需要已配置的模型服务')
                 decision = {'status': 'analyzing', 'outcome':'analyzing', 'facts':facts, 'winner_id': winner['id'], 'evaluation_identity': identity, 'provider_calls': 0, 'started_at': _now(), 'sources': [c['id'] for c in eligible], 'attempts': [], 'token_usage': []}
@@ -3319,10 +3327,6 @@ class GovernanceStore:
                                                         experiment['result'].get('round_conclusions'))
         strict = experiment['result'].get('decision_contract_version') == '109c'
         from .agent_inputs import baseline_bad_case_rows, prepare_baseline_rows, is_optimization_target
-        from .agent_mechanism import CONTRACT, fault_stage, validate_mechanism
-        use_final = verdict.current(experiment['result'])
-        mechanism_enabled = experiment['result'].get('mechanism_contract') == CONTRACT
-        frozen = _load(baseline['dataset_snapshot_json'], {})
         winner_cases = verdict.final_cases(self, winner['result']['evaluation_run_id'], use_final=use_final) if strict or mechanism_enabled else []
         frozen_questions = {q['id']: q for q in frozen.get('questions', [])}
         d_groups = bad_case_groups(winner_cases, questions=frozen_questions) if strict else []
@@ -3333,13 +3337,10 @@ class GovernanceStore:
             failed_winner_cases = [{'id': c['question_id'], 'question_id': c['question_id'], 'result': c}
                                    for c in winner_cases if c.get('passed') is False]
             winner_targets = {row['question_id']: row for row in prepare_baseline_rows(baseline, failed_winner_cases)}
-            winner_base_changes = parameter_diff(winner['config'], base_config)
             ledger = experiment['result']['parameter_effect_ledger']
-            preview = (load_retrieval_preview(self, baseline['id'], foundation=frozen.get('corpus_fingerprint'))
-                       if use_final else load_retrieval_preview(self, baseline['id']))
             mechanism_prompt = {'fault_stages': {qid: fault_stage(row) for qid, row in winner_targets.items()},
                                 'parameter_stages': rules.AGENT_PARAMETER_STAGES, 'parameter_effect_ledger': ledger,
-                                'retrieval_preview': preview or {}}
+                                'retrieval_preview': preview}
         prompt_cases = [strategy_case(row) for row in bad_cases]
         for case in prompt_cases:
             category = case['diagnostic_view']['diagnosis_category']

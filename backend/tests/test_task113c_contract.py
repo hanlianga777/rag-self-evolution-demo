@@ -165,7 +165,18 @@ def test_no_evidence_stops_staged_cycle_without_calling_provider(tmp_path, monke
 
     store = GovernanceStore(tmp_path / 'stop.db')
     run_id = completed_baseline(store)
+    baseline = store.evaluation_run(run_id)
+    foundation = json.loads(baseline['dataset_snapshot_json'])['corpus_fingerprint']
+    with store.connection() as db:
+        db.execute("UPDATE evaluation_runs SET config_json=json_set(config_json,'$.knowledge_identity',json(?)) WHERE id=?",
+                   (json.dumps(foundation), run_id))
     experiment = store.create_experiment(run_id, decision_contract_v2=True)
+    preview_dir = tmp_path / 'retrieval_preview'
+    preview_dir.mkdir()
+    (preview_dir / f'{run_id}.json').write_text(json.dumps({
+        'baseline_run_id': run_id, 'rules_version': rules.RULES_VERSION, 'knowledge_identity': foundation,
+        'configs': [{'change': {'top_k': 6}, 'evidence_enters_final': []}],
+    }), encoding='utf-8')
     with store.connection() as db:
         db.execute("UPDATE experiments SET result_json=json_set(result_json, '$.round_policy', json(?)) WHERE id=?",
                    (json.dumps({'mode': 'full_rounds', 'stop_rule': 'staged-v1'}), experiment))
