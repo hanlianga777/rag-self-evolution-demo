@@ -383,7 +383,7 @@ class EvaluationRunner:
         execution = self.runtime.answer(item["question"], config)
         return self.score_execution(item, execution)
 
-    def diagnostic_retest(self, run_id, question_ids, *, repetitions=3, config_override=None):
+    def diagnostic_retest(self, run_id, question_ids, *, repetitions=3, config_override=None, resume=None):
         """Read a frozen scheme and score fresh trials without evaluation writes."""
         from uuid import uuid4
         from .corpus import current_manifest, manifest_identity
@@ -430,17 +430,21 @@ class EvaluationRunner:
         effort = judge.get('judge_thinking', {}).get('reasoning_effort', 'off')
         limits = judge.get('execution_snapshot', {}).get('request_limits')
         diagnostic_id = f'DIAG-{uuid4().hex}'
+        if resume is not None:
+            checkpoints, persist, _ = resume
+            diagnostic_id = checkpoints.setdefault('id', diagnostic_id)
+            persist()
         token = _request_checkpoint.set(None)
         try:
             with experiment_scope(self.store, reuse_experiment(self.store, run)), bypass_reuse(), judge_thinking(effort), execution_limits(limits), accounting_only():
                 self._require_generation_contract(judge)
-                questions = self._diagnostic_trials(items, run, repetitions, diagnostic_id, snapshot, frozen, traces)
+                questions = self._diagnostic_trials(items, run, repetitions, diagnostic_id, snapshot, frozen, traces, resume=resume)
         finally:
             _request_checkpoint.reset(token)
         return {'id': diagnostic_id, 'source_run_id': run_id, 'repetitions': repetitions,
                 'evaluation_identity': judge['evaluation_identity'], 'questions': questions}
 
-    def _diagnostic_trials(self, items, run, repetitions, diagnostic_id, snapshot, frozen, traces):
+    def _diagnostic_trials(self, items, run, repetitions, diagnostic_id, snapshot, frozen, traces, *, resume=None):
         from .evaluation_stage import checkpoint_usage, perform_stage
         from .policy import protected_question
         from .providers import permanent_provider_error
@@ -455,9 +459,24 @@ class EvaluationRunner:
             for index in range(repetitions):
                 trial_id = f'{diagnostic_id}-{len(questions) + 1}-{index + 1}'
                 checkpoint = {'attempts': []}
+                if resume is None:
+                    persist, check_stop = lambda: None, lambda: None
+                else:
+                    checkpoints, persist, check_stop = resume
+                    checkpoint = checkpoints.setdefault(trial_id, {'attempts': [], 'verdict_sample': True})
+                    if 'trial' in checkpoint:
+                        trials.append(checkpoint['trial'])
+                        continue
+
                 def perform(phase, action):
-                    return perform_stage(checkpoint, phase, action, trial_id, automatic=False,
-                                         check_stop=lambda: None, on_state=lambda *_args, **_kwargs: None)
+                    if phase in checkpoint.get('stage_results', {}):
+                        return checkpoint['stage_results'][phase]
+                    value = perform_stage(checkpoint, phase, action, trial_id, automatic=False,
+                                          check_stop=check_stop, on_state=lambda *_args, **_kwargs: persist())
+                    if resume is not None:
+                        checkpoint.setdefault('stage_results', {})[phase] = value
+                        persist()
+                    return value
 
                 execution = None
                 try:
@@ -469,13 +488,16 @@ class EvaluationRunner:
                     sample = verdict.make_sample(score, item['raw'], index + 1, 'recheck', trial_id)
                     trial = {**sample, 'judge_result': sample['judge_raw']}
                 except Exception as error:
-                    if permanent_provider_error(error):
+                    if resume is not None or permanent_provider_error(error):
                         raise
                     trial = {'passed': None, 'risk': None, 'error': str(error)}
                     if answer_kwargs and execution is not None:
                         trial.update(answer=execution.get('answer'), latency_ms=execution.get('latency_ms'),
                                      judge_result=getattr(error, 'raw_provider_response', None))
                 trials.append({'id': trial_id, **trial, 'usage': checkpoint_usage(checkpoint)})
+                if resume is not None:
+                    checkpoint['trial'] = trials[-1]
+                    persist()
             passed = sum(trial['passed'] is True for trial in trials)
             unknown = sum(trial['passed'] is None for trial in trials)
             risk = any(trial['risk'] is True for trial in trials)
@@ -1248,7 +1270,7 @@ class EvaluationRunner:
 
     def recover_run(self,run_id):
         from .evaluation_snapshot import require_resume_snapshot, shared_judge
-        from .paid_run import PaidRun,controlled_run,accounting_only
+        from .paid_run import PaidRun, controlled_run, accounting_only, current_paid_run
         run=self.store.evaluation_run(run_id)
         auto=run['result'].get('auto_recovery',{})
         if not auto.get('enabled', auto.get('authorized')) or auto.get('state')=='stopped' or run['result'].get('stop_request'):return
@@ -1269,6 +1291,10 @@ class EvaluationRunner:
             if current!=snapshot or config!=run['config'] or judge!=shared_judge(run['judge']):raise ValueError('自动恢复冻结配置不匹配')
             execute=lambda:self.execute_baseline(run_id,items,config)
         if auto.get('ledger_path'):
+            current = current_paid_run()
+            if current and str(current.path) == auto['ledger_path'] and current.identity == auto.get('ledger_identity'):
+                with accounting_only():
+                    return execute()
             def check_ledger_identity():
                 from .corpus import current_manifest,manifest_identity
                 if self.store.dataset_snapshots()[0]['id']!=snapshot['id'] or snapshot.get('corpus_fingerprint')!=manifest_identity(current_manifest()):raise ValueError('恢复期间Golden/Corpus身份变化')

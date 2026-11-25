@@ -117,7 +117,10 @@ def recover_authorized_evaluations():
         candidate=store.candidate(run['config']['candidate_id']) if run['config'].get('candidate_id') else None
         if candidate:
             experiment=store.experiment(candidate['experiment_id'])
-            if experiment and experiment['result'].get('optimization_cycle',{}).get('status')=='running':continue
+            if experiment:
+                cycle = experiment['result'].get('optimization_cycle', {})
+                if cycle.get('status') == 'running' or cycle.get('external_runner'):
+                    continue
         if run['status'] in {'queued','running'} or run['status']=='completed' and candidate and candidate['status']=='running':
             threading.Thread(target=recover,args=(run['id'],),daemon=True).start()
 

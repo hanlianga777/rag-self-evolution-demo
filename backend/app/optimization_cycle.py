@@ -433,6 +433,8 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                    or e.get('provider_error',{}).get('http_status') in {400,401,402,403} for e in errors):
                 return None, save('failed','sandbox',run.get('error_message') or 'Provider请求、权限或余额错误，已停止')
             error = run.get('error_message') or str(result.get('technical_errors') or '试跑未完整结束')
+            if state.get('external_runner'):
+                return None, save('failed', 'sandbox', result.get('auto_recovery', {}).get('error') or error)
             recovery = state.setdefault('sandbox_recovery', {}).setdefault(candidate['id'], {'resumes':0, 'error':error})
             if recovery['error'] != error:
                 recovery.update(error=error, resumes=0)
@@ -474,6 +476,8 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
             try:
                 conclude_round(store, runtime, experiment_id, final_d=True)
             except ValueError as error:
+                if state.get('external_runner'):
+                    raise
                 state['d_review_error'] = str(error)
         store.refresh_recommendation(experiment_id)
         return save('recommended', 'before_release')
@@ -557,6 +561,8 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                         return finish(experiment, [winner], 'finish_winner')
                     return save('stopped', 'review', stop['reason'])
             except ProposalValidationExhausted as error:
+                if state.get('external_runner'):
+                    raise
                 failures = state.setdefault('proposal_generation_failures', [])
                 failures.append({'round':number+1, 'reason':str(error), 'sandbox_budget_used':0,
                                  'at':datetime.now(timezone.utc).isoformat()})
@@ -583,6 +589,8 @@ def recover_optimization_cycles(store, runtime):
         rows = connection.execute("SELECT id,json_extract(result_json,'$.optimization_cycle') cycle FROM experiments WHERE json_extract(result_json,'$.optimization_cycle.status')='running'").fetchall()
     for row in rows:
         state = json.loads(row['cycle'])
+        if state.get('external_runner'):
+            continue
         owner = state.get('owner_pid')
         if owner == os.getpid():
             if any(t.ident==state.get('worker_thread') and t.is_alive() for t in threading.enumerate()):continue
@@ -606,7 +614,7 @@ def recover_optimization_cycles(store, runtime):
 def recover_agent_generations(store, runtime):
     """Recover standalone generation; active batch generations belong to their cycle."""
     with store.connection() as connection:
-        rows=connection.execute("SELECT id,baseline_run_id,json_extract(result_json,'$.agent_generation.owner_pid') owner_pid FROM experiments WHERE status='generating' AND coalesce(json_extract(result_json,'$.optimization_cycle.status'),'')!='running'").fetchall()
+        rows=connection.execute("SELECT id,baseline_run_id,json_extract(result_json,'$.agent_generation.owner_pid') owner_pid FROM experiments WHERE status='generating' AND coalesce(json_extract(result_json,'$.optimization_cycle.status'),'')!='running' AND NOT coalesce(json_extract(result_json,'$.optimization_cycle.external_runner'),0)").fetchall()
     def recover(row):
         try:OptimizationAgent(store,runtime.provider).generate(row['baseline_run_id'],experiment_id=row['id'])
         except Exception:logging.exception('Agent generation recovery failed: %s',row['id'])
