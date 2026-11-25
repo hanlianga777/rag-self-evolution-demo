@@ -151,6 +151,8 @@ def product_interruption(candidate):
 
 
 def sandbox_attempts_used(candidate):
+    if candidate.get('reasoning', {}).get('reuse') == '用户授权沿用':
+        return 0
     attempts=candidate.get('reasoning',{}).get('sandbox_attempts',[])
     count=len(attempts) or int(candidate.get('status') in {'evaluated','failed','running'})
     refunded=int(candidate.get('status')=='evaluated' and (candidate.get('result') or {}).get('no_effect',{}).get('budget_refunded') is True)
@@ -2821,11 +2823,16 @@ class GovernanceStore:
                 'round_policy': {'stop_rule': 'staged-v1'}}
 
     def create_experiment(self, baseline_run_id: str, status: str = "analyzing", *,
-                          decision_contract_v2=False, historical_experiment_id=None, mode='initial'):
+                          decision_contract_v2=False, historical_experiment_id=None, mode='initial', seed_candidates=None):
         from .agent_strategy import NEW_EXPERIMENT_STRATEGY
 
         if mode not in ('initial', 'continuous') or status == 'direct_release' and mode != 'initial':
             raise ValueError('实验 mode 须为 initial 或 continuous，直接发布只支持 initial')
+        if seed_candidates is not None and (not isinstance(seed_candidates, list) or seed_candidates and (
+                status == 'direct_release' or len(seed_candidates) != 1 or not isinstance(seed_candidates[0], dict)
+                or not all(isinstance(seed_candidates[0].get(key), str) and seed_candidates[0][key]
+                           for key in ('experiment_id', 'candidate_id')))):
+            raise ValueError('seed_candidates 仅接受一个已完成的第 1 轮 A，须给 experiment_id 和 candidate_id')
         experiment_id = f"EXP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         context = {} if status == 'direct_release' else dict(NEW_EXPERIMENT_STRATEGY)
         with self.connection() as connection:
@@ -2857,10 +2864,112 @@ class GovernanceStore:
                 context['mechanism_contract'] = CONTRACT
                 context.setdefault('parameter_effect_ledger', {'current': [], 'historical': []})
             connection.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline_run_id, status, _json(context), _now()))
+            if seed_candidates:
+                self._seed_round_one(connection, experiment_id, baseline_run_id, context, seed_candidates[0])
         return experiment_id
+
+    def _seed_round_one(self, db, experiment_id, baseline_id, context, reference):
+        from .agent_mechanism import effect_entries, same_base
+        from .agent_round_contract import all_gates_pass, saved_final_map, validate_layered_limits
+        from .composite import parameter_diff, pipeline_config
+        from .evaluation import candidate_comparison
+        from .evaluation_snapshot import shared_judge
+        from .policy import evaluate_regression, qualify_candidate, validate_candidate_config
+
+        source = db.execute('SELECT baseline_run_id FROM experiments WHERE id=?',
+                            (reference['experiment_id'],)).fetchone()
+        candidate = db.execute('SELECT * FROM candidate_configs WHERE experiment_id=? AND id=?',
+                               (reference['experiment_id'], reference['candidate_id'])).fetchone()
+        if not source or source['baseline_run_id'] != baseline_id:
+            raise ValueError('引用候选必须绑定同一 Baseline 运行')
+        reasoning = _load(candidate['reasoning_json'], {}) if candidate else {}
+        if (not candidate or candidate['status'] != 'evaluated' or reasoning.get('round') != 1
+                or reasoning.get('candidate_label') != 'A' or reasoning.get('inherited_from')):
+            raise ValueError('只允许引用已完成的第 1 轮 A')
+        source_result = _load(candidate['result_json'], {})
+        run_id = source_result.get('evaluation_run_id')
+        run = db.execute('SELECT * FROM evaluation_runs WHERE id=?', (run_id,)).fetchone()
+        base = db.execute('SELECT * FROM evaluation_runs WHERE id=?', (baseline_id,)).fetchone()
+        run_result = _load(run['result_json'], {}) if run else {}
+        if (not run or run['status'] != 'completed' or run_result.get('evaluation_complete') is not True
+                or run_result.get('technical_failed') or source_result.get('evaluation_complete') is not True):
+            raise ValueError('引用候选缺少已完成的 Sandbox 运行')
+        if not verdict.uses_final(run_result) or run_result['verdict_version'] != source_result.get('verdict_version'):
+            raise ValueError('引用候选的最终判定合同不兼容')
+        if source_result.get('baseline_run_id') != baseline_id:
+            raise ValueError('引用 Sandbox 的 Baseline 运行不一致')
+        frozen = _load(base['dataset_snapshot_json'], {})
+        run_frozen = _load(run['dataset_snapshot_json'], {})
+        if frozen.get('corpus_fingerprint') is None or frozen.get('corpus_fingerprint') != run_frozen.get('corpus_fingerprint'):
+            raise ValueError('引用候选的知识身份不一致')
+        if (base['dataset_version_id'] != run['dataset_version_id']
+                or rules.canonical_hash(frozen) != rules.canonical_hash(run_frozen)):
+            raise ValueError('引用候选的冻结题卷不一致')
+        base_config, run_config, config = (_load(row['config_json'], {}) for row in (base, run, candidate))
+        if run_config.get('knowledge_identity') != base_config.get('knowledge_identity'):
+            raise ValueError('引用 Sandbox 的知识身份不一致')
+        if (run_config.get('run_target') != 'sandbox_candidate' or run_config.get('candidate_id') != candidate['id']
+                or not same_base(config, run_config)):
+            raise ValueError('引用候选的配置与保存的 Sandbox 不一致')
+        base_judge, run_judge = (_load(row['judge_json'], {}) for row in (base, run))
+        identity = base_judge.get('evaluation_identity')
+        if (not identity or source_result.get('evaluation_identity') != identity
+                or shared_judge(run_judge) != shared_judge(base_judge)):
+            raise ValueError('引用候选的 Judge 合同不一致')
+        if (not validate_candidate_config(config)['valid']
+                or config.get('generation_thinking', rules.BASELINE['generation_thinking']) not in rules.AGENT['thinking_values']):
+            raise ValueError('引用候选的配置超出当前 Search Space')
+        validate_layered_limits(config, base_config, base_config)
+        saved = verdict.records(self, run_id, connection=db)
+        base_records = verdict.records(self, baseline_id, connection=db)
+        before = saved_final_map(self, baseline_id, saved=base_records)
+        after = saved_final_map(self, run_id, saved=saved)
+        if (not before or before.keys() != after.keys() or set(after) != set(frozen['question_ids'])
+                or any(row.get('run_id') != run_id or row.get('question_id') != qid
+                       or verdict.resolve(row.get('samples') or []) != after[qid] for qid, row in saved.items())):
+            raise ValueError('引用候选缺少完整、有效的逐题最终判定')
+        questions = {q['id']: q for q in frozen['questions']}
+        targets = {q for q in before if q in reasoning.get('observed_evidence', [])
+                   or f'BC-{baseline_id}-{q}' in reasoning.get('observed_evidence', [])}
+        comparison = candidate_comparison({q: {'passed': p} for q, p in before.items()},
+                                          {q: {'passed': p} for q, p in after.items()}, targets, questions)
+        regression = evaluate_regression(new_critical_failures=comparison['new_critical_failures'],
+                                         new_ordinary_failures=comparison['new_ordinary_failures'])
+        regression.update(comparison, severe_risk_question_ids=sorted(
+            qid for qid, row in saved.items() if any(s['risk'] for s in row['samples'])))
+        gates = run_result.get('gates') or {}
+        qualification = qualify_candidate({**gates, 'passed': all_gates_pass(gates)}, regression,
+                                          comparison['target_bad_cases_fixed'], sum(not p for p in before.values()),
+                                          comparison['bad_case_count'], rule_version=rules.RULES_VERSION)
+        provenance = {'source_experiment_id': reference['experiment_id'], 'source_candidate_id': candidate['id'],
+                      'source_run_id': run_id, 'generated_by': 'Agent', 'reuse': '用户授权沿用'}
+        cid = f'{experiment_id}-R1-A'
+        base_config = pipeline_config(base_config)
+        changes = parameter_diff(config, base_config)
+        reasoning = {key: value for key, value in reasoning.items() if key != 'sandbox_attempts'} | {
+            **provenance, 'changed_parameters': changes, 'changed_parameters_vs_baseline': changes}
+        result = {key: run_result[key] for key in ('metrics', 'overall_score', 'safety_metrics', 'group_metrics')
+                  if key in run_result} | {**comparison, **provenance, 'baseline_run_id': baseline_id,
+                  'evaluation_run_id': run_id, 'evaluation_complete': True, 'evaluation_identity': identity,
+                  'verdict_version': rules.RULES_VERSION, 'final_verdict_ref': {'run_id': run_id, 'key': verdict.RECORDS_KEY},
+                  'gates': gates, 'regression': regression, 'qualification': qualification,
+                  'release_qualification': qualification}
+        db.execute("INSERT INTO candidate_configs VALUES (?, ?, 'evaluated', ?, ?, ?, ?)",
+                   (cid, experiment_id, _json(config), _json(reasoning), _json(result), _now()))
+        effect_source = {'experiment_id': experiment_id, 'candidate_id': cid, 'round': 1,
+                         'baseline_run_id': baseline_id, 'base_id': 'Baseline', 'base_run_id': baseline_id,
+                         'base_config': base_config, 'base_reference_candidate_id': None,
+                         'candidate_run_id': run_id, **provenance}
+        cases = [{qid: verdict.decision_case({}, row, row['final_passed']) for qid, row in records.items()}
+                 for records in (base_records, saved)]
+        context['seed_round_planned'] = False
+        context['parameter_effect_ledger']['current'] = effect_entries(
+            changes, effect_source, questions, {q for q, passed in before.items() if not passed}, *cases)
+        db.execute('UPDATE experiments SET result_json=? WHERE id=?', (_json(context), experiment_id))
 
     def claim_agent_generation(self, baseline_run_id, trigger_id=None, experiment_id=None):
         from .agent_strategy import NEW_EXPERIMENT_STRATEGY
+        from .agent_round_contract import layered
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK, self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -2902,6 +3011,8 @@ class GovernanceStore:
             if candidates and not rounds:
                 raise ValueError("历史 Candidate 缺少有效 Round，无法继续优化")
             current_round = max(rounds, default=0)
+            if context.get('seed_round_planned') is False:
+                current_round = 0
             if verdict.current(context):
                 verdict.require_empty_history(context.get('parameter_effect_ledger'))
                 if context.get('decision_stop'):
@@ -2917,7 +3028,7 @@ class GovernanceStore:
                 raise ValueError("本轮完整评测已无剩余业务问题")
             used = existing["evaluation_budget"]["used"] if existing else 0
             staged = bool(existing) and existing['result'].get('round_policy', {}).get('stop_rule') == 'staged-v1'
-            if used >= (MAX_EVALS if staged else MAX_EVALS - 1):
+            if used >= (MAX_EVALS if staged and not layered(context) else MAX_EVALS - 1):
                 raise ValueError(f"evaluation budget exhausted: max_evals={MAX_EVALS}")
             if not experiment_id:
                 context.update(self.new_verdict_experiment(connection, baseline_run_id))
@@ -2962,6 +3073,8 @@ class GovernanceStore:
             if verdict.current(persisted) and 'parameter_effect_ledger' in result:
                 # The trace keeps the prompt's snapshot; the experiment keeps newer evidence too.
                 result = {**result, 'parameter_effect_ledger': persisted['parameter_effect_ledger']}
+            if persisted.get('seed_round_planned') is False and result.get('round') == 1:
+                result = {**result, 'seed_round_planned': True, 'decision_stop': None}
             connection.execute("UPDATE experiments SET status='completed', result_json=? WHERE id=?", (_json({**persisted, **result, 'prior_round_reviews':reviews, 'agent_strategies':strategies}), experiment_id))
 
     def restore_round_reviews(self, experiment_id):
@@ -3131,11 +3244,11 @@ class GovernanceStore:
             return [{**dict(row), "config": _load(row["config_json"], {}), "reasoning": _load(row["reasoning_json"], {}), "result": self._candidate_result(connection,row,light=light)} for row in rows]
 
     @staticmethod
-    def _round_summary(candidates: list[dict], number: int) -> dict:
+    def _round_summary(candidates: list[dict], number: int, *, seed_round_open=False) -> dict:
         items = [item for item in candidates if item.get("reasoning", {}).get("round") == number]
         evaluated = sum(item["status"]=='evaluated' and item["result"].get('evaluation_complete') is not False for item in items)
         skipped = sum(item['status']=='skipped' for item in items)
-        return {"round": number, "candidate_ids": [item["id"] for item in items], "evaluated": evaluated, "skipped":skipped, "total": len(items), "complete": bool(items) and evaluated + skipped == len(items)}
+        return {"round": number, "candidate_ids": [item["id"] for item in items], "evaluated": evaluated, "skipped":skipped, "total": len(items), "complete": bool(items) and evaluated + skipped == len(items) and not (number == 1 and seed_round_open)}
 
     def skip_candidate(self, candidate_id, actor, reason, *, automatic=False):
         """Only an unstarted A/B/C may be skipped; preserve the visible proposal."""
@@ -3161,11 +3274,16 @@ class GovernanceStore:
         self.refresh_recommendation(candidate['experiment_id'])
         return self.candidate(candidate_id)
 
-    def round_completion(self, candidate: dict, *, peers=None) -> dict:
+    def round_completion(self, candidate: dict, *, peers=None, seed_round_open=None) -> dict:
         number = candidate.get("reasoning", {}).get("round")
         if not isinstance(number, int):
             return {"direct_or_legacy": True, "complete": True, "evaluated": 1, "total": 1}
-        return self._round_summary(peers if peers is not None else self.candidates(candidate["experiment_id"],light=True), number)
+        if seed_round_open is None and candidate['reasoning'].get('reuse') == '用户授权沿用':
+            with self.connection() as db:
+                row = db.execute('SELECT result_json FROM experiments WHERE id=?', (candidate['experiment_id'],)).fetchone()
+            seed_round_open = bool(row and _load(row[0], {}).get('seed_round_planned') is False)
+        return self._round_summary(peers if peers is not None else self.candidates(candidate["experiment_id"],light=True),
+                                   number, seed_round_open=seed_round_open)
 
     def finish_candidate(self, candidate_id: str, status: str, result: dict):
         from .agent_inputs import new_failure_ids
@@ -3190,6 +3308,7 @@ class GovernanceStore:
 
     def reserve_candidate_evaluation(self, candidate_id: str, connection=None):
         """Reserve execution and validate current identity in one writer transaction."""
+        from .agent_round_contract import layered
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK, (self.connection() if connection is None else nullcontext(connection)) as connection:
             if not connection.in_transaction:
@@ -3217,7 +3336,7 @@ class GovernanceStore:
             used = sum(sandbox_attempts_used({'status':item['status'],'reasoning':_load(item['reasoning_json'],{}),'result':_load(item['result_json'],{})}) for item in items)
             # 规则总表六.6：分阶段停止的实验总预算包含 D，不单独预留。
             staged = result.get('round_policy', {}).get('stop_rule') == 'staged-v1'
-            limit = MAX_EVALS if is_d or staged else MAX_EVALS - 1
+            limit = MAX_EVALS if is_d or staged and not layered(result) else MAX_EVALS - 1
             resuming = row['status']=='failed' and (product_interruption(candidate) or bool(candidate['result'].get('stop_request')))
             if used >= limit and not resuming:
                 raise ValueError('Sandbox 评测预算已用完' if staged or is_d else 'Sandbox 评测额度已用完，剩余额度为 D 预留')
@@ -3235,6 +3354,8 @@ class GovernanceStore:
         return {**candidate, 'status':'running', 'reasoning':{**candidate['reasoning'], 'sandbox_attempts':attempts}}
 
     def confirm_experiment_report(self, experiment_id: str, winner_id: str, actor: str, *, audit_note=None, delegated_review=None):
+        from .agent_round_contract import layered, layered_winner
+
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
             experiment = self.experiment(experiment_id,light=True)
@@ -3242,6 +3363,8 @@ class GovernanceStore:
                 raise ValueError('Experiment 不存在')
             if experiment['result'].get('report_confirmation'):
                 raise ValueError('报告已确认')
+            if experiment['result'].get('seed_round_planned') is False:
+                raise ValueError('需先完成第 1 轮 B/C 规划才能确认 Gate 2')
             from .paid_schedule import unattended_authorization
             authorization = unattended_authorization(self)
             audit = gate_audit('gate2', actor, authorization=authorization, reviews=delegated_review)
@@ -3257,6 +3380,10 @@ class GovernanceStore:
                 raise ValueError('Winner评测身份不一致')
             if not winner or winner['status'] != 'evaluated' or not winner['result'].get('qualification', {}).get('qualified'):
                 raise ValueError('至少需要一个合格 A/B/C Winner')
+            if layered(experiment['result']):
+                incumbent = layered_winner(self, baseline, candidates, connection=connection)
+                if not incumbent or incumbent['id'] != winner_id:
+                    raise ValueError('Gate 2 须确认按逐轮非回退规则得到的 Winner')
             if experiment['evaluation_budget']['used'] >= MAX_EVALS and not (
                     experiment['result'].get('round_policy', {}).get('stop_rule') == 'staged-v1'
                     and experiment['evaluation_budget']['used'] == MAX_EVALS):
@@ -3268,6 +3395,18 @@ class GovernanceStore:
             if audit == rules.AGENT_GATE_AUDIT:
                 confirmation['authorization'] = authorization
             result = {**experiment['result'], 'report_confirmation': confirmation}
+            if layered(result):
+                from .optimization_cycle import layered_stage_facts, staged_decision
+
+                cycle = result.get('optimization_cycle') or {}
+                number = max((item['reasoning'].get('round', 1) for item in candidates
+                              if item['reasoning'].get('candidate_label') in rules.AGENT['candidate_labels']), default=0)
+                if (cycle.get('staged_decision') or {}).get('round') != number:
+                    facts = layered_stage_facts(self, experiment, baseline, winner, number)
+                    used = experiment['evaluation_budget']['used']
+                    action = staged_decision(number, 1, used, version=result['verdict_version'], **facts)
+                    result['optimization_cycle'] = {**cycle, 'staged_decision': {
+                        'round': number, 'winner_id': winner_id, 'used': used, 'decision': action, **facts}}
             connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (_json(result), experiment_id))
             connection.execute('INSERT INTO approvals(gate,target_id,decision,actor,created_at) VALUES (?,?,?,?,?)', ('experiment_report', experiment_id, 'approved', actor, _now()))
         self.refresh_recommendation(experiment_id)
@@ -3276,6 +3415,7 @@ class GovernanceStore:
     @provider_task('agent')
     def create_composite(self, experiment_id: str, provider=None, authorize_provider=None):
         from .agent_mechanism import CONTRACT, fault_stage, validate_mechanism
+        from .agent_round_contract import layered, validate_layered_limits
         from .composite import build_d_facts, validate_d_refinement, pipeline_config, parameter_diff, retryable_d_decision
         from .optimization import load_retrieval_preview, parse_agent_json, require_retrieval_preview, strategy_case, strategy_candidate
         from .telemetry import collect_usage, cost_fields
@@ -3294,6 +3434,24 @@ class GovernanceStore:
         frozen_baseline = self.require_current_baseline(requested['baseline_run_id'])
         # Materialize facts even when the price window queues the actual suggestion.
         frozen_winner = next(c for c in requested['candidates'] if c['id']==requested['result']['report_confirmation']['winner_id'])
+        use_layered = layered(requested['result'])
+        if use_layered:
+            from .optimization_cycle import layered_stage_facts, staged_decision
+
+            previous = requested['result'].get('composite')
+            if previous and not retryable_d_decision(previous):
+                return self.candidate(previous['candidate_id']) if previous.get('candidate_id') else previous
+            frozen = _load(frozen_baseline['dataset_snapshot_json'], {})
+            winner_diff = parameter_diff(frozen_winner['config'], pipeline_config(frozen_baseline['config']))
+            preview = load_retrieval_preview(self, frozen_baseline['id'], foundation=frozen.get('corpus_fingerprint'))
+            require_retrieval_preview(preview, winner_diff)
+            number = max((c['reasoning'].get('round', 1) for c in requested['candidates']
+                          if c['reasoning'].get('candidate_label') in rules.AGENT['candidate_labels']), default=0)
+            facts = layered_stage_facts(self, requested, frozen_baseline, frozen_winner, number)
+            decision = staged_decision(number, 1, requested['evaluation_budget']['used'],
+                                       version=requested['result']['verdict_version'], **facts)
+            if decision != 'composite':
+                raise ValueError('当前没有可用的 D 组合机会' if decision == 'finish_winner' else '还有层可继续探索，当前轮次不能进入 D')
         frozen_history = [c for c in requested['candidates'] if c['status']=='evaluated' and c['reasoning'].get('candidate_label')!='D' and c['result'].get('evaluation_identity')==frozen_baseline['judge'].get('evaluation_identity')]
         frozen_facts = build_d_facts(self, frozen_baseline, frozen_winner, frozen_history)
         with self.connection() as connection:
@@ -3415,6 +3573,10 @@ class GovernanceStore:
                         'partial_fusion时，用qualified_candidate_ids从history筛出合格来源，取它们parameter_diff中不冲突的并集；如果并集未评测且相对Baseline不超出3项，优先提出该方案。proposed_config_diff只列相对Winner的差异，changes与这些差异逐一对应。'
                         '没有证据支持修好Winner剩余题时，仍可探索上述并集：用partial，source_candidates只填另一合格方案的当前实验ID，target_question_ids填[]，expected_fixed_count填0，说明用Sandbox检验组合和回退。不要给探索性改动硬配目标题。'
                         '副作用检查不能只想剩余错题，要逐一检查历史翻错的保护题、Winner修好题、所有门槛。should_generate_d必须为true；风险大小不能作为不生成理由。'
+                        + ('新逐层规则优先于前面的合格方案数示例：程序已判断本轮可以进入D。'
+                           f'相对 Winner 最多新增 {rules.AGENT["max_changed_parameters"]} 项，且保留 Winner 的所有改动。'
+                           '能取用互补合格方案时用 partial_fusion；有同底座证据精修剩余题时可用 winner_plus。'
+                           if use_layered else '')
                         + ('bad_case_summary须为{groups,focus,conclusions:[{id,conclusion}]}，其中groups直接复制bad_case_groups。'
                            'bad_case_conclusion_ids须引用这些结论。非空的changes.target_question_ids只允许从d_facts.remaining_failures取正式题号，表示预期改善，不能填Winner已经答对的题。' if strict else '')
                         + ('逐题按 Winner 的 fault_stages 校验相对 Winner 的完整改动。须有同底座的预演或账本依据；'
@@ -3499,9 +3661,15 @@ class GovernanceStore:
                     validate_bad_case_references(suggestion, bad_case_conclusion_ids(suggestion.get('bad_case_summary'), d_groups))
                 if experiment['result'].get('strategy_contract') in {'agent-strategy-3','agent-strategy-4'}:
                     from .agent_strategy import validate_d_mode
-                    validate_d_mode(suggestion, winner, eligible, facts)
+                    validate_d_mode(suggestion, winner, eligible, facts, use_layered=use_layered)
                 if suggestion['should_generate_d']:
                     config, source_records = validate_d_refinement(suggestion, winner, eligible, base_config, facts)
+                    if use_layered:
+                        validate_layered_limits(config, winner['config'], base_config)
+                        if any(key in winner_base_changes for key in parameter_diff(config, pipeline_config(winner['config']))):
+                            raise ValueError('D 须保留 Winner 已验证的改动')
+                        if any(pipeline_config(c['config']) == pipeline_config(config) for c in eligible):
+                            raise ValueError('D 须提出未运行过的配置')
                     if any(row.get('normalized_fields') for row in source_records):
                         audit['normalized_fields'] = [item for row in source_records for item in row.get('normalized_fields', [])]
                         persist_attempts()
@@ -3568,6 +3736,8 @@ class GovernanceStore:
         return self.candidate(decision['candidate_id']) if decision.get('candidate_id') else decision
 
     def refresh_recommendation(self, experiment_id: str):
+        from .agent_round_contract import layered, layered_winner
+
         # One writer snapshot prevents a late worker from erasing a newer Gate 2/D decision.
         with self.connection() as connection:
             if not connection.in_transaction:connection.execute('BEGIN IMMEDIATE')
@@ -3593,12 +3763,20 @@ class GovernanceStore:
                         result['bad_case_count'] = sum(not value for value in passed.values())
             qualified = sorted([item for item in candidates if item['reasoning'].get('candidate_label') != 'D' and item['status'] == 'evaluated' and item['result'].get('qualification', {}).get('qualified') and policy_current(baseline.get('judge', {})) and identity and item['result'].get('evaluation_identity') == identity], key=candidate_rank)
             final = next((c for c in candidates if c['reasoning'].get('candidate_label') == 'D' and c['status'] == 'evaluated' and c['result'].get('evaluation_identity') == identity), None)
-            decision = select_final_candidate(qualified, final)
+            use_layered = layered(state)
+            winner = layered_winner(self, baseline, qualified, connection=connection) if use_layered else (
+                qualified[0] if qualified else None)
+            decision = select_final_candidate(([winner] if winner else []) if use_layered else qualified, final)
+            if use_layered and winner and decision['candidate_id'] == winner['id'] and final is None:
+                decision['reason'] = '保留按逐轮非回退规则得到的 Winner'
+            finish_winner = use_layered and (state.get('optimization_cycle') or {}).get('staged_decision', {}).get('decision') == 'finish_winner'
             selected = None
-            if any(item['status'] in {'running', 'generated'} or item['result'].get('evaluation_complete') is False for item in candidates if item['reasoning'].get('candidate_label') != 'D'):
+            if state.get('seed_round_planned') is False or any(item['status'] in {'running', 'generated'} or item['result'].get('evaluation_complete') is False for item in candidates if item['reasoning'].get('candidate_label') != 'D'):
                 status = 'WAITING_FOR_ROUND_COMPLETION'
             elif not confirmation:
-                status = 'Needs Report Confirmation' if qualified else 'No Qualified Candidate'
+                status = 'Needs Report Confirmation' if winner else 'No Qualified Candidate'
+            elif finish_winner and not composite:
+                status, selected = 'Recommended', decision['candidate_id']
             elif not composite:
                 status = 'Needs Composite'
             elif composite['status'] in {'no_effective_composite', 'failed'}:
@@ -3612,9 +3790,9 @@ class GovernanceStore:
                 else:
                     status, selected = 'Recommended', decision['candidate_id']
             result = {'status': status, 'recommended_candidate': selected, 'final_decision': decision, 'report_confirmation': confirmation, 'composite': composite, 'd_outcome':('evaluation_failed' if composite and composite.get('candidate_id') and self.candidate(composite['candidate_id'])['status']=='failed' else (composite or {}).get('outcome')),
-                      'suggested_winner': qualified[0]['id'] if qualified else None, 'why': decision['reason'], 'alternatives': [{'candidate_id': c['id'], 'reason': '按 Bad Case 数由少到多比较', 'rank': i + 1} for i, c in enumerate(qualified)],
+                      'suggested_winner': winner['id'] if winner else None, 'why': decision['reason'], 'alternatives': [{'candidate_id': c['id'], 'reason': '按 Bad Case 数由少到多比较', 'rank': i + 1} for i, c in enumerate(qualified)],
                       'pareto_frontier': [item['id'] for item in qualified if item['reasoning'].get('candidate_label') != 'D'],
-                      'not_recommended': [{'candidate_id': item['id'], 'reason': '未完成完整Sandbox' if item['status'] != 'evaluated' else '规则身份不一致' if item['result'].get('evaluation_identity') != identity else '资格未通过' if not item['result'].get('qualification', {}).get('qualified') else 'Bad Case 数未优于首选'} for item in candidates if not qualified or item['id'] != qualified[0]['id']],
+                      'not_recommended': [{'candidate_id': item['id'], 'reason': '未完成完整Sandbox' if item['status'] != 'evaluated' else '规则身份不一致' if item['result'].get('evaluation_identity') != identity else '资格未通过' if not item['result'].get('qualification', {}).get('qualified') else '未满足逐轮 Winner 晋升条件' if use_layered else 'Bad Case 数未优于首选'} for item in candidates if not winner or item['id'] != winner['id']],
                       'comparison': [{'candidate_id': item['id'], 'status': item['status'], **item['result'], 'parameter_diff': item['reasoning'].get('changed_parameters_vs_baseline', item['reasoning'].get('changed_parameters', {}))} for item in candidates]}
             connection.execute('INSERT OR REPLACE INTO recommendations VALUES (?, ?, ?, ?, ?)', (experiment_id, selected, status, _json(result), _now()))
             return result
@@ -3655,14 +3833,14 @@ class GovernanceStore:
             return "需要 Gate 2 报告确认及 D 决策完成"
         return None
 
-    def release_state(self, candidate: dict, *, peers=None) -> dict:
+    def release_state(self, candidate: dict, *, peers=None, seed_round_open=None) -> dict:
         recommendation = (self.recommendation(candidate["experiment_id"]) or {}).get("result", {})
         result = candidate["result"]
         qualified = bool(result.get("release_qualification", {}).get("qualified"))
         qualification = result.get("qualification", {})
         if qualification.get('rule_version') in {rules.QUALIFICATION['version'], verdict.PREVIOUS_VERDICT_VERSION}:
             qualified = qualified and qualification.get("qualified") is True
-        return {"sandbox": candidate["status"] == "evaluated", "qualified": qualified, "recommended": recommendation.get("recommended_candidate") == candidate["id"], "human_release": (self.latest_approval("human_release", candidate["id"]) or {}).get("decision") == "approved", "round_complete": self.round_completion(candidate, peers=peers)["complete"]}
+        return {"sandbox": candidate["status"] == "evaluated", "qualified": qualified, "recommended": recommendation.get("recommended_candidate") == candidate["id"], "human_release": (self.latest_approval("human_release", candidate["id"]) or {}).get("decision") == "approved", "round_complete": self.round_completion(candidate, peers=peers, seed_round_open=seed_round_open)["complete"]}
 
     def publish_candidate(self, candidate_id: str, actor: str, *, delegated_review=None):
         candidate = self.candidate(candidate_id)
@@ -3857,6 +4035,7 @@ class GovernanceStore:
         return (self.optimization_trigger(trigger_id) or {}).get("status") == "human_confirmed"
 
     def experiment(self, experiment_id: str, *, light=False):
+        from .agent_round_contract import layered
         from .gate_audit_correction import E2_ID, gate2_correction
 
         with self.connection() as connection:
@@ -3871,8 +4050,9 @@ class GovernanceStore:
         result = _load(row["result_json"], {})
         if correction:
             result['gate2_audit_correction'] = correction
-        staged = result.get('round_policy', {}).get('stop_rule') == 'staged-v1'
-        return {**dict(row), "result": result, "candidates": [{**item, "product_interruption":product_interruption(item), "release_state": self.release_state(item, peers=items)} for item in items], "rounds": [self._round_summary(items, number) for number in numbers], "evaluation_budget": {"used": sum(sandbox_attempts_used(item) for item in items), "max": MAX_EVALS, 'reserved_for_d': 0 if staged else 1}}
+        staged = result.get('round_policy', {}).get('stop_rule') == 'staged-v1' and not layered(result)
+        seed_round_open = result.get('seed_round_planned') is False
+        return {**dict(row), "result": result, "candidates": [{**item, "product_interruption":product_interruption(item), "release_state": self.release_state(item, peers=items, seed_round_open=seed_round_open)} for item in items], "rounds": [self._round_summary(items, number, seed_round_open=seed_round_open) for number in numbers], "evaluation_budget": {"used": sum(sandbox_attempts_used(item) for item in items), "max": MAX_EVALS, 'reserved_for_d': 0 if staged else 1}}
 
     def latest_experiment(self):
         with self.connection() as connection:

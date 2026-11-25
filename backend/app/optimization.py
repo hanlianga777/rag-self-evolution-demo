@@ -620,6 +620,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
     audit.update(parsed_json=None,parsed_candidates=None,rejected_candidates=[])
     mechanism_enabled = audit.get('mechanism_contract') == CONTRACT
     round_base = audit.get('round_base')
+    round_target = audit.get('round_target_layer')
     if round_base:
         from .agent_round_contract import validate_base, validate_combinations, validate_hypothesis
     if mechanism_enabled:
@@ -692,6 +693,15 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
         validate_strategy(result, prior_candidates, audit, {item['question_id'] for item in bad_cases})
     if round_base:
         validate_combinations(candidates)
+        if round_target:
+            from .agent_round_contract import COMBINATION, validate_layered_limits, validate_target_layer
+
+            same_round = [c['reasoning']['changed_parameters'] for c in prior_candidates
+                          if c['reasoning'].get('round') == round_number and c['reasoning'].get('reuse') == '用户授权沿用']
+            validate_combinations([*candidates, *[{'config_diff': diff, 'attribution': COMBINATION}
+                                                  for diff in same_round]])
+            if any(c['config_diff'].keys() & diff.keys() for c in candidates for diff in same_round):
+                raise ValueError('同轮方案不得共用参数（含引用的 A）')
         plan = validate_hypothesis(result.get('hypothesis_plan'), candidates,
                                    audit['ledger_inherit'], audit['ledger_exclude'], audit['previous_commitment'])
         result['hypothesis_plan'] = {**plan, 'candidate_id': f"{audit['optimization_run_id']}-R{round_number}-{plan['test_candidate']}"}
@@ -765,6 +775,9 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
             config = {**effective_base, **diff}
             if config.get("hybrid_search") is False and "hybrid_alpha" not in diff:
                 config.pop("hybrid_alpha", None)
+            if round_target:
+                validate_layered_limits(config, effective_base, base_config)
+                validate_target_layer(candidate, selected, audit['round_opportunities'], round_target)
             audit["validation_stage"] = "search_space"
             check = validate_candidate_config(config, prior_configs=prior, completed_evals=completed)
             if not check["valid"]:
@@ -846,6 +859,14 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
                 'actual_value':audit.get('actual_value'),'expected_type':audit.get('expected_type'),'allowed_values':audit.get('allowed_values')})
     if len(staged)!=(len(labels) if audit.get('strategy_contract') == 'agent-strategy-4' else len(ROUND_LABELS)):
         raise ValueError('整轮ABC校验拒绝：'+'；'.join(r['reason'] for r in audit['rejected_candidates']))
+    if round_target:
+        from .agent_round_contract import fault_layer
+
+        layer_cases = {ref for row in bad_cases
+                       if fault_layer(audit['round_opportunities'][row['question_id']]['fault']['code']) == round_target['layer']
+                       for ref in (row['id'], row['question_id'])}
+        if sum(bool(layer_cases.intersection(c['target_bad_cases'])) for c, _ in staged) < min(round_target['capacity'], len(staged)):
+            raise ValueError('未用足可组合的目标层机会，不得将本轮方案全部转向其他层')
     audit["validation_stage"] = "completed"
     audit['failed_parameter_signatures'] = sorted(failed_signatures)
     audit["failed_candidate_id"] = None
@@ -853,7 +874,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
     for candidate, config in staged:
         batch.append((f"R{round_number}-{candidate['id']}", config, {
             **{key:candidate[key] for key in ('direction','strategy_name','core_idea','adjustments','risks','parameter_signature','review_conclusion_ids')},
-            **{key:candidate[key] for key in ('bad_case_conclusion_ids','predicted_fixed_question_ids','mechanism_checks','attribution') if key in candidate},
+            **{key:candidate[key] for key in ('bad_case_conclusion_ids','predicted_fixed_question_ids','mechanism_checks','attribution','layer_reason') if key in candidate},
             **({'round_base': round_base} if round_base else {}),
             "intervention_direction":candidate['intervention_direction'], "supporting_directions":candidate.get('supporting_directions',[]), "action_name":candidate["action_name"], "intervention_contract_version":"agent-closure-4", "experiment_kind":candidate.get("experiment_kind","confirmed"), "falsification":candidate.get("falsification"), "parameter_dependencies":candidate.get('parameter_dependencies',[]), "evidence_assertions":candidate.get('evidence_assertions',[]), "performance_stage":candidate.get('performance_stage'),
             "target_root_causes": candidate.get("target_root_causes"), "provenance": candidate.get("provenance"), "target_group": candidate.get("target_group") if isinstance(candidate.get("target_group"),str) else None, "root_cause": candidate["root_cause"], "root_cause_evidence": candidate["root_cause_evidence"], "expected_improvement": candidate["expected_improvement"], "target_diagnosis": [strategy_case(item) for item in bad_cases if item["id"] in candidate["target_bad_cases"] or item["question_id"] in candidate["target_bad_cases"]], "root_cause_cluster": result.get("root_cause_cluster"), "observed_evidence": candidate["target_bad_cases"], "hypothesis": candidate["hypothesis"], "proposal": candidate["why"], "risk": candidate["risk"],
@@ -959,6 +980,8 @@ class OptimizationAgent:
         from .agent_mechanism import CONTRACT, fault_stage, faults_for_cases, saved_passed
         experiment = self.store.experiment(experiment_id)
         context = experiment['result']
+        from .agent_round_contract import layered, layered_winner
+        use_layered = layered(context)
         v2 = context.get('mechanism_contract') == CONTRACT
         use_final = verdict.current(context)
         requires_preview = v2 or use_final
@@ -969,7 +992,10 @@ class OptimizationAgent:
             from .agent_round_contract import (STOP_REASON, available_labels, check_commitment, inherited_repairs,
                                                previous_commitment, round_base, round_opportunities)
 
-            base = round_base(base_config, prior_candidates, round_number, identity=baseline['judge'].get('evaluation_identity'))
+            winner = layered_winner(self.store, baseline, [c for c in prior_candidates
+                                    if c['reasoning'].get('round', round_number) < round_number]) if use_layered else None
+            base = round_base(base_config, prior_candidates, round_number, identity=baseline['judge'].get('evaluation_identity'),
+                              winner=winner, use_layered=use_layered)
         if requires_preview:
             try:
                 require_retrieval_preview(retrieval_preview, base['changes'] if v2 else {})
@@ -1011,6 +1037,10 @@ class OptimizationAgent:
         persisted_gates = (gate_results or {}).get("gates")
         failed_gates = [gate for gate in persisted_gates if gate.get("passed") is False] if isinstance(persisted_gates, list) else None
         labels = ROUND_LABELS
+        seeds = [c for c in prior_candidates if c['reasoning'].get('reuse') == '用户授权沿用'] if (
+            context.get('seed_round_planned') is False and round_number == 1) else []
+        if seeds:
+            labels = [label for label in labels if label != 'A']
         if context.get('round_policy',{}).get('mode') == 'full_rounds':
             labels = labels[:evaluation_budget['remaining_for_abc']]
         audit = {"optimization_run_id": experiment_id, "baseline_id": baseline_run_id, "timestamp": datetime.now(timezone.utc).isoformat(), "provider_raw_text": None, "parsed_json": None, "parsed_candidates": None, "validation_stage": "provider", "failed_candidate_id": None, "failed_field": None, "actual_value": None, "expected_type": None, "allowed_values": None, "validation_issues": [], "diagnostic_tasks":diagnostic_tasks, "processing_progress":processing_progress, "all_bad_case_audit": [{k:v for k,v in row.items() if k!='result_json'} for row in audited_cases], "root_cause_counts": dict(Counter(item['diagnostic_view']['primary_root_cause'] for item in bad_cases)), "source_bad_case_ids": [item["id"] for item in bad_cases], "monitoring_context": monitoring_context, "monitoring_target_event_ids": monitoring_target_event_ids, "target_reference_map": target_reference_map, "evaluation_budget": evaluation_budget, "baseline_gate_results": gate_results, "failed_gates": failed_gates}
@@ -1050,13 +1080,35 @@ class OptimizationAgent:
             targets = [{**item, 'mechanism_fault': faults[base['id']].get(item['question_id']) or {
                 'code': 'unknown', 'stage': '未知', 'subtype': None, 'reason': '当前 Winner 缺少该题的已保存诊断。'}}
                        for item in failures]
+            seed_changes = [c['reasoning']['changed_parameters'] for c in seeds]
             opportunities = round_opportunities(targets, base, base_config, prior_candidates, retrieval_preview,
-                                             ledger['current'], ledger['historical'], blocked=blocked)
+                                             ledger['current'], ledger['historical'], blocked=blocked, use_layered=use_layered,
+                                             reserved_keys={key for diff in seed_changes for key in diff},
+                                             combination_used=any(len(diff) > 1 for diff in seed_changes))
             # Some frozen failures lack the persisted diagnosis required by the Sandbox entry point.
             for item in failures:
                 if item not in bad_cases:
                     opportunities[item['question_id']].update(available=[], reason='缺少可用于 Sandbox 的已保存目标记录')
-            labels = available_labels(opportunities, labels[:evaluation_budget['remaining_for_abc']])
+            labels = labels[:evaluation_budget['remaining_for_abc']]
+            if use_layered:
+                from .agent_round_contract import GENERATION_REQUIRED, layer_plan, layer_signals
+
+                current_result = winner['result'] if winner else baseline['result']
+                base_run = current_result.get('evaluation_run_id') if winner else baseline_run_id
+                gate_faults, severe = layer_signals(self.store, base_run, (current_result.get('gates') or {}).get('gates', []),
+                                                  faults[base['id']])
+                target = layer_plan(opportunities, gate_faults, severe, ledger['current'], base['id'], labels)
+                audit['round_target_layer'] = target
+                labels = labels[:target['proposal_count']]
+                if target.get('generation_precondition'):
+                    self.store.save_agent_trace(experiment_id, 'failed', {
+                        'generation_status': 'failed', 'validation_stage': 'generation_diagnosis_precondition',
+                        'validation_error': GENERATION_REQUIRED, 'provider_called': False, 'round': round_number,
+                        'round_target_layer': target,
+                    }, GENERATION_REQUIRED, generation_token=generation_token)
+                    raise ValueError(GENERATION_REQUIRED)
+            else:
+                labels = available_labels(opportunities, labels)
             inherited = inherited_repairs(base, prior_candidates, ledger['current'], passed)
             excluded = [r for r in ledger['current'] if r['base_id'] == base['id'] and r['status'] in {'无效', '弄坏'}]
             audit.update(round_base=base, round_opportunities=opportunities, previous_commitment=previous,
@@ -1069,6 +1121,7 @@ class OptimizationAgent:
                     'decision_stop': {'round': round_number, 'reason': reason, 'questions': opportunities,
                                       'base': base, 'previous_check': check},
                     'round': round_number, 'provider_called': False, 'generated_candidate_count': 0,
+                    **({'round_target_layer': audit['round_target_layer']} if use_layered else {}),
                 }, generation_token=generation_token)
                 return self.store.experiment(experiment_id)
             audit['source_bad_case_ids'] = [item['id'] for item in bad_cases]
@@ -1118,6 +1171,18 @@ class OptimizationAgent:
             prompt.update(round_base=audit['round_base'], round_opportunities=audit['round_opportunities'],
                           previous_commitment=audit['previous_commitment'], ledger_inherit=audit['ledger_inherit'],
                           ledger_exclude=audit['ledger_exclude'])
+            if use_layered:
+                prompt['round_target_layer'] = audit['round_target_layer']
+                system += ('每个方案的 target_bad_cases 须至少含一题 round_target_layer.layer。'
+                           '只有目标层可用机会少于方案数时，余下方案才可跨层，并须写 layer_reason。'
+                           f'继承也计入相对原 Baseline 最多 {rules.AGENT["d_max_changed_parameters"]} 项的上限。')
+                if seeds:
+                    prompt['seed_candidates'] = [{**strategy_candidate(c),
+                        'source': {key: c['reasoning'][key] for key in (
+                            'source_experiment_id', 'source_candidate_id', 'source_run_id', 'generated_by', 'reuse')}}
+                        for c in seeds]
+                    system += ('seed_candidates 是本轮已沿用的方案及保存结果。只生成 goal.candidate_labels，'
+                               '仍使用原 Baseline，不得共用 A 已改的参数，也不重新评测 A。')
             prompt['round_contract'].update(default_changed_parameters=1, max_combination_candidates=1)
             system += ('决策合同 v2 优先于前面旧版的继承或数量示例。所有方案均以 round_base 为唯一底座。'
                        '若为 Baseline 不填继承，否则完整原样填写 inherited_from 和 inherited_parameters，新改动须保留这些参数。'

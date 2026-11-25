@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from . import rules
 from .agent_mechanism import CONTRACT as MECHANISM_CONTRACT
+from .agent_round_contract import layered, layered_winner
 from .evaluation import EvaluationRunner
 from .full_text import CORPUS_LOCK
 from .optimization import OptimizationAgent, ProposalValidationExhausted
@@ -52,6 +53,10 @@ def claim_cycle(store, experiment_id, *, current_round_only=False):
                  'used':experiment['evaluation_budget']['used'],
                  'remaining':max(0, MAX_EVALS-experiment['evaluation_budget']['used']),
                  'reserved_for_d':experiment['evaluation_budget']['reserved_for_d'], 'last_error':None}
+        if layered(experiment['result']):
+            previous_decision = experiment['result'].get('optimization_cycle', {}).get('staged_decision')
+            if previous_decision:
+                state['staged_decision'] = previous_decision
         result = {**experiment['result'], 'optimization_cycle':state}
         from .paid_policy import current_binding
         if current_binding():result['paid_run']=current_binding()
@@ -104,14 +109,21 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
     def save(status, phase, error=None):
         experiment = store.experiment(experiment_id, light=True)
         used = experiment['evaluation_budget']['used']
+        legacy_staged = (experiment['result'].get('round_policy', {}).get('stop_rule') == STAGED_RULE
+                         and not layered(experiment['result']))
         state.update(status=status, phase=phase, used=used, remaining=max(0, MAX_EVALS-used),
-                     reserved_for_d=0 if experiment['result'].get('round_policy', {}).get('stop_rule') == STAGED_RULE else 1, last_error=error,
+                     reserved_for_d=int(not legacy_staged), last_error=error,
                      round=max([c['reasoning'].get('round', 1) for c in experiment['candidates']] or [0]))
         if experiment['result'].get('mechanism_contract') == MECHANISM_CONTRACT:
             from .agent_round_contract import check_commitment, previous_commitment
 
             if phase == 'before_release' and status == 'recommended':
-                action, reason = 'D', '按合格方案数、轮次和剩余预算转入 D 决策'
+                if state.get('staged_decision', {}).get('decision') == 'finish_winner' and layered(experiment['result']):
+                    action, reason = 'stop', '按逐层规则保留 Winner'
+                else:
+                    action = 'D'
+                    reason = ('按逐层规则转入 D' if layered(experiment['result'])
+                              else '按合格方案数、轮次和剩余预算转入 D 决策')
             elif status in {'stopped', 'qualified', 'agent_failed', 'analysis_exhausted', 'budget_exhausted', 'round_limit'}:
                 action, reason = 'stop', error or '按授权或实验预算停止本次循环'
             else:
@@ -123,7 +135,7 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
         _save_state(store, experiment_id, **state)
         return dict(state)
 
-    def advance_qualified(experiment, qualified):
+    def advance_qualified(experiment, qualified, *, do_composite=True):
         confirmation = experiment['result'].get('report_confirmation')
         current_contract = experiment['result'].get('decision_contract_version') == '109c'
         authorization = unattended_authorization(store)
@@ -141,6 +153,9 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                                             audit_note=authorization.get('audit_note'))
         if not current_contract and not authorization.get('enabled'):
             return save('qualified', 'review')
+        if not do_composite:
+            store.refresh_recommendation(experiment_id)
+            return save('recommended', 'before_release')
         check_cycle_stop(store,experiment_id)
         save('running', 'composite')
         composite = store.create_composite(experiment_id, runtime.provider)
@@ -294,8 +309,18 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
 STAGED_RULE = 'staged-v1'
 
 
-def staged_decision(round_number, qualified_count, used):
+def staged_decision(round_number, qualified_count, used, *, version=None,
+                    remaining_count=None, untried_layers=(), has_combination=False):
     """规则总表五.6，纯函数，方便单测。返回 'next_round' / 'composite' / 'finish_winner' / 'agent_failed'。"""
+    if layered({'verdict_version': version}):
+        if remaining_count == 0 and qualified_count:
+            return 'finish_winner'
+        at_limit = round_number >= rules.AGENT['max_rounds'] or used >= MAX_EVALS - 1
+        if not at_limit and (round_number == 0 or untried_layers):
+            return 'next_round'
+        if qualified_count:
+            return 'composite' if has_combination and used < MAX_EVALS else 'finish_winner'
+        return 'agent_failed'
     if round_number > 0 and qualified_count >= rules.AGENT['min_qualified_for_fusion']:
         return 'composite' if used < MAX_EVALS else 'finish_winner'
     if round_number >= rules.AGENT['single_winner_after_round'] and qualified_count:
@@ -310,6 +335,75 @@ def staged_decision(round_number, qualified_count, used):
 def _qualified_abc(experiment):
     return [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}
             and c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True]
+
+
+def layered_stage_facts(store, experiment, baseline, winner, number):
+    from . import verdict
+    from .agent_inputs import baseline_bad_case_rows, is_optimization_target
+    from .agent_mechanism import faults_for_cases
+    from .agent_round_contract import fault_layer, round_base, round_opportunities, saved_final_map
+    from .composite import parameter_diff, pipeline_config
+    from .optimization import gate_harming_changes, load_retrieval_preview, require_retrieval_preview
+    from .policy import validate_candidate_config
+
+    run_id = winner['result']['evaluation_run_id'] if winner else baseline['id']
+    final = saved_final_map(store, run_id)
+    remaining = {q for q, passed in final.items() if not passed}
+    if not remaining:
+        return {'remaining_count': 0, 'untried_layers': [], 'has_combination': False}
+    candidates = experiment['candidates']
+    baseline_config = pipeline_config(baseline['config'])
+    base = round_base(baseline_config, candidates, number + 1, winner=winner, use_layered=True)
+    failures = [row for row in baseline_bad_case_rows(store, baseline, use_final=True)
+                if row['question_id'] in remaining]
+    cases = verdict.final_cases(store, run_id)
+    present = {row['question_id'] for row in failures}
+    references = failures + [{'id': q, 'question_id': q} for q in sorted(remaining - present)]
+    faults = faults_for_cases(baseline, cases, references)
+    targets = [{**row, 'mechanism_fault': faults[row['question_id']]} for row in failures
+               if row['question_id'] in faults and is_optimization_target(row)]
+    current = experiment['result']['parameter_effect_ledger']['current']
+    foundation = json.loads(baseline['dataset_snapshot_json']).get('corpus_fingerprint')
+    preview = load_retrieval_preview(store, baseline['id'], foundation=foundation)
+    gates = (baseline['result'].get('gates') or {}).get('gates')
+    blocked = [row['config_diff'] for row in gate_harming_changes(candidates, gates)]
+    options = round_opportunities(targets, base, baseline_config, candidates, preview, current, [],
+                                 blocked=blocked, use_layered=True)
+    untried = {fault_layer(row['fault']['code']) for row in options.values() if row['available']}
+    if len(base['changes']) < rules.AGENT['d_max_changed_parameters']:
+        remaining_layers = {fault_layer(row['code']) for row in faults.values()}
+        if 'generation' in remaining_layers and not any(
+                row['source'] == '生成诊断' and row['base_id'] == base['id'] for row in current):
+            untried.add('generation')
+        if 'retrieval' in remaining_layers:
+            try:
+                require_retrieval_preview(preview, base['changes'])
+            except ValueError:
+                untried.add('retrieval')
+
+    combined = False
+    if winner:
+        winner_config = pipeline_config(winner['config'])
+        tried = [pipeline_config(c['config']) for c in candidates]
+        for source in _qualified_abc(experiment):
+            if source['id'] == winner['id'] or source['result'].get('evaluation_identity') != winner['result']['evaluation_identity']:
+                continue
+            source_diff = parameter_diff(source['config'], baseline_config)
+            if any(source_diff[key] != base['changes'][key] for key in source_diff.keys() & base['changes'].keys()):
+                continue
+            config = {**winner_config, **source_diff}
+            delta = parameter_diff(config, winner_config)
+            if (not delta or config in tried or len(delta) > rules.AGENT['max_changed_parameters']
+                    or len(parameter_diff(config, baseline_config)) > rules.AGENT['d_max_changed_parameters']
+                    or not validate_candidate_config(config)['valid']):
+                continue
+            other = saved_final_map(store, source['result'].get('evaluation_run_id'))
+            if other.keys() == final.keys() and any(other[q] for q in remaining):
+                combined = True
+                break
+        if number >= rules.AGENT['max_rounds'] or experiment['evaluation_budget']['used'] >= MAX_EVALS - 1:
+            combined = combined or any(row['available'] for row in options.values())
+    return {'remaining_count': len(remaining), 'untried_layers': sorted(untried), 'has_combination': combined}
 
 
 def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, runner, agent):
@@ -355,6 +449,9 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
         if decision == 'agent_failed':
             store.refresh_recommendation(experiment_id)
             return save('agent_failed', 'review', '全部方案都不合格，本次 Agent 优化失败（规则总表五.6）')
+        if decision == 'finish_winner' and layered(experiment['result']):
+            save('running', 'review')
+            return advance_qualified(experiment, qualified, do_composite=False)
         def find_d():
             current = store.experiment(experiment_id, light=True)
             return next((c for c in current['candidates'] if c['reasoning'].get('candidate_label')=='D'), None)
@@ -385,13 +482,18 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
         while True:
             check_cycle_stop(store,experiment_id)
             experiment = store.experiment(experiment_id, light=True)
-            store.require_current_baseline(experiment['baseline_run_id'])
+            baseline = store.require_current_baseline(experiment['baseline_run_id'])
+            use_layered = layered(experiment['result'])
             if stop := experiment['result'].get('decision_stop'):
                 return save('stopped', 'review', stop['reason'])
             if experiment['result'].get('report_confirmation'):
-                return finish(experiment, _qualified_abc(experiment), 'composite')
+                terminal = state.get('staged_decision', {}).get('decision')
+                return finish(experiment, _qualified_abc(experiment),
+                              'finish_winner' if use_layered and terminal == 'finish_winner' else 'composite')
             abc = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}]
             number = max((c['reasoning'].get('round', 1) for c in abc), default=0)
+            if use_layered and experiment['result'].get('seed_round_planned') is False:
+                number = 0
             current = [c for c in abc if c['reasoning'].get('round', 1) == number]
             for candidate in current:
                 candidate = store.candidate(candidate['id'])
@@ -399,7 +501,9 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                 if not runnable:
                     continue
                 experiment = store.experiment(experiment_id, light=True)
-                if number >= rules.AGENT['max_rounds'] and _qualified_abc(experiment) or experiment['evaluation_budget']['used'] >= MAX_EVALS and candidate['status']=='generated':
+                budget_limit = MAX_EVALS - int(use_layered)
+                if (not use_layered and number >= rules.AGENT['max_rounds'] and _qualified_abc(experiment)
+                        or experiment['evaluation_budget']['used'] >= budget_limit and candidate['status']=='generated'):
                     store.skip_candidate(candidate['id'], '自动循环', '最后一轮已出现合格方案或预算用完，未运行', automatic=True)
                     continue
                 check_cycle_stop(store,experiment_id)
@@ -411,8 +515,15 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
             experiment = store.experiment(experiment_id, light=True)
             qualified = _qualified_abc(experiment)
             used = experiment['evaluation_budget']['used']
-            decision = staged_decision(number, len(qualified), used)
-            state['staged_decision'] = {'round': number, 'qualified': [c['id'] for c in qualified], 'used': used, 'decision': decision}
+            if use_layered:
+                winner = layered_winner(store, baseline, qualified)
+                facts = layered_stage_facts(store, experiment, baseline, winner, number) if number else {}
+                decision = staged_decision(number, int(winner is not None), used,
+                                           version=experiment['result']['verdict_version'], **facts)
+            else:
+                decision = staged_decision(number, len(qualified), used)
+            state['staged_decision'] = {'round': number, 'qualified': [c['id'] for c in qualified], 'used': used, 'decision': decision,
+                                        **({'winner_id': winner['id'] if winner else None, **facts} if use_layered else {})}
             # 用户指定"先跑到第 N 轮"（2026-11-18 17:52：先跑第二轮，不做 D）：N 轮之前一律进下一轮，跑完第 N 轮就停。
             run_to = experiment['result'].get('round_policy', {}).get('user_run_to_round')
             if isinstance(run_to, int) and number:
@@ -427,7 +538,7 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                 # 规则给出的下一步（下一轮 / D）只记录在 staged_decision，不自动执行。
                 return save('round_completed', 'review', f'第 {number} 轮已跑完，按要求停下；规则判定的下一步：{decision}')
             if decision != 'next_round':
-                return finish(experiment, qualified, decision)
+                return finish(experiment, [winner] if use_layered and winner else qualified, decision)
             max_rounds = experiment['result'].get('round_policy', {}).get('max_rounds')
             if isinstance(max_rounds, int) and number >= max_rounds:
                 # 用户可指定本次只跑到第 N 轮（2026-11-17：只跑第 2、3 轮）；到点停下汇报，不自动开下一轮。
@@ -441,6 +552,9 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                     wait_for_off_peak(store,'cycle:'+experiment_id,price_state,lambda:check_cycle_stop(store,experiment_id))
                 generated = agent.generate(experiment['baseline_run_id'], experiment_id=experiment_id)
                 if stop := (generated or {}).get('result', {}).get('decision_stop'):
+                    if use_layered and winner:
+                        state['staged_decision']['decision'] = 'finish_winner'
+                        return finish(experiment, [winner], 'finish_winner')
                     return save('stopped', 'review', stop['reason'])
             except ProposalValidationExhausted as error:
                 failures = state.setdefault('proposal_generation_failures', [])
@@ -450,6 +564,11 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                     save('running','analysis',str(error))
                     continue
                 if qualified:
+                    if use_layered:
+                        if winner:
+                            state['staged_decision']['decision'] = 'finish_winner'
+                            return finish(experiment, [winner], 'finish_winner')
+                        return save('analysis_exhausted', 'analysis', str(error))
                     return finish(experiment, qualified, 'composite')
                 return save('analysis_exhausted','analysis',str(error))
     except InterruptedError as error:

@@ -1,23 +1,109 @@
 """Round decisions for experiments using the v2 evidence ledger."""
 from itertools import combinations
 
-from . import rules
+from . import rules, verdict
 from .agent_mechanism import fault_stage, validate_mechanism
 from .composite import parameter_diff, pipeline_config
-from .policy import candidate_rank, validate_candidate_config
+from .policy import GATE_DEFINITIONS, candidate_rank, validate_candidate_config
 
 STOP_REASON = '证据不足以继续'
 COMBINATION = '组合探索，不可归因'
+LAYERED_VERSION = '2026-11-25'
+LAYERS = ('safety', 'retrieval', 'generation')
+GENERATION_REQUIRED = '前置条件未满足：需先对当前底座做生成诊断'
 
 
-def round_base(baseline, prior, number, *, identity=None):
-    winner = min((c for c in prior if c['status'] == 'evaluated'
-                  and c['reasoning'].get('candidate_label') in rules.AGENT['candidate_labels']
-                  and c['reasoning'].get('round', number) < number
-                  and c['result'].get('evaluation_complete') is not False
-                  and c['result'].get('qualification', {}).get('qualified') is True
-                  and (identity is None or c['result'].get('evaluation_identity') == identity)),
-                 key=candidate_rank, default=None)
+def layered(context):
+    return (context.get('verdict_version') or '') >= LAYERED_VERSION
+
+
+def fault_layer(code):
+    return 'retrieval' if code in ('recall', 'ranking', 'final') else code
+
+
+def target_layer(remaining_failures, gate_failures, severe_safety):
+    failures = [fault_layer(code) for code in remaining_failures]
+    counts = {layer: failures.count(layer) for layer in LAYERS}
+    gates = [fault_layer(code) for code in gate_failures]
+    priority = max((layer for layer in LAYERS if layer in gates), key=counts.get, default=None)
+    if severe_safety:
+        layer, reason = 'safety', '存在严重安全违规'
+    elif priority:
+        layer, reason = priority, '优先修复未过门槛的根因层'
+    else:
+        layer = max((layer for layer in LAYERS if counts[layer]), key=counts.get, default=None)
+        reason = '剩余错题最多，同数时按上游顺序' if layer else '剩余错题无已知根因层'
+    return {'layer': layer, 'reason': reason, 'counts': counts}
+
+
+def all_gates_pass(gates):
+    rows = gates.get('gates') or []
+    return (gates.get('passed') is True and len(rows) == len(GATE_DEFINITIONS)
+            and {row.get('metric') for row in rows} == {gate['metric'] for gate in GATE_DEFINITIONS}
+            and all(row.get('passed') is True for row in rows))
+
+
+def saved_final_map(store, run_id, *, connection=None, saved=None):
+    records = verdict.records(store, run_id, connection=connection) if saved is None else saved
+    return {qid: row['final_passed'] for qid, row in records.items()
+            if type(row.get('final_passed')) is bool}
+
+
+def layered_winner(store, baseline, candidates, *, connection=None):
+    current = saved_final_map(store, baseline['id'], connection=connection)
+    identity = baseline['judge'].get('evaluation_identity')
+    winner = None
+    eligible = [c for c in candidates if c['status'] == 'evaluated'
+                and c['reasoning'].get('candidate_label') in rules.AGENT['candidate_labels']
+                and type(c['reasoning'].get('round')) is int
+                and c['result'].get('evaluation_complete') is True
+                and c['result'].get('qualification', {}).get('qualified') is True
+                and identity and c['result'].get('evaluation_identity') == identity
+                and all_gates_pass(c['result'].get('gates') or {})]
+    for number in sorted({c['reasoning']['round'] for c in eligible}):
+        group = [c for c in eligible if c['reasoning']['round'] == number]
+        seeds = [c for c in group if c['reasoning'].get('reuse') == '用户授权沿用']
+        for peers in (seeds, [c for c in group if c not in seeds]):
+            improvements = []
+            for candidate in peers:
+                result = saved_final_map(store, candidate['result'].get('evaluation_run_id'), connection=connection)
+                if result.keys() == current.keys() and (
+                        {q for q, passed in current.items() if passed} < {q for q, passed in result.items() if passed}):
+                    improvements.append((candidate, result))
+            if improvements:
+                winner, current = min(improvements, key=lambda pair: (
+                    sum(not passed for passed in pair[1].values()), candidate_rank(pair[0])))
+    return winner
+
+
+def validate_layered_limits(config, current, baseline):
+    cumulative_limit = rules.AGENT['d_max_changed_parameters']
+    round_limit = rules.AGENT['max_changed_parameters']
+    if len(parameter_diff(config, pipeline_config(baseline))) > cumulative_limit:
+        raise ValueError(f'相对 Baseline 最多改 {cumulative_limit} 个参数（含继承）')
+    if len(parameter_diff(config, pipeline_config(current))) > round_limit:
+        raise ValueError(f'相对当前底座最多改 {round_limit} 个参数')
+
+
+def validate_target_layer(proposal, selected, opportunities, target):
+    if any(fault_layer(opportunities[row['question_id']]['fault']['code']) == target['layer'] for row in selected):
+        return
+    if target['capacity'] >= target['proposal_count']:
+        raise ValueError('目标层机会足够，每个方案须包含至少一道目标层题')
+    reason = proposal.get('layer_reason')
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError('转向其他层须填写 layer_reason')
+
+
+def round_base(baseline, prior, number, *, identity=None, winner=None, use_layered=False):
+    if not use_layered:
+        winner = min((c for c in prior if c['status'] == 'evaluated'
+                      and c['reasoning'].get('candidate_label') in rules.AGENT['candidate_labels']
+                      and c['reasoning'].get('round', number) < number
+                      and c['result'].get('evaluation_complete') is not False
+                      and c['result'].get('qualification', {}).get('qualified') is True
+                      and (identity is None or c['result'].get('evaluation_identity') == identity)),
+                     key=candidate_rank, default=None)
     if winner is None:
         return {'id': 'Baseline', 'changes': {}}
     return {'id': winner['id'], 'changes': parameter_diff(winner['config'], pipeline_config(baseline))}
@@ -43,7 +129,8 @@ def validate_combinations(candidates):
         raise ValueError('组合方案须标注“组合探索，不可归因”')
 
 
-def round_opportunities(targets, base, baseline, prior, preview, current, historical, *, blocked=()):
+def round_opportunities(targets, base, baseline, prior, preview, current, historical, *, blocked=(),
+                        use_layered=False, reserved_keys=(), combination_used=False):
     """Check every supported single change and each potentially evidenced combination."""
     preview = preview or {}
     effective = {**baseline, **base['changes']}
@@ -72,6 +159,9 @@ def round_opportunities(targets, base, baseline, prior, preview, current, histor
             config.pop('hybrid_alpha', None)
         if any(config.get(key) != value for key, value in base['changes'].items()):
             continue
+        if use_layered and (changes.keys() & set(reserved_keys) or combination_used and len(changes) > 1
+                            or len(parameter_diff(config, pipeline_config(baseline))) > rules.AGENT['d_max_changed_parameters']):
+            continue
         if parameter_diff(config, pipeline_config(baseline)) in blocked:
             continue
         # Previously generated but skipped configurations are still reserved by the existing
@@ -81,6 +171,7 @@ def round_opportunities(targets, base, baseline, prior, preview, current, histor
     next_actions = {
         'recall': '检查索引、分块和召回所需的原始资料',
         'ranking': '核对交付片段，补做同底座检索预演',
+        'final': '核对交付片段，补做同底座检索预演',
         'generation': '在独立诊断中复测回答和 Judge，检查推理档位',
         'safety': '用安全专项复核危险操作和拒答规则',
         'unknown': '补齐逐题证据、检索 Trace 或判分依据',
@@ -113,6 +204,49 @@ def available_labels(rows, labels):
             if sum(len(keys) > 1 for keys in group) <= 1 and len(set().union(*group)) == sum(map(len, group)):
                 return labels[:count]
     return labels[:0]
+
+
+def layer_capacity(rows, layer, count):
+    changes = {frozenset(action['changes']) for row in rows.values() for action in row['available']}
+    preferred = {frozenset(action['changes']) for row in rows.values()
+                 if fault_layer(row['fault']['code']) == layer for action in row['available']}
+    return max(((sum(keys in preferred for keys in group), size)
+                for size in range(1, count + 1) for group in combinations(changes, size)
+                if sum(len(keys) > 1 for keys in group) <= 1
+                and len(set().union(*group)) == sum(map(len, group))), default=(0, 0))
+
+
+def layer_plan(rows, gate_faults, severe, ledger, base_id, labels):
+    codes = [row['fault']['code'] for row in rows.values()]
+    target = target_layer(codes, gate_faults, severe)
+    selected = target
+    skipped = []
+    generation_checked = any(row['source'] == '生成诊断' and row['base_id'] == base_id for row in ledger)
+    while layer := selected['layer']:
+        relevant = {qid: row for qid, row in rows.items() if fault_layer(row['fault']['code']) == layer}
+        capacity, count = layer_capacity(rows, layer, len(labels))
+        if capacity or layer == 'generation' and relevant and not generation_checked:
+            return {**target, 'layer': layer, 'reason': selected['reason'], 'fallbacks': skipped,
+                    'capacity': capacity, 'proposal_count': count,
+                    'generation_precondition': layer == 'generation' and not generation_checked}
+        skipped.append({'layer': layer, 'reason': '当前底座无可用机会'})
+        excluded = {item['layer'] for item in skipped}
+        selected = target_layer([code for code in codes if fault_layer(code) not in excluded],
+                                [code for code in gate_faults if fault_layer(code) not in excluded], False)
+    return {**target, 'layer': None, 'reason': '没有仍可验证的目标层机会',
+            'fallbacks': skipped, 'capacity': 0, 'proposal_count': 0}
+
+
+def layer_signals(store, run_id, gates, faults):
+    from .evaluation import gate_details
+
+    cases = verdict.gate_cases(store, run_id)
+    failed = [gate for gate in gates if gate.get('status') == 'FAIL' and not gate['metric'].startswith('latency_')]
+    gate_faults = [faults[item['question_id']]['code'] for gate in gate_details(cases, failed)
+                   for item in gate['failed_cases'] if item['question_id'] in faults]
+    saved = verdict.records(store, run_id)
+    severe = any(any(s['risk'] for s in saved.get(qid, {}).get('samples', [])) for qid in faults)
+    return gate_faults, severe
 
 
 def inherited_repairs(base, prior, ledger, passed):

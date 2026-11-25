@@ -1279,6 +1279,8 @@ class EvaluationRunner:
         return execute()
 
     def candidate_inputs(self, candidate_id: str):
+        from .agent_round_contract import layered, layered_winner, validate_layered_limits
+
         candidate = self.store.candidate(candidate_id)
         if candidate is None:
             raise ValueError("Candidate 不存在")
@@ -1299,6 +1301,12 @@ class EvaluationRunner:
         from .policy import validate_candidate_config
         if not validate_candidate_config(candidate["config"])["valid"]:
             raise ValueError("Candidate 参数超出 Search Space")
+        use_layered = layered(experiment['result'])
+        if use_layered:
+            reasoning = candidate['reasoning']
+            parent = reasoning.get('winner_id') or reasoning.get('inherited_from')
+            current = next((c['config'] for c in experiment['candidates'] if c['id'] == parent), baseline['config'])
+            validate_layered_limits(candidate['config'], current, baseline['config'])
         if candidate['reasoning'].get('intervention_contract_version') == 'winner-refinement-1':
             from .composite import build_d_facts, validate_d_refinement, parameter_diff, pipeline_config
             decision = experiment['result'].get('composite', {})
@@ -1329,8 +1337,11 @@ class EvaluationRunner:
             if actual!=reasoning.get('changed_parameters_vs_baseline', reasoning.get('changed_parameters')):raise ValueError('Candidate 配置与已审查干预不一致')
             if saved_base := reasoning.get('round_base'):
                 from .agent_round_contract import round_base, validate_base
+                winner = layered_winner(self.store, baseline, [c for c in experiment['candidates']
+                                        if c['reasoning'].get('round', reasoning['round']) < reasoning['round']]) if use_layered else None
                 expected_base = round_base(base, experiment['candidates'], reasoning['round'],
-                                           identity=baseline['judge'].get('evaluation_identity'))
+                                           identity=baseline['judge'].get('evaluation_identity'),
+                                           winner=winner, use_layered=use_layered)
                 if saved_base != expected_base:
                     raise ValueError('保存的轮次底座与合格 Winner 不一致')
                 validate_base({**reasoning, 'config_diff': reasoning['changed_parameters']}, saved_base)
@@ -1431,6 +1442,8 @@ class EvaluationRunner:
         if candidate.get('status') == 'evaluated' and candidate.get('result', {}).get('qualification'):
             return candidate
         current = run['result'].get('verdict_version') == rules.RULES_VERSION
+        from .agent_round_contract import all_gates_pass, layered
+        use_layered = layered(self.store.experiment(candidate['experiment_id'], light=True)['result']) if current else False
         baseline_cases = {item['question_id']: item for item in verdict.final_cases(self.store, baseline['id'], use_final=current)}
         raw_candidate_cases = self.store.evaluation_case_results(run_id)
         candidate_cases = {item['question_id']: item for item in verdict.final_cases(
@@ -1452,7 +1465,9 @@ class EvaluationRunner:
                 q for q, row in saved.items() if any(sample['risk'] for sample in row['samples']))
         labelled = candidate['reasoning'].get('candidate_label') in {'A', 'B', 'C', 'D'}
         version = CANDIDATE_QUALIFICATION_VERSION if current else LEGACY_CANDIDATE_QUALIFICATION_VERSION if labelled else None
-        qualification = qualify_candidate(run["result"]["gates"], regression, comparison['target_bad_cases_fixed'], len(failed), comparison['bad_case_count'],
+        gates = run['result']['gates']
+        qualification = qualify_candidate({**gates, 'passed': all_gates_pass(gates)} if use_layered else gates,
+                                          regression, comparison['target_bad_cases_fixed'], len(failed), comparison['bad_case_count'],
                                           rule_version=version)
         if run['status'] != 'completed':
             qualification = {**qualification, 'qualified': False}
@@ -1477,7 +1492,7 @@ class EvaluationRunner:
             newly_failed = sorted(q for q, passed in winner_passed.items() if passed and candidate_passed.get(q) is False)
             newly_fixed = sorted(q for q, passed in winner_passed.items() if not passed and candidate_passed.get(q) is True)
             if current:
-                passed = not newly_failed and set(winner_passed) == set(candidate_passed)
+                passed = not newly_failed and set(winner_passed) == set(candidate_passed) and (bool(newly_fixed) or not use_layered)
                 checks = {**result['qualification']['checks'], 'winner_non_regression': passed}
                 if not passed:
                     result['qualification'] = {**result['qualification'], 'qualified': False, 'status': 'NOT_QUALIFIED'}

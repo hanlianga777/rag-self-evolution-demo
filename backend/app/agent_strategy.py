@@ -501,7 +501,7 @@ def _d_fusion_already_evaluated(history, qualified, base):
     return bool(combined) and combined in evaluated.values()
 
 
-def validate_d_mode(suggestion, winner, history, facts=None):
+def validate_d_mode(suggestion, winner, history, facts=None, *, use_layered=False):
     """规则总表六.7：多个合格方案可部分合并，组合已跑过时改为 Winner 加一项。
     优先用验证过的参数；没验证过的参数可以用，但已有可用的验证参数时不能全部用新参数。D 必须生成。"""
     mode = suggestion.get('combination_mode')
@@ -528,7 +528,13 @@ def validate_d_mode(suggestion, winner, history, facts=None):
             validate_d_parameter_limit(effective, base)
     min_fusion = rules.AGENT['min_qualified_for_fusion']
     fusion_repeated = len(qualified) >= min_fusion and base and _d_fusion_already_evaluated(history, qualified, base)
-    if len(qualified) >= min_fusion and not fusion_repeated:
+    if use_layered:
+        if mode == 'partial_fusion' and not any(
+                set(c.get('source_candidates') or []) & (qualified - {winner['id']}) for c in changes if isinstance(c, dict)):
+            raise ValueError('partial_fusion须取用另一个合格方案的有效参数')
+        if mode == 'winner_plus' and not any(c.get('target_question_ids') for c in changes if isinstance(c, dict)):
+            raise ValueError('winner_plus 须针对有证据的剩余错题')
+    elif len(qualified) >= min_fusion and not fusion_repeated:
         if mode != 'partial_fusion':
             raise ValueError(f'已有 {min_fusion} 个及以上合格方案，D须为partial_fusion')
         others = qualified - {winner['id']}
