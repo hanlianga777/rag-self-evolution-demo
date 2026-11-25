@@ -303,7 +303,10 @@ function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: 
     const result = source.result;
     if (source !== evaluation && (result?.price_pause?.paused || ["running", "queued"].includes(source.status))) return candidateProgress(source, activeOperation(source.id), sandboxPause);
     if (!result || result.evaluation_complete === false || !["completed", "evaluated"].includes(source.status)) return null;
-    if (key === "correct") return typeof result.total === "number" && typeof result.bad_case_count === "number" ? result.total - result.bad_case_count : null;
+    if (key === "correct") {
+      const total = result.total ?? (evaluation.id && result.baseline_run_id === evaluation.id ? evaluation.result?.total : undefined);
+      return typeof total === "number" && typeof result.bad_case_count === "number" ? total - result.bad_case_count : null;
+    }
     if (key === "new") return Array.isArray(result.new_regression_question_ids) ? new Set(result.new_regression_question_ids).size : typeof result.new_regressions === "number" ? result.new_regressions : null;
     if (key === "gates") return result.gates?.passed_count ?? null;
     const value = result.comparison_metrics?.[key] ?? result.metrics?.[key] ?? result.safety_metrics?.[key] ?? result.gates?.gates?.find((gate: any) => gate.metric === key)?.actual;

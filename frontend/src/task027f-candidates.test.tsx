@@ -66,6 +66,23 @@ it('keeps six primary metrics in teaching order and uses white secondary actions
  expect(table.querySelectorAll('tbody tr').length).toBeGreaterThan(6);expect(table.textContent).not.toContain('运行状态');expect(table.textContent).not.toContain('Candidate 合格');expect(table.textContent).not.toContain('指定目标修好');
  await click('查看高级指标');expect(document.querySelector('[role=dialog]')?.textContent).not.toMatch(/Provider Cost|费用未采集|无法准确回算/);
 });
+it.each([
+ ['base', '48 / 50'],
+ ['other-base', '未知'],
+ [undefined, '未知'],
+])('renders R1-A without total for Baseline reference %s', async (baselineId, expected) => {
+ const a = data.optimization.candidates.find((c: any) => c.reasoning.round === 1 && c.reasoning.candidate_label === 'A');
+ a.result.baseline_run_id = baselineId;
+ a.result.bad_case_count = 2;
+ delete a.result.total;
+ await mount();
+ await click('进化路线');
+ await click('Round 1');
+ const table = document.querySelector('.sandbox-core-table table')!;
+ const column = [...table.querySelectorAll('thead th')].findIndex(th => th.querySelector('.ui-ct-name')?.textContent === 'R1-A');
+ const correct = [...table.querySelectorAll('tbody tr')].find(row => row.querySelector('th')?.textContent === '答对');
+ expect(correct?.children[column]?.textContent).toBe(expected);
+});
 it('keeps unknown ranking unknown and omits empty side-effect cards',async()=>{
  const d=data.optimization.candidates[0];delete d.reasoning.changes[0].side_effect_check;data.optimization.result.d_facts.remaining_failures[0].evidence_positions=[];
  await mount();await click('进化路线');await click('Candidate D');expect(document.querySelector('.d-side-effects')).toBeNull();expect(document.querySelector('.d-unresolved-card')?.textContent).toContain('原因未知');expect(document.querySelectorAll('.d-rank-bar')).toHaveLength(1);

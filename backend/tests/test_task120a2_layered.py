@@ -33,7 +33,7 @@ def saved_runs(tmp_path, monkeypatch):
             sample = verdict.make_sample(case, env.questions[q], 1, 'fixture', None)
             finals[q] = verdict.record(run, q, [sample])
         verdict.save_records(store, run, finals)
-        result = {'evaluation_run_id': run, 'baseline_run_id': env.base, 'evaluation_complete': True,
+        result = {'evaluation_run_id': run, 'baseline_run_id': env.base, 'evaluation_complete': True, 'total': len(finals),
                   'evaluation_identity': env.baseline['judge']['evaluation_identity'],
                   'verdict_version': store.experiment(experiment)['result']['verdict_version'], 'bad_case_count': 6 - len(fixes),
                   'all_fixed_question_ids': sorted(fixes), 'qualification': {'qualified': True},
@@ -181,6 +181,7 @@ def test_seed_a_reuses_saved_run_and_keeps_round_one_open(saved_runs, tmp_path, 
     assert seed['result']['qualification']['rule_version'] == '2026-11-25'
     assert seed['result']['qualification']['qualified']
     assert seed['result']['evaluation_run_id'] == run
+    assert seed['result']['total'] == len(env.questions)
     assert exp['evaluation_budget']['used'] == 0
     assert not exp['rounds'][0]['complete']
     assert not store.round_completion(seed)['complete']

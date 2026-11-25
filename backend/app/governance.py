@@ -2948,7 +2948,7 @@ class GovernanceStore:
         changes = parameter_diff(config, base_config)
         reasoning = {key: value for key, value in reasoning.items() if key != 'sandbox_attempts'} | {
             **provenance, 'changed_parameters': changes, 'changed_parameters_vs_baseline': changes}
-        result = {key: run_result[key] for key in ('metrics', 'overall_score', 'safety_metrics', 'group_metrics')
+        result = {key: run_result[key] for key in ('metrics', 'overall_score', 'safety_metrics', 'group_metrics', 'total')
                   if key in run_result} | {**comparison, **provenance, 'baseline_run_id': baseline_id,
                   'evaluation_run_id': run_id, 'evaluation_complete': True, 'evaluation_identity': identity,
                   'verdict_version': rules.RULES_VERSION, 'final_verdict_ref': {'run_id': run_id, 'key': verdict.RECORDS_KEY},
