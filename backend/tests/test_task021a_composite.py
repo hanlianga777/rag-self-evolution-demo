@@ -135,6 +135,90 @@ class RefinementTests(unittest.TestCase):
         self.assertEqual(self.store.create_composite(self.experiment,provider)['id'],result['id'])
         self.assertEqual(provider.complete.call_count,2)
 
+    def q05_combination(self):
+        from app.agent_mechanism import CONTRACT
+
+        self.snapshot['questions'][1]['coverage_slot'] = 'Q05'
+        with self.store.connection() as db:
+            db.execute('update dataset_versions set snapshot_json=? where id=?',
+                       (json.dumps(self.snapshot), self.snapshot['id']))
+            db.execute('update evaluation_runs set dataset_snapshot_json=? where id=?',
+                       (json.dumps(self.snapshot), self.baseline))
+            db.execute('update candidate_configs set config_json=? where id=?',
+                       (json.dumps({**DEFAULT_PIPELINE_CONFIG, 'query_decompose': True}), self.other['id']))
+            db.execute('update experiments set result_json=json_set(result_json,'
+                       "'$.mechanism_contract', ?, '$.parameter_effect_ledger', json(?)) where id=?",
+                       (CONTRACT, '{"current":[],"historical":[]}', self.experiment))
+        preview = patch('app.optimization.load_retrieval_preview', return_value={
+            'configs': [{'change': {'candidate_k': 24}}],
+        })
+        preview.start()
+        self.addCleanup(preview.stop)
+        value = self.suggestion()
+        value.update(combination_mode='partial_fusion', mode_reason='取用合格 B 的拆问',
+                     proposed_config_diff={'query_decompose': True}, bad_case_conclusion_ids=['B1'])
+        value['changes'][0].update(parameter='query_decompose', source_type='partial')
+        return value
+
+    @staticmethod
+    def q05_response(value, prompt):
+        return json.dumps({**value, 'bad_case_summary': {
+            'groups': prompt['bad_case_groups'], 'focus': 'Q05 的生成错误',
+            'conclusions': [{'id': 'B1', 'conclusion': '标准证据已进入 Final'}],
+        }})
+
+    def test_d_rejects_q05_repair_without_evidence_and_explains_both_retry_paths(self):
+        from unittest.mock import Mock
+
+        value = self.q05_combination()
+        provider = Mock(settings=None)
+        provider.complete.side_effect = lambda _system, user, **_: self.q05_response(value, json.loads(user))
+        decision = self.store.create_composite(self.experiment, provider)
+        self.assertEqual(decision['outcome'], 'validation_failed')
+        self.assertEqual(provider.complete.call_count, 3)
+        for attempt in decision['attempts']:
+            self.assertIn('Q05：标准证据已进入 Final', attempt['validation_error'])
+        for call in provider.complete.call_args_list[1:]:
+            feedback = json.loads(call.args[1])['validation_rejection']
+            self.assertIn('Q05', feedback['reason'])
+            for detail in ('同底座', '逐题中间机制', '不承诺修好的组合探索', 'target_question_ids', 'expected_fixed_count'):
+                self.assertIn(detail, feedback['instruction'])
+
+    def test_d_same_parameters_with_no_q05_repair_claim_enters_sandbox(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        from app.evaluation import EvaluationRunner
+
+        rejected = self.q05_combination()
+        exploration = deepcopy(rejected)
+        exploration.update(expected_improvement='验证组合效果', explanation='不承诺修好')
+        exploration['changes'][0].update(target_question_ids=[], expected_fixed_count=0, reason='验证组合效果')
+        provider = Mock(settings=None)
+        provider.complete.side_effect = lambda _system, user, **_: self.q05_response(rejected, json.loads(user))
+        self.store.create_composite(self.experiment, provider)
+        old = self.store.experiment(self.experiment)['result']['composite']
+        self.assertEqual(old['outcome'], 'validation_failed')
+
+        def respond(_system, user, **_kwargs):
+            prompt = json.loads(user)
+            self.assertIn('validation_rejection', prompt)
+            feedback = prompt['validation_rejection']
+            self.assertEqual(feedback['reason'], old['reason'])
+            return self.q05_response(exploration, prompt)
+
+        provider.complete = Mock(side_effect=respond)
+        candidate = self.store.create_composite(self.experiment, provider)
+        provider.complete.assert_called_once()
+        self.assertEqual(candidate['status'], 'generated', candidate)
+        saved = self.store.experiment(self.experiment)['result']['composite']
+        self.assertEqual(saved['previous_failures'][0]['attempts'], old['attempts'])
+        self.assertEqual(candidate['reasoning']['winner_config_diff'], rejected['proposed_config_diff'])
+        self.assertEqual(candidate['reasoning']['mechanism_checks'], [])
+        self.assertEqual(candidate['reasoning']['changes'][0]['target_question_ids'], [])
+        runner = EvaluationRunner(self.store, SimpleNamespace(model='fixture'))
+        with patch.object(runner, '_require_generation_contract'), patch.object(runner, 'snapshot_items', return_value=[]):
+            self.assertEqual(runner.candidate_inputs(candidate['id'])[2]['id'], candidate['id'])
+
     def test_d_uses_agent_output_limit_and_restores_outer_task(self):
         from unittest.mock import Mock
         from app.paid_run import current_request_limit, execution_limits, provider_task

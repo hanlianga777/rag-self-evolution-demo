@@ -3356,6 +3356,8 @@ class GovernanceStore:
                 connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (_json({**state, 'composite': decision}), experiment_id))
             claim = json.loads(_json(decision))
 
+        rejection_reason = next((row['validation_error'] for row in reversed((previous or {}).get('attempts', []))
+                                 if row.get('validation_error')), None)
         for attempt in range(3):
             wait_for_off_peak(self, 'composite:' + experiment_id,
                 lambda pause: save_composite_schedule(self, experiment_id, price_pause=pause))
@@ -3390,7 +3392,17 @@ class GovernanceStore:
                             'agent_rules':rules.AGENT, 'search_space':{key: value for key, value in search_space_contract().items() if key in rules.AGENT['tunable']},
                             'strategy_contract':experiment['result'].get('strategy_contract'), 'round_conclusions':prior_conclusions,
                             **({'bad_case_groups':d_groups} if strict else {}), **mechanism_prompt,
-                            **({'validation_rejection':{'reason':decision['attempts'][-2]['validation_error'], 'instruction':'根据原因重出完整建议；usable_repairs非空时必须生成D，只能在为空时有依据地不生成'}} if attempt else {})}), json_mode=True)
+                            **({'validation_rejection': {
+                                'reason': rejection_reason,
+                                'instruction': (
+                                    '根据拒绝原因重新提交完整 D 建议。路径一：保留预期修好题时，给出当前 Winner 同底座、同改动、同题的预演或账本证据；'
+                                    '涉及跨层时，在 cross_layer_mechanisms 写明逐题中间机制，并给出同底座预演依据。'
+                                    '路径二：缺证据时，从各项改动的 target_question_ids 去掉缺证据题，同步 expected_fixed_count 和文案中的修好预期。'
+                                    '如果是合格方案的部分合并且没有有证据的预期修好题，按不承诺修好的组合探索提交：'
+                                    'combination_mode=partial_fusion，source_type=partial，target_question_ids=[]，expected_fixed_count=0，'
+                                    '在 Sandbox 逐题检验组合效果和回退，仍需保留合法来源与副作用检查。'
+                                ),
+                            }} if rejection_reason else {})}), json_mode=True)
                 audit['provider_raw_text'] = content
                 decision['token_usage'].extend(usage)
                 persist_attempts()
@@ -3476,7 +3488,8 @@ class GovernanceStore:
                 decision.update(status='generated' if suggestion['should_generate_d'] else 'no_effective_composite', outcome='generated' if suggestion['should_generate_d'] else 'declined', suggestion=suggestion)
                 break
             except (ValueError, TypeError, KeyError) as error:
-                audit['validation_error'] = str(error)
+                rejection_reason = str(error)
+                audit['validation_error'] = rejection_reason
                 persist_attempts()
                 if attempt == 2:
                     decision.update(status='failed', outcome='validation_failed', reason=str(error))
