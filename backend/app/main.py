@@ -2114,7 +2114,7 @@ def evaluation_run(run_id: str, light: bool = False):
     run=persisted_evaluation_progress(run)
     from . import verdict
     from .agent_inputs import prepare_baseline_rows
-    use_final = verdict.current(run['result'])
+    use_final = verdict.uses_final(run['result'])
     cases = [{**row['result'], 'diagnostic_view': row['diagnostic_view']} for row in prepare_baseline_rows(run,
              [{'question_id': case['question_id'], 'result': case} for case in verdict.final_cases(store, run_id, use_final=use_final)])]
     gate_inputs = verdict.gate_cases(store, run_id) if use_final else cases

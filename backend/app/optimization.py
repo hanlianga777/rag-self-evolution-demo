@@ -27,7 +27,7 @@ INTERVENTIONS = {
     'query_expansion': ({'query_rewrite','multi_query','hyde','query_decompose'}, {'recall_missing'}),
     'candidate_recall': ({'candidate_k','hybrid_search','hybrid_alpha'}, {'recall_missing'}),
     'context_selection': ({'top_k','rerank','min_score','retrieval_max_tokens'}, {'ranking_omission','retrieval_noise'}),
-    'grounded_generation': ({'prompt_strategy','top_k','retrieval_max_tokens'}, {'final_sufficient','confirmed_claim','safety_failure'}),  # 2026-11-19 思考档位锁定时靠回答提示词和交付资料
+    'grounded_generation': ({'prompt_strategy','generation_thinking','top_k','retrieval_max_tokens'}, {'final_sufficient','confirmed_claim','safety_failure'}),
     'stage_performance': (set(search_space_contract()), {'measured_latency'}),
 }
 
@@ -144,9 +144,11 @@ def validate_round_contract(candidates, baseline, prior_candidates, baseline_gat
         if len(diff) > MAX_CHANGED_PARAMETERS:raise ValueError(f'每个方案相对底座最多改 {MAX_CHANGED_PARAMETERS} 个参数（规则总表六.1）')
         if used & set(diff):raise ValueError('同轮方案不得共用参数：'+','.join(sorted(used & set(diff))))
         used.update(diff)
-        changed = diff.keys() | (candidate.get('inherited_parameters') or {}).keys()
-        if rules.AGENT['thinking_locked'] and 'generation_thinking' in changed:
-            raise ValueError('思考档位已锁定为 Baseline 档位，方案不得改 generation_thinking')
+        inherited = candidate.get('inherited_parameters') or {}
+        changed = diff.keys() | inherited.keys()
+        if any('generation_thinking' in values and values['generation_thinking'] not in rules.AGENT['thinking_values']
+               for values in (diff, inherited)):
+            raise ValueError('generation_thinking 必须使用 Agent 允许的档位')
         unsupported = changed - set(rules.AGENT['tunable'])
         if unsupported:
             raise ValueError('方案包含不可调参数：' + '、'.join(sorted(unsupported)))
@@ -368,7 +370,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
                        baseline_result=None, baseline_cases=None, candidate_cases=None, golden_questions=None, round_conclusions=None, round_policy=None, causal_evidence=False, round_number=None,
                        retrieval_preview=None):
     """Build the exact Agent request without a Provider or persistence side effect."""
-    allowed = {key: value for key, value in search_space_contract().items() if key in rules.AGENT['tunable']}
+    allowed = search_space_contract(for_agent=True)
     strategy_options = '、'.join(f"{option['value']}（{option['description']}）"
                                for option in allowed['prompt_strategy']['options'])
     qualification = qualification_description()
@@ -378,7 +380,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
               '先读程序生成的基线诊断摘要、速度事实、逐题变化及已被证明有害的改动清单gate_harming_changes。本轮方案标签见goal.candidate_labels，direction由你根据事实自行确定，不预设方向。同轮修改参数互斥。不得照搬gate_harming_changes。'
               f'回答提示词 prompt_strategy 可选 {strategy_options}。历史方案的效果只读 prior_sandbox_results。'
               '换提示词会影响整卷回答。选生成策略时必须在risks里按题号点名安全关键题和提示注入题，题号见prompt_strategy_risk_questions，并写明各类可能的退化。'
-              f'query_decompose把一问多件事的问题拆成子问题分别检索，针对桥接题、跨段题。{search_space_contract()["generation_thinking"]["description"]}。'
+              f'query_decompose把一问多件事的问题拆成子问题分别检索，针对桥接题、跨段题。Agent 的 generation_thinking 只从 {allowed["generation_thinking"]["allowed"]} 选择。'
               f'Baseline 温度 {rules.BASELINE["temperature"]} 下判定稳定，回答文字仍可能不同。生成层和安全题可从 Prompt Strategy 和交付资料入手。每个方案相对其底座最多改 {MAX_CHANGED_PARAMETERS} 个参数。'
               '诊断→动作对照（优先参考）：检索层·查不到（标准证据没进候选或最终资料）→扩大candidate_k、放宽top_k、降低min_score，或开query_rewrite/multi_query/hyde；检索层·排序遗漏（证据在候选里但没进最终资料）→调rerank、top_k、min_score；型号、错误码等精确词查错→hybrid_alpha调向关键词；被相似型号干扰（答成别的型号的数值）→提高min_score、保持rerank、减小top_k；'
               '生成层·标准证据已齐但仍读错→核对现有参数是否有对应手段；'

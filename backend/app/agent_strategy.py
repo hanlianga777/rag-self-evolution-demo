@@ -182,7 +182,7 @@ def winner_comparison(store, d, winner):
     """D 相对 Winner 的程序事实：只改了哪些参数、相对 Winner 修好/新错哪些题。"""
     def outcomes(candidate):
         run = candidate['result'].get('evaluation_run_id')
-        return verdict.final_verdicts(run, store=store, use_final=verdict.current(candidate['result']))
+        return verdict.final_verdicts(run, store=store, use_final=verdict.uses_final(candidate['result']))
     mine, theirs = outcomes(d), outcomes(winner)
     return {'winner_id': winner['id'],
             'changed_parameters_vs_winner': d['reasoning'].get('winner_config_diff', {}),
@@ -364,7 +364,7 @@ def round_conclusions_for_prompt(store, baseline, candidates, conclusions):
         if len(selected)!=len(plans):
             item['review'] = {'plans':[],'lessons':['复盘引用的保存方案缺失，待核对']}
             continue
-        use_final = any(verdict.current(c['result']) for c in selected)
+        use_final = any(verdict.uses_final(c['result']) for c in selected)
         candidate_cases = {c['id']: verdict.final_cases(store, c['result'].get('evaluation_run_id'), use_final=use_final)
                            for c in selected}
         facts = _round_case_facts(verdict.final_cases(store, baseline['id'], use_final=use_final),candidate_cases,
@@ -406,7 +406,7 @@ def conclude_round(store, runtime, experiment_id, *, final_d=False):
     evaluated = [c for c in current if c['status'] == 'evaluated']
     from .optimization import build_agent_prompt
     baseline = store.evaluation_run(experiment['baseline_run_id'])
-    use_final = verdict.current(experiment['result'])
+    use_final = verdict.uses_final(experiment['result'])
     baseline_cases = verdict.final_cases(store, baseline['id'], use_final=use_final)
     candidate_cases = {c['id']: verdict.final_cases(store, c['result'].get('evaluation_run_id'), use_final=use_final)
                        for c in evaluated}

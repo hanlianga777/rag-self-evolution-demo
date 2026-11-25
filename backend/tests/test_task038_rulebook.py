@@ -160,14 +160,16 @@ def test_staged_decision(round_number, qualified, used, decision):
     assert staged_decision(round_number, qualified, used) == decision
 
 
-def test_agent_thinking_locked_without_round_three_downgrade():
-    for thinking in ('off', 'max'):
+def test_agent_thinking_limited_even_in_round_three():
+    for thinking in ('off', 'low'):
         base = {**base_config(), 'generation_thinking': thinking}
         candidates = [{"id": "A", "config_diff": {"top_k": 6}}, {"id": "B", "config_diff": {"hyde": True}},
                       {"id": "C", "config_diff": {"min_score": 0.1}}]
         validate_round_contract(candidates, base, [], round_number=3)
         candidates[2]["config_diff"]["generation_thinking"] = "high"
-        with pytest.raises(ValueError, match="思考档位已锁定"):
+        validate_round_contract(candidates, base, [], round_number=3)
+        candidates[2]["config_diff"]["generation_thinking"] = "max"
+        with pytest.raises(ValueError, match="generation_thinking"):
             validate_round_contract(candidates, base, [], round_number=3)
 
 

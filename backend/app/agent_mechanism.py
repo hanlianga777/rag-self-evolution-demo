@@ -16,7 +16,7 @@ FAULT_LABELS = {'recall': '未召回', 'ranking': '排序靠后', 'generation': 
                 'safety': '安全相关', 'unknown': '未知'}
 DIRECT_STAGES = {'recall': {'recall'}, 'ranking': {'ranking', 'final'},
                  'generation': {'generation'}, 'safety': {'generation'}}
-PREVIEW_KEYS = rules.AGENT_PARAMETER_STAGES.keys() - {'prompt_strategy'}
+PREVIEW_KEYS = rules.AGENT_PARAMETER_STAGES.keys() - {'prompt_strategy', 'generation_thinking'}
 
 
 def same_base(left, right):

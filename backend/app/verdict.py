@@ -8,6 +8,7 @@ from . import rules
 BASELINE_ORIGINAL_ID = 'EVAL-20261120213645613191'
 RECORDS_KEY = 'verdict:final'
 DIMENSIONS = ('correctness', 'faithfulness', 'completeness')
+PREVIOUS_VERDICT_VERSION = '2026-11-24'
 
 
 def resolve(samples):
@@ -175,6 +176,11 @@ def require_baseline(store, run, *, connection=None, saved=None):
 
 def current(experiment_result):
     return experiment_result.get('verdict_version') == rules.RULES_VERSION
+
+
+def uses_final(result):
+    """Read E4 with its original majority verdict after newer rules take effect."""
+    return current(result) or result.get('verdict_version') == PREVIOUS_VERDICT_VERSION
 
 
 def require_empty_history(ledger):

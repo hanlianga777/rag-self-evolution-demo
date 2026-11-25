@@ -47,7 +47,8 @@ def round_opportunities(targets, base, baseline, prior, preview, current, histor
     """Check every supported single change and each potentially evidenced combination."""
     preview = preview or {}
     effective = {**baseline, **base['changes']}
-    trial_changes = [{key: value} for key in rules.AGENT['tunable'] for value in rules.PIPELINE_VALUES[key]
+    trial_changes = [{key: value} for key in rules.AGENT['tunable']
+                     for value in (rules.AGENT['thinking_values'] if key == 'generation_thinking' else rules.PIPELINE_VALUES[key])
                      if not (type(value) is type(effective.get(key)) and value == effective.get(key))]
     for variant in preview.get('configs', []):
         trial = {**effective, **variant.get('change', {})}
@@ -62,6 +63,7 @@ def round_opportunities(targets, base, baseline, prior, preview, current, histor
     valid = []
     for changes in trial_changes:
         if (changes in valid or base['changes'].keys() & changes.keys()
+                or 'generation_thinking' in changes and changes['generation_thinking'] not in rules.AGENT['thinking_values']
                 or not set(changes).issubset(rules.AGENT['tunable']) or any(
                 type(value) is type(effective.get(key)) and value == effective.get(key) for key, value in changes.items())):
             continue

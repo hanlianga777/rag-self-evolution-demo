@@ -1,4 +1,4 @@
-"""070 噪声根治：Baseline 关闭思考时，Agent 方案不得改 generation_thinking；旧口径不受影响。"""
+"""Baseline 保持关闭思考。120a 起 Agent 提案受限于三档。"""
 import pytest
 from app.optimization import validate_round_contract
 from app.policy import FRIEND_BASELINE_CONFIG
@@ -12,9 +12,10 @@ def test_friend_baseline_is_thinking_off():
     assert FRIEND_BASELINE_CONFIG['generation_thinking'] == 'off'
 
 
-def test_thinking_change_rejected_when_baseline_off():
-    with pytest.raises(ValueError, match='思考档位已锁定'):
-        validate_round_contract(_cands({'generation_thinking': 'high'}), dict(FRIEND_BASELINE_CONFIG), [])
+def test_max_thinking_rejected_when_baseline_off():
+    validate_round_contract(_cands({'generation_thinking': 'high'}), dict(FRIEND_BASELINE_CONFIG), [])
+    with pytest.raises(ValueError, match='generation_thinking'):
+        validate_round_contract(_cands({'generation_thinking': 'max'}), dict(FRIEND_BASELINE_CONFIG), [])
 
 
 def test_retrieval_only_round_passes_when_baseline_off():

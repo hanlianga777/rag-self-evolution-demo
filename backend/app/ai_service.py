@@ -229,10 +229,16 @@ class AiService:
         return {**self.readiness(), "probe": self.last_probe["status"]}
 
     @provider_task('answer')
-    def answer(self, question: str, config: dict | None = None, *, on_token=None) -> dict:
+    def answer(self, question: str, config: dict | None = None, *, on_token=None, saved_trace=None) -> dict:
         config = {**DEFAULT_PIPELINE_CONFIG, **(config or {})}
         started_at = time.perf_counter()
-        evidence, context_budget, stages, trace, auxiliary_usage = self.retrieve_context(question, config)
+        if saved_trace is None:
+            evidence, context_budget, stages, trace, auxiliary_usage = self.retrieve_context(question, config)
+        else:
+            trace = saved_trace
+            evidence = trace['final']
+            context_budget = trace.get('context_budget') or {'generation_allowed': True}
+            stages, auxiliary_usage = [], []
         return self._generate(question, config, started_at, evidence, context_budget, stages, trace, auxiliary_usage, on_token)
 
     @provider_task('answer')

@@ -49,7 +49,7 @@ class StableRequests(unittest.TestCase):
         validate_round_contract(candidates, DEFAULT_PIPELINE_CONFIG, [], completed=6)
         system, prompt = build_agent_prompt([], DEFAULT_PIPELINE_CONFIG, [], [], list('ABC'), evaluation_budget={'used':6}, round_number=3)
         self.assertNotIn('downgrade_required', prompt['round_contract'])
-        self.assertNotIn('generation_thinking', prompt['allowed_parameter_values'])
+        self.assertEqual(prompt['allowed_parameter_values']['generation_thinking']['allowed'], ['off', 'low', 'high'])
         self.assertIn('prompt_strategy', prompt['allowed_parameter_values'])  # 2026-11-19 规则修订：回答提示词与问题拆解进入 Agent 可调范围
         self.assertNotIn('Max降到High', system)
 

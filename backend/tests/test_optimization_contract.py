@@ -113,7 +113,7 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertIn("all_bad_case_audit",audit)
         self.assertIsNone(provider.prompt["goal"]["failed_gates"])
         self.assertEqual(provider.prompt["allowed_parameter_values"],
-                         {key: value for key, value in search_space_contract().items() if key in AGENT["tunable"]})
+                         search_space_contract(for_agent=True))
         self.assertEqual(set(provider.prompt["allowed_parameter_values"]), set(AGENT["tunable"]))
         self.assertNotIn("excluded_automatic_parameters",provider.prompt)
         self.assertEqual({key: provider.prompt["allowed_parameter_values"]["multi_query"][key] for key in ("type", "allowed")}, {"type": "boolean false or integer", "allowed": [False, 2, 4, 6]})

@@ -119,7 +119,8 @@ def test_rulebook_machine_contract():
     assert rules.RULES_VERSION == CANDIDATE_QUALIFICATION_VERSION
     assert rules.AGENT['candidates_per_round'] == len(rules.AGENT['candidate_labels'])
     assert all(FRIEND_BASELINE_CONFIG[key] == value for key, value in rules.BASELINE.items())
-    assert set(ALLOWED_SEARCH_SPACE) - {'generation_thinking'} == set(rules.AGENT['tunable'])
+    assert set(ALLOWED_SEARCH_SPACE) == set(rules.AGENT['tunable'])
+    assert set(rules.AGENT['thinking_values']) < set(ALLOWED_SEARCH_SPACE['generation_thinking'])
     assert MAX_EVALS == rules.AGENT['budget']
 
 
@@ -243,7 +244,8 @@ def test_agent_prompt_uses_current_qualification_and_parameter_contract():
     assert prompt['qualification_rules']['version'] == rules.RULES_VERSION
     assert prompt['round_contract']['max_changed_parameters'] == rules.AGENT['max_changed_parameters']
     assert {key: row['allowed'] for key, row in prompt['allowed_parameter_values'].items()} == {
-        key: list(rules.PIPELINE_VALUES[key]) for key in rules.AGENT['tunable']}
+        key: rules.AGENT['thinking_values'] if key == 'generation_thinking' else list(rules.PIPELINE_VALUES[key])
+        for key in rules.AGENT['tunable']}
     assert f"{len(GATE_DEFINITIONS)} 项门槛" in system
     assert '普通新增只用于' not in system
     assert f"至少修好 {prompt['qualification_rules']['min_fixed']} 道" in system

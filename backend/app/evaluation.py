@@ -383,7 +383,7 @@ class EvaluationRunner:
         execution = self.runtime.answer(item["question"], config)
         return self.score_execution(item, execution)
 
-    def diagnostic_retest(self, run_id, question_ids, *, repetitions=3):
+    def diagnostic_retest(self, run_id, question_ids, *, repetitions=3, config_override=None):
         """Read a frozen scheme and score fresh trials without evaluation writes."""
         from uuid import uuid4
         from .corpus import current_manifest, manifest_identity
@@ -413,6 +413,19 @@ class EvaluationRunner:
         frozen = {q['id']: q for q in snapshot['questions']}
         if any('test_category' not in frozen.get(q, {}) for q in selected):
             raise ValueError('复测题目缺少冻结类别或原题内容')
+        traces = {}
+        if config_override is not None:
+            saved = verdict.records(self.store, run_id)
+            for question_id in selected:
+                if question_id not in saved:
+                    raise ValueError(f'{question_id} 缺少底座最终判定')
+                row = saved[question_id]
+                case = verdict.decision_case({}, row, row['final_passed'])
+                trace = case['programmatic_metrics']['retrieval_trace']
+                if not isinstance(trace['final'], list):
+                    raise ValueError(f'{question_id} 缺少底座已保存的 Final')
+                traces[question_id] = trace
+            run = {**run, 'config': {**run['config'], **config_override}}
         items = self.snapshot_items({**snapshot, 'question_ids': selected})
         effort = judge.get('judge_thinking', {}).get('reasoning_effort', 'off')
         limits = judge.get('execution_snapshot', {}).get('request_limits')
@@ -421,13 +434,13 @@ class EvaluationRunner:
         try:
             with experiment_scope(self.store, reuse_experiment(self.store, run)), bypass_reuse(), judge_thinking(effort), execution_limits(limits), accounting_only():
                 self._require_generation_contract(judge)
-                questions = self._diagnostic_trials(items, run, repetitions, diagnostic_id, snapshot, frozen)
+                questions = self._diagnostic_trials(items, run, repetitions, diagnostic_id, snapshot, frozen, traces)
         finally:
             _request_checkpoint.reset(token)
         return {'id': diagnostic_id, 'source_run_id': run_id, 'repetitions': repetitions,
                 'evaluation_identity': judge['evaluation_identity'], 'questions': questions}
 
-    def _diagnostic_trials(self, items, run, repetitions, diagnostic_id, snapshot, frozen):
+    def _diagnostic_trials(self, items, run, repetitions, diagnostic_id, snapshot, frozen, traces):
         from .evaluation_stage import checkpoint_usage, perform_stage
         from .policy import protected_question
         from .providers import permanent_provider_error
@@ -436,6 +449,7 @@ class EvaluationRunner:
         questions = []
         for item in items:
             question_id = item['id']
+            answer_kwargs = {'saved_trace': traces[question_id]} if question_id in traces else {}
             protected = protected_question(item, item['raw'])
             trials = []
             for index in range(repetitions):
@@ -445,9 +459,10 @@ class EvaluationRunner:
                     return perform_stage(checkpoint, phase, action, trial_id, automatic=False,
                                          check_stop=lambda: None, on_state=lambda *_args, **_kwargs: None)
 
+                execution = None
                 try:
                     with question_scope(question_id):
-                        execution = perform('generation', lambda: self.runtime.answer(item['question'], run['config']))
+                        execution = perform('generation', lambda: self.runtime.answer(item['question'], run['config'], **answer_kwargs))
                     score = perform('judge', lambda: self.score_execution(item, execution))
                     if type(score.get('passed')) is not bool:
                         raise ValueError('本次没有有效判定')
@@ -457,6 +472,9 @@ class EvaluationRunner:
                     if permanent_provider_error(error):
                         raise
                     trial = {'passed': None, 'risk': None, 'error': str(error)}
+                    if answer_kwargs and execution is not None:
+                        trial.update(answer=execution.get('answer'), latency_ms=execution.get('latency_ms'),
+                                     judge_result=getattr(error, 'raw_provider_response', None))
                 trials.append({'id': trial_id, **trial, 'usage': checkpoint_usage(checkpoint)})
             passed = sum(trial['passed'] is True for trial in trials)
             unknown = sum(trial['passed'] is None for trial in trials)

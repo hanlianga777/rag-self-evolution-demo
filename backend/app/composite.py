@@ -32,7 +32,7 @@ def build_d_facts(store, baseline, winner, history):
     """Read the saved decision evidence for the Winner and its comparison runs."""
     questions = {q['id']:q for q in json.loads(baseline['dataset_snapshot_json']).get('questions', [])}
     base = pipeline_config(baseline['config'])
-    use_final = verdict.current(winner['result'])
+    use_final = verdict.uses_final(winner['result'])
     if use_final:
         from .evaluation import summarize_evaluation_cases
         baseline = {**baseline, 'result': {**baseline['result'],
@@ -115,14 +115,16 @@ def build_d_facts(store, baseline, winner, history):
                          'margin':delta(metric(winner['result'],g['metric']),g['threshold']) if g['operator']=='>=' else delta(g['threshold'],metric(winner['result'],g['metric'])),
                          'unit':'秒' if 'latency' in g['metric'] else '百分点'} for g in GATE_DEFINITIONS],
         'missing_winner_cases':sorted(set(questions)-set(win_cases)), 'note':'仅保存结果；缺记录为未知，伴随出现不等于导致。前提不同的副作用是待验证风险，不能单独作为放弃理由。'}
-    facts['usable_repairs'] = usable_repairs(facts)
+    facts['usable_repairs'] = usable_repairs(facts, allow_thinking=verdict.current(winner['result']))
     return facts
 
 
-def usable_repairs(facts):
+def usable_repairs(facts, *, allow_thinking):
     """Identify historical repairs supported by saved Winner positions, not predicted gains."""
     base = facts['baseline_config']; winner = facts['winner_config']; repairs = []
     tunable = set(rules.AGENT['tunable'])
+    if not allow_thinking:
+        tunable.discard('generation_thinking')
     limit = rules.AGENT['d_max_changed_parameters']
     for failure in facts['remaining_failures']:
         positions = failure['evidence_positions']
@@ -130,7 +132,7 @@ def usable_repairs(facts):
         for source in failure['historical_fixes']:
             if failure['question_id'] not in source['fixed_question_ids']:continue
             for key,value in parameter_diff(source['config'],winner).items():
-                if key not in tunable:continue
+                if key not in tunable or key == 'generation_thinking' and value not in rules.AGENT['thinking_values']:continue
                 evidence = []
                 for pos in positions:
                     final,rank,candidate = (pos.get(stage) for stage in ('final','reranked','candidates'))
@@ -191,8 +193,8 @@ def validate_d_parameter_limit(config, base):
 def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
     diff = suggestion.get('proposed_config_diff')
     if not isinstance(diff,dict) or set(diff)-set(ALLOWED_SEARCH_SPACE):raise ValueError('非法Pipeline参数')
-    if rules.AGENT['thinking_locked'] and 'generation_thinking' in diff:
-        raise ValueError('思考档位锁定，D 不得调整 generation_thinking')
+    if 'generation_thinking' in diff and diff['generation_thinking'] not in rules.AGENT['thinking_values']:
+        raise ValueError('generation_thinking 必须使用 Agent 允许的档位')
     base = pipeline_config(baseline_config)
     winner_config = pipeline_config(winner['config'])
     config = pipeline_config({**winner_config, **diff})

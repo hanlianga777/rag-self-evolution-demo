@@ -3,7 +3,7 @@
 import hashlib
 
 from . import rules
-from .policy import DEFAULT_PIPELINE_CONFIG
+from .policy import DEFAULT_PIPELINE_CONFIG, search_space_contract
 
 
 def _versions(judge):
@@ -20,7 +20,7 @@ def _versions(judge):
     prompts.update(judge=RUBRIC_JUDGE_PROMPT, agent_system=agent_system)
     return {
         'rules_hash': rules.RULES_HASH,
-        'search_space_version': rules.canonical_hash({key: rules.PIPELINE_VALUES[key] for key in rules.AGENT['tunable']}),
+        'search_space_version': rules.canonical_hash({key: spec['allowed'] for key, spec in search_space_contract(for_agent=True).items()}),
         'prompt_version': {name: hashlib.sha256(template.encode()).hexdigest() for name, template in prompts.items()},
     }
 

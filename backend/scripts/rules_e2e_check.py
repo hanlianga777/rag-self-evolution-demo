@@ -73,7 +73,7 @@ def compare(system, prompt, api, payloads):
     from app import rules
     from app.policy import search_space_contract
 
-    thinking_text = search_space_contract()['generation_thinking']['description']
+    thinking_text = f"Agent 的 generation_thinking 只从 {rules.AGENT['thinking_values']} 选择"
     stability_text = f"温度 {rules.BASELINE['temperature']} 下判定稳定，回答文字仍可能不同"
     agent_allowed = prompt['allowed_parameter_values']
     api_allowed = api['search_space']
@@ -89,6 +89,7 @@ def compare(system, prompt, api, payloads):
                          for task in audit_tasks}
     allowed = {key: list(values) for key, values in rules.PIPELINE_VALUES.items()}
     tunable = {key: allowed[key] for key in rules.AGENT['tunable']}
+    tunable['generation_thinking'] = rules.AGENT['thinking_values']
     agent_values = {key: entry['allowed'] for key, entry in agent_allowed.items()}
     api_values = {key: entry['allowed'] for key, entry in api_allowed.items()}
     drift = {source: STALE_TEXT.findall(value) for source, value in {
@@ -102,7 +103,8 @@ def compare(system, prompt, api, payloads):
          and body['round_contract']['max_changed_parameters'] == rules.AGENT['max_changed_parameters'],
          {'规则版本': rules.RULES_VERSION, '资格': body.get('qualification_rules'),
           '当轮约束': body['round_contract']}),
-        ('思考档设置一致', thinking_text in system and thinking_description == thinking_text
+        ('思考档设置一致', thinking_text in system
+         and thinking_description == search_space_contract()['generation_thinking']['description']
          and agent_config['generation_thinking'] == api_config['generation_thinking'] == rules.BASELINE['generation_thinking']
          and body['goal']['baseline_configuration']['generation_thinking'] == rules.BASELINE['generation_thinking']
          and payloads['Agent']['messages'][0]['content'] == system

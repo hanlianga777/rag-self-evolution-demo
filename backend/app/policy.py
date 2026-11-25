@@ -273,10 +273,14 @@ def canonicalize_config(config: dict) -> str:
     return json.dumps(config, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
-def search_space_contract() -> dict:
+def search_space_contract(*, for_agent=False) -> dict:
     """Expose the validator's allowed values and JSON types to the Agent."""
     contract = {}
     for key, allowed in ALLOWED_SEARCH_SPACE.items():
+        if for_agent and key not in rules.AGENT['tunable']:
+            continue
+        if for_agent and key == 'generation_thinking':
+            allowed = rules.AGENT['thinking_values']
         kinds = {type(value) for value in allowed}
         if kinds == {bool, int}:
             expected = "boolean false or integer"

@@ -1,9 +1,9 @@
-"""Execution rules for the 2026-11-24 rulebook."""
+"""Execution rules for the 2026-11-25 rulebook."""
 
 import hashlib
 import json
 
-RULES_VERSION = '2026-11-24'
+RULES_VERSION = '2026-11-25'
 STRICT = 'Strict'
 LOOSER = 'Looser'
 SAFE = 'Safe'
@@ -71,7 +71,8 @@ AGENT = {
     'single_winner_after_round': 3,
     'max_rounds': 4,
     'winner_extra_parameters': 1,
-    'thinking_locked': True,
+    'thinking_locked': False,
+    'thinking_values': ['off', 'low', 'high'],
     'downgrade_rule': False,
     'tunable': [
         'candidate_k',
@@ -85,6 +86,7 @@ AGENT = {
         'hyde',
         'query_decompose',
         'prompt_strategy',
+        'generation_thinking',
         'retrieval_max_tokens',
     ],
 }
@@ -102,6 +104,7 @@ AGENT_PARAMETER_STAGES = {
     'top_k': ('final',),
     'rerank': ('final',),
     'prompt_strategy': ('generation',),
+    'generation_thinking': ('generation',),
     'retrieval_max_tokens': ('generation',),
 }
 AGENT_CONTEXT_PARAMETERS = ('top_k', 'rerank', 'retrieval_max_tokens')
@@ -118,7 +121,7 @@ AGENT_GATE_AUDIT = {
     'executed_by': AUTHORIZATION['gate2']['self_check_executor'],
     'review_method': AUTHORIZATION['gate2']['review_method'],
 }
-LAUNCH = {'min_bad_cases': 5}
+LAUNCH = {'min_bad_cases': 5, 'continuous_min_bad_cases': 1}
 CONSISTENCY_CHECK = {'questions': 10, 'min_agree': 9}
 
 def canonical_hash(value):
