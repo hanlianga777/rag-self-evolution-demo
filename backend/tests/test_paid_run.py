@@ -43,6 +43,7 @@ class PaidRunTests(unittest.TestCase):
 
     def test_next_stage_preserves_unknown_call_and_reserve(self):
         old=self.run.begin('DeepSeek','deepseek-v4-flash',{'max_tokens':10})
+        old['sent_at'] = old['reserved_at']
         original_reserve=old['reserved_yuan']
         self.run.stop('ProviderTimeout')
         resumed=PaidRun.next_stage(self.path,'resume',lambda:{'corpus':'new'})
@@ -81,7 +82,9 @@ class PaidRunTests(unittest.TestCase):
         self.assertEqual(json.loads(self.path.read_text())['stopped'],'ProviderTimeout')
 
     def test_resuming_unknown_billing_still_requires_same_identity(self):
-        self.run.begin('DeepSeek','deepseek-v4-flash',{'max_tokens':10})
+        call = self.run.begin('DeepSeek','deepseek-v4-flash',{'max_tokens':10})
+        call['sent_at'] = call['reserved_at']
+        self.run.save()
         with self.assertRaisesRegex(RuntimeError,'identity'):
             PaidRun.next_stage(self.path,'baseline-recovery-1',lambda:{'corpus':'different'})
         resumed=PaidRun.next_stage(self.path,'baseline-recovery-1',lambda:{'corpus':'new'})

@@ -53,13 +53,24 @@ def claim_cycle(store, experiment_id, *, current_round_only=False):
                  'used':experiment['evaluation_budget']['used'],
                  'remaining':max(0, MAX_EVALS-experiment['evaluation_budget']['used']),
                  'reserved_for_d':experiment['evaluation_budget']['reserved_for_d'], 'last_error':None}
+        prior_cycle = experiment['result'].get('optimization_cycle', {})
+        if prior_cycle.get('status') in {'blocked', 'stopped'}:
+            state['reopen_paid_ledger'] = True
+        blocked = [c['result']['evaluation_run_id'] for c in experiment['candidates']
+                   if c['status']=='failed' and c['result'].get('evaluation_run_id')
+                   and c['result'].get('auto_recovery', {}).get('state') == 'blocked']
+        if blocked:
+            state.update(resume_blocked_runs=blocked, reopen_paid_ledger=True)
         if layered(experiment['result']):
             previous_decision = experiment['result'].get('optimization_cycle', {}).get('staged_decision')
             if previous_decision:
                 state['staged_decision'] = previous_decision
         result = {**experiment['result'], 'optimization_cycle':state}
         from .paid_policy import current_binding
-        if current_binding():result['paid_run']=current_binding()
+        if binding := current_binding():
+            if result.get('paid_run') not in (None, binding):
+                raise ValueError('实验已绑定另一份费用授权')
+            result['paid_run'] = binding
         connection.execute('UPDATE experiments SET result_json=? WHERE id=?',
                            (json.dumps(result, ensure_ascii=False), experiment_id))
     from .paid_schedule import clear_run_now
@@ -93,17 +104,50 @@ def request_cycle_stop(store, experiment_id):
 
 def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
     """Continue the authorized batch, reusing saved Sandbox checkpoints."""
-    from .paid_run import current_paid_run
-    binding=store.experiment(experiment_id,light=True)['result'].get('paid_run')
-    if binding and current_paid_run() is None:
-        from .paid_policy import restore_paid_context
-        with restore_paid_context(store,binding):
-            return run_until_qualified(store,runtime,experiment_id,claimed=claimed)
+    from contextlib import nullcontext
+    from .paid_policy import experiment_binding, restore_paid_context
+    from .providers import permanent_provider_error, provider_error_details, provider_retry_scope
     if not claimed:
         claim_cycle(store, experiment_id)
+    provider = runtime.provider if getattr(runtime, 'live_enabled', True) else None
+    def on_state(status, **details):
+        _save_state(store, experiment_id, provider_retry={'state':status, **details})
+    try:
+        binding = experiment_binding(store, experiment_id, provider)
+        result = store.experiment(experiment_id, light=True)['result']
+        reopen = result.get('optimization_cycle', {}).get('reopen_paid_ledger', False)
+        with provider_retry_scope(lambda:check_cycle_stop(store, experiment_id), on_state), (
+                restore_paid_context(store,binding,reopen=reopen) if binding else nullcontext()):
+            if reopen:
+                _save_state(store, experiment_id, reopen_paid_ledger=False)
+            return _run_until_qualified(store, runtime, experiment_id)
+    except (ValueError, OSError) as error:
+        _save_state(store, experiment_id, status='blocked', last_error=str(error),
+                    provider_retry={'state':'blocked', **provider_error_details(error,'authorization')})
+    except Exception as error:
+        if not permanent_provider_error(error):
+            raise
+        _save_state(store, experiment_id, status='blocked', last_error=str(error),
+                    provider_retry={'state':'blocked', **provider_error_details(error,'provider')})
+    return store.experiment(experiment_id, light=True)['result']['optimization_cycle']
+
+
+def _candidate_block_error(run):
+    result = run['result']
+    recovery = result.get('auto_recovery', {})
+    if recovery.get('state') == 'blocked' or any(
+            (error.get('provider_error') or {}).get('http_status') in {400, 401, 402, 403}
+            for error in result.get('technical_errors', [])):
+        return run.get('error_message') or recovery.get('error') or 'Provider请求、权限或余额错误，已停止'
+    return None
+
+
+def _run_until_qualified(store, runtime, experiment_id):
+    from .providers import permanent_provider_error
     runner, agent = EvaluationRunner(store, runtime), OptimizationAgent(store, runtime.provider)
     empty_rounds = 0
     state = dict(store.experiment(experiment_id, light=True)['result'].get('optimization_cycle', {}))
+    state.pop('provider_retry', None)
     state.update(owner_pid=os.getpid(), worker_thread=threading.get_ident())
 
     def save(status, phase, error=None):
@@ -114,6 +158,10 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
         state.update(status=status, phase=phase, used=used, remaining=max(0, MAX_EVALS-used),
                      reserved_for_d=int(not legacy_staged), last_error=error,
                      round=max([c['reasoning'].get('round', 1) for c in experiment['candidates']] or [0]))
+        if status == 'blocked':
+            retry = experiment['result'].get('optimization_cycle', {}).get('provider_retry') or {}
+            state['provider_retry'] = {**retry, 'state':'blocked', 'error':error,
+                'resume_hint':'排除所列故障后，使用原实验和授权从断点手动续跑'}
         if experiment['result'].get('mechanism_contract') == MECHANISM_CONTRACT:
             from .agent_round_contract import check_commitment, previous_commitment
 
@@ -159,6 +207,8 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
         check_cycle_stop(store,experiment_id)
         save('running', 'composite')
         composite = store.create_composite(experiment_id, runtime.provider)
+        if composite.get('outcome') == 'provider_blocked':
+            return save('blocked', 'composite', composite.get('reason'))
         if composite.get('status') in {'analyzing','unknown'}:
             return save('failed', 'composite', 'D分析结果未知，保留记录，不重复付费调用')
         experiment = store.experiment(experiment_id, light=True)
@@ -222,10 +272,11 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                     result = run['result']
                     if result.get('stop_request') and run['id'] not in state.get('resume_stopped_runs',[]):
                         return save('stopped','sandbox','用户已停止试跑，保留断点')
-                    errors=result.get('technical_errors',[])
-                    if any(e.get('provider_error',{}).get('status_code') in {400,401,402,403}
-                           or e.get('provider_error',{}).get('http_status') in {400,401,402,403} for e in errors):
-                        return save('failed','sandbox',run.get('error_message') or 'Provider请求、权限或余额错误，已停止')
+                    if blocked := _candidate_block_error(run):
+                        if run['id'] in state.get('resume_blocked_runs', []):
+                            finished = runner.run_candidate(candidate['id'], automatic=True, manual_resume=True)
+                            continue
+                        return save('blocked','sandbox',blocked)
                     error = run.get('error_message') or str(result.get('technical_errors') or '试跑未完整结束')
                     failures = state.setdefault('sandbox_recovery', {})
                     recovery = failures.setdefault(candidate['id'], {'resumes':0, 'error':error})
@@ -303,7 +354,7 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
     except InterruptedError as error:
         return save('stopped',state.get('phase','sandbox'),str(error))
     except Exception as error:
-        return save('failed', state.get('phase','analysis'), str(error))
+        return save('blocked' if permanent_provider_error(error) else 'failed', state.get('phase','analysis'), str(error))
 
 
 STAGED_RULE = 'staged-v1'
@@ -409,6 +460,7 @@ def layered_stage_facts(store, experiment, baseline, winner, number):
 def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, runner, agent):
     """按规则总表六.6/六.7 执行分阶段试跑。"""
     from .agent_strategy import conclude_round
+    from .providers import permanent_provider_error
 
     def execute(candidate):
         save('running', 'sandbox')
@@ -428,10 +480,11 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
             result = run['result']
             if result.get('stop_request') and run['id'] not in state.get('resume_stopped_runs',[]):
                 return None, save('stopped','sandbox','用户已停止试跑，保留断点')
-            errors=result.get('technical_errors',[])
-            if any(e.get('provider_error',{}).get('status_code') in {400,401,402,403}
-                   or e.get('provider_error',{}).get('http_status') in {400,401,402,403} for e in errors):
-                return None, save('failed','sandbox',run.get('error_message') or 'Provider请求、权限或余额错误，已停止')
+            if blocked := _candidate_block_error(run):
+                if run['id'] in state.get('resume_blocked_runs', []):
+                    finished = runner.run_candidate(candidate['id'], automatic=True, manual_resume=True)
+                    continue
+                return None, save('blocked','sandbox',blocked)
             error = run.get('error_message') or str(result.get('technical_errors') or '试跑未完整结束')
             if state.get('external_runner'):
                 return None, save('failed', 'sandbox', result.get('auto_recovery', {}).get('error') or error)
@@ -580,7 +633,7 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
     except InterruptedError as error:
         return save('stopped',state.get('phase','sandbox'),str(error))
     except Exception as error:
-        return save('failed', state.get('phase','analysis'), str(error))
+        return save('blocked' if permanent_provider_error(error) else 'failed', state.get('phase','analysis'), str(error))
 
 
 def recover_optimization_cycles(store, runtime):

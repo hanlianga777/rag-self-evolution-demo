@@ -92,7 +92,7 @@ class CycleRecoveryTests(unittest.TestCase):
 
     def test_provider_balance_failure_does_not_resume(self):
         result,_,_,tries=self.exercise(account_failure=True)
-        self.assertEqual(result['status'],'failed')
+        self.assertEqual(result['status'],'blocked')
         self.assertEqual(tries,{'A':1})
 
     def test_restart_running_a_uses_saved_questions_then_continues_b_c(self):

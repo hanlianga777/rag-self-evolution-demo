@@ -184,6 +184,7 @@ class VectorRetriever:
             if (self._bundle or {}).get('manifest', {}).get('knowledge_identity'):
                 from .knowledge_pipeline import AlibabaProvider
                 try:vector = AlibabaProvider().embed([question], self._index.d)
+                except InterruptedError:raise
                 except Exception as error:raise RetrievalUnavailable('query_embedding',error) from error
             else:
                 vector = self._model.encode([question], normalize_embeddings=True)
@@ -358,6 +359,7 @@ class VectorRetriever:
             hits = [self._materialize(by_id[item['chunk_id']], item['combined']) for item in ranked]
             with measure(stages, 'rerank', 'retrieval'):
                 try:reranked = query_only_order(question,hits) if config.get('rerank')=='query_only' else AlibabaProvider().rerank(question, hits) if config.get('rerank', BASELINE['rerank']) else hits
+                except InterruptedError:raise
                 except Exception as error:raise RetrievalUnavailable('rerank',error) from error
             minimum = config.get('min_score')
             if minimum is not None: reranked = [h for h in reranked if h['score'] >= minimum]

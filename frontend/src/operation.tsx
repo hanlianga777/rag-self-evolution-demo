@@ -37,17 +37,20 @@ function evaluation(run: any): Partial<Operation> {
     const active = ["queued", "running"].includes(run.status);
     return { status: active ? "running" : "stopped", stopping: active, stage: active ? "正在停止，等待当前请求结束并保存进度" : "已停止，进度已保存", current, total, ...(!active ? { endedAt: Date.now() } : {}) };
   }
-  return { status: ["queued", "running"].includes(run.status) ? "running" : run.status === "completed" ? "completed" : "failed", stage: ["queued", "running"].includes(run.status) ? "正在运行 Golden Case" : run.status === "completed" ? "评测完成" : "评测失败", current, total, pricePause: run.result?.price_pause, error: run.error_message };
+  const retry = run.result?.provider_retry;
+  return { status: ["queued", "running"].includes(run.status) ? "running" : run.status === "completed" ? "completed" : "failed",
+    stage: retry?.state === "retry_wait" ? "等待模型服务恢复，进度已保存" : retry?.state === "blocked" ? "运行受阻，进度已保存" : ["queued", "running"].includes(run.status) ? "正在运行 Golden Case" : run.status === "completed" ? "评测完成" : "评测失败",
+    current, total, pricePause: run.result?.price_pause, error: run.error_message };
 }
 
 function cycleProgress(saved: any): Partial<Operation> {
   const cycle = saved.result.optimization_cycle, budget = saved.evaluation_budget;
   const stopped = ["stopped", "analysis_exhausted"].includes(cycle.status);
-  return { status: cycle.status === "running" ? "running" : cycle.status === "failed" ? "failed" : stopped ? "stopped" : "completed",
+  return { status: cycle.status === "running" ? "running" : ["failed", "blocked"].includes(cycle.status) ? "failed" : stopped ? "stopped" : "completed",
     stopping: cycle.status === "running" && !!cycle.stop_request, error: cycle.last_error,
     current: budget?.used ?? cycle.used, total: budget?.max ?? 12,
     pricePause: [cycle.price_pause, saved.result.price_pause].find(pause => pause?.paused) || cycle.price_pause,
-    stage: cycle.stop_request ? "正在停止，等待当前请求结束并保存进度" : `已用 ${budget?.used ?? cycle.used} 次，剩余 ${cycle.remaining} 次（含合并 Candidate 预留）` };
+    stage: cycle.stop_request ? "正在停止，等待当前请求结束并保存进度" : cycle.provider_retry?.state === "retry_wait" ? "等待模型服务恢复，进度已保存" : `已用 ${budget?.used ?? cycle.used} 次，剩余 ${cycle.remaining} 次（含合并 Candidate 预留）` };
 }
 
 const revisionStages: Record<string, string> = {
@@ -155,7 +158,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
         update(id, cycleProgress(saved));
         if (candidateRefresh.current) await candidateRefresh.current();
         if (cycle.status !== "running") {
-          if (cycle.status === "failed") throw new Error(cycle.last_error || "本批次已停止");
+          if (["failed", "blocked"].includes(cycle.status)) throw new Error(cycle.last_error || "本批次已停止");
           if (cycle.status === "analysis_exhausted") { update(id,{status:"stopped",stage:cycle.last_error || "连续 3 次 Candidate 不合规，已停止",endedAt:Date.now()}); break; }
           if (cycle.status === "stopped") { update(id,{status:"stopped",endedAt:Date.now()}); break; }
           succeed(id); break;

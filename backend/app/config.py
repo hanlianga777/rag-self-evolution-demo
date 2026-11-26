@@ -17,6 +17,7 @@ class Settings:
     baseline_thinking: str = rules.BASELINE['generation_thinking']
     judge_thinking: str = rules.JUDGE['thinking']
     judge_samples: int = rules.JUDGE['samples']
+    accounting_database: Path | None = None
 
     @property
     def configured(self) -> bool:
@@ -37,6 +38,12 @@ def load_values(env: dict[str, str] | None = None, env_file: Path | None = None)
     return values
 
 
+def accounting_database(values):
+    if values.get('RAG_FORCE_MOCK') == '1':
+        return None
+    return Path(values.get('RAG_DEMO_DB_PATH') or Path(__file__).resolve().parents[1] / 'data' / 'demo.db')
+
+
 def load_settings(env: dict[str, str] | None = None, env_file: Path | None = None) -> Settings:
     values = load_values(env, env_file)
     timeout = float(values.get("DEEPSEEK_TIMEOUT_SECONDS", "240"))
@@ -49,4 +56,5 @@ def load_settings(env: dict[str, str] | None = None, env_file: Path | None = Non
         base_url=values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/"),
         model=model,
         timeout_seconds=timeout,
+        accounting_database=accounting_database(values) if env is None or 'RAG_DEMO_DB_PATH' in values else None,
     )

@@ -376,7 +376,8 @@ class EvaluationRunner:
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK:
             snapshot, approved, config, judge = self.baseline_inputs(resume_source_id)
-            run_id = self.store.create_baseline_run(snapshot, config, judge, resume_source_id, automatic=automatic)
+            run_id = self.store.create_baseline_run(snapshot, config, judge, resume_source_id, automatic=automatic,
+                                                     manual_resume=resume_source_id is not None)
         return run_id, approved, config
 
     def _case_result(self, item: dict, config: dict):
@@ -1075,6 +1076,7 @@ class EvaluationRunner:
         with execution_limits(limits),accounting_only():return self._execute_baseline(run_id,approved,config)
 
     def _execute_baseline(self, run_id, approved, config):
+        from .providers import permanent_provider_error, provider_error_details
         cases, checkpoints, phase, item = [], {}, 'initialization', None
         run = self.store.evaluation_run(run_id)
         frozen_ids = set(json.loads(run['dataset_snapshot_json'])['question_ids'])
@@ -1086,7 +1088,7 @@ class EvaluationRunner:
             experiment = self.store.experiment(owner['experiment_id'])
             baseline_cases = {c['question_id']: c for c in verdict.final_cases(
                 self.store, experiment['baseline_run_id'], use_final=verdict.current(experiment['result']))}
-        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay','manual_resume','experiment_config_identity','final_retry_started','price_pause') if k in run['result']}
+        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay','manual_resume','experiment_config_identity','final_retry_started','price_pause','provider_retry') if k in run['result']}
         from .request_reuse import matching_configuration, question_scope, reused_case
         reusable_cases = matching_configuration(self.store, run) if config.get('candidate_id') and experiment['result'].get('causal_evidence') else {}
         summary_cache = {}
@@ -1138,7 +1140,10 @@ class EvaluationRunner:
                     durable=details.pop('durable',False)
                     if not durable and time.monotonic()-last_heartbeat<2:return
                     last_heartbeat=time.monotonic()
-                    if automatic:lineage['auto_recovery'].update(state=state,question_id=item['id'],**details)
+                    if state in {'retry_wait', 'recovering', 'recovered', 'blocked'}:
+                        lineage['provider_retry'] = {'state':state, 'question_id':item['id'], **details}
+                    if automatic and state not in {'sending', 'request_retry'}:
+                        lineage['auto_recovery'].update(state=state,question_id=item['id'],**details)
                     persist()
                 return perform_stage(checkpoint,phase,action,stage_run_id,automatic=automatic,check_stop=check_stop,on_state=on_state)
             for final_pass in range(1 if lineage.get('final_retry_started') else 0,2):
@@ -1191,7 +1196,6 @@ class EvaluationRunner:
                             checkpoint['scored_result']=perform(phase,score)
                             persist()
                     except Exception as error:
-                        from .providers import permanent_provider_error, provider_error_details
                         if isinstance(error, InterruptedError) or permanent_provider_error(error):
                             raise
                         checkpoint['technical_error']={'phase':phase, 'error_type':type(error).__name__, 'error':str(error),
@@ -1250,13 +1254,11 @@ class EvaluationRunner:
                 checkpoint = checkpoints.setdefault(item['id'], {'attempts':[]})
                 checkpoint.pop('inflight', None)
                 if not isinstance(error,InterruptedError):
-                    from .providers import provider_error_details
                     checkpoint.setdefault('technical_error',{'phase':phase,'error_type':type(error).__name__,'error':str(error),'provider_error':provider_error_details(error,phase)})
                 if not checkpoint['attempts'] or checkpoint['attempts'][-1].get('status')!='error':checkpoint['attempts'].append({'phase':phase, 'status':'error', 'error_type':type(error).__name__, 'cause_type':type(error.__cause__).__name__ if error.__cause__ else None, 'error':str(error), 'usage':locals().get('usage', []), 'elapsed_ms':round((time.perf_counter()-started)*1000) if 'started' in locals() else None})
                 checkpoint['attempts'][-1]['cause_message'] = str(error.__cause__) if error.__cause__ else None
                 if isinstance(getattr(error, 'raw_provider_response', None), str):
                     checkpoint['attempts'][-1]['raw_provider_response'] = error.raw_provider_response
-            from .providers import permanent_provider_error
             automatic=lineage.get('auto_recovery',{}).get('enabled',lineage.get('auto_recovery',{}).get('authorized')) is True
             if automatic and phase != 'recheck' and not isinstance(error,(InterruptedError,ValueError)) and not permanent_provider_error(error):
                 lineage['auto_recovery'].update(state='retrying',error=str(error))
@@ -1265,7 +1267,11 @@ class EvaluationRunner:
                     import logging
                     logging.exception('Evaluation storage unavailable; existing worker checkpoint remains recoverable')
                 return {**run,'status':'running','result':progress()}
-            if lineage.get('auto_recovery'):lineage['auto_recovery'].update(state='stopped',error=str(error))
+            state = 'blocked' if permanent_provider_error(error) or isinstance(error, ValueError) else 'stopped'
+            if state == 'blocked':
+                lineage['provider_retry'] = {'state':state, **provider_error_details(error,phase),
+                    'resume_hint':'排除所列故障后，使用原实验和授权从断点手动续跑'}
+            if lineage.get('auto_recovery'):lineage['auto_recovery'].update(state=state,error=str(error))
             return self.store.finish_evaluation_run(run_id, 'partial' if cases or any('execution' in c for c in checkpoints.values()) else 'failed', progress(), str(error))
 
     def recover_run(self,run_id):
@@ -1273,22 +1279,30 @@ class EvaluationRunner:
         from .paid_run import PaidRun, controlled_run, accounting_only, current_paid_run
         run=self.store.evaluation_run(run_id)
         auto=run['result'].get('auto_recovery',{})
-        if not auto.get('enabled', auto.get('authorized')) or auto.get('state')=='stopped' or run['result'].get('stop_request'):return
-        require_resume_snapshot(run['judge'])
-        snapshot=json.loads(run['dataset_snapshot_json'])
-        if run['judge'].get('evaluation_identity')!=evaluation_identity(snapshot,run['judge']) or not policy_current(run['judge']):raise ValueError('自动恢复Evaluation Identity不匹配')
+        if (not auto.get('enabled', auto.get('authorized')) or auto.get('state')=='stopped'
+                or auto.get('state') == 'blocked' and run['status'] not in {'queued', 'running'}
+                or run['result'].get('stop_request')):return
+        from .providers import ProviderIdentityError
+        try:
+            require_resume_snapshot(run['judge'])
+            snapshot=json.loads(run['dataset_snapshot_json'])
+        except (ValueError, KeyError, TypeError) as error:
+            raise ProviderIdentityError(str(error)) from error
+        if run['judge'].get('evaluation_identity')!=evaluation_identity(snapshot,run['judge']) or not policy_current(run['judge']):raise ProviderIdentityError('自动恢复Evaluation Identity不匹配')
         if run['config'].get('run_target')=='answer_replay':
             executions={key:cp['execution'] for key,cp in run['result'].get('checkpoints',{}).items() if 'execution' in cp}
             items=self.snapshot_items(snapshot)
-            if set(executions)!=set(snapshot['question_ids']):raise ValueError('回放冻结回答断点不完整，禁止重新生成')
+            if set(executions)!=set(snapshot['question_ids']):raise ProviderIdentityError('回放冻结回答断点不完整，禁止重新生成')
             execute=lambda:self.execute_replay(run_id,items,executions)
         elif run['config'].get('candidate_id'):
             items,config,candidate,baseline=self.candidate_inputs(run['config']['candidate_id'])
-            if config!=run['config'] or shared_judge(baseline['judge'])!=shared_judge(run['judge']):raise ValueError('自动恢复 Candidate 身份不匹配')
+            if config!=run['config'] or shared_judge(baseline['judge'])!=shared_judge(run['judge']):raise ProviderIdentityError('自动恢复 Candidate 身份不匹配')
             execute=lambda:self.execute_candidate(run_id,items,config,candidate,baseline)
+            if self.store.experiment(candidate['experiment_id'], light=True)['result'].get('paid_run'):
+                return execute()
         else:
             current,items,config,judge=self.baseline_inputs(run_id)
-            if current!=snapshot or config!=run['config'] or judge!=shared_judge(run['judge']):raise ValueError('自动恢复冻结配置不匹配')
+            if current!=snapshot or config!=run['config'] or judge!=shared_judge(run['judge']):raise ProviderIdentityError('自动恢复冻结配置不匹配')
             execute=lambda:self.execute_baseline(run_id,items,config)
         if auto.get('ledger_path'):
             current = current_paid_run()
@@ -1306,6 +1320,7 @@ class EvaluationRunner:
 
     def candidate_inputs(self, candidate_id: str):
         from .agent_round_contract import layered, layered_winner, validate_layered_limits
+        from .providers import ProviderIdentityError
 
         candidate = self.store.candidate(candidate_id)
         if candidate is None:
@@ -1404,15 +1419,17 @@ class EvaluationRunner:
         from .paid_run import current_paid_run
         limits = baseline['judge'].get('execution_snapshot',{}).get('request_limits')
         if limits is not None:
+            from .paid_policy import EXPERIMENT_ACCOUNTING
             paid_run=current_paid_run()
-            if paid_run is not None and (paid_run.output_limits is None or limits!={key:paid_run.output_limits.get(key) for key in ('answer','judge','query')}):
-                raise ValueError('Candidate request limits must match frozen Baseline')
+            accounting = paid_run and (paid_run.request_policy or {}).get('kind') == EXPERIMENT_ACCOUNTING
+            if paid_run is not None and not accounting and (paid_run.output_limits is None or limits!={key:paid_run.output_limits.get(key) for key in ('answer','judge','query')}):
+                raise ProviderIdentityError('Candidate request limits must match frozen Baseline')
         if baseline['judge'].get('evaluation_identity') != evaluation_identity(snapshot, baseline['judge']):
-            raise ValueError('Evaluation身份不匹配')
+            raise ProviderIdentityError('Evaluation身份不匹配')
         self.store.require_current_baseline(baseline["id"])
         approved = self.snapshot_items(snapshot)
         if baseline['judge'].get('model') != self.runtime.model:
-            raise ValueError('Sandbox 必须使用 Baseline 冻结的 Judge Model')
+            raise ProviderIdentityError('Sandbox 必须使用 Baseline 冻结的 Judge Model')
         config = {**{k:baseline["config"].get(k,DEFAULT_PIPELINE_CONFIG[k]) for k in ("generation_thinking","retrieval_max_tokens")}, **candidate["config"], **({"knowledge_identity": baseline["config"]["knowledge_identity"]} if baseline["config"].get("knowledge_identity") else {}), "run_target": "sandbox_candidate", "candidate_id": candidate_id}
         return approved, config, candidate, baseline
 
@@ -1441,14 +1458,23 @@ class EvaluationRunner:
     def start_candidate(self, candidate_id: str, *, automatic=False, manual_resume=False):
         approved, config, candidate, baseline = self.candidate_inputs(candidate_id)
         snapshot = json.loads(baseline["dataset_snapshot_json"])
+        from contextlib import nullcontext
         from .full_text import CORPUS_LOCK
-        with CORPUS_LOCK:
+        from .paid_policy import experiment_binding, restore_paid_context
+        provider = getattr(self.runtime, 'provider', None) if getattr(self.runtime, 'live_enabled', True) else None
+        binding = experiment_binding(self.store, candidate['experiment_id'], provider)
+        with (restore_paid_context(self.store, binding, reopen=manual_resume) if binding else nullcontext()), CORPUS_LOCK:
             run_id = self.store.create_baseline_run(snapshot, config, baseline['judge'], candidate_id=candidate_id, automatic=automatic,manual_resume=manual_resume)
             candidate = self.store.candidate(candidate_id)
         return run_id, approved, config, candidate, baseline
 
     def execute_candidate(self, run_id, approved, config, candidate, baseline):
-        run = self.execute_baseline(run_id, approved, config)
+        from contextlib import nullcontext
+        from .paid_policy import restore_paid_context
+
+        binding = self.store.experiment(candidate['experiment_id'], light=True)['result'].get('paid_run')
+        with restore_paid_context(self.store, binding) if binding else nullcontext():
+            run = self.execute_baseline(run_id, approved, config)
         if run['status'] in {'queued','running'}:return self.store.candidate(candidate['id'])
         if run['status']!='completed' or not run['result'].get('evaluation_complete'):
             result={**run['result'],'evaluation_run_id':run_id,'baseline_run_id':baseline['id'],'error':run.get('error_message'),
@@ -1533,5 +1559,5 @@ class EvaluationRunner:
     def run_baseline(self, *, automatic=True):
         return self.execute_baseline(*self.start_baseline(automatic=automatic))
 
-    def run_candidate(self, candidate_id: str, *, automatic=True):
-        return self.execute_candidate(*self.start_candidate(candidate_id,automatic=automatic))
+    def run_candidate(self, candidate_id: str, *, automatic=True, manual_resume=False):
+        return self.execute_candidate(*self.start_candidate(candidate_id,automatic=automatic,manual_resume=manual_resume))

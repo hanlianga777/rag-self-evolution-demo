@@ -145,7 +145,9 @@ def start_scheduled_composite(store, provider, experiment_id, *, recover=False):
             save_composite_schedule(store, experiment_id, status='running')
             outcome=store.create_composite(experiment_id, provider)
             save_composite_schedule(store, experiment_id,
-                status='running' if outcome.get('status')=='analyzing' else 'completed')
+                status='blocked' if outcome.get('outcome')=='provider_blocked' else
+                       'running' if outcome.get('status')=='analyzing' else 'completed',
+                error=outcome.get('reason') if outcome.get('outcome')=='provider_blocked' else None)
         except Exception as error:
             save_composite_schedule(store, experiment_id, status='failed', error=str(error))
     with _composite_lock:

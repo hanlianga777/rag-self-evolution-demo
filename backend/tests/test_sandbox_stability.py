@@ -6,7 +6,7 @@ import urllib.error
 from unittest.mock import patch
 
 from app.config import Settings
-from app.evaluation_stage import perform_stage
+from app.evaluation_stage import perform_stage, reopen_blocked_requests
 from app.knowledge_pipeline import AlibabaProvider
 from app.providers import DeepSeekProvider, ProviderAPIError, ProviderTimeout
 
@@ -28,7 +28,7 @@ class RequestCheckpointTests(unittest.TestCase):
             calls.append(request.full_url)
             if request.full_url.endswith('/embeddings'):
                 return io.BytesIO(b'{"data":[{"index":0,"embedding":[1,2]}],"usage":{"total_tokens":2}}')
-            if calls.count(request.full_url) <= 3:
+            if calls.count(request.full_url) <= 13:
                 raise urllib.error.HTTPError(request.full_url, 429, 'limited', {}, io.BytesIO(b'{}'))
             return io.BytesIO(b'{"results":[{"index":0,"relevance_score":0.9}],"usage":{"total_tokens":2}}')
         cp = {'attempts': []}; provider = self.provider()
@@ -38,6 +38,7 @@ class RequestCheckpointTests(unittest.TestCase):
         with patch('urllib.request.urlopen', side_effect=network), patch('app.evaluation_stage.time.sleep'):
             with self.assertRaises(ProviderAPIError): self.stage(cp, answer)
             restored = json.loads(json.dumps(cp))
+            reopen_blocked_requests(restored)
             self.stage(restored, answer, 'explicit-resume')
         self.assertEqual(sum(url.endswith('/embeddings') for url in calls), 1)
 
@@ -70,18 +71,18 @@ class RequestCheckpointTests(unittest.TestCase):
             self.assertEqual(request.call_count,1)
         self.assertEqual(len(checkpoint_usage(cp)),1)
 
-    def test_deepseek_rejection_is_known_and_retries_only_three_times(self):
+    def test_deepseek_rejection_is_known_and_task_recovery_is_bounded(self):
         provider = DeepSeekProvider(Settings('fixture', 'https://fixture.invalid', 'fixture'))
         def network(request, **kwargs):
             raise urllib.error.HTTPError(request.full_url, 429, 'limited', {}, io.BytesIO(b'{"error":{"code":"rate_limit"}}'))
         cp = {'attempts': []}
         with patch('urllib.request.urlopen', side_effect=network) as request, patch('app.evaluation_stage.time.sleep'):
             with self.assertRaises(ProviderAPIError): self.stage(cp, lambda: provider.complete('system', 'user'))
-        self.assertEqual(request.call_count, 3)
+        self.assertEqual(request.call_count, 13)
         self.assertFalse(cp.get('unknown_execution', {}).get('generation', False))
         self.assertFalse(cp.get('unsettled_usage', {}).get('generation', False))
 
-    def test_5xx_or_timeout_keeps_unknown_after_three_attempts(self):
+    def test_5xx_or_timeout_keeps_unknown_after_task_recovery_exhausts(self):
         for provider in (self.provider(), DeepSeekProvider(Settings('fixture', 'https://fixture.invalid', 'fixture'))):
             for fault in ('timeout', '503'):
                 def fail(*args, **kwargs):
@@ -92,7 +93,7 @@ class RequestCheckpointTests(unittest.TestCase):
                     action = (lambda: provider._post('/embeddings', {'model':'text-embedding-v4'})) if isinstance(provider, AlibabaProvider) else (lambda: provider.complete('system', 'user'))
                     with patch('urllib.request.urlopen', side_effect=fail) as request:
                         with self.assertRaises((ProviderAPIError, ProviderTimeout)): self.stage(cp, action)
-                    self.assertEqual(request.call_count, 3)
+                    self.assertEqual(request.call_count, 13)
                     self.assertTrue(cp['unknown_execution']['generation'])
 
     def test_body_timeout_preserves_received_http_headers_without_claiming_completion(self):
@@ -193,7 +194,7 @@ class FiftyQuestionMatrixTests(unittest.TestCase):
                                 record_usage({'provider':'DeepSeek','requested_model':'fixture','status':'ok','prompt_tokens':2,'completion_tokens':1})
                                 raise ProviderInvalidResponse('fixture invalid JSON' if fault=='judge_structure' else 'answer quote is missing or not located', raw_provider_response='fixture invalid response')
                             return original_judge(q,*args,**kwargs)
-                        with patch.object(self.runtime,'answer',side_effect=answer), patch.object(self.runtime,'judge',side_effect=judge), patch('urllib.request.urlopen',side_effect=network), patch('app.evaluation_stage.time.sleep'):
+                        with patch.object(self.runtime,'answer',side_effect=answer), patch.object(self.runtime,'judge',side_effect=judge), patch('urllib.request.urlopen',side_effect=network), patch('app.evaluation_stage.time.sleep'), patch('app.providers._retry_sleep'):
                             outcome = self.runner.run_candidate(cid,automatic=True)
                             source = self.store.evaluation_run(outcome['result']['evaluation_run_id'])
                             rows = self.store.evaluation_case_results(source['id']); before = deepcopy(source)
@@ -209,7 +210,7 @@ class FiftyQuestionMatrixTests(unittest.TestCase):
                                 self.assertTrue(plan['can_resume'])
                                 if plan['can_resume']:
                                     enabled[0] = False
-                                    finished = self.runner.run_candidate(cid,automatic=True)
+                                    finished = self.runner.run_candidate(cid,automatic=True,manual_resume=True)
                                     self.assertEqual(finished['result']['completed'],50)
                                     self.assertEqual(self.store.evaluation_run(source['id']),before)
                                     child = self.store.evaluation_case_results(finished['result']['evaluation_run_id'])

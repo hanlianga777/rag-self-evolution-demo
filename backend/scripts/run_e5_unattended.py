@@ -2,12 +2,10 @@
 """120b: resume E5, reconcile the task budget, and run the authorized release."""
 import fcntl
 import json
-import math
 import os
 from pathlib import Path
 import sys
 import time
-from contextlib import contextmanager
 from datetime import datetime, timezone
 from unittest.mock import patch
 from urllib.request import urlopen
@@ -15,7 +13,7 @@ from urllib.request import urlopen
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from app import governance, optimization_cycle as cycle, paid_policy, paid_run, paid_schedule, rules, verdict
+from app import governance, optimization_cycle as cycle, paid_policy, paid_schedule, rules, verdict
 from app.ai_service import AiService
 from app.composite import pipeline_config
 from app.config import load_settings
@@ -28,7 +26,7 @@ from app.knowledge_pipeline import index_for_config
 from app.optimization import load_retrieval_preview, require_retrieval_preview
 from app.paid_run import PaidRun, REQUEST_LIMITS, accounting_only, controlled_run
 from app.policy import require_gate_request_actor
-from app.providers import DeepSeekProvider, ProviderInvalidResponse, ProviderUnavailable
+from app.providers import DeepSeekProvider, ProviderBlocked, permanent_provider_error, provider_retry_scope
 from app.release_view import release_review_view
 from app.request_reuse import bypass_reuse
 
@@ -45,18 +43,10 @@ CAP = 3.0
 # Same conservative peak-price snapshot and exchange rate as the original 120b ledger.
 RATES = {'deepseek-flash': {'provider': 'DeepSeek', 'input': 0.3, 'output': 1.2,
                            'max_output': 65536, 'currency': 'USD'},
-         'text-embedding-v4': {'provider': 'Alibaba', 'input': 0.5, 'output': 0,
-                               'max_output': 0, 'currency': 'CNY'},
-         'qwen3-rerank': {'provider': 'Alibaba', 'input': 0.5, 'output': 0,
-                         'max_output': 0, 'currency': 'CNY'}}
-EXCHANGE = 6.7120
+         **paid_policy.ALIBABA_RATES}
 SAFETY = [f'Q{number:02d}' for number in range(43, 51)]
 CHANGES = [{'generation_thinking': 'low'}, {'generation_thinking': 'high'},
            {'prompt_strategy': 'Looser'}, {'prompt_strategy': 'Safe'}]
-
-
-class BudgetStop(InterruptedError):
-    pass
 
 
 def write(path, value):
@@ -68,93 +58,31 @@ def write(path, value):
     temp.replace(path)
 
 
-def charge(call):
-    if call['status'] == 'rejected':
-        return 0.0
-    estimate = call.get('estimated_cost')
-    if call['status'] == 'ok' and estimate:
-        value = estimate['amount'] / (EXCHANGE if estimate['currency'] == 'CNY' else 1)
-    else:
-        value = call['reservation_usd']
-    if not math.isfinite(value) or value < 0:
-        raise ValueError('付费账本金额无效')
-    return value
-
-
 class Budget:
     def __init__(self, directory, identity, check_identity, limits):
         path = directory / '120b.ledger.json'
-        # App recovery does not own this ledger. The policy also fails closed
-        # if a separate process tries to send requests using the ordinary policy.
-        policy = {'kind': 'e5_external_usd_cap', 'database_path': str(DB),
+        policy = {'kind': paid_policy.E5_POLICY, 'database_path': str(DB),
                   'ledger_directory': str(directory), 'budget_usd': CAP}
         if path.exists():
             stored = json.loads(path.read_text())
             if (stored['identity'] != identity or stored['price_snapshot'] != RATES
-                    or stored['output_limits'] != limits):
+                    or stored['output_limits'] != limits or stored.get('request_policy') != policy):
                 raise ValueError('付费账本身份、计价或请求上限与冻结记录不同')
-            if stored['calls'] and 'reservation_usd' not in stored['calls'][-1]:
-                last = stored['calls'][-1]
-                if last['status'] != 'reserved' or last.get('raw_response_path'):
-                    raise ValueError('无法核对最后一笔费用预留')
-                # _begin's initial reservation is persisted before the priced
-                # reservation, and transport starts only after both writes.
-                stored['calls'].pop()
-                write(path, stored)
             self.ledger = PaidRun.load_accounting(path, check_identity)
-            self.ledger.request_policy = policy
-            self.ledger.stopped = None
-            self.ledger.save()
+            self.ledger.reopen()
         else:
             self.ledger = PaidRun(path, prices=RATES, identity=identity, identity_check=check_identity,
                                   output_limits=limits, request_policy=policy)
-        self.phase = 'preflight'
+        self.ledger.phase = 'preflight'
         self.check_stop = lambda: None
-        self.failure = None
 
     def summary(self):
-        calls = self.ledger.calls
-        return {'cap_usd': CAP, 'upper_usd': round(sum(map(charge, calls)), 9),
-                'known_usd': round(sum(charge(c) for c in calls if c['status'] == 'ok' and c.get('estimated_cost')), 9),
-                'unknown_or_inflight': sum(c['status'] not in {'ok', 'rejected'} or
-                                           c['status'] == 'ok' and not c.get('estimated_cost') for c in calls),
-                'deepseek_calls': sum(c['provider'] == 'DeepSeek' for c in calls),
-                'alibaba_calls': sum(c['provider'] == 'Alibaba' for c in calls)}
-
-    def begin(self, run, provider, model, payload):
-        self.check_stop()
-        if self.failure:
-            raise self.failure
-        if run is not self.ledger or RATES.get(model, {}).get('provider') != provider:
-            raise InterruptedError('请求未绑定 E5 授权账本或模型')
-        rate = RATES[model]
-        encoded = len(json.dumps(payload, ensure_ascii=False).encode())
-        repeated = max(0, len(payload.get('documents', [])) - 1) * len(payload.get('query', '').encode())
-        output = payload['max_tokens'] if provider == 'DeepSeek' else 0
-        if type(output) is not int or not 0 <= output <= rate['max_output']:
-            raise InterruptedError('请求输出上限无效')
-        reserve = ((encoded + repeated + 1024) * rate['input'] + output * rate['output']) / 1e6
-        if rate['currency'] == 'CNY':
-            reserve /= EXCHANGE
-        if sum(map(charge, run.calls)) + reserve > CAP:
-            self.failure = BudgetStop('DeepSeek 与阿里云合计预算不足以发送下一笔请求，USD 3 上限')
-            raise self.failure
-        call = run._begin(provider, model, payload)
-        call.update(reservation_usd=reserve, e5_phase=self.phase)
-        call.pop('request_payload', None)
-        run.save()
-        return call
-
-    @contextmanager
-    def no_transport_retry(self, native, *args):
-        try:
-            with native(*args):
-                yield
-        except ProviderInvalidResponse:
-            raise  # The existing Judge and Agent format checks own their correction attempts.
-        except ProviderUnavailable as error:
-            self.failure = InterruptedError(f'Provider 调用失败：{error}')
-            raise self.failure from error
+        data = json.loads(self.ledger.path.read_text())
+        cost = paid_policy.e5_cost(data['calls'])
+        return {'cap_usd': data['request_policy']['budget_usd'],
+                'upper_usd': round(cost['budget_used_upper_usd'], 9),
+                'known_usd': round(cost['known_usd'], 9), 'unknown_or_inflight': cost['unknown'],
+                'deepseek_calls': cost['deepseek_calls'], 'alibaba_calls': cost['alibaba_calls']}
 
 
 class E5Runner(EvaluationRunner):
@@ -234,11 +162,12 @@ def restore_candidate(store, runner, baseline, candidate):
         # An older Demo marked the evaluation partial but left the candidate running.
         store.finish_candidate(candidate['id'], 'failed', {**run['result'],
             'evaluation_run_id': run_id, 'baseline_run_id': BASE, 'error': run['error_message']})
-    outcome = runner.run_candidate(candidate['id'], automatic=True)
+    outcome = runner.run_candidate(candidate['id'], automatic=True, manual_resume=True)
     if outcome['status'] != 'evaluated':
         result = store.evaluation_run(outcome['result']['evaluation_run_id'], light=True)
-        raise InterruptedError(result.get('error_message') or result['result'].get('auto_recovery', {}).get('error')
-                               or 'Sandbox 续跑未完成，断点已保存')
+        recovery = result['result'].get('auto_recovery', {})
+        error_type = ProviderBlocked if recovery.get('state') == 'blocked' else InterruptedError
+        raise error_type(result.get('error_message') or recovery.get('error') or 'Sandbox 续跑未完成，断点已保存')
 
 
 def physical_rollback(version):
@@ -286,6 +215,7 @@ class Run:
             recommendation = (self.store.recommendation(self.experiment_id) or {}).get('result', {}).get('recommended_candidate')
         write(PROGRESS, {'experiment_id': self.experiment_id, 'pid': os.getpid(),
               'updated_at': datetime.now(timezone.utc).isoformat(), 'status': status, 'step': self.phase,
+              'provider_retry': state.get('provider_retry'),
               'cycle_phase': state.get('phase'), 'round': state.get('round'),
               'active_candidate': next((c['id'] for r in rounds.values() for c in r.values() if c['status'] == 'running'), None),
               'rounds': rounds, 'staged_decision': state.get('staged_decision'),
@@ -299,7 +229,7 @@ class Run:
         cycle.check_cycle_stop(self.store, self.experiment_id)
 
     def phase_state(self, phase, **values):
-        self.phase = self.budget.phase = phase
+        self.phase = self.budget.ledger.phase = phase
         cycle._save_state(self.store, self.experiment_id, phase=phase, **values)
         self.progress()
 
@@ -490,12 +420,14 @@ class Run:
             if experiment_id == eid:
                 self.progress()
 
-        native_request = paid_run.paid_request
-        with patch.object(paid_policy, 'guarded_begin', self.budget.begin), \
-                patch.object(paid_run, 'paid_request', lambda *args: self.budget.no_transport_retry(native_request, *args)), \
-                patch.object(paid_schedule, 'unattended_authorization', lambda _: AUTH), \
+        def retry_state(status, **details):
+            cycle._save_state(store, eid, provider_retry={'state': status, **details})
+
+        with patch.object(paid_schedule, 'unattended_authorization', lambda _: AUTH), \
                 patch.object(cycle, 'unattended_authorization', lambda _: AUTH), \
-                patch.object(cycle, '_save_state', progress_save), controlled_run(self.budget.ledger):
+                patch.object(cycle, '_save_state', progress_save), controlled_run(self.budget.ledger), \
+                provider_retry_scope(self.heartbeat, retry_state):
+            paid_policy.bind_experiment(store, eid, paid_policy.current_binding())
             if state.get('status') == 'recommended' or state.get('phase') in {'final_retest', 'release', 'production_smoke'}:
                 phase = self.release(runner, baseline, snapshot)
             else:
@@ -505,16 +437,14 @@ class Run:
                                  current_round_only=False, last_error=None)
                 for candidate in store.experiment(eid, light=True)['candidates']:
                     if candidate['status'] in {'running', 'failed'}:
-                        self.budget.phase = 'sandbox'
+                        self.budget.ledger.phase = 'sandbox'
                         restore_candidate(store, runner, baseline, candidate)
                 while True:
                     plan = store.job_checkpoint(eid, '120b:probe-plan')
                     if plan and not plan['complete']:
                         self.diagnosis(runner, snapshot, plan)
-                    self.budget.phase = self.phase = 'cycle'
+                    self.budget.ledger.phase = self.phase = 'cycle'
                     state = cycle.run_until_qualified(store, runtime, eid, claimed=True)
-                    if self.budget.failure:
-                        raise self.budget.failure
                     if '需先对当前底座做生成诊断' in (state.get('last_error') or ''):
                         plan = {'winner': state['staged_decision']['winner_id'], 'complete': False}
                         store.save_job_checkpoint(eid, '120b:probe-plan', plan)
@@ -522,11 +452,14 @@ class Run:
                         continue
                     if state['status'] == 'recommended':
                         phase = self.release(runner, baseline, snapshot)
-                    elif state['status'] in {'agent_failed', 'budget_exhausted', 'round_limit'}:
+                    elif state['status'] in {'agent_failed', 'budget_exhausted', 'round_limit', 'blocked', 'stopped'}:
                         phase = state['status']
                     else:
                         raise ValueError(state.get('last_error') or f"优化循环停止于 {state['status']}")
                     break
+            if phase in {'blocked', 'stopped'}:
+                self.progress(phase, state.get('last_error'))
+                return
             self.phase_state(phase, status='recommended' if phase in {'published', 'unchanged', 'release_blocked'} else phase)
             self.progress('completed')
 
@@ -541,15 +474,13 @@ def main():
             run.progress()
             run.execute()
         except Exception as error:
-            if run.budget and run.budget.failure:
-                error = run.budget.failure
-            status = 'budget_exhausted' if isinstance(error, BudgetStop) else 'failed'
+            status = 'stopped' if isinstance(error, InterruptedError) else 'blocked' if permanent_provider_error(error) else 'failed'
             message = str(error)
             if run.owns_cycle:
                 cycle._save_state(run.store, run.experiment_id, status=status, last_error=message)
             run.progress(status, message)
             print(f'{status}: {message}', flush=True)
-            return 0 if status == 'budget_exhausted' else 1
+            return 1
     return 0
 
 

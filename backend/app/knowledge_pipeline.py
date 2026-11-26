@@ -27,7 +27,8 @@ from . import rules
 from .corpus import EMBEDDING_MODEL, source_fingerprint, _split_long_part
 from .full_text import CORPUS_LOCK, checksum, validate_bundle, write_full_text
 from .providers import (ProviderUnavailable, ProviderAPIError, ProviderTimeout, ProviderNetworkError,
-                        ProviderRequestError, ProviderInvalidResponse, redact_provider_error, request_timeout, request_with_retries)
+                        ProviderRequestError, ProviderInvalidResponse, redact_provider_error, request_timeout, save_paid_response,
+                        transient_provider_error)
 
 CONFIG = {'parser': 'MinerU', 'parser_mode': 'vlm', 'table_normalize': 'table-kv-v1',
           'chunk_strategy': 'Parent-Child', 'parent_tokens': 1400, 'child_tokens': 400,
@@ -897,7 +898,11 @@ def expand_parents(hits, parents, top_k):
 
 
 class AlibabaProvider:
-    def __init__(self, values=None): self.values = settings() if values is None else values
+    def __init__(self, values=None, *, ledger_database=None):
+        from .config import accounting_database
+
+        self.values = settings() if values is None else values
+        self.ledger_database = accounting_database(self.values) if values is None else ledger_database
 
     def _post(self, path, payload, *, validate=None):
         from .paid_run import paid_request
@@ -905,7 +910,7 @@ class AlibabaProvider:
             raise ProviderRequestError('Alibaba Key / business-space endpoint missing')
         def send_request():
             request_timeout(60)  # Deadline check precedes any payment reservation.
-            with paid_request('Alibaba',payload['model'],payload):
+            with paid_request('Alibaba',payload['model'],payload,database_path=self.ledger_database):
                 body=self._post_request(path,payload)
                 if validate:
                     try:validate(body)
@@ -915,9 +920,8 @@ class AlibabaProvider:
                         raise failure from error
                 return body
         from .evaluation_stage import checkpoint_request
-        def send():
-            return checkpoint_request('Alibaba',payload['model'],self.values['DASHSCOPE_BASE_URL'].rstrip('/')+path,payload,send_request)
-        return request_with_retries(send)
+        return checkpoint_request('Alibaba',payload['model'],self.values['DASHSCOPE_BASE_URL'].rstrip('/')+path,
+                                  payload,send_request,transport_retry=True)
 
     def _post_request(self, path, payload):
         key = self.values.get('DASHSCOPE_API_KEY', '').strip()
@@ -935,14 +939,14 @@ class AlibabaProvider:
                 response_text=response.read().decode('utf-8')
                 body=json.loads(response_text)
                 if not isinstance(body,dict):raise ProviderInvalidResponse('阿里云响应不是对象',raw_provider_response=redact_provider_error(response_text,key))
-        except (OSError, http.client.HTTPException, json.JSONDecodeError, ProviderInvalidResponse) as error:
+        except (OSError, EOFError, http.client.HTTPException, json.JSONDecodeError, ProviderInvalidResponse) as error:
             status=error.code if isinstance(error,urllib.error.HTTPError) else None
             raw=None
             if status:
                 try:raw=redact_provider_error(error.read(65536).decode('utf-8',errors='replace'),key)
                 finally:error.close()
             # Only explicit rejection responses prove that no request result was produced.
-            rejected=status in {400,401,403,404,413,422,429}
+            rejected=status in {400,401,402,403,404,413,422,429}
             metadata={'provider':'Alibaba','model':payload['model'],'http_status':status or received_status,
                       'http_response_received':bool(status) or response_received,
                       'request_id':error.headers.get('x-request-id') if status and error.headers else request_id,
@@ -964,12 +968,14 @@ class AlibabaProvider:
             record_usage({'provider':'Alibaba','requested_model':payload['model'],'call_started_at':call_started_at,
                 'status':'rejected' if rejected else 'unknown','latency_ms':round((time.perf_counter()-started)*1000),
                 **metadata,'provider_code':getattr(failure,'provider_code',None),'detail':str(failure)})
+            if isinstance(failure, ProviderNetworkError):
+                failure.transport_retryable = transient_provider_error(error)
             raise failure from None
         # Local accounting/storage failures must never resend a successful RPC.
-        record_usage({**(body.get('usage') if isinstance(body.get('usage'),dict) else {}), 'provider':'Alibaba', 'requested_model':payload['model'], 'call_started_at':call_started_at, 'status':'ok', 'latency_ms':round((time.perf_counter()-started)*1000),
-            'request_sha256':hashlib.sha256(request.data).hexdigest(),'request_id':body.get('request_id') or request_id})
-        from .paid_run import current_paid_run
-        if current_paid_run(): current_paid_run().response(body)
+        save_paid_response(body, {**(body.get('usage') if isinstance(body.get('usage'),dict) else {}),
+            'provider':'Alibaba', 'requested_model':payload['model'], 'call_started_at':call_started_at, 'status':'ok',
+            'latency_ms':round((time.perf_counter()-started)*1000), 'request_sha256':hashlib.sha256(request.data).hexdigest(),
+            'request_id':body.get('request_id') or request_id})
         return body
 
     def embed(self, texts, dimension):
@@ -1105,9 +1111,11 @@ class KnowledgePipeline:
 
     def build(self, documents, values=None, *, progress=lambda *args: None, parser=None, embedder=None, counter=None, chunk_version='parent-child-v1'):
         import faiss
+        from .config import accounting_database
         from .governance import GENERATION_PROFILES
         from .golden_v2 import build_plan
-        values = settings() if values is None else values
+        configured = values is None
+        values = settings() if configured else values
         if not documents: raise ValueError('Corpus has no source documents')
         if parser is None and provider_status(values)['mineru'] == 'missing': raise ProviderUnavailable('MinerU Token missing')
         if embedder is None and (not values.get('DASHSCOPE_API_KEY') or not values.get('DASHSCOPE_BASE_URL')): raise ProviderUnavailable('Alibaba Key / business-space endpoint missing')
@@ -1125,7 +1133,8 @@ class KnowledgePipeline:
         if any(not value for value in identity['sources'].values()): raise ValueError('Source PDF missing')
         operation_id = 'KNOW-' + datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')
         staging = self.index_dir.parent/'index_versions'/(operation_id + '-building'); staging.mkdir(parents=True)
-        parser = parser or MinerUProvider(values); embedder = embedder or AlibabaProvider(values)
+        parser = parser or MinerUProvider(values)
+        embedder = embedder or AlibabaProvider(values, ledger_database=accounting_database(values) if configured else None)
         parents, children, records, pages = [], [], [], []
         previous_volumes = {}
         if chunk_version == 'parent-child-v2':

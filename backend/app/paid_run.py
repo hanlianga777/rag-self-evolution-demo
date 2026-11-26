@@ -1,5 +1,6 @@
 """Serial request accounting, retaining unknown charges across bounded retries."""
 import hashlib
+import fcntl
 import json
 import math
 import os
@@ -15,6 +16,10 @@ _task = ContextVar('controlled_provider_task',default=None)
 _accounting = ContextVar('evaluation_accounting_only',default=False)
 REQUEST_LIMITS = {'business_audit':16384,'qc':16384,'answerability':12288,'negative_subtype':8192,
                   'answer':65536,'judge':65536,'agent':32768,'query':16384,'revision':16384}
+
+
+def _now():
+    return datetime.now(timezone.utc).isoformat()
 
 
 class PaidRun:
@@ -36,11 +41,20 @@ class PaidRun:
 
     def save(self):
         temporary = self.path.with_suffix(self.path.suffix+'.tmp')
+        bounds = [call.get('upper_estimate_yuan') if call.get('upper_estimate_yuan') is not None
+                  else call.get('reserved_yuan') for call in self.calls]
         data = {'identity':self.identity, 'budget_yuan':self.budget, 'price_snapshot':self.prices,
-                'spent_yuan':self.spent, 'budget_enforcement':bool(getattr(self,'request_policy',None) and self.request_policy.get('budget_usd') is not None), 'available_yuan':None,
-                'cost_unknown':any(c['status'] not in {'ok','rejected'} or c['status']=='ok' and c.get('upper_estimate_yuan') is None for c in self.calls),
+                'spent_yuan':self.spent, 'budget_used_upper_yuan':sum(bounds) if None not in bounds else None,
+                'budget_enforcement':bool(getattr(self,'request_policy',None) and self.request_policy.get('budget_usd') is not None), 'available_yuan':None,
+                'cost_unknown':any(c['status'] not in {'ok','rejected'} or c['status']=='ok'
+                                   and c.get('upper_estimate_yuan') is None for c in self.calls),
                 'stopped':self.stopped, 'calls':self.calls,'output_limits':self.output_limits,'stages':self.stages}
-        if getattr(self,'request_policy',None):data['request_policy']=self.request_policy
+        if self.request_policy:
+            from .paid_policy import E5_POLICY, e5_cost
+            data['request_policy'] = self.request_policy
+            if self.request_policy['kind'] == E5_POLICY:
+                upper = e5_cost(self.calls)['budget_used_upper_usd']
+                data.update(budget_used_upper_usd=upper, remaining_usd=max(0, self.request_policy['budget_usd']-upper))
         with temporary.open('w') as stream:
             json.dump(data,stream,ensure_ascii=False,indent=2); stream.flush(); os.fsync(stream.fileno())
         os.replace(temporary,self.path)
@@ -49,8 +63,59 @@ class PaidRun:
         finally: os.close(descriptor)
 
     def stop(self, reason):
-        self.stopped = self.stopped or reason
-        self.save()
+        with self.transaction(cancellable=False):
+            self.stopped = self.stopped or reason
+            self.save()
+
+    @contextmanager
+    def transaction(self, *, cancellable=True):
+        """One process owns a paid policy ledger through settlement of each send."""
+        if not self.request_policy:
+            yield
+            return
+        from .providers import ProviderRequestError, check_provider_stop
+        import time
+        with self.path.with_suffix('.lock').open('a') as lock:
+            while True:
+                if cancellable:
+                    check_provider_stop()
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    time.sleep(1)
+            try:
+                data = json.loads(self.path.read_text())
+                if (data['identity'], data['price_snapshot'], data.get('request_policy'), data.get('output_limits')) != (
+                        self.identity, self.prices, self.request_policy, self.output_limits):
+                    raise ProviderRequestError('费用账本身份、价格、授权或请求上限已变化')
+                if not isinstance(data['calls'], list) or any(not isinstance(call, dict) or 'status' not in call for call in data['calls']):
+                    raise ValueError('invalid calls')
+                self.calls, self.spent, self.stopped = data['calls'], data['spent_yuan'], data.get('stopped')
+                self.stages = data.get('stages', [])
+                self._retire_reserved()
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                raise ProviderRequestError('费用账本缺失或损坏，请核对原账本') from error
+            yield
+
+    def reopen(self):
+        """An explicit resume reopens the same authorization and balance."""
+        with self.transaction():
+            self._verify_identity()
+            if self.stopped:
+                self.stages.append({'resume_at': _now(), 'previous_stop': self.stopped})
+                self.stopped = None
+            self.save()
+
+    def _verify_identity(self):
+        from .providers import ProviderIdentityError
+
+        try:
+            matches = self.identity_check is not None and self.identity_check() == self.identity
+        except (ValueError, OSError) as error:
+            raise ProviderIdentityError(f'费用账本身份无法核对：{error}') from error
+        if not matches:
+            raise ProviderIdentityError('Paid run identity unavailable or changed')
 
     @classmethod
     def next_stage(cls,path,stage,identity_check,*,authorization=None,budget_yuan=None):
@@ -58,7 +123,7 @@ class PaidRun:
         path=Path(path);data=json.loads(path.read_text())
         if identity_check()!=data['identity']: raise RuntimeError('Paid continuation identity changed')
         stages=data.get('stages',[])
-        if stage in [s['stage'] for s in stages]: raise RuntimeError('Paid stage already claimed; no duplicate execution')
+        if stage in [s.get('stage') for s in stages]: raise RuntimeError('Paid stage already claimed; no duplicate execution')
         run=cls.__new__(cls)
         run.path,run.budget,run.prices=path,data['budget_yuan'],data['price_snapshot']
         run.identity,run.identity_check=data['identity'],identity_check
@@ -80,9 +145,19 @@ class PaidRun:
         return run
 
     def _retire_reserved(self):
-        for call in self.calls:
+        from .paid_policy import E5_POLICY
+        for index, call in enumerate(self.calls):
             if call.get('status') == 'reserved':
-                call.update(status='unknown', upper_estimate_yuan=None, recovery_reason='previous worker ended before settlement')
+                # The old E5 runner wrote the unpriced reservation before saving
+                # the USD bound, and only then allowed HTTP to start.
+                old_unpriced = ((self.request_policy or {}).get('kind') == E5_POLICY
+                                and index == len(self.calls)-1 and 'reservation_usd' not in call
+                                and not call.get('raw_response_path'))
+                if not call.get('sent_at') and (call.get('reserved_at') or old_unpriced):
+                    call.update(status='rejected', upper_estimate_yuan=0., settlement='not_sent', settled_at=_now())
+                else:
+                    call.update(status='unknown', upper_estimate_yuan=None, recovery_reason='previous worker ended before settlement',
+                                settled_at=_now())
 
     def begin(self, provider, model, payload):
         if getattr(self,'request_policy',None):
@@ -90,24 +165,12 @@ class PaidRun:
             return guarded_begin(self,provider,model,payload)
         return self._begin(provider,model,payload)
 
-    def _begin(self, provider, model, payload):
-        if _accounting.get():
-            if self.stopped: raise RuntimeError('Paid run stopped: '+self.stopped)
-            request_hash = hashlib.sha256(json.dumps(payload,ensure_ascii=False).encode()).hexdigest()
-            if any(call['status']=='reserved' for call in self.calls):
-                raise RuntimeError('Serial paid run already has an in-flight request')
-            if self.identity_check is None or self.identity_check()!=self.identity:raise RuntimeError('Paid run identity unavailable or changed')
-            call={'provider':provider,'model':model,'status':'reserved','reserved_yuan':0.,'upper_estimate_yuan':None,
-                  'request_sha256':request_hash,'request_payload':payload,
-                  'started_at':datetime.now(timezone.utc).isoformat(),'task':_task.get(),'max_tokens':payload.get('max_tokens'),
-                  'accounting_only':True}
-            self.calls.append(call);self.save();return call
-        if self.stopped: raise RuntimeError('Paid run stopped: '+self.stopped)
+    def _begin(self, provider, model, payload, **reservation):
+        from .providers import ProviderRequestError
+        if self.stopped: raise ProviderRequestError('Paid run stopped: '+self.stopped)
         if any(call['status']=='reserved' for call in self.calls):
-            raise RuntimeError('Serial paid run already has an in-flight request')
-        request_hash = hashlib.sha256(json.dumps(payload,ensure_ascii=False).encode()).hexdigest()
-        if self.identity_check is None or self.identity_check() != self.identity:
-            raise RuntimeError('Paid run identity unavailable or changed')
+            raise ProviderRequestError('Serial paid run already has an in-flight request')
+        self._verify_identity()
         rate = self.prices.get(model)
         if rate and (rate.get('provider') != provider or any(type(rate.get(key)) not in (int,float) or not math.isfinite(rate[key]) or rate[key]<0 for key in ('input','output','max_output'))):
             rate = None
@@ -115,35 +178,30 @@ class PaidRun:
         repeated_query = (max(0,len(payload.get('documents',[]))-1)*len(str(payload.get('query','')).encode())) if provider=='Alibaba' else 0
         # UTF-8 bytes plus framing allowance conservatively bound input tokens.
         bound = payload.get('max_tokens',rate['max_output'] if rate else None)
-        if bound is not None and (type(bound) is not int or bound<0 or rate and bound>rate['max_output']): raise RuntimeError('Invalid output budget bound')
+        if bound is not None and (type(bound) is not int or bound<0 or rate and bound>rate['max_output']):
+            raise ProviderRequestError('Invalid output budget bound')
         if bound is not None and self.output_limits and _task.get() in self.output_limits and bound>self.output_limits[_task.get()]:
-            raise RuntimeError('Frozen task output limit exceeded')
+            raise ProviderRequestError('Frozen task output limit exceeded')
         reserved = ((len(encoded)+repeated_query+1024)*rate['input'] + bound*rate['output'])/1_000_000 if rate else None
         currency=rate.get('currency','CNY') if rate else None
+        stamp = _now()
         call = {'provider':provider,'model':model,'status':'reserved','reserved_yuan':reserved if currency=='CNY' else None,
                 'reservation_estimate':{'amount':reserved,'currency':currency} if reserved is not None else None,
-                'request_sha256':hashlib.sha256(encoded).hexdigest(),'started_at':datetime.now(timezone.utc).isoformat(),
-                'task':_task.get(),'max_tokens':payload.get('max_tokens')}
+                'request_sha256':hashlib.sha256(encoded).hexdigest(),'started_at':stamp,'reserved_at':stamp,
+                'task':_task.get(),'max_tokens':payload.get('max_tokens'), **reservation}
+        if _accounting.get():
+            call.update(accounting_only=True)
+            if not self.request_policy:
+                call['request_payload'] = payload
         self.calls.append(call); self.save()
         return call
 
     def settle(self, call, usage):
+        if call['status'] != 'reserved': raise RuntimeError('Duplicate payment Usage')
+        call['settled_at'] = _now()
         if usage.get('status')=='rejected' and usage.get('request_execution_unknown') is False:
             call.update(status='rejected',usage=usage,upper_estimate_yuan=0.,settlement='provider_confirmed_rejection')
             self.save();return
-        if call.get('accounting_only'):
-            call['usage']=usage
-            prompt=usage.get('prompt_tokens',usage.get('total_tokens'));output=usage.get('completion_tokens',0 if call['provider']=='Alibaba' else None)
-            valid=usage.get('status')=='ok' and usage.get('provider')==call['provider'] and usage.get('requested_model')==call['model'] and all(type(v) is int and v>=0 for v in (prompt,output))
-            rate=self.prices.get(call['model'],{})
-            priced=valid and rate.get('provider')==call['provider'] and all(type(rate.get(k)) in (int,float) and math.isfinite(rate[k]) and rate[k]>=0 for k in ('input','output'))
-            amount=(prompt*rate['input']+output*rate['output'])/1_000_000 if priced else None
-            currency=rate.get('currency','CNY')
-            call.update(status='ok' if valid else 'unknown',upper_estimate_yuan=amount if currency=='CNY' else None,
-                        estimated_cost={'amount':amount,'currency':currency} if amount is not None else None)
-            if amount is not None and currency=='CNY':self.spent+=amount
-            self.save();return
-        if call['status'] != 'reserved': raise RuntimeError('Duplicate payment Usage')
         call['usage'] = usage
         prompt = usage.get('prompt_tokens',usage.get('total_tokens'))
         output = usage.get('completion_tokens',0 if call['provider']=='Alibaba' else None)
@@ -172,9 +230,14 @@ class PaidRun:
         call = _ticket.get()
         if call is None: return
         path = self.path.parent/f'{self.path.stem}-response-{len(self.calls):04d}.json'
-        with path.open('x') as stream:
-            json.dump(body,stream,ensure_ascii=False);stream.flush();os.fsync(stream.fileno())
-        call['raw_response_path'] = str(path)
+        try:
+            with path.open('x') as stream:
+                json.dump(body,stream,ensure_ascii=False);stream.flush();os.fsync(stream.fileno())
+        except OSError as error:
+            error.provider_blocked = True
+            call['response_save_error'] = str(error)
+            raise
+        call.update(raw_response_path=str(path), response_saved_at=_now())
         self.save()
 
 
@@ -199,26 +262,43 @@ def controlled_run(run):
 
 
 @contextmanager
-def paid_request(provider, model, payload):
+def paid_request(provider, model, payload, *, database_path=None):
     run = current_paid_run()
-    if run is None:
+    if run is None and database_path is None:
         yield
         return
-    token = None
+    from .providers import ProviderIdentityError, check_provider_stop, permanent_provider_error
+    standalone = run is None
+    if standalone:
+        from .paid_policy import standalone_ledger
+        try:
+            run = standalone_ledger(database_path)
+        except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
+            raise ProviderIdentityError('费用账本缺失或损坏，请核对原账本') from error
+    scope = _run.set(run)
     try:
-        call = run.begin(provider,model,payload)
-        token = _ticket.set(call)
-        yield
-        if call['status']=='reserved':
-            call.update(status='unknown', settlement='usage_missing');run.save()
-    except Exception as error:
-        if token is not None and call['status']=='reserved':
-            call.update(status='unknown',error_type=type(error).__name__);run.save()
-        from .providers import permanent_provider_error
-        if permanent_provider_error(error):run.stop(type(error).__name__)
-        raise
+        with run.transaction():
+            check_provider_stop()
+            call = run.begin(provider,model,payload)
+            token = _ticket.set(call)
+            try:
+                check_provider_stop()
+                call['sent_at'] = _now()
+                run.save()
+                yield
+            except Exception as error:
+                call['error_type'] = type(error).__name__
+                if not standalone and permanent_provider_error(error):
+                    run.stopped = run.stopped or type(error).__name__
+                run.save()
+                raise
+            finally:
+                _ticket.reset(token)
+                if call['status'] == 'reserved':
+                    run._retire_reserved()
+                    run.save()
     finally:
-        if token is not None: _ticket.reset(token)
+        _run.reset(scope)
 
 
 def payment_usage(usage):

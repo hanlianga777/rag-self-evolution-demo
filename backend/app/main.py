@@ -2034,7 +2034,7 @@ def run_candidate(candidate_id: str, payload: PaidActionRequest | None = None):
             require_idle_cycle(experiment)
     runner = EvaluationRunner(store, ai_service)
     try:
-        run_id, approved, config, candidate, baseline = runner.start_candidate(candidate_id,automatic=True)
+        run_id, approved, config, candidate, baseline = runner.start_candidate(candidate_id,automatic=True,manual_resume=True)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     threading.Thread(target=contextvars.copy_context().run, args=(runner.execute_candidate,run_id, approved, config, candidate, baseline), daemon=True).start()

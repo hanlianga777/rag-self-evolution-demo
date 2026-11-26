@@ -5,6 +5,8 @@ from contextvars import ContextVar
 from contextlib import contextmanager
 import http.client
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+import errno
 import math
 import socket
 import ssl
@@ -105,6 +107,40 @@ def safe_response_text(raw):
 
 _stage_deadline = ContextVar('evaluation_stage_deadline', default=None)
 _stage_control = ContextVar('evaluation_stage_control',default=None)
+_retry_scope = ContextVar('provider_retry_scope', default=None)
+
+
+@contextmanager
+def provider_retry_scope(check_stop, on_state):
+    token = _retry_scope.set((check_stop, on_state))
+    try:
+        yield
+    finally:
+        _retry_scope.reset(token)
+
+
+def check_provider_stop(check_stop=None):
+    scope = _retry_scope.get()
+    if scope:
+        scope[0]()
+    if check_stop:
+        check_stop()
+    elif control := _stage_control.get():
+        control[1]()
+
+
+def save_paid_response(body, usage):
+    from .paid_run import current_paid_run
+
+    try:
+        try:
+            if run := current_paid_run():
+                run.response(body)
+        finally:
+            record_usage(usage)
+    except OSError as error:
+        error.provider_blocked = True
+        raise
 
 @contextmanager
 def stage_deadline(deadline, *, automatic=False, check_stop=lambda:None):
@@ -144,6 +180,14 @@ class ProviderAPIError(ProviderUnavailable):
         super().__init__(message)
 
 class ProviderRequestError(ProviderUnavailable):
+    pass
+
+
+class ProviderIdentityError(ProviderRequestError, ValueError):
+    pass
+
+
+class ProviderBlocked(ProviderUnavailable):
     pass
 
 
@@ -188,10 +232,10 @@ def permanent_provider_error(error):
     seen=set()
     while error is not None and id(error) not in seen:
         seen.add(id(error))
-        if isinstance(error,ProviderRequestError):return True
+        if isinstance(error,(ProviderRequestError, ProviderBlocked)) or getattr(error, 'provider_blocked', False):return True
         if isinstance(error,(ProviderAPIError,urllib.error.HTTPError)):
-            code=getattr(error,'provider_code',None)
-            if any(term in str(code).lower().replace('_','') for term in ('insufficientbalance','insufficientquota','invalidapikey','arrearage','accessdenied')):return True
+            detail = re.sub(r'[\W_]+', '', str(error).lower())
+            if any(term in detail for term in ('insufficientbalance','insufficientquota','invalidapikey','arrearage','accessdenied','余额不足','欠费')):return True
             status=getattr(error,'status_code',None) or getattr(error,'code',None)
             return status in {400,401,402,403}
         error=error.__cause__
@@ -207,11 +251,17 @@ def transient_provider_error(error):
         if isinstance(error,ProviderInvalidResponse):return False
         if isinstance(error,(ProviderAPIError,urllib.error.HTTPError)):
             status=getattr(error,'status_code',None) or getattr(error,'code',None)
-            return type(status) is int and (status in {408,429} or 500<=status<600)
-        if isinstance(error,(ProviderTimeout,TimeoutError,http.client.HTTPException,ConnectionError,ssl.SSLError)):return True
+            return status in {408, 429, 500, 502, 503, 504}
         if isinstance(error,urllib.error.URLError):
-            return not isinstance(error.reason,socket.gaierror) or error.reason.errno!=socket.EAI_NONAME
-        if isinstance(error,ProviderNetworkError):return True
+            error = error.reason
+            if not isinstance(error, BaseException):
+                return False
+            continue
+        if isinstance(error,socket.gaierror):return error.errno == socket.EAI_AGAIN
+        if isinstance(error,ssl.SSLCertVerificationError):return False
+        if isinstance(error,(ProviderTimeout,TimeoutError,http.client.IncompleteRead,http.client.RemoteDisconnected,ConnectionError,ssl.SSLError,EOFError)):return True
+        if isinstance(error,OSError):return error.errno in {errno.ECONNRESET, errno.ECONNABORTED, errno.ETIMEDOUT, errno.EPIPE}
+        if isinstance(error,ProviderNetworkError) and error.__cause__ is None:return getattr(error, 'transport_retryable', True)
         error=error.__cause__
     return False
 
@@ -226,20 +276,121 @@ def retryable_error(error):
     return transient_provider_error(original)
 
 
-def request_with_retries(action):
-    """One RPC, three attempts at most; each action owns its Usage/checkpoint."""
-    for attempt in range(3):
-        control=_stage_control.get()
-        if control:control[1]()
-        try:return action()
+_REQUEST_DELAYS = (5, 15, 30)
+_TASK_DELAYS = (60, 120, 300, 600)
+_TASK_WAIT_LIMIT = 3600
+_RESUME_HINT = '排除所列故障后，使用原实验和授权从断点手动续跑'
+
+
+def _retry_after(error, default):
+    while error is not None:
+        if isinstance(error, ProviderAPIError) and error.status_code == 429:
+            value = error.retry_after
+            try:
+                seconds = float(value)
+            except (TypeError, ValueError):
+                try:
+                    seconds = parsedate_to_datetime(value).timestamp() - time.time()
+                except (TypeError, ValueError, OverflowError, AttributeError):
+                    return default
+            return min(120, max(0, seconds)) if math.isfinite(seconds) else default
+        error = error.__cause__
+    return default
+
+
+def _retry_sleep(seconds, check_stop):
+    if not check_stop and not _retry_scope.get() and not _stage_control.get():
+        time.sleep(seconds)
+        return
+    for _ in range(math.ceil(seconds)):
+        check_provider_stop(check_stop)
+        tick = min(seconds, 1)
+        time.sleep(tick)
+        seconds -= tick
+    check_provider_stop(check_stop)
+
+
+def request_with_retries(action, *, transport=None, check_stop=None, on_state=None):
+    """One counter for the original send, request retries, and checkpoint recovery."""
+    scope = _retry_scope.get()
+    task = transport is not None or scope is not None
+    transport = {} if transport is None else transport
+
+    def update(state):
+        transport['state'] = state
+        details = {key: value for key, value in transport.items() if key != 'state'}
+        if on_state:
+            on_state(state, **details)
+        if scope and state in {'retry_wait', 'recovering', 'recovered', 'blocked'}:
+            scope[1](state, **details)
+
+    def block(error):
+        error.provider_blocked = True
+        transport.update(error=str(error), resume_hint=_RESUME_HINT)
+        update('blocked')
+
+    def schedule(error=None):
+        attempt = transport['request_attempt_count']
+        if attempt <= len(_REQUEST_DELAYS):
+            delay = _retry_after(error, _REQUEST_DELAYS[attempt-1])
+            state = 'request_retry'
+        else:
+            waited = transport.get('task_wait_seconds', 0)
+            if not task or waited >= _TASK_WAIT_LIMIT:
+                return None
+            index = transport.get('task_recovery_count', 0)
+            delay = min(_TASK_DELAYS[min(index, len(_TASK_DELAYS)-1)], _TASK_WAIT_LIMIT-waited)
+            transport.update(task_recovery_count=index+1, task_wait_seconds=waited+delay)
+            state = 'retry_wait'
+        transport.update(retry_delay_seconds=delay, resume_at=time.time()+delay)
+        update(state)
+        return delay
+
+    # A worker can exit after recording the send and before recording its outcome.
+    delay = None
+    if transport.get('state') == 'sending':
+        delay = schedule()
+        if delay is None:
+            block(ProviderBlocked('Provider 请求恢复次数已用完'))
+    while True:
+        check_provider_stop(check_stop)
+        if transport.get('state') == 'blocked':
+            raise ProviderBlocked(f"{transport['error']}；{transport['resume_hint']}")
+        state = transport.get('state')
+        if state in {'request_retry', 'retry_wait'}:
+            _retry_sleep(delay if delay is not None else max(0, transport['resume_at']-time.time()), check_stop)
+            if state == 'retry_wait':
+                if _stage_deadline.get() is not None:
+                    _stage_deadline.set(time.monotonic()+600)
+                update('recovering')
+        check_provider_stop(check_stop)
+        transport.pop('resume_at', None)
+        transport['request_attempt_count'] = transport.get('request_attempt_count', 0)+1
+        update('sending')
+        try:
+            result = action()
         except Exception as error:
-            if not transient_provider_error(error):raise
-            metadata={**(getattr(error,'response_metadata',None) or {}),'request_attempt_count':attempt+1}
-            error.response_metadata=metadata
-            if attempt==2:
-                error.provider_retry_exhausted=True
+            if permanent_provider_error(error):
+                block(error)
                 raise
-            time.sleep((5,15)[attempt])
+            if not transient_provider_error(error):
+                if isinstance(error, ProviderUnavailable) and not isinstance(error, ProviderInvalidResponse):
+                    block(error)
+                    raise
+                update('ended')
+                raise
+            count = transport['request_attempt_count']
+            error.response_metadata = {**(getattr(error, 'response_metadata', None) or {}), 'request_attempt_count': count}
+            transport['error'] = str(error)
+            delay = schedule(error)
+            if delay is None:
+                error.provider_retry_exhausted = True
+                block(error)
+                raise
+        else:
+            if transport.get('task_recovery_count'):
+                update('recovered')
+            return result
 
 
 class DeepSeekProvider:
@@ -303,12 +454,13 @@ class DeepSeekProvider:
             _response_metadata.set({})
             started=datetime.now(timezone.utc).isoformat()
             request_timeout(self.settings.timeout_seconds)
-            with paid_request('DeepSeek',self.settings.model,json.loads(request.data)):
+            with paid_request('DeepSeek',self.settings.model,json.loads(request.data),
+                              database_path=getattr(self.settings, 'accounting_database', None)):
                 try:
                     return self._complete_request(request,stream)
                 except ProviderUnavailable as error:
                     if not _response_metadata.get().get('usage'):
-                        rejected=isinstance(error,ProviderAPIError) and error.status_code in {400,401,403,404,413,422,429}
+                        rejected=isinstance(error,ProviderAPIError) and error.status_code in {400,401,402,403,404,413,422,429}
                         error.request_execution_unknown=not rejected
                         received=_response_metadata.get()
                         error.response_metadata={**received,**(getattr(error,'response_metadata',None) or {}),
@@ -318,7 +470,7 @@ class DeepSeekProvider:
                         record_usage({'provider':'DeepSeek','requested_model':self.settings.model,'status':'rejected' if rejected else 'unknown',
                             'call_started_at':started,**thinking_config(),**error.response_metadata})
                     raise
-        action = lambda: request_with_retries(lambda:checkpoint_request('DeepSeek',self.settings.model,request.full_url,json.loads(request.data),send,reuse=_task.get()!='judge'))
+        action = lambda: checkpoint_request('DeepSeek',self.settings.model,request.full_url,json.loads(request.data),send,reuse=_task.get()!='judge',transport_retry=True)
         if _task.get() == 'judge':
             return action()  # Cache only the validated judgment, never a raw invalid reply.
         from .request_reuse import reuse_result
@@ -381,7 +533,7 @@ class DeepSeekProvider:
             raise ProviderNetworkError(f"DeepSeek 网络错误（{type(error.reason).__name__}）") from error
         except (TimeoutError, socket.timeout) as error:
             raise ProviderTimeout("DeepSeek 请求超时，请重试") from error
-        except (http.client.HTTPException, OSError) as error:
+        except (http.client.HTTPException, OSError, EOFError) as error:
             partial=getattr(error,'partial',b'')
             raw=partial.decode('utf-8',errors='replace') if isinstance(partial,bytes) else str(partial)
             if not stream:
@@ -389,7 +541,7 @@ class DeepSeekProvider:
                 except (ValueError,TypeError):raise ProviderNetworkError(f"DeepSeek 连接中断（{type(error).__name__}）",raw_provider_response=safe_response_text(raw)) from error
                 if not isinstance(body,dict) or not body.get('choices'):raise ProviderNetworkError('DeepSeek连接中断，响应不完整',raw_provider_response=safe_response_text(raw)) from error
                 body['_transport_recovery']='complete_json_after_incomplete_read';ttft_ms=None
-            else:raise ProviderNetworkError(f"DeepSeek 连接中断（{type(error).__name__}）",raw_provider_response=''.join(raw_events),metadata={'partial_usage':locals().get('usage')}) from error
+            else:raise ProviderNetworkError(f"DeepSeek 连接中断（{type(error).__name__}）",raw_provider_response=''.join(locals().get('raw_events', [])),metadata={'partial_usage':locals().get('usage')}) from error
         except json.JSONDecodeError as error:
             raise ProviderInvalidResponse("DeepSeek 返回无效 JSON",raw_provider_response="".join(raw_events) if stream else safe_response_text(locals().get("raw_body"))) from error
         body = without_reasoning(body)
@@ -398,8 +550,7 @@ class DeepSeekProvider:
         elapsed_ms = round((time.perf_counter()-started_at)*1000)
         request_parameters={key:value for key,value in json.loads(request.data).items() if key != 'messages'}
         usage = {**usage,**thinking_config(),'request_parameters':request_parameters,'response_model':body.get('model'),'requested_model':self.settings.model,'call_started_at':call_started_at,'provider':'DeepSeek','status':'ok','latency_ms':elapsed_ms,'request_sha256':hashlib.sha256(request.data).hexdigest(),'request_id':body.get('id')}
-        if run is not None:run.response(body)
-        record_usage(usage)
+        save_paid_response(body, usage)
         _response_metadata.set({**_response_metadata.get(),'usage':usage,'request_id':body.get('id')})
         metadata={**_response_metadata.get(),'response_model':body.get('model'),**thinking_config(),'finish_reason':(body.get('choices') or [{}])[0].get('finish_reason'),'usage':usage,'transport_recovery':body.get('_transport_recovery'),'request_id':body.get('id')}
         _response_metadata.set(metadata)

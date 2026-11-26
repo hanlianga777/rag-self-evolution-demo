@@ -23,16 +23,16 @@ class SandboxFailureTests(unittest.TestCase):
         wrapped=RetrievalUnavailable('vector_search',caught.exception)
         self.assertEqual(wrapped.status_code,429)
         self.assertNotIn('本地模型',str(wrapped))
-    def test_timeout_keeps_unknown_billing_after_three_attempts(self):
+    def test_timeout_keeps_unknown_billing_after_task_recovery_exhausts(self):
         checkpoint={'attempts':[]}
         with patch('urllib.request.urlopen',side_effect=TimeoutError('fixture-secret')) as request:
             with self.assertRaises(ProviderTimeout):
                 perform_stage(checkpoint,'generation',lambda:self.provider()._post('/embeddings',{'model':'text-embedding-v4'}),'run',automatic=True,check_stop=lambda:None,on_state=lambda *a,**kw:None)
-        self.assertEqual(request.call_count,3)
+        self.assertEqual(request.call_count,13)
         self.assertTrue(checkpoint['unknown_execution']['generation'])
         self.assertTrue(checkpoint['attempts'][0]['request_execution_unknown'])
     def test_confirmed_rejection_is_bounded_and_permanent_auth_not_retried(self):
-        for status,code,expected in [(429,'Throttling',3),(401,'InvalidApiKey',1),(429,'insufficient_quota',1)]:
+        for status,code,expected in [(429,'Throttling',13),(401,'InvalidApiKey',1),(429,'insufficient_quota',1)]:
             def fail(*a,**kw):raise urllib.error.HTTPError('https://fixture.invalid',status,'rejected',{},io.BytesIO(json.dumps({'code':code,'message':'fixture'}).encode()))
             cp={'attempts':[]}
             with patch('urllib.request.urlopen',side_effect=fail) as request,patch('app.evaluation_stage.time.sleep'):

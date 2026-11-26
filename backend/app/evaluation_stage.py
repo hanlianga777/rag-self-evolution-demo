@@ -4,6 +4,7 @@ import math
 import hashlib
 import json
 import uuid
+from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
 from .telemetry import collect_usage
@@ -12,15 +13,43 @@ from .paid_run import unsettled_usage
 _request_checkpoint = ContextVar('evaluation_request_checkpoint', default=None)
 
 
-def checkpoint_request(provider, model, endpoint, payload, action, *, reuse=True):
+@contextmanager
+def request_checkpoint_scope(checkpoint, phase, run_id, on_state, check_stop):
+    token = _request_checkpoint.set((checkpoint, phase, run_id, on_state, check_stop))
+    try:
+        yield
+    finally:
+        _request_checkpoint.reset(token)
+
+
+def reopen_blocked_requests(checkpoint):
+    """An explicit resume keeps completed RPCs and starts a fresh blocked-request window."""
+    for request in checkpoint.get('provider_requests', {}).values():
+        transport = request.get('transport')
+        if transport and transport.get('state') == 'blocked':
+            request.setdefault('transport_history', []).append(request.pop('transport'))
+    for child in checkpoint.get('verdict_trials', {}).values():
+        reopen_blocked_requests(child)
+    for child in checkpoint.get('regression_review', {}).get('runs', []):
+        reopen_blocked_requests(child)
+
+
+def checkpoint_request(provider, model, endpoint, payload, action, *, reuse=True, transport_retry=False):
     """Persist a serial RPC inside its owning question/phase, never across Candidates."""
+    from .providers import ProviderRequestError, request_with_retries
     context = _request_checkpoint.get()
     if context is None:
-        return action()
+        return request_with_retries(action) if transport_retry else action()
     checkpoint, phase, run_id, on_state, check_stop = context
     check_stop()
     key = hashlib.sha256(json.dumps([phase, provider, model, endpoint, payload], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-    saved = checkpoint.setdefault('provider_requests', {}).setdefault(key, {'phase':phase, 'provider':provider, 'model':model, 'attempts':[]})
+    requests = checkpoint.setdefault('provider_requests', {})
+    if not isinstance(requests, dict):
+        raise ProviderRequestError('Provider 请求断点损坏')
+    saved = requests.setdefault(key, {'phase':phase, 'provider':provider, 'model':model, 'attempts':[]})
+    if (not isinstance(saved, dict) or not isinstance(saved.get('attempts'), list)
+            or saved.get('status') == 'completed' and 'result' not in saved):
+        raise ProviderRequestError('Provider 请求断点损坏')
     if saved.get('status') == 'completed' and (reuse or saved.get('persistence_pending')):
         if saved.get('persistence_pending'):
             on_state('running', phase=phase, durable=True)
@@ -32,28 +61,44 @@ def checkpoint_request(provider, model, endpoint, payload, action, *, reuse=True
         for previous in saved['attempts']:
             if previous.get('status') == 'inflight':
                 previous.update(status='unknown', recovery_reason='worker ended before request result was saved')
-    attempt = {'id':uuid.uuid4().hex, 'recorded_by_run_id':run_id, 'status':'inflight', 'usage':[]}
-    saved['attempts'].append(attempt);saved['status'] = 'inflight'
-    on_state('running', phase=phase, durable=True)
-    try:
-        with collect_usage() as usage:
-            try:
-                value = action()
-            finally:
-                for event in usage:event['checkpoint_request_id'] = attempt['id']
-                attempt['usage'] = usage
-    except Exception as error:
-        unknown = getattr(error, 'request_execution_unknown', None) is True or any(unsettled_usage(u) for u in attempt['usage'])
-        attempt.update(status='unknown' if unknown else 'error', error_type=type(error).__name__)
-        saved['status'] = attempt['status']
+    def send():
+        attempt = {'id':uuid.uuid4().hex, 'recorded_by_run_id':run_id, 'status':'inflight', 'usage':[]}
+        saved['attempts'].append(attempt);saved['status'] = 'inflight'
         on_state('running', phase=phase, durable=True)
-        raise
-    saved.update(status='completed', result=deepcopy(value))
-    attempt['status'] = 'completed'
-    saved['persistence_pending'] = True
-    on_state('running', phase=phase, durable=True)
-    saved.pop('persistence_pending', None)
-    return value
+        try:
+            with collect_usage() as usage:
+                try:
+                    value = action()
+                finally:
+                    for event in usage:event['checkpoint_request_id'] = attempt['id']
+                    attempt['usage'] = usage
+        except Exception as error:
+            unknown = getattr(error, 'request_execution_unknown', None) is True or any(unsettled_usage(u) for u in attempt['usage'])
+            attempt.update(status='unknown' if unknown else 'error', error_type=type(error).__name__)
+            saved['status'] = attempt['status']
+            on_state('running', phase=phase, durable=True)
+            raise
+        saved.update(status='completed', result=deepcopy(value))
+        saved.pop('transport', None)
+        attempt['status'] = 'completed'
+        saved['persistence_pending'] = True
+        on_state('running', phase=phase, durable=True)
+        saved.pop('persistence_pending', None)
+        return value
+
+    if not transport_retry:
+        return send()
+    transport = saved.setdefault('transport', {})
+    if not isinstance(transport, dict):
+        raise ProviderRequestError('Provider 重试断点损坏')
+    if transport.get('state') == 'ended':
+        transport.clear()
+    def persist_retry(state, **details):
+        if state != 'sending':  # send() persists the count with its in-flight checkpoint.
+            on_state(state, phase=phase, durable=True, **details)
+
+    return request_with_retries(send, transport=transport, check_stop=check_stop,
+                                on_state=persist_retry)
 
 
 def checkpoint_usage(checkpoint):
@@ -77,7 +122,7 @@ def judge_request_count(checkpoint, run_id):
 
 
 def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state):
-    from .providers import ProviderAPIError,ProviderInvalidResponse,ProviderTimeout,retryable_error,provider_error_details,stage_deadline
+    from .providers import ProviderInvalidResponse,ProviderTimeout,provider_error_details,stage_deadline,permanent_provider_error
     # Explicit Resume starts a new retry window; process recovery of this Run keeps its failures.
     prior=[a for a in checkpoint['attempts'] if a.get('phase')==phase and a.get('recorded_by_run_id')==run_id]
     failures=0;invalid_failures=0
@@ -86,7 +131,12 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
         failures+=1;invalid_failures+=a.get('error_type')=='ProviderInvalidResponse'
     windows=checkpoint.setdefault('phase_windows',{})
     window=windows.get(phase)
-    if not window or window.get('run_id')!=run_id:
+    requests = checkpoint.get('provider_requests', {})
+    recovering = isinstance(requests, dict) and any(
+        isinstance(request, dict) and request.get('phase') == phase and isinstance(request.get('transport'), dict)
+        and request['transport'].get('state') in {'sending', 'request_retry', 'retry_wait', 'recovering', 'blocked'}
+        for request in requests.values())
+    if not window or window.get('run_id')!=run_id or recovering:
         window={'run_id':run_id,'started_at':time.time()};windows[phase]=window
     deadline=time.monotonic()+max(0,600-(time.time()-window['started_at']))
     if checkpoint.get('inflight')==phase:checkpoint.setdefault('unknown_execution',{})[phase]=True
@@ -125,10 +175,8 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
             if billing_unknown:checkpoint.setdefault('unsettled_usage',{})[phase]=True
             attempt['billing_unknown']=billing_unknown
             responses=max(1,sum(u.get('status')=='ok' for u in usage))
-            from .providers import permanent_provider_error
             retry = not isinstance(error, InterruptedError) and not permanent_provider_error(error) and time.monotonic()<deadline
-            # The transport already used its bounded attempts; the question's final
-            # pass can retry it, without nesting another transport retry window here.
+            # A managed HTTP request keeps its own attempt limit and recovery state.
             transport_error=error
             while transport_error is not None:
                 if getattr(transport_error,'provider_retry_exhausted',False):
@@ -146,18 +194,11 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
             attempt['request_execution_unknown']=unknown
             if unknown:checkpoint.setdefault('unknown_execution',{})[phase]=True
             attempt['retryable']=retry;checkpoint['attempts'].append(attempt);checkpoint.pop('inflight',None)
+            if permanent_provider_error(error):
+                on_state('blocked', phase=phase, durable=True, error=str(error),
+                         resume_hint='排除所列故障后，使用原实验和授权从断点手动续跑')
             if retry:
                 delay=min(60,2**min(failures-1,6))
-                retry_error=error
-                while retry_error.__cause__ is not None and not isinstance(retry_error,ProviderAPIError):retry_error=retry_error.__cause__
-                if isinstance(retry_error,ProviderAPIError):
-                    try:delay=max(delay,float(retry_error.retry_after or 0))
-                    except (TypeError,ValueError):
-                        try:
-                            from email.utils import parsedate_to_datetime
-                            delay=max(delay,parsedate_to_datetime(retry_error.retry_after).timestamp()-time.time())
-                        except (TypeError,ValueError,OverflowError):pass
-                if not isinstance(delay,(int,float)) or not math.isfinite(delay):delay=60
                 delay=min(delay,max(0,deadline-time.monotonic()))
                 attempt['retry_delay_seconds']=delay
                 on_state('retrying',phase=phase,error=str(error),retry_count=failures)

@@ -913,9 +913,10 @@ class OptimizationAgent:
         checkpoints=previous.get('agent_request_checkpoints',{})
         checkpoint=checkpoints.setdefault(request_hash,previous.get('agent_request_checkpoint',{'attempts':[]})
             if previous.get('agent_request_sha256')==request_hash else {'attempts':[]})
-        def save(*_args,**_kwargs):
+        def save(state,*_args,**details):
+            status = {'agent_provider_retry': {'state':state, **details}} if state in {'retry_wait','recovering','recovered','blocked'} else {}
             self._checkpoint(experiment_id,generation_token,{'agent_request_checkpoint':checkpoint,'agent_request_sha256':request_hash,
-                'agent_request_checkpoints':checkpoints})
+                'agent_request_checkpoints':checkpoints, **status})
         from .optimization_cycle import check_cycle_stop
         token=_request_checkpoint.set((checkpoint,'agent',experiment_id,save,lambda:check_cycle_stop(self.store,experiment_id)))
         try:yield checkpoint
@@ -962,10 +963,15 @@ class OptimizationAgent:
                 'next_action':'sandbox_full_snapshot' if ready else plan.get('next_action','repair_sources_or_trace'),
                 'experiment_plan':plan,'gaps':view.get('diagnostic_gaps',[]),'blockers':plan.get('blockers',[])})
         from .paid_run import current_paid_run
-        if confirmed_context.get('paid_run') and current_paid_run() is None:
-            from .paid_policy import restore_paid_context
-            with restore_paid_context(self.store,confirmed_context['paid_run']):
+        from .paid_policy import current_binding, restore_paid_context
+        binding = confirmed_context.get('paid_run')
+        if binding and current_paid_run() is None:
+            with restore_paid_context(self.store,binding,
+                    reopen=confirmed_context.get('agent_provider_retry', {}).get('state') == 'blocked'
+                    and (existing or {}).get('status') != 'generating'):
                 return self.generate(baseline_run_id,trigger_id,experiment_id=existing_id)
+        if binding and current_binding() != binding:
+            raise ValueError('当前请求与实验费用授权不一致')
         trigger = trigger or self.store.optimization_trigger(confirmed_context.get("trigger_id"))
         event = None
         if existing and existing["baseline_run_id"] == baseline_run_id and trigger and trigger["status"] == "human_confirmed" and trigger["optimization_run_id"] == existing_id:
@@ -1224,6 +1230,16 @@ class OptimizationAgent:
         audit['baseline_diagnosis_summary'] = prompt['baseline_diagnosis_summary']
         audit['next_action'] = prompt['next_action']
         try:
+            from contextlib import nullcontext
+            from .paid_policy import experiment_binding
+            from .evaluation_stage import reopen_blocked_requests
+            binding = experiment_binding(self.store, experiment_id, self.provider)
+            if (existing or {}).get('status') != 'generating':
+                for checkpoint in confirmed_context.get('agent_request_checkpoints', {}).values():
+                    reopen_blocked_requests(checkpoint)
+            def payment_context():
+                return restore_paid_context(self.store, binding) if binding else nullcontext()
+
             stages = []
             recovered_usage=[]
             with collect_usage() as usage, measure(stages, 'optimization_agent'):
@@ -1249,7 +1265,7 @@ class OptimizationAgent:
                     else:
                         wait_for_off_peak(self.store,'agent:'+experiment_id,
                             lambda pause:self._checkpoint(experiment_id,generation_token,{'price_pause':pause}))
-                        with self._request_checkpoint(experiment_id,generation_token,previous,request_hash) as checkpoint:
+                        with payment_context(), self._request_checkpoint(experiment_id,generation_token,previous,request_hash) as checkpoint:
                             content=self.provider.complete(system,user,json_mode=True)
                             if not usage:
                                 from .evaluation_stage import checkpoint_usage
@@ -1287,7 +1303,7 @@ class OptimizationAgent:
                         'request_sha256':hashlib.sha256((system+retry_user).encode()).hexdigest()}
                     with collect_usage() as retry_usage:
                         previous=self.store.experiment(experiment_id,light=True)['result']
-                        with self._request_checkpoint(experiment_id,generation_token,previous,summary['request_sha256']) as checkpoint:
+                        with payment_context(), self._request_checkpoint(experiment_id,generation_token,previous,summary['request_sha256']) as checkpoint:
                             content=self.provider.complete(system,retry_user,json_mode=True)
                             if not retry_usage:
                                 from .evaluation_stage import checkpoint_usage
@@ -1311,4 +1327,6 @@ class OptimizationAgent:
             message=f"{error}；失败阶段：{audit['validation_stage']}；可重试：{'是' if audit['provider_error']['retryable'] else '否'}"
             audit["validation_error"] = message
             self.store.save_agent_trace(experiment_id, "failed", audit, message, generation_token=generation_token)
+            if isinstance(error, InterruptedError):
+                raise
             raise ValueError(message) from error

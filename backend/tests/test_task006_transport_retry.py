@@ -45,16 +45,16 @@ class TransportRetryTests(unittest.TestCase):
                 self.assertEqual([u['status'] for u in usage], ['unknown', 'ok'])
                 self.assertEqual([c.args[0] for c in sleep.call_args_list], [5])
 
-    def test_three_failures_have_three_usage_rows_and_no_nested_stage_retry(self):
+    def test_exhausted_task_keeps_one_row_per_send_without_nested_stage_retry(self):
         for name, action, _, _ in self.providers():
             checkpoint={'attempts':[]}
             with self.subTest(provider=name), patch('urllib.request.urlopen', side_effect=TimeoutError('read timed out')) as http, patch('app.providers.time.sleep') as sleep:
                 with self.assertRaises(Exception) as caught:
                     self.stage(checkpoint, action)
                 self.assertTrue(caught.exception.provider_retry_exhausted)
-                self.assertEqual(http.call_count, 3)
-                self.assertEqual([c.args[0] for c in sleep.call_args_list], [5,15])
-                self.assertEqual(len(checkpoint_usage(checkpoint)), 3)
+                self.assertEqual(http.call_count, 13)
+                self.assertEqual(sum(c.args[0] for c in sleep.call_args_list), 3650)
+                self.assertEqual(len(checkpoint_usage(checkpoint)), 13)
                 self.assertEqual(len(checkpoint['attempts']), 1)
 
     def test_401_is_permanent_and_sent_once(self):
@@ -114,9 +114,9 @@ class TransportRetryTests(unittest.TestCase):
         self.assertEqual(sum(url.endswith('/reranks') for url in urls),2)
         self.assertEqual(len(checkpoint_usage(checkpoint)),3)
 
-    def test_all_5xx_are_transient_but_invalid_json_is_not_transport(self):
+    def test_only_selected_http_statuses_and_transport_errors_are_retryable(self):
         from app.providers import transient_provider_error, permanent_provider_error, ProviderInvalidResponse
-        for status in (429,500,501,502,503,504,507,599):
+        for status in (408,429,500,502,503,504):
             error=ProviderAPIError('fixture',status_code=status)
             self.assertTrue(transient_provider_error(error))
             self.assertFalse(permanent_provider_error(error))
@@ -125,8 +125,10 @@ class TransportRetryTests(unittest.TestCase):
             error=ProviderAPIError('fixture',status_code=status)
             self.assertFalse(transient_provider_error(error))
             self.assertTrue(permanent_provider_error(error))
-        for status in (404,413,422):
-            self.assertFalse(permanent_provider_error(ProviderAPIError('fixture',status_code=status)))
+        for status in (404,413,422,501,507,599):
+            error = ProviderAPIError('fixture', status_code=status)
+            self.assertFalse(permanent_provider_error(error))
+            self.assertFalse(transient_provider_error(error))
 
     def test_network_attempt_does_not_consume_judge_format_rejudgment(self):
         from app.ai_service import AiService
