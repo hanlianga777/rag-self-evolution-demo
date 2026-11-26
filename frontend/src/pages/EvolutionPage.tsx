@@ -33,7 +33,7 @@ import { cachedJson, errorMessage, getJson, identityKey, postJson } from "../api
 import { LoadingSkeleton, Badge, ConclusionCard, Section, TableVerdict, ShortId, Status, TruncatedText } from "../components/Primitives";
 import { ExecutionMetrics, ParameterDiff, SearchSpaceTable, parameterNames, formatValue, billedCostText } from "../components/PipelineFields";
 import { ConfirmDialog, Drawer } from "../components/Dialog";
-import { useOperation } from "../operation";
+import { cycleRunsThroughRelease, useOperation } from "../operation";
 import { displayText, narrativeText, baselineName } from "../display";
 import { CaseAnswer } from "../components/CaseAnswer";
 import { CaseDetails, gateNames } from "./EvaluationPage";
@@ -194,7 +194,7 @@ function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: 
   const selectedWinner = qualified.some(item => item.id === winnerId) ? winnerId : recommendation.suggested_winner || qualified[0]?.id || "";
   const batchId = `sandbox-round:${experiment?.id}:${roundNumber}`;
   const batchRunning = operation.operations.some(item => item.id === batchId && item.status === "running");
-  const hasRunning = cycle?.status === "running" || compositeWaiting || candidates.some(item => ["running", "queued"].includes(item.status)) || operation.operations.some(item => item.candidateId && item.status === "running") || batchRunning;
+  const hasRunning = ["queued", "running", "recovering"].includes(cycle?.status) || compositeWaiting || candidates.some(item => ["running", "queued"].includes(item.status)) || operation.operations.some(item => item.candidateId && item.status === "running") || batchRunning;
   const published = (data.versions || []).some((version:any) => version.status === "active" && version.provenance === "published" && candidates.some(candidate => candidate.id === version.snapshot?.candidate_id));
   const pending = currentRound.filter(item => ["generated", "failed"].includes(item.status));
   const policyBlocked = !!evaluation.requires_policy_upgrade || !!data.workspace?.requires_policy_upgrade;
@@ -211,14 +211,14 @@ function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: 
     catch (reason) { if (currentIdentity.current === captured) { setError(errorMessage(reason)); await refresh(); } }
   };
   const requestPaid = (title: string, description: string, execute: () => void) => { if (!readOnly) setConfirmationAction({title, description, execute}); };
-  const runBatch = () => requestPaid('运行本轮 A/B/C Sandbox', `Golden ${evaluation.dataset_snapshot?.question_ids?.length ?? evaluation.cases?.length ?? '未采集'} 题，待运行 ${pending.length} 个 Candidate；每题回答+Judge；评测次数 ${budget.used}/${budget.max}${reservedForD ? `，为 D 预留 ${reservedForD} 次` : ""}。Rewrite/MultiQuery/HyDE 启用时有额外模型调用。`, () => void executeBatch());
+  const runBatch = () => requestPaid(cycleRunsThroughRelease(cycle) ? '继续已授权的优化流程' : '运行本轮 A/B/C Sandbox', `Golden ${evaluation.dataset_snapshot?.question_ids?.length ?? evaluation.cases?.length ?? '未采集'} 题，待运行 ${pending.length} 个 Candidate；每题回答+Judge；评测次数 ${budget.used}/${budget.max}${reservedForD ? `，为 D 预留 ${reservedForD} 次` : ""}。Rewrite/MultiQuery/HyDE 启用时有额外模型调用。${cycleRunsThroughRelease(cycle) ? "随后继续已保存的复测与发布流程。仅在检查通过且已有 Gate 3 授权时更新线上版本。" : ""}`, () => void executeBatch());
   const activeOperation = (candidateId: string) => operation.operations.find(item => item.candidateId === candidateId && item.status === "running");
   const processingCases=agentDiagnosisRows(badCases);
 
   const gateDetails = evaluation.gate_details || [];
   const snapshot = savedSnapshot(evaluation);
   const refresh = async () => { const captured = identity; const value: any = await getJson("/api/optimization?light=true&planning=true"); if (currentIdentity.current === captured && (!value.current_baseline_id || value.current_baseline_id === evaluation.id)) setExperiment(value.id ? value : null); };
-  const polling = !readOnly && (hasRunning || experiment?.result?.optimization_cycle?.status === "running");
+  const polling = !readOnly && hasRunning;
   useEffect(() => {
     if (!experiment?.id || !polling) return;
     let cancelled = false;
@@ -228,7 +228,7 @@ function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: 
         const value = await getJson<any>(`/api/experiments/${experiment.id}?light=true`);
         if (cancelled) return;
         setExperiment((previous: any) => ({...previous, ...value, result:{...previous?.result,...value.result}, candidates:(value.candidates || []).map((candidate:any) => ({...previous?.candidates?.find((saved:any) => saved.id === candidate.id), ...candidate}))}));
-        if (value.result?.optimization_cycle?.status === "running" || ["scheduled", "waiting", "queued", "running"].includes(value.result?.composite_schedule?.status) || value.result?.composite_schedule?.price_pause?.paused || value.candidates?.some((candidate:any) => ["running","queued"].includes(candidate.status))) timer = window.setTimeout(poll, 1000);
+        if (["queued", "running", "recovering"].includes(value.result?.optimization_cycle?.status) || ["scheduled", "waiting", "queued", "running"].includes(value.result?.composite_schedule?.status) || value.result?.composite_schedule?.price_pause?.paused || value.candidates?.some((candidate:any) => ["running","queued"].includes(candidate.status))) timer = window.setTimeout(poll, 1000);
         else await refresh();
       } catch (reason) { if (!cancelled) { setError(errorMessage(reason)); timer = window.setTimeout(poll, 2000); } }
     };
@@ -263,8 +263,19 @@ function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: 
   const missingRoundReview = experiment?.result?.decision_contract_version === '109c'
     && experiment.result.round_conclusions?.[String(roundNumber)]?.status !== 'saved';
   const continueRound = () => requestPaid('生成下一轮建议',
-    missingRoundReview ? '先复盘本轮已保存结果，再生成下一轮方案。' : '读取已保存历史实验反馈，生成下一轮方案。',
-    () => void action('生成下一轮A/B/C', () => postJson(`/api/experiments/${experiment.id}/continue`)));
+    `${missingRoundReview ? '先复盘本轮已保存结果，再生成下一轮方案。' : '读取已保存历史实验反馈，生成下一轮方案。'}如果本轮目标需要生成诊断，系统将自动先做生成诊断。诊断和生成建议会调用模型并产生费用。`,
+    () => void action('生成下一轮A/B/C', async () => {
+      try {
+        await postJson(`/api/experiments/${experiment.id}/continue`);
+      } catch (reason) {
+        const message = errorMessage(reason);
+        const guidance = message.includes('需先对当前底座做生成诊断')
+          ? '系统将自动先做生成诊断。请刷新实验进度后，再从当前断点继续。'
+          : '请按上述原因处理后，再从当前实验继续。';
+        await refresh().catch(() => {});
+        throw new Error(`${message}。 ${guidance}`);
+      }
+    }));
   const run = (candidate: any) => candidate.resume_plan?.can_resume === false ? setError(candidate.resume_plan.reason || '当前无法继续，请查看原因') : requestPaid('运行 Candidate Sandbox', '继续完成尚未结束的评测；会产生模型费用。', () => void executeCandidate(candidate));
   const executeCandidate = async (candidate: any) => {
     if (readOnly || !["generated", "failed"].includes(candidate.status) || activeOperation(candidate.id)) return;
@@ -354,6 +365,7 @@ function EvolutionWorkspace({ data, selector, readOnly, archive, unavailable }: 
     {policyBlocked && <p className="error-notice">当前 Baseline 评测版本身份与运行代码不兼容，真实 Agent 启动已阻断，旧实验只读。全部 Bad Case 保留在优化规划中；请先到 Baseline 查看身份预检，核对历史评测与当前规则的兼容性；需要新版评分时使用保存回答判分，不自动重新生成。</p>}
 {!readOnly && <div className="header-actions agent-secondary-actions">{triedSandbox ? null : planningBlocked && !published ? <button className={stage === "review" ? "secondary" : "primary"} disabled={busy || policyBlocked || hasRunning || !!confirmation} onClick={completePlan}>补齐本轮规划（不收费）</button> : pending.length ? <button className={stage === "review" ? "secondary" : "primary"} disabled={busy || !canBatch} onClick={() => void runBatch()}><Play size={15} />{batchRunning ? "本轮 Sandbox 运行中" : "运行本轮 A/B/C Sandbox"}</button> : <button className={stage === "review" ? "secondary" : "primary"} disabled={policyBlocked || busy || hasRunning || evaluation.status !== "completed" || (!!abc.length && !canContinue) || (!badCases.length && !experiment?.result?.monitoring_context)} onClick={() => void (canContinue ? continueRound() : generate())}><Play size={15} />{busy ? "处理中…" : canContinue ? "继续优化下一轮" : abc.length ? "本轮 Candidate 已生成" : "生成 A / B / C"}</button>}{!published && planningIncomplete && triedSandbox && <button className="secondary" disabled={busy || policyBlocked || hasRunning || !!confirmation} onClick={completePlan}>补齐本轮规划（不收费）</button>}{canBatch && triedSandbox && <button className="secondary" disabled={busy} onClick={() => void runBatch()}>运行本轮 A/B/C Sandbox</button>}{triedSandbox && canContinue && !pending.length && <button className="primary" disabled={policyBlocked || busy || hasRunning || evaluation.status !== "completed"} onClick={() => continueRound()}><Play size={15} />{busy ? "处理中…" : "继续优化下一轮"}</button>}</div>}
     <Drawer className="workbench-drawer" open={historyOpen} onOpenChange={setHistoryOpen} title="历史实验 · 原 Candidate 与结果只读"><div className="drawer-body"><div className="candidate-cards">{abc.filter(item => (item.reasoning?.round || 1) < roundNumber).map(candidate => <CandidateCard key={candidate.id} experiment={experiment} candidate={candidate} includeRound readOnly baseline={evaluation.config || {}} busy={true} onDetail={()=>{setHistoryOpen(false);setSelectedCandidate(candidate);}} targets={targetRows(candidate,badCases)} onTargets={()=>{setHistoryOpen(false);setTargetCandidate(candidate);}} onRun={()=>void run(candidate)} />)}</div></div></Drawer>
+    {hasRunning && cycle?.next_action && <p role="status">{cycle.next_action}</p>}
     {error && <p ref={errorRef} tabIndex={-1} className="error-notice" role="alert">{error}</p>}
 
     {experiment?.result?.generation_status==='no_candidates' && <p className="workbench-status" role="status">本轮没有合法 Candidate，不能运行 Sandbox；未生成不代表优化成功。</p>}

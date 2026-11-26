@@ -33,6 +33,7 @@ from .evaluation_contract import policy_current, VERSIONS, validate_business_jud
 from .evaluation_contract import CURRENT_JUDGE_PROMPT as BUSINESS_JUDGE_PROMPT
 from .governance import GovernanceStore, GENERATION_PROFILES
 from .optimization import OptimizationAgent
+from .workflow_engine import WorkflowEngine, recover_pending
 from .diagnostics import diagnostic_view
 from .diagnostic_categories import DIAGNOSTIC_CATEGORIES
 from .product_diagnostics import product_diagnostics
@@ -112,7 +113,7 @@ def recover_authorized_evaluations():
             if candidate:
                 experiment = store.experiment(candidate['experiment_id'], light=True)
                 cycle = (experiment or {}).get('result', {}).get('optimization_cycle') or {}
-                if cycle.get('stop_request') or cycle_occupied(store, experiment):
+                if cycle.get('stop_request') or cycle.get('status') in task_leases.ACTIVE_STATES or cycle_occupied(store, experiment):
                     continue
         threading.Thread(target=recover, args=(run['id'],), daemon=True).start()
 
@@ -135,8 +136,8 @@ def start_recovery_monitor():
                 recover_authorized_evaluations()
                 from .baseline_chain import advance_chain
                 advance_chain(store,ai_service)
-                from .optimization_cycle import recover_optimization_cycles, recover_agent_generations
-                recover_optimization_cycles(store,ai_service)
+                from .optimization_cycle import recover_agent_generations
+                recover_pending(store, ai_service)
                 recover_agent_generations(store,ai_service)
                 from .paid_schedule import recover_scheduled_composites
                 recover_scheduled_composites(store,ai_service.provider)
@@ -1869,7 +1870,10 @@ def continue_experiment(run_id: str):
     require_current_baseline(experiment["baseline_run_id"])
     require_idle_cycle(experiment)
     try:
-        return OptimizationAgent(store, ai_service.provider).generate(experiment["baseline_run_id"], experiment_id=run_id)
+        state = WorkflowEngine(store, ai_service, run_id).start('next_round', background=False)
+        if state.get('status') != 'completed':
+            raise ValueError(state.get('last_error') or '下一轮仍在处理，请查看实验运行进度')
+        return store.experiment(run_id)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 
@@ -2436,16 +2440,15 @@ def require_idle_cycle(experiment):
 
 
 @app.post('/api/experiments/{run_id}/run-cycle', status_code=201, dependencies=[Depends(require_trusted_origin)])
-def run_optimization_cycle(run_id: str, current_round_only: bool = False):
-    from .optimization_cycle import claim_cycle, run_until_qualified, take_cycle_claim
+def run_optimization_cycle(run_id: str, current_round_only: bool = False, *,
+                           target: Literal['cycle', 'release'] | None = None, candidate_id: str | None = None):
+    if (current_round_only and (candidate_id or target == 'release')) or (candidate_id and target == 'release'):
+        raise HTTPException(422, '请只指定一个运行范围')
+    scope = 'current_round' if current_round_only else 'candidate' if candidate_id else target
     try:
-        state=claim_cycle(store,run_id,current_round_only=current_round_only)
+        return WorkflowEngine(store, ai_service, run_id).start(scope, candidate_id=candidate_id)
     except ValueError as error:
-        raise HTTPException(409,str(error)) from error
-    token = take_cycle_claim(store, run_id)
-    threading.Thread(target=contextvars.copy_context().run,
-        args=(lambda:run_until_qualified(store, ai_service, run_id, lease_token=token),), daemon=True).start()
-    return state
+        raise HTTPException(409, str(error)) from error
 
 
 @app.post('/api/experiments/{run_id}/stop-cycle', dependencies=[Depends(require_trusted_origin)])

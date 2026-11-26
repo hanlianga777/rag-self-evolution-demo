@@ -126,3 +126,22 @@ it('shows the saved unknown-charge reason when A cannot resume',async()=>{
  expect(document.activeElement).toBe(document.querySelector('[role="alert"]'));
  expect(document.querySelector('[role="dialog"]')).toBeNull();
 });
+
+it.each([
+ ['前置条件未满足：需先对当前底座做生成诊断', '系统将自动先做生成诊断'],
+ ['上一轮 A/B/C 必须全部完成 Sandbox 后才能继续优化', '请按上述原因处理后，再从当前实验继续'],
+])('explains a refused next round and what to do after %s', async (reason, guidance) => {
+ const experiment = {id:'exp',candidates:[{id:'exp-R1-A',status:'evaluated',reasoning:{candidate_label:'A',round:1}}],
+  evaluation_budget:{used:1,max:12,reserved_for_d:1},rounds:[{round:1,complete:true,total:1}],result:{round_policy:{mode:'full_rounds'}}};
+ vi.stubGlobal('fetch',vi.fn(async (url:string) => url.endsWith('/continue')
+  ? new Response(JSON.stringify({detail:reason}),{status:409})
+  : new Response(JSON.stringify(experiment))));
+ await render(<EvolutionPage data={{evaluation,badCases:[],optimization:experiment}}/>);
+ await click('进化路线');
+ await click('继续优化下一轮');
+ expect(document.querySelector('[role="dialog"]')?.textContent).toContain('系统将自动先做生成诊断');
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog button.primary')!.click());
+ const alert = document.querySelector('[role="alert"]')?.textContent;
+ expect(alert).toContain(reason);
+ expect(alert).toContain(guidance);
+});

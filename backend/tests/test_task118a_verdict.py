@@ -33,8 +33,8 @@ def scored(passed, answer='原样本', *, category='positive', subtype=None, ris
 
 
 class OfflineEvaluation:
-    def __init__(self, tmp_path, monkeypatch, first, *, evidence=None):
-        manifest = {'sources': []}
+    def __init__(self, tmp_path, monkeypatch, first, *, evidence=None, manifest=None):
+        manifest = {'sources': []} if manifest is None else manifest
         monkeypatch.setattr(governance, 'current_manifest', lambda: manifest)
         monkeypatch.setattr(corpus, 'current_manifest', lambda: manifest)
         self.store = GovernanceStore(tmp_path / 'verdict.db')

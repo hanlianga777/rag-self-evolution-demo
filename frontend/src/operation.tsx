@@ -6,7 +6,7 @@ import type { PricePause } from "./components/RuntimeSettings";
 import { ConfirmDialog } from "./components/Dialog";
 import { RunProgressPanel } from "./ui/RunProgressPanel";
 
-type Operation = { id: string; runId?: string; candidateId?: string; experimentId?: string; pricePause?: PricePause; title: string; status: "running" | "completed" | "failed" | "stopped"; stopping?: boolean; stopError?: string; kind?: "evaluation" | "revision" | "cycle"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
+type Operation = { id: string; runId?: string; candidateId?: string; experimentId?: string; throughRelease?: boolean; pricePause?: PricePause; title: string; status: "running" | "completed" | "failed" | "stopped"; stopping?: boolean; stopError?: string; kind?: "evaluation" | "revision" | "cycle"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
 type BatchRequest = { experimentId: string; baselineId: string; round: number; candidateIds: string[]; identity?: string };
 type OperationContextValue = {
   runCandidateBatch: (request: BatchRequest) => Promise<void>;
@@ -43,11 +43,17 @@ function evaluation(run: any): Partial<Operation> {
     current, total, pricePause: run.result?.price_pause, error: run.error_message };
 }
 
+const cycleActive = (cycle: any) => ["queued", "running", "recovering"].includes(cycle?.status);
+export const cycleRunsThroughRelease = (cycle: any) =>
+  cycle?.workflow_scope?.target === "release" || cycle?.external_runner === true;
+const cycleRunPath = (experimentId: string, throughRelease?: boolean) =>
+  `/api/experiments/${experimentId}/run-cycle${throughRelease ? "?target=release" : ""}`;
+
 function cycleProgress(saved: any): Partial<Operation> {
   const cycle = saved.result.optimization_cycle, budget = saved.evaluation_budget;
   const stopped = ["stopped", "analysis_exhausted"].includes(cycle.status);
-  return { status: cycle.status === "running" ? "running" : ["failed", "blocked"].includes(cycle.status) ? "failed" : stopped ? "stopped" : "completed",
-    stopping: cycle.status === "running" && !!cycle.stop_request, error: cycle.last_error,
+  return { status: cycleActive(cycle) ? "running" : ["failed", "blocked"].includes(cycle.status) ? "failed" : stopped ? "stopped" : "completed",
+    stopping: cycleActive(cycle) && !!cycle.stop_request, error: cycle.last_error, throughRelease: cycleRunsThroughRelease(cycle),
     current: budget?.used ?? cycle.used, total: budget?.max ?? 12,
     pricePause: [cycle.price_pause, saved.result.price_pause].find(pause => pause?.paused) || cycle.price_pause,
     stage: cycle.stop_request ? "正在停止，等待当前请求结束并保存进度" : cycle.provider_retry?.state === "retry_wait" ? "等待模型服务恢复，进度已保存" : `已用 ${budget?.used ?? cycle.used} 次，剩余 ${cycle.remaining} 次（含合并 Candidate 预留）` };
@@ -150,14 +156,15 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       const [workspace, experiment] = await Promise.all([getJson<any>("/api/workspace"), getJson<any>(`/api/experiments/${request.experimentId}`)]);
       if (workspace.current_baseline_id !== request.baselineId || (request.identity && identityKey(workspace) !== request.identity) || experiment.baseline_run_id !== request.baselineId) throw new Error("当前实验身份已变化，请刷新");
       if (experiment.result?.report_confirmation) throw new Error("报告已确认，本轮结果不能改变");
-      if (experiment.result?.optimization_cycle?.status !== "running") await postJson(`/api/experiments/${request.experimentId}/run-cycle`, {});
+      const priorCycle = experiment.result?.optimization_cycle;
+      if (!cycleActive(priorCycle)) await postJson(cycleRunPath(request.experimentId, cycleRunsThroughRelease(priorCycle)), {});
       while (mounted.current) {
         const saved = await getJson<any>(`/api/experiments/${request.experimentId}?light=true`);
         const cycle = saved.result?.optimization_cycle;
         if (!cycle) throw new Error("记录缺失：优化批次状态");
         update(id, cycleProgress(saved));
         if (candidateRefresh.current) await candidateRefresh.current();
-        if (cycle.status !== "running") {
+        if (!cycleActive(cycle)) {
           if (["failed", "blocked"].includes(cycle.status)) throw new Error(cycle.last_error || "本批次已停止");
           if (cycle.status === "analysis_exhausted") { update(id,{status:"stopped",stage:cycle.last_error || "连续 3 次 Candidate 不合规，已停止",endedAt:Date.now()}); break; }
           if (cycle.status === "stopped") { update(id,{status:"stopped",endedAt:Date.now()}); break; }
@@ -189,7 +196,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       for (const item of revisions.filter(item => ["queued", "generating", "validating", "probing", "qc"].includes(item.status))) start("局部修订", { id: item.id, kind: "revision", restored: true, startedAt: item.created_at ? Date.parse(item.created_at) : undefined });
     }).catch(() => {});
     getJson<any>("/api/optimization?light=true").then(saved => {
-      if (cancelled || saved.result?.optimization_cycle?.status !== "running") return;
+      if (cancelled || !cycleActive(saved.result?.optimization_cycle)) return;
       start("A/B/C · Sandbox 自动循环", { id: `cycle:${saved.id}`, experimentId: saved.id, kind: "cycle", restored: true, ...cycleProgress(saved) });
     }).catch(() => {});
     });
@@ -241,7 +248,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     update(item.id, { status: "running", stopping: false, stopError: undefined });
     try {
       if (item.experimentId) {
-        await postJson(`/api/experiments/${item.experimentId}/run-cycle`, {});
+        await postJson(cycleRunPath(item.experimentId, item.throughRelease), {});
         update(item.id, { kind: "cycle" });
       } else if (item.candidateId) {
         const started = await postJson<{ id: string }>(`/api/candidates/${item.candidateId}/run`, { authorize_provider: true });
@@ -278,7 +285,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
   </div>)}</div>;
   return <OperationContext.Provider value={{ operations, runCandidateBatch, start, update, succeed, fail, run, startEvaluation, watchEvaluation, watchRevision, registerCandidateRefresh, unregisterCandidateRefresh, registerDialogHost, unregisterDialogHost }}>
     {children}
-    <ConfirmDialog open={!!continueConfirm} onOpenChange={open => !open && setContinueConfirm(null)} title="确认继续运行" onConfirm={() => { const next = continueConfirm; setContinueConfirm(null); if (next) void continueOperation(next); }}><p>将继续运行{continueConfirm ? operationTitle(continueConfirm.title) : "当前任务"}，会调用模型并产生费用；已完成的步骤保留。</p><p>不会影响当前线上版本。</p></ConfirmDialog>
+    <ConfirmDialog open={!!continueConfirm} onOpenChange={open => !open && setContinueConfirm(null)} title="确认继续运行" onConfirm={() => { const next = continueConfirm; setContinueConfirm(null); if (next) void continueOperation(next); }}><p>将继续运行{continueConfirm ? operationTitle(continueConfirm.title) : "当前任务"}，会调用模型并产生费用；已完成的步骤保留。</p><p>{continueConfirm?.throughRelease ? "仅在复测、发布检查和已保存的 Gate 3 授权都满足时更新线上版本。" : "不会影响当前线上版本。"}</p></ConfirmDialog>
     {dialogHosts.length ? createPortal(console, dialogHosts[dialogHosts.length - 1]) : console}
   </OperationContext.Provider>;
 }

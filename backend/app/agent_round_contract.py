@@ -13,6 +13,15 @@ LAYERS = ('safety', 'retrieval', 'generation')
 GENERATION_REQUIRED = '前置条件未满足：需先对当前底座做生成诊断'
 
 
+class GenerationDiagnosisRequired(ValueError):
+    def __init__(self, base_id, run_id, question_ids):
+        super().__init__(GENERATION_REQUIRED)
+        self.base_id = base_id
+        self.run_id = run_id
+        self.question_ids = question_ids
+
+
+
 def layered(context):
     return (context.get('verdict_version') or '') >= LAYERED_VERSION
 

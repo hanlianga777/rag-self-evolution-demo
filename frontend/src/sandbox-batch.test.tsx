@@ -89,3 +89,20 @@ it('lets the user stop the cycle once and shows stopped instead of completed', a
  expect(document.body.textContent).toContain('已停止');
  expect(document.querySelector('.ui-status')?.textContent).toBe('已停止');
 });
+
+it('continues a saved release workflow through the same optimization button', async () => {
+ let started = false;
+ const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+  if (url.endsWith('/workspace')) return reply({current_baseline_id:'E1'});
+  if (init?.method === 'POST') { started = true; return reply({}); }
+  return reply({baseline_run_id:'E1',result:{optimization_cycle:{
+   status:started ? 'completed' : 'stopped',phase:started ? 'published' : 'sandbox',
+   workflow_scope:{target:'release'},used:1,remaining:11,
+  }}});
+ });
+ vi.stubGlobal('fetch', fetcher);
+ await mount();
+ await click();
+ const posts = fetcher.mock.calls.filter(([, init]) => init?.method === 'POST');
+ expect(posts.map(([url]) => url)).toEqual([expect.stringContaining('/experiments/EXP/run-cycle?target=release')]);
+});

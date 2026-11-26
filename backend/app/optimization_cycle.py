@@ -42,8 +42,20 @@ def _save_state(store, experiment_id, **state):
         key = 'cycle:' + experiment_id
         task_leases.require(connection, key, task_leases.current(store, key), legacy=True)
         result = json.loads(row['result_json'])
-        result['optimization_cycle'] = {**result.get('optimization_cycle', {}), **state,
-            'updated_at': datetime.now(timezone.utc).isoformat()}
+        previous = result.get('optimization_cycle', {})
+        updated = {**previous, **state, 'updated_at': datetime.now(timezone.utc).isoformat()}
+        scope = updated.get('workflow_scope', {})
+        if scope.get('target') == 'release' and state.get('status') == 'recommended':
+            # The lease must remain recoverable between recommendation and retest.
+            updated.update(status='running', phase='final_retest')
+        if scope:
+            changes = ('status', 'phase', 'active_candidate')
+            audit = previous.get('workflow_audit', [])
+            if any(updated.get(field) != previous.get(field) for field in changes):
+                audit = [*audit, {'at': updated['updated_at'], **{field: updated.get(field) for field in changes},
+                                 'reason': updated.get('last_error')}]
+            updated['workflow_audit'] = audit
+        result['optimization_cycle'] = updated
         connection.execute('UPDATE experiments SET result_json=? WHERE id=?',
                            (json.dumps(result, ensure_ascii=False, allow_nan=False), experiment_id))
 
@@ -54,14 +66,17 @@ def _save_state(store, experiment_id, **state):
             business = task_leases.progress_state(cycle)
         elif status == 'stopped':
             business = 'paused'
-        elif status in {'recommended', 'qualified', 'round_completed', 'round_limit', 'completed'}:
+        elif status in {'recommended', 'qualified', 'round_completed', 'round_limit', 'completed', 'awaiting_release_approval'}:
             business = 'completed'
         else:
             business = 'blocked' if status in {'blocked', 'budget_exhausted'} else 'failed'
         task_leases.update_state(connection, store, key, business)
+    from .paid_run import current_paid_run
+    if 'phase' in state and (ledger := current_paid_run()):
+        ledger.phase = updated['phase']
 
 
-def claim_cycle(store, experiment_id, *, current_round_only=False, external=False):
+def claim_cycle(store, experiment_id, *, current_round_only=False, workflow_scope=None):
     """Called before starting the worker, so duplicate clicks cannot own two cycles."""
     with CORPUS_LOCK, store.connection() as connection:
         connection.execute('BEGIN IMMEDIATE')
@@ -76,6 +91,14 @@ def claim_cycle(store, experiment_id, *, current_round_only=False, external=Fals
                 or task_leases.active(connection, 'composite:' + experiment_id)
                 or any(candidate_occupied(connection, c) for c in experiment['candidates'])):
             raise ValueError('当前方案或评测仍在运行')
+        if workflow_scope and workflow_scope.get('target') is None:
+            saved_scope = prior_cycle.get('workflow_scope') or {}
+            if (prior_cycle.get('status') in {*task_leases.ACTIVE_STATES, 'blocked', 'stopped', 'failed'}
+                    and saved_scope.get('target') in {'current_round', 'candidate', 'release'}):
+                workflow_scope = {**saved_scope, 'entry': workflow_scope['entry']}
+            else:
+                workflow_scope = {**workflow_scope, 'target': 'cycle'}
+            current_round_only = workflow_scope['target'] == 'current_round'
         confirmation = experiment['result'].get('report_confirmation')
         if confirmation:
             winner = next((c for c in experiment['candidates'] if c['id'] == confirmation['winner_id']), None)
@@ -83,6 +106,16 @@ def claim_cycle(store, experiment_id, *, current_round_only=False, external=Fals
                 raise ValueError('Winner资格失效，不能续跑D')
             if current_round_only:
                 raise ValueError('报告已确认，只能续跑D')
+        if workflow_scope:
+            workflow_scope = dict(workflow_scope)
+            if workflow_scope['target'] == 'next_round':
+                if confirmation:
+                    raise ValueError('报告已确认，不能继续改变实验')
+                current_round = max((c['reasoning'].get('round', 1) for c in experiment['candidates']), default=0)
+                workflow_scope['round'] = 1 if experiment['result'].get('seed_round_planned') is False else current_round + 1
+            if workflow_scope['target'] == 'candidate' and not any(
+                    c['id'] == workflow_scope['candidate_id'] for c in experiment['candidates']):
+                raise ValueError('Candidate 不属于本实验')
         if current_round_only and not any(c['reasoning'].get('candidate_label') in {'A','B','C'} for c in experiment['candidates']):
             raise ValueError('当前没有可续跑的 A/B/C 方案')
         state = {'status':'running', 'phase':'composite' if confirmation else 'analysis', 'owner_pid':os.getpid(), 'current_round_only':current_round_only,
@@ -91,7 +124,16 @@ def claim_cycle(store, experiment_id, *, current_round_only=False, external=Fals
                  'used':experiment['evaluation_budget']['used'],
                  'remaining':max(0, MAX_EVALS-experiment['evaluation_budget']['used']),
                  'reserved_for_d':experiment['evaluation_budget']['reserved_for_d'], 'last_error':None}
-        if prior_cycle.get('status') in {'blocked', 'stopped'}:
+        if workflow_scope:
+            if workflow_scope['target'] == 'release' and prior_cycle.get('phase') in {
+                    'before_release', 'final_retest', 'release', 'production_smoke', 'published', 'unchanged'}:
+                state['phase'] = 'final_retest'
+            state.update(workflow_scope=workflow_scope, workflow_audit=[*prior_cycle.get('workflow_audit', []), {
+                'at': datetime.now(timezone.utc).isoformat(), 'status': 'running', 'phase': state['phase'],
+                'scope': workflow_scope,
+            }])
+        if prior_cycle.get('status') in {'blocked', 'stopped'} or (
+                workflow_scope and prior_cycle.get('external_runner') and prior_cycle.get('status') == 'failed'):
             state['reopen_paid_ledger'] = True
         blocked = [c['result']['evaluation_run_id'] for c in experiment['candidates']
                    if c['status']=='failed' and c['result'].get('evaluation_run_id')
@@ -102,10 +144,6 @@ def claim_cycle(store, experiment_id, *, current_round_only=False, external=Fals
             previous_decision = experiment['result'].get('optimization_cycle', {}).get('staged_decision')
             if previous_decision:
                 state['staged_decision'] = previous_decision
-        if external:
-            if prior_cycle.get('stop_request'):
-                raise InterruptedError('已收到停止请求，断点保留')
-            state = {**state, **prior_cycle, 'external_runner': True}
         token = task_leases.claim(connection, 'cycle:' + experiment_id)
         result = {**experiment['result'], 'optimization_cycle':state}
         from .paid_policy import current_binding
@@ -130,9 +168,15 @@ def take_cycle_claim(store, experiment_id):
     return None
 
 
+def read_cycle_state(store, experiment_id):
+    if reader := getattr(store, 'optimization_cycle_state', None):
+        return reader(experiment_id)
+    return (store.experiment(experiment_id, light=True) or {}).get('result', {}).get('optimization_cycle', {})
+
+
 def check_cycle_stop(store, experiment_id):
     task_leases.check(store)
-    state = (store.experiment(experiment_id, light=True) or {}).get('result', {}).get('optimization_cycle', {})
+    state = read_cycle_state(store, experiment_id)
     if state.get('stop_request') and state.get('status') in {'running', 'queued', 'recovering', 'stopped'}:
         raise InterruptedError('用户停止运行，断点已保存')
 
@@ -163,6 +207,9 @@ def request_cycle_stop(store, experiment_id):
 
 def run_until_qualified(store, runtime, experiment_id, *, claimed=False, lease_token=None):
     """Continue the authorized batch, reusing saved Sandbox checkpoints."""
+    from .workflow_engine import WorkflowEngine
+
+    engine = WorkflowEngine(store, runtime, experiment_id)
     key = 'cycle:' + experiment_id
     if task_leases.current(store, key):
         return _run_owned_cycle(store, runtime, experiment_id)
@@ -173,38 +220,13 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False, lease_t
         with task_leases.work(store, key, token):
             return _run_owned_cycle(store, runtime, experiment_id)
     except task_leases.LeaseLost:
-        return store.experiment(experiment_id, light=True)['result']['optimization_cycle']
+        return engine.state()
 
 
 def _run_owned_cycle(store, runtime, experiment_id):
-    from contextlib import nullcontext
-    from .paid_policy import experiment_binding, restore_paid_context
-    from .providers import permanent_provider_error, provider_error_details, provider_retry_scope
-    provider = runtime.provider if getattr(runtime, 'live_enabled', True) else None
-    def on_state(status, **details):
-        _save_state(store, experiment_id, provider_retry={'state':status, **details})
-    try:
-        binding = experiment_binding(store, experiment_id, provider)
-        result = store.experiment(experiment_id, light=True)['result']
-        reopen = result.get('optimization_cycle', {}).get('reopen_paid_ledger', False)
-        with provider_retry_scope(lambda:check_cycle_stop(store, experiment_id), on_state), (
-                restore_paid_context(store,binding,reopen=reopen) if binding else nullcontext()):
-            if reopen:
-                _save_state(store, experiment_id, reopen_paid_ledger=False)
-            return _run_until_qualified(store, runtime, experiment_id)
-    except task_leases.LeaseLost:
-        raise
-    except InterruptedError as error:
-        _save_state(store, experiment_id, status='stopped', last_error=str(error))
-    except (ValueError, OSError) as error:
-        _save_state(store, experiment_id, status='blocked', last_error=str(error),
-                    provider_retry={'state':'blocked', **provider_error_details(error,'authorization')})
-    except Exception as error:
-        if not permanent_provider_error(error):
-            raise
-        _save_state(store, experiment_id, status='blocked', last_error=str(error),
-                    provider_retry={'state':'blocked', **provider_error_details(error,'provider')})
-    return store.experiment(experiment_id, light=True)['result']['optimization_cycle']
+    from .workflow_engine import WorkflowEngine
+
+    return WorkflowEngine(store, runtime, experiment_id).run()
 
 
 def _candidate_block_error(run):
@@ -219,6 +241,8 @@ def _candidate_block_error(run):
 
 def _run_until_qualified(store, runtime, experiment_id):
     from .providers import permanent_provider_error
+    from .workflow_engine import WorkflowEngine
+    engine = WorkflowEngine(store, runtime, experiment_id)
     runner, agent = EvaluationRunner(store, runtime), OptimizationAgent(store, runtime.provider)
     empty_rounds = 0
     state = dict(store.experiment(experiment_id, light=True)['result'].get('optimization_cycle', {}))
@@ -230,6 +254,8 @@ def _run_until_qualified(store, runtime, experiment_id):
         used = experiment['evaluation_budget']['used']
         legacy_staged = (experiment['result'].get('round_policy', {}).get('stop_rule') == STAGED_RULE
                          and not layered(experiment['result']))
+        if phase != 'sandbox':
+            state['active_candidate'] = None
         state.update(status=status, phase=phase, used=used, remaining=max(0, MAX_EVALS-used),
                      reserved_for_d=int(not legacy_staged), last_error=error,
                      round=max([c['reasoning'].get('round', 1) for c in experiment['candidates']] or [0]))
@@ -261,7 +287,7 @@ def _run_until_qualified(store, runtime, experiment_id):
     def advance_qualified(experiment, qualified, *, do_composite=True):
         confirmation = experiment['result'].get('report_confirmation')
         current_contract = experiment['result'].get('decision_contract_version') == '109c'
-        authorization = unattended_authorization(store)
+        authorization = engine.release_authorization() or unattended_authorization(store)
         if not confirmation:
             for candidate in experiment['candidates']:
                 if candidate['status']=='generated' and candidate['reasoning'].get('candidate_label') in {'A','B','C'}:
@@ -292,7 +318,10 @@ def _run_until_qualified(store, runtime, experiment_id):
             if current_contract and d:
                 from .agent_strategy import conclude_round
                 save('running', 'composite_review')
-                conclude_round(store, runtime, experiment_id, final_d=True)
+                try:
+                    conclude_round(store, runtime, experiment_id, final_d=True)
+                except ValueError as error:
+                    return save('blocked', 'composite_review', str(error))
             store.refresh_recommendation(experiment_id)
             return save('recommended', 'before_release')
         return None
@@ -309,7 +338,9 @@ def _run_until_qualified(store, runtime, experiment_id):
                          and c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True]
             policy = experiment['result'].get('round_policy', {})
             full_rounds = policy.get('mode') == 'full_rounds'
-            finishing = not full_rounds or bool(experiment['result'].get('report_confirmation')) or bool(state.get('proposal_round_end'))
+            round_only = state.get('current_round_only')
+            finishing = not round_only and (not full_rounds or bool(experiment['result'].get('report_confirmation'))
+                                            or bool(state.get('proposal_round_end')))
             if qualified and finishing:
                 if terminal := advance_qualified(experiment, qualified):
                     return terminal
@@ -317,6 +348,9 @@ def _run_until_qualified(store, runtime, experiment_id):
             labels = {'D'} if qualified and finishing else {'A','B','C'}
             pending = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in labels
                        and (c['status'] in {'generated','running'} or c['status']=='failed' and c['result'].get('evaluation_run_id'))]
+            if round_only:
+                latest = max((c['reasoning'].get('round', 1) for c in experiment['candidates']), default=0)
+                pending = [c for c in pending if c['reasoning'].get('round', 1) == latest]
             if qualified and finishing and not pending:
                 return save('failed','composite','D没有可安全续跑的结果或断点')
             for candidate in pending:
@@ -331,6 +365,7 @@ def _run_until_qualified(store, runtime, experiment_id):
                     if full_rounds:
                         break
                     return save('budget_exhausted', 'review')
+                state['active_candidate'] = candidate['id']
                 save('running', 'sandbox')
                 finished = candidate
                 while True:
@@ -365,10 +400,10 @@ def _run_until_qualified(store, runtime, experiment_id):
                     recovery['resumes'] += 1
                     save('running','sandbox',f"断点续跑第{recovery['resumes']}次：{error}")
                     finished = runner.run_candidate(candidate['id'], automatic=True)
-                if not full_rounds and finished['result'].get('qualification',{}).get('qualified') is True:
+                if not round_only and not full_rounds and finished['result'].get('qualification',{}).get('qualified') is True:
                     break
             experiment = store.experiment(experiment_id, light=True)
-            if not full_rounds and any(c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True for c in experiment['candidates']):
+            if not round_only and not full_rounds and any(c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True for c in experiment['candidates']):
                 for candidate in experiment['candidates']:
                     if candidate['status']=='generated' and candidate['reasoning'].get('candidate_label') in {'A','B','C'}:
                         store.skip_candidate(candidate['id'], '用户', '出现合格方案，已跳过（未运行）', automatic=True)
@@ -404,7 +439,7 @@ def _run_until_qualified(store, runtime, experiment_id):
                     save('running','analysis')
                 if experiment['result'].get('mechanism_contract') != MECHANISM_CONTRACT:
                     wait_for_off_peak(store,'cycle:'+experiment_id,price_state,lambda:check_cycle_stop(store,experiment_id))
-                generated = agent.generate(experiment['baseline_run_id'], experiment_id=experiment_id)
+                generated = engine.generate_next(agent)
                 if stop := (generated or {}).get('result', {}).get('decision_stop'):
                     return save('stopped', 'review', stop['reason'])
             except ProposalValidationExhausted as error:
@@ -429,9 +464,10 @@ def _run_until_qualified(store, runtime, experiment_id):
     except task_leases.LeaseLost:
         raise
     except InterruptedError as error:
-        return save('stopped',state.get('phase','sandbox'),str(error))
+        return save('stopped',engine.state().get('phase','sandbox'),str(error))
     except Exception as error:
-        return save('blocked' if permanent_provider_error(error) else 'failed', state.get('phase','analysis'), str(error))
+        return save('blocked' if permanent_provider_error(error) or isinstance(error, ValueError) else 'failed',
+                    engine.state().get('phase','analysis'), str(error))
 
 
 STAGED_RULE = 'staged-v1'
@@ -536,10 +572,13 @@ def layered_stage_facts(store, experiment, baseline, winner, number):
 
 def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, runner, agent):
     """按规则总表六.6/六.7 执行分阶段试跑。"""
+    from .workflow_engine import WorkflowEngine
+    engine = WorkflowEngine(store, runtime, experiment_id)
     from .agent_strategy import conclude_round
     from .providers import permanent_provider_error
 
     def execute(candidate):
+        state['active_candidate'] = candidate['id']
         save('running', 'sandbox')
         finished = candidate
         while True:
@@ -563,8 +602,6 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                     continue
                 return None, save('blocked','sandbox',blocked)
             error = run.get('error_message') or str(result.get('technical_errors') or '试跑未完整结束')
-            if state.get('external_runner') and task_leases.current(store, 'cycle:' + experiment_id):
-                return None, save('failed', 'sandbox', result.get('auto_recovery', {}).get('error') or error)
             recovery = state.setdefault('sandbox_recovery', {}).setdefault(candidate['id'], {'resumes':0, 'error':error})
             if recovery['error'] != error:
                 recovery.update(error=error, resumes=0)
@@ -606,9 +643,7 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
             try:
                 conclude_round(store, runtime, experiment_id, final_d=True)
             except ValueError as error:
-                if state.get('external_runner') and task_leases.current(store, 'cycle:' + experiment_id):
-                    raise
-                state['d_review_error'] = str(error)
+                return save('blocked', 'composite_review', str(error))
         store.refresh_recommendation(experiment_id)
         return save('recommended', 'before_release')
 
@@ -684,15 +719,13 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                     save('running','analysis')
                 if experiment['result'].get('mechanism_contract') != MECHANISM_CONTRACT:
                     wait_for_off_peak(store,'cycle:'+experiment_id,price_state,lambda:check_cycle_stop(store,experiment_id))
-                generated = agent.generate(experiment['baseline_run_id'], experiment_id=experiment_id)
+                generated = engine.generate_next(agent)
                 if stop := (generated or {}).get('result', {}).get('decision_stop'):
                     if use_layered and winner:
                         state['staged_decision']['decision'] = 'finish_winner'
                         return finish(experiment, [winner], 'finish_winner')
                     return save('stopped', 'review', stop['reason'])
             except ProposalValidationExhausted as error:
-                if state.get('external_runner') and task_leases.current(store, 'cycle:' + experiment_id):
-                    raise
                 failures = state.setdefault('proposal_generation_failures', [])
                 failures.append({'round':number+1, 'reason':str(error), 'sandbox_budget_used':0,
                                  'at':datetime.now(timezone.utc).isoformat()})
@@ -710,43 +743,16 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
     except task_leases.LeaseLost:
         raise
     except InterruptedError as error:
-        return save('stopped',state.get('phase','sandbox'),str(error))
+        return save('stopped',engine.state().get('phase','sandbox'),str(error))
     except Exception as error:
-        return save('blocked' if permanent_provider_error(error) else 'failed', state.get('phase','analysis'), str(error))
+        return save('blocked' if permanent_provider_error(error) or isinstance(error, ValueError) else 'failed',
+                    engine.state().get('phase','analysis'), str(error))
 
 
 def recover_optimization_cycles(store, runtime):
-    """Claim an interrupted cycle in place, retaining its saved phase and authorization."""
-    with store.connection() as connection:
-        ids = [row['id'] for row in connection.execute("""SELECT id FROM experiments
-            WHERE json_extract(result_json,'$.optimization_cycle.status') IN ('queued','running','recovering')""")]
-    for experiment_id in ids:
-        with store.connection() as connection:
-            connection.execute('BEGIN IMMEDIATE')
-            saved = connection.execute('SELECT status,result_json FROM experiments WHERE id=?',(experiment_id,)).fetchone()
-            if not saved:
-                continue
-            context = json.loads(saved['result_json'])
-            state = context.get('optimization_cycle', {})
-            if state.get('status') not in task_leases.ACTIVE_STATES or task_leases.cycle_active(connection, experiment_id, state):
-                continue
-            if state.get('stop_request'):
-                task_leases.mark_paused(connection, 'cycle:' + experiment_id)
-                state['status'] = 'stopped'
-                token = None
-            else:
-                candidates = store.candidates(experiment_id, light=True)
-                if (task_leases.agent_active(connection, experiment_id, context, legacy_generating=saved['status'] == 'generating')
-                        or task_leases.active(connection, 'composite:' + experiment_id)
-                        or any(candidate_occupied(connection, candidate) for candidate in candidates)):
-                    continue
-                token = task_leases.claim(connection, 'cycle:' + experiment_id, recovering=True)
-                state.update(status='recovering', external_runner=False, owner_pid=os.getpid())
-                state.pop('worker_thread', None)
-            connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (json.dumps(context, ensure_ascii=False), experiment_id))
-        if token:
-            threading.Thread(target=run_until_qualified, args=(store,runtime,experiment_id),
-                             kwargs={'claimed':True, 'lease_token':token}, daemon=True).start()
+    from .workflow_engine import recover_pending
+
+    return recover_pending(store, runtime)
 
 
 def recover_agent_generations(store, runtime):

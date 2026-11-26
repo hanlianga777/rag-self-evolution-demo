@@ -185,6 +185,12 @@ class GovernanceStore:
         finally:
             connection.close()
 
+    def optimization_cycle_state(self, experiment_id):
+        with self.connection() as db:
+            row = db.execute("SELECT json_extract(result_json,'$.optimization_cycle') FROM experiments WHERE id=?",
+                             (experiment_id,)).fetchone()
+        return _load(row[0], {}) if row else {}
+
     def save_job_checkpoint(self, run_id, question_id, payload):
         with self.connection() as connection:
             connection.execute('INSERT INTO job_checkpoints VALUES (?,?,?) ON CONFLICT(run_id,question_id) DO UPDATE SET checkpoint_json=excluded.checkpoint_json', (run_id,question_id,_json(payload)))
@@ -3465,7 +3471,8 @@ class GovernanceStore:
             if experiment['result'].get('seed_round_planned') is False:
                 raise ValueError('需先完成第 1 轮 B/C 规划才能确认 Gate 2')
             from .paid_schedule import unattended_authorization
-            authorization = unattended_authorization(self)
+            from .workflow_engine import WorkflowEngine
+            authorization = WorkflowEngine(self, None, experiment_id).release_authorization() or unattended_authorization(self)
             audit = gate_audit('gate2', actor, authorization=authorization, reviews=delegated_review)
             self.require_current_baseline(experiment['baseline_run_id'], connection)
             candidates = experiment['candidates']
@@ -4000,7 +4007,7 @@ class GovernanceStore:
             qualified = qualified and qualification.get("qualified") is True
         return {"sandbox": candidate["status"] == "evaluated", "qualified": qualified, "recommended": recommendation.get("recommended_candidate") == candidate["id"], "human_release": (self.latest_approval("human_release", candidate["id"]) or {}).get("decision") == "approved", "round_complete": self.round_completion(candidate, peers=peers, seed_round_open=seed_round_open)["complete"]}
 
-    def publish_candidate(self, candidate_id: str, actor: str, *, delegated_review=None):
+    def publish_candidate(self, candidate_id: str, actor: str, *, delegated_review=None, workflow_release=None):
         candidate = self.candidate(candidate_id)
         if candidate is None or candidate["status"] != "evaluated":
             raise ValueError("仅已完成 Sandbox 的 Candidate 可发布")
@@ -4022,6 +4029,22 @@ class GovernanceStore:
             experiment = connection.execute("SELECT baseline_run_id, result_json FROM experiments WHERE id=?", (candidate["experiment_id"],)).fetchone()
             self.require_current_baseline(experiment["baseline_run_id"], connection)
             audit = gate_audit('gate3', actor, reviews=delegated_review)
+            workflow = _load(experiment['result_json'], {}).get('optimization_cycle', {})
+            if workflow_release:
+                task_leases.require(connection, 'cycle:' + candidate['experiment_id'],
+                                    task_leases.current(self, 'cycle:' + candidate['experiment_id']))
+                if workflow.get('stop_request'):
+                    raise InterruptedError('用户停止运行，断点已保存')
+                previous_id, verified_run_id, authorized_at = workflow_release
+                if verified_run_id != run['id']:
+                    raise ValueError('已复测的 Candidate 评测身份已变化，请核对发布依据')
+                active = connection.execute("SELECT id FROM production_versions WHERE status='active'").fetchone()
+                if not active or active['id'] != previous_id:
+                    raise ValueError('发布前线上版本变化，请重新核对回滚点')
+                audit.update(authorized_at=authorized_at, executed_by='Codex')
+            elif workflow.get('workflow_scope', {}).get('target') == 'release' and task_leases.cycle_active(
+                    connection, candidate['experiment_id'], workflow):
+                raise ValueError('统一编排正在复测或发布，请查看本次运行进度')
             if connection.execute("SELECT 1 FROM production_versions WHERE json_extract(snapshot_json, '$.candidate_id') = ?", (candidate_id,)).fetchone():
                 raise ValueError("Candidate 已发布")
             row = connection.execute("SELECT status, result_json, config_json FROM candidate_configs WHERE id = ?", (candidate_id,)).fetchone()

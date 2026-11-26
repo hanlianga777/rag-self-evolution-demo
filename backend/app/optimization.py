@@ -1106,7 +1106,7 @@ class OptimizationAgent:
                     opportunities[item['question_id']].update(available=[], reason='缺少可用于 Sandbox 的已保存目标记录')
             labels = labels[:evaluation_budget['remaining_for_abc']]
             if use_layered:
-                from .agent_round_contract import GENERATION_REQUIRED, layer_plan, layer_signals
+                from .agent_round_contract import GENERATION_REQUIRED, GenerationDiagnosisRequired, layer_plan, layer_signals
 
                 current_result = winner['result'] if winner else baseline['result']
                 base_run = current_result.get('evaluation_run_id') if winner else baseline_run_id
@@ -1121,7 +1121,7 @@ class OptimizationAgent:
                         'validation_error': GENERATION_REQUIRED, 'provider_called': False, 'round': round_number,
                         'round_target_layer': target,
                     }, GENERATION_REQUIRED, generation_token=generation_token)
-                    raise ValueError(GENERATION_REQUIRED)
+                    raise GenerationDiagnosisRequired(base['id'], base_run, sorted(remaining))
             else:
                 labels = available_labels(opportunities, labels)
             inherited = inherited_repairs(base, prior_candidates, ledger['current'], passed)

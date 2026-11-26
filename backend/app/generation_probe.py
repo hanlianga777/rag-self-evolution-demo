@@ -70,11 +70,12 @@ def run_probe(store, evaluator, experiment_id, base_run_id, changes_list, questi
         with store.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
             _, state = _experiment_state(connection, experiment_id)
-            state['parameter_effect_ledger']['current'].extend(entries)
-            connection.execute('INSERT INTO job_checkpoints VALUES (?,?,?)',
-                               (result['id'], 'generation_probe', json.dumps(result, ensure_ascii=False)))
-            connection.execute('UPDATE experiments SET result_json=? WHERE id=?',
-                               (json.dumps(state, ensure_ascii=False), experiment_id))
+            written = connection.execute('INSERT INTO job_checkpoints VALUES (?,?,?) ON CONFLICT(run_id,question_id) DO NOTHING',
+                                         (result['id'], 'generation_probe', json.dumps(result, ensure_ascii=False)))
+            if written.rowcount:
+                state['parameter_effect_ledger']['current'].extend(entries)
+                connection.execute('UPDATE experiments SET result_json=? WHERE id=?',
+                                   (json.dumps(state, ensure_ascii=False), experiment_id))
         diagnostics.append(result)
     return diagnostics
 
