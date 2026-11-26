@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import unicodedata
 
 from . import rules
 
@@ -206,6 +207,13 @@ def _reason(value, name):
     return value.strip()
 
 
+_FACT_QUOTES = str.maketrans('「」“”', '""""')
+
+
+def _normalize_fact(text):
+    return ''.join(unicodedata.normalize('NFKC', text).split()).translate(_FACT_QUOTES)
+
+
 def parse_rubric_output(text, category, *, reference=None, expected_behavior=None) -> dict:
     """只做格式校验与少量无歧义的类型规范化，不改语义。不合格 → ValueError（技术失败，可重试）。"""
     text = (text or '').strip().removeprefix('﻿')
@@ -244,14 +252,16 @@ def parse_rubric_output(text, category, *, reference=None, expected_behavior=Non
         if not isinstance(hits, list) or bool(hits) != bool(reference.strip()):
             raise ValueError('fact_hits 必须列出参考答案的事实命中情况')
         result['fact_hits'] = []
+        normalized_reference = _normalize_fact(reference)
         seen = set()
         for hit in hits:
             if not isinstance(hit, dict):
                 raise ValueError('fact_hits 每项必须是对象')
-            fact = _reason(hit.get('fact'), 'fact')
-            if fact not in reference or fact in seen:
+            fact = hit.get('fact')
+            normalized_fact = _normalize_fact(_reason(fact, 'fact'))
+            if not normalized_fact or normalized_fact not in normalized_reference or normalized_fact in seen:
                 raise ValueError('fact_hits 的 fact 必须是无重复的参考答案原文片段')
-            seen.add(fact)
+            seen.add(normalized_fact)
             result['fact_hits'].append({'fact': fact, 'matched': _flag(hit.get('matched'), 'matched')})
     return result
 

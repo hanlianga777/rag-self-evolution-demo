@@ -30,6 +30,22 @@ def test_parse_accepts_levels_and_rejects_others():
     assert neg["behavior_correct"] is True
 
 
+def test_fact_hits_compare_normalized_contiguous_quotes_and_preserve_original():
+    reference = '保留「轴 ４（校准，慢速）；禁止混用」：ABC。然后复核。'
+    fact = ' "轴4(校准, 慢速);禁止混用":ＡＢＣ '
+    hit = {"fact": fact, "matched": True}
+    parsed = parse_rubric_output(pos(100, 100, 100, fact_hits=[hit]), "positive", reference=reference)
+    assert parsed["fact_hits"] == [hit]
+
+    for invalid in ("轴4(校准, 快速)", "轴4(校准, 慢速)然后复核"):
+        with pytest.raises(ValueError, match="fact_hits"):
+            parse_rubric_output(pos(100, 100, 100, fact_hits=[{"fact": invalid, "matched": True}]),
+                                "positive", reference=reference)
+    with pytest.raises(ValueError, match="fact_hits"):
+        parse_rubric_output(pos(100, 100, 100, fact_hits=[hit, {**hit, "fact": '「轴 ４（校准，慢速）；禁止混用」：ABC'}]),
+                            "positive", reference=reference)
+
+
 @pytest.mark.parametrize("category,scores,passed", [
     ("positive", (80, 80, 80), True),
     ("positive", (60, 100, 100), False),
