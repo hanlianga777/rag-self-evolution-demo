@@ -90,14 +90,14 @@ def make_sample(case, question, position, source, diagnostic_id):
     }
 
 
-def failed_judge_sample(trial, question, position, failure):
+def failed_judge_sample(trial, question, position, failure, *, source='baseline_recheck'):
     execution = trial['execution']
     sample = make_sample({
         'model_answer': execution['answer'],
         'judge_result': {'samples': list(trial.get('verdict_judgments', {}).values())},
         'programmatic_metrics': {k: execution[k] for k in (
             'retrieval_trace', 'latency_ms', 'generation_request_sha256', 'token_usage') if k in execution},
-    }, question, position, 'baseline_recheck', trial.get('diagnostic_id'))
+    }, question, position, source, trial.get('diagnostic_id'))
     return {**sample, 'judge_status': 'retry_exhausted', 'judge_error': failure['error']}
 
 

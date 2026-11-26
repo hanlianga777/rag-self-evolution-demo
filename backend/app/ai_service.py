@@ -403,19 +403,31 @@ class AiService:
         context = context or {}
         from .rubric_judge import RUBRIC_VERSION, reuse_parts
         if context.get('contract_version') == RUBRIC_VERSION:
-            from .rubric_judge import DEFAULT_JUDGE_SAMPLES, aggregate_samples
+            from .rubric_judge import DEFAULT_JUDGE_SAMPLES, aggregate_samples, rubric_verdict
             count = DEFAULT_JUDGE_SAMPLES
             from .evaluation_stage import _request_checkpoint
+            from .paid_policy import e6_accounting
+            from .paid_run import current_paid_run
             checkpoint = _request_checkpoint.get()
             durable = checkpoint is not None and checkpoint[1] == 'judge' and checkpoint[0].get('verdict_sample')
             saved = checkpoint[0].setdefault('verdict_judgments', {}) if durable else {}
             samples, usage, recovery, reused = [], [], [], []
+            fallback = None
             for sample in range(1, count + 1):
                 one = saved.get(str(sample))
                 if one is None:
                     parts = reuse_parts(question, expected, answer, category, context.get('negative_subtype'), context.get('final_texts', []), thinking_config('judge'), sample,
                                         expected_behavior=context.get('expected_behavior'))
-                    one = reuse_result('judge', parts, lambda:self._judge_uncached(question,expected,answer,category,context=context))
+                    try:
+                        one = reuse_result('judge', parts, lambda:self._judge_uncached(question,expected,answer,category,context=context))
+                    except ProviderInvalidResponse as error:
+                        votes = {rubric_verdict(category, prior)['passed'] for prior in samples}
+                        if (not durable or not e6_accounting(current_paid_run()) or len(samples) != 2 or len(votes) != 1
+                                or not getattr(error, 'provider_retry_exhausted', False)
+                                or getattr(error, 'request_execution_unknown', False)):
+                            raise
+                        fallback = str(error)
+                        break
                     if durable:
                         saved[str(sample)] = one
                         checkpoint[3]('running', phase='judge', durable=True)
@@ -425,7 +437,10 @@ class AiService:
                     usage.extend(one.get('token_usage') or []); recovery.extend(one.get('response_recovery') or [])
                 samples.append(one)
             # 2026-11-18：单次 Judge 的 estimated_cost 是费用报告字典，不能直接 sum；按各次的真实用量合并重算
-            result = {**aggregate_samples(category, samples), 'stages': [s for one in samples for s in (one.get('stages') or [])],
+            aggregate = aggregate_samples(category, samples, exhausted=fallback is not None)
+            if fallback is not None:
+                aggregate['aggregation']['judge_failure'] = fallback
+            result = {**aggregate, 'stages': [s for one in samples for s in (one.get('stages') or [])],
                       'token_usage': usage, 'response_recovery': recovery,
                       **(cost_fields(self.model, usage) if usage else {'estimated_cost': 0})}
             if durable:

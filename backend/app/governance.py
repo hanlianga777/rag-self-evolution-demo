@@ -4230,7 +4230,11 @@ class GovernanceStore:
             raise KeyError(version_id)
         from .knowledge_pipeline import index_for_config
         from .corpus import INDEX_DIR, CorpusStore
-        path = index_for_config(INDEX_DIR, target['config'])
+        config = target['config']
+        expected_knowledge = target['snapshot'].get('knowledge_identity')
+        if expected_knowledge and config.get('knowledge_identity') not in (None, expected_knowledge):
+            raise ValueError('回滚配置与快照的知识库身份不一致')
+        path = index_for_config(INDEX_DIR, {**config, 'knowledge_identity': expected_knowledge or config.get('knowledge_identity')})
         if not (path / 'manifest.json').exists() or not (path / 'faiss.index').exists():
             raise ValueError('回滚目标索引不可用；仅恢复配置，不能恢复缺失知识资产')
         index = CorpusStore(path).index_info()

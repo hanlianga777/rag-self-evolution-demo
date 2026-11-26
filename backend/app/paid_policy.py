@@ -7,10 +7,16 @@ from contextlib import contextmanager
 from pathlib import Path
 
 E5_POLICY = 'e5_external_usd_cap'  # Persisted 120b policy name.
+E6_TASK = '124c'
+E6_BASELINE = 'EVAL-20261126212249302614'
 E5_EXCHANGE = 6.7120
 EXPERIMENT_ACCOUNTING = 'experiment_accounting_v1'
 ALIBABA_RATES = {model: {'provider':'Alibaba', 'input':0.5, 'output':0, 'max_output':0, 'currency':'CNY'}
                  for model in ('text-embedding-v4', 'qwen3-rerank')}
+
+
+def e6_accounting(run):
+    return bool(run and isinstance(run.identity, dict) and run.identity.get('task') == E6_TASK)
 
 
 def e5_cost(calls):

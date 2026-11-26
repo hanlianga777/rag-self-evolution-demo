@@ -487,9 +487,11 @@ class EvaluationRunner:
                 'evaluation_identity': judge['evaluation_identity'], 'questions': questions}
 
     def _diagnostic_trials(self, items, run, repetitions, diagnostic_id, snapshot, frozen, traces, *, resume=None):
-        from .evaluation_stage import checkpoint_usage, perform_stage
+        from .evaluation_stage import checkpoint_usage, exhausted_judge_attempt, perform_stage
+        from .paid_policy import e6_accounting
+        from .paid_run import current_paid_run
         from .policy import protected_question
-        from .providers import permanent_provider_error
+        from .providers import ProviderInvalidResponse, permanent_provider_error
         from .request_reuse import question_scope
 
         questions = []
@@ -498,6 +500,7 @@ class EvaluationRunner:
             answer_kwargs = {'saved_trace': traces[question_id]} if question_id in traces else {}
             protected = protected_question(item, item['raw'])
             trials = []
+            fallback = resume is not None and e6_accounting(current_paid_run())
             for index in range(repetitions):
                 trial_id = f'{diagnostic_id}-{len(questions) + 1}-{index + 1}'
                 checkpoint = {'attempts': []}
@@ -524,7 +527,18 @@ class EvaluationRunner:
                 try:
                     with question_scope(question_id):
                         execution = perform('generation', lambda: self.runtime.answer(item['question'], run['config'], **answer_kwargs))
-                    score = perform('judge', lambda: self.score_execution(item, execution))
+                    if fallback:
+                        checkpoint['execution'] = execution
+                    try:
+                        if fallback and (failure := exhausted_judge_attempt(checkpoint)):
+                            raise ProviderInvalidResponse(failure['error'])
+                        score = perform('judge', lambda: self.score_execution(item, execution))
+                    except ProviderInvalidResponse:
+                        failure = exhausted_judge_attempt(checkpoint) if fallback else None
+                        if not failure:
+                            raise
+                        score = self._unscored_case(item, checkpoint, failure)
+                    checkpoint.pop('execution', None)
                     if type(score.get('passed')) is not bool:
                         raise ValueError('本次没有有效判定')
                     sample = verdict.make_sample(score, item['raw'], index + 1, 'recheck', trial_id)
@@ -542,11 +556,17 @@ class EvaluationRunner:
                     persist()
             passed = sum(trial['passed'] is True for trial in trials)
             unknown = sum(trial['passed'] is None for trial in trials)
+            unscored = sum(trial.get('case', {}).get('final_failure_reason') == verdict.JUDGE_TECHNICAL_FAILURE
+                           for trial in trials)
+            valid = len(trials) - unknown - unscored
+            if unscored and valid == 2 and passed == 1:
+                unknown += 1
             risk = any(trial['risk'] is True for trial in trials)
             display = frozen[question_id].get('coverage_slot') or f"Q{snapshot['question_ids'].index(question_id) + 1:02d}"
             questions.append({'question_id': question_id, 'display_question_id': display,
                               'distribution': f'{passed}/{repetitions}' if not unknown else None,
-                              'passed': passed, 'unknown': unknown, 'risk': None if protected and unknown and not risk else risk,
+                              'passed': passed, 'unknown': unknown,
+                              'risk': None if protected and (unknown or valid < 2 and unscored) and not risk else risk,
                               'trials': trials})
         return questions
 
@@ -582,6 +602,8 @@ class EvaluationRunner:
                           experiment_id, baseline=None, winner=None, automatic=False):
         """Resume by question and sample and publish the complete verdict wave."""
         from .evaluation_stage import exhausted_judge_attempt
+        from .paid_policy import e6_accounting
+        from .paid_run import current_paid_run
         from .providers import ProviderInvalidResponse
         from .request_reuse import experiment_scope
 
@@ -589,6 +611,7 @@ class EvaluationRunner:
         if saved := verdict.records(self.store, run_id):
             return saved
         original = baseline is None
+        fallback = original or e6_accounting(current_paid_run())
         raw = {case['question_id']: case for case in cases}
         if set(raw) != {item['id'] for item in items} or any(type(c.get('passed')) is not bool for c in raw.values()):
             raise ValueError('判定样本 1 缺少完整的冻结题集结果')
@@ -605,27 +628,46 @@ class EvaluationRunner:
                 diagnostic_id = case.get('diagnostic_id') or f'{run_id}:{key}:1'
                 samples = [verdict.make_sample(case, item['raw'], 1, source, diagnostic_id)]
                 if original or reason:
+                    if case.get('final_failure_reason') == verdict.JUDGE_TECHNICAL_FAILURE:
+                        samples[0].update(passed=None, judge_status='retry_exhausted')
                     checkpoint = checkpoints.setdefault(key, {'attempts': []})
                     trials = checkpoint.setdefault('verdict_trials', {})
                     for position in (2, 3):
                         trial = trials.setdefault(str(position), {'attempts': []})
                         source = 'baseline_recheck' if original else 'recheck'
-                        failure = exhausted_judge_attempt(trial) if original else None
+                        failure = exhausted_judge_attempt(trial) if fallback else None
                         if failure is None:
                             try:
                                 sample = self._verdict_trial(
                                     item, run['config'], trial, run_id, position, source,
                                     lambda: persist(key), check_stop, automatic=automatic)
                             except ProviderInvalidResponse:
-                                failure = exhausted_judge_attempt(trial) if original else None
+                                failure = exhausted_judge_attempt(trial) if fallback else None
                                 if failure is None:
                                     raise
                                 persist(key)
                         if failure is not None:
-                            sample = verdict.failed_judge_sample(trial, item['raw'], position, failure)
+                            sample = verdict.failed_judge_sample(trial, item['raw'], position, failure, source=source)
                         samples.append(sample)
                 final[key] = verdict.record(run_id, key, samples, reason)
         return verdict.save_records(self.store, run_id, final)
+
+    def _unscored_case(self, item, checkpoint, failure):
+        execution = checkpoint['execution']
+        protected = protected_question(item, item['raw'])
+        judge = {'samples': list(checkpoint.get('verdict_judgments', {}).values()), 'behavior_pass': None}
+        return {'question': item['question'], 'test_category': item['test_category'],
+                'negative_subtype': item.get('negative_subtype'), 'severity': 'critical' if protected else 'ordinary',
+                'model_answer': execution['answer'], 'retrieved_chunks': execution.get('retrieval', []),
+                'programmatic_metrics': {**{key: execution.get(key) for key in (
+                    'retrieval_trace', 'latency_ms', 'generation_request_sha256', 'token_usage')},
+                    'behavior_contract': {'effective_pass': None}},
+                'judge_result': judge, 'passed': False, 'redline_pass': False,
+                'failure_tags': [verdict.JUDGE_TECHNICAL_FAILURE], 'primary_root_cause': 'Unknown',
+                'root_cause': {'primary': 'Unknown', 'secondary': [], 'diagnostic_basis': 'judge_retry_exhausted'},
+                'final_failure_reason': verdict.JUDGE_TECHNICAL_FAILURE,
+                'evaluation_outcome': {'verdict': 'FAIL', 'reason': failure['error'],
+                                       'safety_review_required': protected, 'qualification_blocking': True}}
 
     def recheck_baseline(self, run_id=verdict.BASELINE_ORIGINAL_ID):
         """Complete the Baseline verdict for 118b without changing formal scores."""
@@ -1134,6 +1176,12 @@ class EvaluationRunner:
         with execution_limits(limits),accounting_only():return self._execute_baseline(run_id,approved,config)
 
     def _execute_baseline(self, run_id, approved, config):
+        from .evaluation_stage import exhausted_judge_attempt
+        from .paid_policy import e6_accounting
+        from .paid_run import current_paid_run
+        from .providers import ProviderInvalidResponse
+
+        fallback = bool(config.get('candidate_id')) and e6_accounting(current_paid_run())
         from .providers import permanent_provider_error, provider_error_details
         cases, checkpoints, phase, item = [], {}, 'initialization', None
         run = self.store.evaluation_run(run_id)
@@ -1258,7 +1306,16 @@ class EvaluationRunner:
                                 from .evaluation_stage import correction_for
                                 correction=correction_for(checkpoint,stage_run_id)
                                 return self.score_execution(item,checkpoint['execution'],judge_correction=correction)
-                            checkpoint['scored_result']=perform(phase,score)
+                            failure = exhausted_judge_attempt(checkpoint) if fallback else None
+                            if not failure:
+                                try:
+                                    checkpoint['scored_result'] = perform(phase, score)
+                                except ProviderInvalidResponse:
+                                    failure = exhausted_judge_attempt(checkpoint) if fallback else None
+                                    if not failure:
+                                        raise
+                            if failure:
+                                checkpoint['scored_result'] = self._unscored_case(item, checkpoint, failure)
                             persist()
                     except Exception as error:
                         if isinstance(error, InterruptedError) or permanent_provider_error(error):

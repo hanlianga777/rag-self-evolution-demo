@@ -12,19 +12,21 @@ from .evaluation import EvaluationRunner
 from .evaluation_stage import perform_stage, reopen_blocked_requests
 from .generation_probe import SOURCE, run_probe
 from .optimization import OptimizationAgent
-from .paid_policy import ALIBABA_RATES, E5_POLICY, experiment_binding, restore_paid_context
+from .paid_policy import ALIBABA_RATES, E5_POLICY, E6_BASELINE, e6_accounting, experiment_binding, restore_paid_context
 from .paid_run import REQUEST_LIMITS, current_paid_run
 from .paid_schedule import wait_for_off_peak
 from .policy import protected_question, require_gate_request_actor
 from .providers import permanent_provider_error, provider_retry_scope
 
-# The only existing task with a saved, task-specific authorization for automatic Gate 3.
 E5_BASELINE = 'EVAL-20261120213645613191'
 E5_SEED = 'EXP-20261124163600086429-R1-A'
 E5_AUTHORIZATION = {'enabled': True, 'actor': '用户', 'authorized_at': '2026-11-25T09:09:00-05:00',
                     'audit_note': '120b：用户 2026-11-25 09:09 授权 Gate 2 与 Gate 3，Codex 执行'}
 E5_PRICES = {'deepseek-flash': {'provider': 'DeepSeek', 'input': 0.3, 'output': 1.2,
                                'max_output': 65536, 'currency': 'USD'}, **ALIBABA_RATES}
+E6_AUTHORIZATION = {'enabled': True, 'actor': '用户', 'confirmed_by': '总指挥',
+                    'authorized_at': '2026-11-26 09:32',
+                    'audit_note': '124c：用户 11-26 09:32 全权授权，所有 Gate 由总指挥代用户确认'}
 PROBE_CHANGES = [{'generation_thinking': 'low'}, {'generation_thinking': 'high'},
                  {'prompt_strategy': rules.LOOSER}, {'prompt_strategy': rules.SAFE}]
 E5_SAFETY = [f'Q{number:02d}' for number in range(43, 51)]
@@ -116,6 +118,15 @@ class WorkflowEngine:
         identity = ledger.identity
         if not isinstance(identity, dict):
             return None
+        if e6_accounting(ledger):
+            if (experiment['baseline_run_id'] == identity.get('baseline') == E6_BASELINE
+                    and identity.get('experiment_id') == self.id and experiment['result'].get('mode') == 'initial'
+                    and identity.get('release_authorization') == E6_AUTHORIZATION
+                    and ledger.request_policy.get('budget_usd') == 5.0
+                    and not any(c['reasoning'].get('source_candidate_id') for c in experiment['candidates'])
+                    and not experiment['result']['parameter_effect_ledger'].get('historical')):
+                return E6_AUTHORIZATION.copy()
+            return None
         if not (self.is_e5(experiment) and identity.get('task') == '120b'
                 and identity.get('experiment_id') == self.id and identity.get('baseline') == E5_BASELINE
                 and ledger.request_policy.get('budget_usd') == 3.0):
@@ -170,6 +181,8 @@ class WorkflowEngine:
                     restore_paid_context(self.store, binding, reopen=reopen) if binding else nullcontext()):
                 if self.is_e5(experiment):
                     self.require_e5_contract()
+                if e6_accounting(current_paid_run()):
+                    self.require_e6_contract()
                 if reopen:
                     self.save(reopen_paid_ledger=False, resume_probe_requests=True)
                 if not scope and state.get('legacy_external_runner') and self.release_authorization():
@@ -205,6 +218,25 @@ class WorkflowEngine:
                       provider_retry={'state': 'blocked', 'error': str(error),
                                       'resume_hint': '核对所列原因后，从原实验断点继续'})
         return self.state()
+
+    def require_e6_contract(self):
+        from .evaluation_contract import evaluation_identity, policy_current
+
+        if not self.release_authorization():
+            raise ValueError('E6 的实验、Baseline 或授权账本身份不匹配')
+        baseline = self.store.require_current_baseline(E6_BASELINE)
+        frozen = json.loads(baseline['dataset_snapshot_json'])
+        judge = baseline['judge']
+        ledger = current_paid_run()
+        if (frozen['id'] != ledger.identity.get('snapshot_id') or len(frozen['question_ids']) != 50
+                or not policy_current(judge) or judge['evaluation_identity'] != evaluation_identity(frozen, judge)
+                or not self.runtime.live_enabled or self.runtime.model != judge['model']
+                or baseline['config'].get('knowledge_identity') != frozen['corpus_fingerprint']
+                or self.runtime.corpus.index_info()['knowledge_identity'] != frozen['corpus_fingerprint']
+                or ledger.prices != E5_PRICES or ledger.output_limits != {**REQUEST_LIMITS, **judge['execution_snapshot']['request_limits']}
+                or ledger.request_policy.get('ledger_directory') != str(ledger.path.parent)):
+            raise ValueError('E6 的冻结题卷、Judge、知识库、模型或计价不匹配')
+        verdict.require_baseline(self.store, baseline)
 
     def run_candidate(self, candidate_id):
         runner = EvaluationRunner(self.store, self.runtime)
@@ -363,12 +395,41 @@ class WorkflowEngine:
         self.check_stop()
         require_gate_request_actor('gate3', authorization['actor'])
         prepared = {'candidate': cid, 'rollback': active['id'], 'rollback_index': self.rollback_index(active)}
+        if e6_accounting(current_paid_run()):
+            prepared['rollback_rehearsal'] = self.rehearse_rollback(active, candidate)
+            prepared['authorization'] = authorization
         if receipt and receipt != prepared:
             raise ValueError('发布准备记录与当前线上版本不同，请核对回滚点')
         self.store.save_job_checkpoint(self.id, receipt_key, prepared)
         published = self.store.publish_candidate(cid, authorization['actor'], workflow_release=(
             prepared['rollback'], run_id, authorization['authorized_at']))
         self.verify_production(published, candidate, snapshot, prepared, prefix, resume_blocked=resume_blocked)
+
+    def rehearse_rollback(self, active, candidate):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from .governance import GovernanceStore
+
+        simulation = 'rollback-rehearsal'
+        with TemporaryDirectory(prefix='rag-rollback-rehearsal-') as directory:
+            database = Path(directory) / 'rehearsal.db'
+            if database.resolve() == self.store.database_path.resolve():
+                raise ValueError('回滚演练必须使用独立临时库')
+            isolated = GovernanceStore(database)
+            with isolated.connection() as db:
+                db.execute('DELETE FROM production_versions')  # Discard disposable bootstrap row.
+                db.executemany('INSERT INTO production_versions(id,status,config_json,created_at,snapshot_json) '
+                               'VALUES (?,?,?,?,?)', [
+                    (active['id'], 'archived', json.dumps(active['config']), active['created_at'], json.dumps(active['snapshot'])),
+                    (simulation, 'active', json.dumps(candidate['config']), active['created_at'], '{}'),
+                ])
+            restored = isolated.rollback_to(active['id'], 'Codex')
+            with isolated.connection() as db:
+                recorded = db.execute('SELECT 1 FROM rollback_history WHERE from_version_id=? AND to_version_id=?',
+                                      (simulation, active['id'])).fetchone()
+            if not restored or restored['id'] != active['id'] or restored['config'] != active['config'] or not recorded:
+                raise ValueError('临时数据库回滚演练未恢复原配置或缺少回滚记录')
+        return {'database': 'explicit_temporary_database', 'restored_version': active['id'], 'status': 'passed'}
 
     def final_retest(self, experiment, baseline, candidate, snapshot, prefix, *, resume_blocked):
         from .judge_replay import resolve_question_ids
