@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 class CycleRecoveryTests(unittest.TestCase):
     def exercise(self, *, repeated=False, stopped=False, restart=False, account_failure=False, current_round_only=False, resume_stopped=False):
-        from app.optimization_cycle import run_until_qualified
+        from app.optimization_cycle import _run_owned_cycle
         candidates = [{'id':label, 'status':'generated', 'reasoning':{'candidate_label':label, 'round':1}, 'result':{}}
                       for label in 'ABC']
         exp = {'id':'exp', 'baseline_run_id':'base', 'result':{}, 'evaluation_budget':{'used':0}, 'candidates':candidates}
@@ -51,10 +51,10 @@ class CycleRecoveryTests(unittest.TestCase):
             exp['result']['optimization_cycle']={'resume_stopped_runs':['run-A']}
             completed['A'].update(range(25));calls.extend(('A',q) for q in range(25))
             tries['A']=1
-        with patch('app.optimization_cycle.unattended_authorization',return_value={'enabled':False}), patch('app.optimization_cycle.claim_cycle'), patch('app.optimization_cycle._save_state', side_effect=lambda s,e,**kw:states.append(kw)), \
+        with patch('app.optimization_cycle.unattended_authorization',return_value={'enabled':False}), patch('app.optimization_cycle._save_state', side_effect=lambda s,e,**kw:states.append(kw)), \
              patch('app.optimization_cycle.EvaluationRunner',Runner), patch('app.optimization_cycle.OptimizationAgent') as agent:
             if current_round_only:agent.return_value.generate.side_effect=AssertionError('本轮续跑不能重新生成方案')
-            result=run_until_qualified(Store(),SimpleNamespace(provider=object()),'exp')
+            result=_run_owned_cycle(Store(),SimpleNamespace(provider=object()),'exp')
         return result, exp, calls, tries
 
     def test_a_50_question_checkpoint_continues_through_b_c_without_duplicate_calls(self):
@@ -115,8 +115,9 @@ class CycleRecoveryTests(unittest.TestCase):
             self.assertEqual(thread.call_count,1)
             thread.return_value.start.assert_called_once()
             state=store.experiment(experiment_id)['result']['optimization_cycle']
-            self.assertEqual(state['status'],'running')
-            self.assertIsNone(state['worker_thread'])
+            self.assertEqual(state['status'], 'recovering')
+            self.assertNotIn('worker_thread', state)
+            self.assertTrue(thread.call_args.kwargs['kwargs']['lease_token'])
 
 
 if __name__=='__main__':unittest.main()

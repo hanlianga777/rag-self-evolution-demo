@@ -137,7 +137,9 @@ class ScheduleTests(unittest.TestCase):
             self.assertEqual(runtime.judges,[])
             saved=self.store.evaluation_run(key)['result']
             self.assertTrue(saved['price_pause']['paused'])
-            self.assertTrue(saved['auto_recovery'].get('worker_token'))
+            from app import task_leases
+            with self.store.connection() as db:
+                self.assertTrue(task_leases.active(db, 'evaluation:' + key))
             clock[0]=datetime(2026,11,4,4,tzinfo=timezone.utc)
         with patch.object(schedule,'utc_now',side_effect=lambda:clock[0]),patch.object(schedule.time,'sleep',side_effect=sleep):
             result=runner.execute_replay(key,items,executions)
@@ -156,9 +158,18 @@ class ScheduleTests(unittest.TestCase):
         with self.store.connection() as db:
             self.assertTrue(has_active_jobs(db))
             with self.assertRaises(ValueError):require_idle(db)
-        with patch.object(schedule,'utc_now',return_value=datetime(2026,11,7,12,tzinfo=timezone.utc)),patch.object(self.store,'create_composite',return_value={'status':'generated'}) as composite:
+        from threading import Thread
+        from types import SimpleNamespace
+        workers = []
+        def worker_factory(**kwargs):
+            worker = Thread(**kwargs)
+            workers.append(worker)
+            return worker
+        with patch.object(schedule, 'threading', SimpleNamespace(Thread=worker_factory)), \
+                patch.object(schedule, 'utc_now', return_value=datetime(2026, 11, 7, 12, tzinfo=timezone.utc)), \
+                patch.object(self.store, 'create_composite', return_value={'status': 'generated'}) as composite:
             schedule.recover_scheduled_composites(self.store,object())
-            worker=schedule._composite_workers[(str(self.store.database_path),experiment_id)]
+            worker = workers[0]
             worker.join(3)
             self.assertFalse(worker.is_alive())
             composite.assert_called_once()
@@ -204,7 +215,12 @@ class ScheduleTests(unittest.TestCase):
         result={'optimization_cycle':{'status':'running','price_pause':{'paused':False}},'price_pause':pause}
         with self.store.connection() as db:
             db.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps(result),key))
-        rows=schedule.active_pauses(self.store)
+        from app import task_leases
+        with self.store.connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            token = task_leases.claim(db, 'cycle:' + key)
+        with task_leases.work(self.store, 'cycle:' + key, token):
+            rows = schedule.active_pauses(self.store)
         self.assertEqual(rows,[{'task_label':'Agent 优化循环','price_pause':pause,'target':{'experiment_id':key}}])
         from api_fixture import main
         from fastapi.testclient import TestClient
@@ -222,8 +238,11 @@ class ScheduleTests(unittest.TestCase):
             self.assertTrue(schedule.pause_state(self.store,'agent:'+key)['paused'])
             result['optimization_cycle']['status']='running'
             with self.store.connection() as db:
+                db.execute('BEGIN IMMEDIATE')
                 db.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps(result),key))
-            self.assertFalse(schedule.pause_state(self.store,'agent:'+key)['paused'])
+                token = task_leases.claim(db, 'cycle:' + key)
+            with task_leases.work(self.store, 'cycle:' + key, token):
+                self.assertFalse(schedule.pause_state(self.store,'agent:'+key)['paused'])
 
 
 class DiagnosticScheduleTests(unittest.TestCase):

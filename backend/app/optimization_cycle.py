@@ -3,9 +3,10 @@ import json
 import logging
 import os
 import threading
+from contextvars import ContextVar
 from datetime import datetime, timezone
 
-from . import rules
+from . import rules, task_leases
 from .agent_mechanism import CONTRACT as MECHANISM_CONTRACT
 from .agent_round_contract import layered, layered_winner
 from .evaluation import EvaluationRunner
@@ -15,10 +16,31 @@ from .paid_schedule import wait_for_off_peak, unattended_authorization
 from .policy import MAX_EVALS, candidate_rank, gate2_self_check_authorized
 
 
+_pending_cycle = ContextVar('pending_cycle_lease', default=None)
+
+
+def cycle_occupied(store, experiment):
+    if not experiment:
+        return False
+    with store.connection() as connection:
+        return task_leases.cycle_active(connection, experiment['id'],
+                                        experiment['result'].get('optimization_cycle') or {})
+
+
+def candidate_occupied(connection, candidate):
+    run_id = candidate['result'].get('evaluation_run_id')
+    if not run_id:
+        return False
+    run = connection.execute('SELECT * FROM evaluation_runs WHERE id=?', (run_id,)).fetchone()
+    return run is not None and task_leases.evaluation_active(connection, run)
+
+
 def _save_state(store, experiment_id, **state):
     with store.connection() as connection:
         connection.execute('BEGIN IMMEDIATE')
         row = connection.execute('SELECT result_json FROM experiments WHERE id=?', (experiment_id,)).fetchone()
+        key = 'cycle:' + experiment_id
+        task_leases.require(connection, key, task_leases.current(store, key), legacy=True)
         result = json.loads(row['result_json'])
         result['optimization_cycle'] = {**result.get('optimization_cycle', {}), **state,
             'updated_at': datetime.now(timezone.utc).isoformat()}
@@ -26,7 +48,20 @@ def _save_state(store, experiment_id, **state):
                            (json.dumps(result, ensure_ascii=False, allow_nan=False), experiment_id))
 
 
-def claim_cycle(store, experiment_id, *, current_round_only=False):
+        cycle = result['optimization_cycle']
+        status = cycle.get('status')
+        if status in {'running', 'recovering'}:
+            business = task_leases.progress_state(cycle)
+        elif status == 'stopped':
+            business = 'paused'
+        elif status in {'recommended', 'qualified', 'round_completed', 'round_limit', 'completed'}:
+            business = 'completed'
+        else:
+            business = 'blocked' if status in {'blocked', 'budget_exhausted'} else 'failed'
+        task_leases.update_state(connection, store, key, business)
+
+
+def claim_cycle(store, experiment_id, *, current_round_only=False, external=False):
     """Called before starting the worker, so duplicate clicks cannot own two cycles."""
     with CORPUS_LOCK, store.connection() as connection:
         connection.execute('BEGIN IMMEDIATE')
@@ -34,9 +69,12 @@ def claim_cycle(store, experiment_id, *, current_round_only=False):
         if not experiment:
             raise ValueError('实验不存在')
         store.require_current_baseline(experiment['baseline_run_id'], connection)
-        if experiment['result'].get('optimization_cycle', {}).get('status') == 'running':
+        prior_cycle = experiment['result'].get('optimization_cycle', {})
+        if task_leases.cycle_active(connection, experiment_id, prior_cycle):
             raise ValueError('优化批次正在运行')
-        if experiment['status'] == 'generating' or any(c['status'] in {'queued', 'running'} for c in experiment['candidates']):
+        if (task_leases.agent_active(connection, experiment_id, experiment['result'], legacy_generating=experiment['status'] == 'generating')
+                or task_leases.active(connection, 'composite:' + experiment_id)
+                or any(candidate_occupied(connection, c) for c in experiment['candidates'])):
             raise ValueError('当前方案或评测仍在运行')
         confirmation = experiment['result'].get('report_confirmation')
         if confirmation:
@@ -53,7 +91,6 @@ def claim_cycle(store, experiment_id, *, current_round_only=False):
                  'used':experiment['evaluation_budget']['used'],
                  'remaining':max(0, MAX_EVALS-experiment['evaluation_budget']['used']),
                  'reserved_for_d':experiment['evaluation_budget']['reserved_for_d'], 'last_error':None}
-        prior_cycle = experiment['result'].get('optimization_cycle', {})
         if prior_cycle.get('status') in {'blocked', 'stopped'}:
             state['reopen_paid_ledger'] = True
         blocked = [c['result']['evaluation_run_id'] for c in experiment['candidates']
@@ -65,6 +102,11 @@ def claim_cycle(store, experiment_id, *, current_round_only=False):
             previous_decision = experiment['result'].get('optimization_cycle', {}).get('staged_decision')
             if previous_decision:
                 state['staged_decision'] = previous_decision
+        if external:
+            if prior_cycle.get('stop_request'):
+                raise InterruptedError('已收到停止请求，断点保留')
+            state = {**state, **prior_cycle, 'external_runner': True}
+        token = task_leases.claim(connection, 'cycle:' + experiment_id)
         result = {**experiment['result'], 'optimization_cycle':state}
         from .paid_policy import current_binding
         if binding := current_binding():
@@ -73,42 +115,71 @@ def claim_cycle(store, experiment_id, *, current_round_only=False):
             result['paid_run'] = binding
         connection.execute('UPDATE experiments SET result_json=? WHERE id=?',
                            (json.dumps(result, ensure_ascii=False), experiment_id))
+    _pending_cycle.set((store.database_path, experiment_id, token))
     from .paid_schedule import clear_run_now
     for kind in ('cycle:', 'agent:'):
         clear_run_now(store, kind + experiment_id)
     return state
 
 
+def take_cycle_claim(store, experiment_id):
+    pending = _pending_cycle.get()
+    if pending and pending[:2] == (store.database_path, experiment_id):
+        _pending_cycle.set(None)
+        return pending[2]
+    return None
+
+
 def check_cycle_stop(store, experiment_id):
-    state=(store.experiment(experiment_id,light=True) or {}).get('result',{}).get('optimization_cycle',{})
-    if state.get('status')=='running' and state.get('stop_request'):
+    task_leases.check(store)
+    state = (store.experiment(experiment_id, light=True) or {}).get('result', {}).get('optimization_cycle', {})
+    if state.get('stop_request') and state.get('status') in {'running', 'queued', 'recovering', 'stopped'}:
         raise InterruptedError('用户停止运行，断点已保存')
 
 
 def request_cycle_stop(store, experiment_id):
     with CORPUS_LOCK, store.connection() as connection:
         connection.execute('BEGIN IMMEDIATE')
-        row=connection.execute('SELECT result_json FROM experiments WHERE id=?',(experiment_id,)).fetchone()
-        if not row:raise ValueError('实验不存在')
-        result=json.loads(row['result_json'])
-        state=result.get('optimization_cycle',{})
-        if state.get('status')=='running':
-            state.setdefault('stop_request',{'requested_at':datetime.now(timezone.utc).isoformat(),'reason':'用户停止运行'})
-            connection.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps(result,ensure_ascii=False),experiment_id))
-        runs=connection.execute("""SELECT e.id FROM evaluation_runs e JOIN candidate_configs c
-            ON json_extract(e.config_json,'$.candidate_id')=c.id
-            WHERE c.experiment_id=? AND e.status IN ('queued','running')""",(experiment_id,)).fetchall()
-    for run in runs:store.request_evaluation_stop(run['id'])
-    return store.experiment(experiment_id,light=True)['result'].get('optimization_cycle',{})
+        row = connection.execute('SELECT result_json FROM experiments WHERE id=?', (experiment_id,)).fetchone()
+        if not row:
+            raise ValueError('实验不存在')
+        result = json.loads(row['result_json'])
+        state = result.get('optimization_cycle', {})
+        if state.get('status') in {'running', 'queued', 'recovering'} or task_leases.cycle_active(connection, experiment_id, state):
+            state.setdefault('stop_request', {'requested_at': datetime.now(timezone.utc).isoformat(), 'reason': '用户停止运行'})
+            if not task_leases.cycle_active(connection, experiment_id, state):
+                state['status'] = 'stopped'
+                task_leases.mark_paused(connection, 'cycle:' + experiment_id)
+            result['optimization_cycle'] = state
+            connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (json.dumps(result, ensure_ascii=False), experiment_id))
+            runs = connection.execute("""SELECT e.id FROM evaluation_runs e JOIN candidate_configs c
+                ON json_extract(e.config_json,'$.candidate_id')=c.id
+                WHERE c.experiment_id=? AND e.status IN ('queued','running','recovering','completed')
+                AND json_extract(c.result_json,'$.evaluation_run_id')=e.id""", (experiment_id,)).fetchall()
+            for run in runs:
+                store.request_evaluation_stop(run['id'], connection=connection)
+    return state
 
 
-def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
+def run_until_qualified(store, runtime, experiment_id, *, claimed=False, lease_token=None):
     """Continue the authorized batch, reusing saved Sandbox checkpoints."""
+    key = 'cycle:' + experiment_id
+    if task_leases.current(store, key):
+        return _run_owned_cycle(store, runtime, experiment_id)
+    if not claimed and not lease_token:
+        claim_cycle(store, experiment_id)
+    token = lease_token or take_cycle_claim(store, experiment_id)
+    try:
+        with task_leases.work(store, key, token):
+            return _run_owned_cycle(store, runtime, experiment_id)
+    except task_leases.LeaseLost:
+        return store.experiment(experiment_id, light=True)['result']['optimization_cycle']
+
+
+def _run_owned_cycle(store, runtime, experiment_id):
     from contextlib import nullcontext
     from .paid_policy import experiment_binding, restore_paid_context
     from .providers import permanent_provider_error, provider_error_details, provider_retry_scope
-    if not claimed:
-        claim_cycle(store, experiment_id)
     provider = runtime.provider if getattr(runtime, 'live_enabled', True) else None
     def on_state(status, **details):
         _save_state(store, experiment_id, provider_retry={'state':status, **details})
@@ -121,6 +192,10 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
             if reopen:
                 _save_state(store, experiment_id, reopen_paid_ledger=False)
             return _run_until_qualified(store, runtime, experiment_id)
+    except task_leases.LeaseLost:
+        raise
+    except InterruptedError as error:
+        _save_state(store, experiment_id, status='stopped', last_error=str(error))
     except (ValueError, OSError) as error:
         _save_state(store, experiment_id, status='blocked', last_error=str(error),
                     provider_retry={'state':'blocked', **provider_error_details(error,'authorization')})
@@ -148,7 +223,7 @@ def _run_until_qualified(store, runtime, experiment_id):
     empty_rounds = 0
     state = dict(store.experiment(experiment_id, light=True)['result'].get('optimization_cycle', {}))
     state.pop('provider_retry', None)
-    state.update(owner_pid=os.getpid(), worker_thread=threading.get_ident())
+    state.pop('worker_thread', None)
 
     def save(status, phase, error=None):
         experiment = store.experiment(experiment_id, light=True)
@@ -351,6 +426,8 @@ def _run_until_qualified(store, runtime, experiment_id):
             empty_rounds = empty_rounds+1 if len(experiment['candidates'])==before else 0
             if empty_rounds >= 3:
                 return save('analysis_exhausted', 'analysis', '连续3轮没有合法草案，已停止；试跑预算未额外扣减')
+    except task_leases.LeaseLost:
+        raise
     except InterruptedError as error:
         return save('stopped',state.get('phase','sandbox'),str(error))
     except Exception as error:
@@ -486,7 +563,7 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                     continue
                 return None, save('blocked','sandbox',blocked)
             error = run.get('error_message') or str(result.get('technical_errors') or '试跑未完整结束')
-            if state.get('external_runner'):
+            if state.get('external_runner') and task_leases.current(store, 'cycle:' + experiment_id):
                 return None, save('failed', 'sandbox', result.get('auto_recovery', {}).get('error') or error)
             recovery = state.setdefault('sandbox_recovery', {}).setdefault(candidate['id'], {'resumes':0, 'error':error})
             if recovery['error'] != error:
@@ -529,7 +606,7 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
             try:
                 conclude_round(store, runtime, experiment_id, final_d=True)
             except ValueError as error:
-                if state.get('external_runner'):
+                if state.get('external_runner') and task_leases.current(store, 'cycle:' + experiment_id):
                     raise
                 state['d_review_error'] = str(error)
         store.refresh_recommendation(experiment_id)
@@ -614,7 +691,7 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                         return finish(experiment, [winner], 'finish_winner')
                     return save('stopped', 'review', stop['reason'])
             except ProposalValidationExhausted as error:
-                if state.get('external_runner'):
+                if state.get('external_runner') and task_leases.current(store, 'cycle:' + experiment_id):
                     raise
                 failures = state.setdefault('proposal_generation_failures', [])
                 failures.append({'round':number+1, 'reason':str(error), 'sandbox_budget_used':0,
@@ -630,6 +707,8 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                         return save('analysis_exhausted', 'analysis', str(error))
                     return finish(experiment, qualified, 'composite')
                 return save('analysis_exhausted','analysis',str(error))
+    except task_leases.LeaseLost:
+        raise
     except InterruptedError as error:
         return save('stopped',state.get('phase','sandbox'),str(error))
     except Exception as error:
@@ -637,45 +716,58 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
 
 
 def recover_optimization_cycles(store, runtime):
-    """Restart only persisted authorized cycles whose worker has exited."""
+    """Claim an interrupted cycle in place, retaining its saved phase and authorization."""
     with store.connection() as connection:
-        rows = connection.execute("SELECT id,json_extract(result_json,'$.optimization_cycle') cycle FROM experiments WHERE json_extract(result_json,'$.optimization_cycle.status')='running'").fetchall()
-    for row in rows:
-        state = json.loads(row['cycle'])
-        if state.get('external_runner'):
-            continue
-        owner = state.get('owner_pid')
-        if owner == os.getpid():
-            if any(t.ident==state.get('worker_thread') and t.is_alive() for t in threading.enumerate()):continue
-            # A claim made by this process has not entered its thread yet.
-            if not state.get('worker_thread'):continue
-        elif type(owner) is int:
-            try:os.kill(owner,0)
-            except ProcessLookupError:pass
-            except PermissionError:continue
-            else:continue
-        with CORPUS_LOCK, store.connection() as connection:
+        ids = [row['id'] for row in connection.execute("""SELECT id FROM experiments
+            WHERE json_extract(result_json,'$.optimization_cycle.status') IN ('queued','running','recovering')""")]
+    for experiment_id in ids:
+        with store.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
-            current = connection.execute('SELECT result_json FROM experiments WHERE id=?',(row['id'],)).fetchone()
-            context = json.loads(current['result_json'])
-            if context.get('optimization_cycle') != state:continue
-            context['optimization_cycle'].update(owner_pid=os.getpid(), worker_thread=None)
-            connection.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps(context,ensure_ascii=False),row['id']))
-        threading.Thread(target=run_until_qualified,args=(store,runtime,row['id']),kwargs={'claimed':True},daemon=True).start()
+            saved = connection.execute('SELECT status,result_json FROM experiments WHERE id=?',(experiment_id,)).fetchone()
+            if not saved:
+                continue
+            context = json.loads(saved['result_json'])
+            state = context.get('optimization_cycle', {})
+            if state.get('status') not in task_leases.ACTIVE_STATES or task_leases.cycle_active(connection, experiment_id, state):
+                continue
+            if state.get('stop_request'):
+                task_leases.mark_paused(connection, 'cycle:' + experiment_id)
+                state['status'] = 'stopped'
+                token = None
+            else:
+                candidates = store.candidates(experiment_id, light=True)
+                if (task_leases.agent_active(connection, experiment_id, context, legacy_generating=saved['status'] == 'generating')
+                        or task_leases.active(connection, 'composite:' + experiment_id)
+                        or any(candidate_occupied(connection, candidate) for candidate in candidates)):
+                    continue
+                token = task_leases.claim(connection, 'cycle:' + experiment_id, recovering=True)
+                state.update(status='recovering', external_runner=False, owner_pid=os.getpid())
+                state.pop('worker_thread', None)
+            connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (json.dumps(context, ensure_ascii=False), experiment_id))
+        if token:
+            threading.Thread(target=run_until_qualified, args=(store,runtime,experiment_id),
+                             kwargs={'claimed':True, 'lease_token':token}, daemon=True).start()
 
 
 def recover_agent_generations(store, runtime):
-    """Recover standalone generation; active batch generations belong to their cycle."""
+    """Keep standalone generation separate from generations owned by a cycle."""
     with store.connection() as connection:
-        rows=connection.execute("SELECT id,baseline_run_id,json_extract(result_json,'$.agent_generation.owner_pid') owner_pid FROM experiments WHERE status='generating' AND coalesce(json_extract(result_json,'$.optimization_cycle.status'),'')!='running' AND NOT coalesce(json_extract(result_json,'$.optimization_cycle.external_runner'),0)").fetchall()
-    def recover(row):
-        try:OptimizationAgent(store,runtime.provider).generate(row['baseline_run_id'],experiment_id=row['id'])
-        except Exception:logging.exception('Agent generation recovery failed: %s',row['id'])
-    for row in rows:
-        owner=row['owner_pid']
-        if type(owner) is int:
-            try:os.kill(owner,0)
-            except ProcessLookupError:pass
-            except PermissionError:continue
-            else:continue
-        threading.Thread(target=recover,args=(dict(row),),daemon=True).start()
+        rows = connection.execute("SELECT id,baseline_run_id,result_json FROM experiments WHERE status='generating'").fetchall()
+        pending = []
+        for row in rows:
+            result = json.loads(row['result_json'])
+            cycle = result.get('optimization_cycle') or {}
+            if (cycle.get('stop_request') or cycle.get('status') in task_leases.ACTIVE_STATES
+                    or task_leases.cycle_active(connection, row['id'], cycle)
+                    or task_leases.agent_active(connection, row['id'], result, legacy_generating=True)):
+                continue
+            pending.append((row['id'], row['baseline_run_id']))
+
+    def recover(experiment_id, baseline_id):
+        try:
+            OptimizationAgent(store, runtime.provider).generate(baseline_id, experiment_id=experiment_id, recovering=True)
+        except Exception:
+            logging.exception('Agent generation recovery failed: %s', experiment_id)
+
+    for args in pending:
+        threading.Thread(target=recover, args=args, daemon=True).start()

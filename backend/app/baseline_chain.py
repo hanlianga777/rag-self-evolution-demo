@@ -71,6 +71,10 @@ def advance_chain(store, runtime):
         if not run or run['status'] != 'completed':
             return state
         result = run['result']
+        auto = result.get('auto_recovery') or {}
+        if (result.get('evaluation_complete') is False and auto.get('enabled', auto.get('authorized'))
+                and auto.get('state') not in {'blocked', 'stopped', 'exhausted'} and not result.get('stop_request')):
+            return state
         if result.get('evaluation_complete') is not True or result.get('technical_failed') != 0:
             state.update(status='failed', error='Baseline未完整结束或存在技术失败，保留断点')
             _write(store, KEY, state)
@@ -92,11 +96,11 @@ def advance_chain(store, runtime):
                 db.execute('INSERT INTO experiments VALUES (?,?,?,?,?)', (experiment_id,run['id'],'analyzing',json.dumps(context,ensure_ascii=False),datetime.now(timezone.utc).isoformat()))
                 state['experiment_id'] = experiment_id
                 db.execute('UPDATE paid_schedule_settings SET value_json=? WHERE key=?', (json.dumps(state,ensure_ascii=False),KEY))
-        from .optimization_cycle import claim_cycle, run_until_qualified
+        from .optimization_cycle import claim_cycle, cycle_occupied, run_until_qualified, take_cycle_claim
         experiment = store.experiment(state['experiment_id'], light=True)
-        if experiment['result'].get('optimization_cycle', {}).get('status') != 'running':
+        if not cycle_occupied(store, experiment) and not experiment['result'].get('optimization_cycle'):
             claim_cycle(store, state['experiment_id'])
-            threading.Thread(target=run_until_qualified, args=(store,runtime,state['experiment_id']), kwargs={'claimed':True}, daemon=True).start()
+            threading.Thread(target=run_until_qualified, args=(store,runtime,state['experiment_id']), kwargs={'claimed':True, 'lease_token':take_cycle_claim(store, state['experiment_id'])}, daemon=True).start()
         state.update(status='agent_running')
         _write(store, KEY, state)
         return state

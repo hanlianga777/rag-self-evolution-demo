@@ -23,7 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 from .ai_service import AiService
-from . import business_import, rules
+from . import business_import, rules, task_leases
 from .corpus import CorpusStore, DOCUMENTS_DIR, UPLOADS_DIR, current_manifest
 from .full_text import CORPUS_LOCK
 from .corpus_management import CorpusManager, require_consistent_switch
@@ -88,41 +88,33 @@ _recovery_stop=threading.Event()
 
 
 def recover_authorized_evaluations():
+    from .optimization_cycle import cycle_occupied
+
     def recover(run_id):
-        try:EvaluationRunner(store,ai_service).recover_run(run_id)
-        except Exception as error:
-            from .providers import permanent_provider_error
-            try:
-                run=store.evaluation_run(run_id,light=True)
-                if run and run['status'] in {'queued','running'}:
-                    result=run['result']
-                    fatal=isinstance(error,(InterruptedError,ValueError)) or permanent_provider_error(error)
-                    result.setdefault('auto_recovery',{}).update(state='stopped' if fatal else 'retrying',error=str(error))
-                    if fatal:store.finish_evaluation_run(run_id,'partial' if store.evaluation_case_results(run_id) else 'failed',result,str(error))
-                    else:store.update_evaluation_progress(run_id,result)
-            except Exception:logging.exception('Recovery storage unavailable; monitor will retry')
+        try:
+            EvaluationRunner(store, ai_service).recover_run(run_id)
+        except Exception:
+            logging.exception('Evaluation recovery failed: %s', run_id)
+
     for run in store.evaluation_runs(authorized_only=True):
-        auto=run['result'].get('auto_recovery',{})
+        auto = run['result'].get('auto_recovery', {})
         if run['result'].get('stop_request'):
-            store.request_evaluation_stop(run['id']);continue
-        if not auto.get('enabled',auto.get('authorized')) or auto.get('state')=='stopped':continue
-        if run['status']=='running' and auto.get('worker_token'):
-            owner=run['result'].get('execution_owner_pid')
-            if owner==os.getpid() and any(t.ident==auto.get('worker_thread') and t.is_alive() for t in threading.enumerate()):continue
-            if owner!=os.getpid() and type(owner) is int:
-                try:os.kill(owner,0)
-                except ProcessLookupError:pass
-                except PermissionError:continue
-                else:continue
-        candidate=store.candidate(run['config']['candidate_id']) if run['config'].get('candidate_id') else None
-        if candidate:
-            experiment=store.experiment(candidate['experiment_id'])
-            if experiment:
-                cycle = experiment['result'].get('optimization_cycle', {})
-                if cycle.get('status') == 'running' or cycle.get('external_runner'):
+            store.request_evaluation_stop(run['id'])
+            continue
+        if auto.get('state') == 'blocked' and run['status'] not in task_leases.ACTIVE_STATES:
+            continue
+        with store.connection() as connection:
+            if task_leases.evaluation_active(connection, run):
+                continue
+        candidate_id = run['config'].get('candidate_id')
+        if candidate_id:
+            candidate = store.candidate(candidate_id)
+            if candidate:
+                experiment = store.experiment(candidate['experiment_id'], light=True)
+                cycle = (experiment or {}).get('result', {}).get('optimization_cycle') or {}
+                if cycle.get('stop_request') or cycle_occupied(store, experiment):
                     continue
-        if run['status'] in {'queued','running'} or run['status']=='completed' and candidate and candidate['status']=='running':
-            threading.Thread(target=recover,args=(run['id'],),daemon=True).start()
+        threading.Thread(target=recover, args=(run['id'],), daemon=True).start()
 
 
 @app.on_event('startup')
@@ -1577,11 +1569,12 @@ def qc_question(question_id: str):
 
 
 def persisted_evaluation_progress(run):
-    if run and run['status']!='completed':
+    if run and not task_leases.complete_evaluation(run['status'], run['result']):
         with store.connection() as connection:
             completed=connection.execute('SELECT count(DISTINCT question_id) FROM evaluation_case_results WHERE run_id=?',(run['id'],)).fetchone()[0]
         result={**run.get('result',{}),'completed':completed,'total':len((run.get('dataset_snapshot') or json.loads(run.get('dataset_snapshot_json','{}'))).get('question_ids',[]))}
-        return {**run,'result':result}
+        status = 'partial' if run['status'] == 'completed' else run['status']
+        return {**run, 'status':status, 'result':result}
     return run
 
 
@@ -1605,7 +1598,8 @@ def evaluation(active_task: bool = False, light: bool = False):
         with store.connection() as connection:
             latest = connection.execute("""SELECT id FROM evaluation_runs WHERE dataset_version_id=?
                 AND json_extract(config_json,'$.run_target')='baseline'""" +
-                ("" if active_task else " AND status IN ('running','partial','failed')") +
+                ("" if active_task else " AND (status IN ('queued','running','recovering','partial','failed')"
+                    " OR status='completed' AND json_extract(result_json,'$.evaluation_complete')=0)") +
                 " ORDER BY created_at DESC,rowid DESC LIMIT 1",(identity['current_golden_id'],)).fetchone()
         if latest:run=persisted_evaluation_progress(store.evaluation_run(latest['id'],light=light))
     diagnostics = product_diagnostics(store,run) if run and not light else {}
@@ -1978,16 +1972,26 @@ def run_now(payload: RunNowRequest):
         set_run_now(store, 'revision:' + payload.revision_id)
     elif payload.evaluation_id:
         run = store.evaluation_run(payload.evaluation_id, light=True)
-        if not run or run['status'] not in {'queued', 'running'}:
+        if not run or run['status'] not in {'queued', 'running', 'recovering'} or run['result'].get('stop_request'):
             raise HTTPException(409, '任务未运行；立即运行不能启动已停止或已完成的任务')
         set_run_now(store, 'evaluation:' + payload.evaluation_id)
     else:
+        from .paid_schedule import composite_active
         experiment = store.experiment(payload.experiment_id, light=True)
         result = (experiment or {}).get('result', {})
-        if not experiment or not (result.get('optimization_cycle', {}).get('status') == 'running'
-                or experiment['status'] == 'generating' or result.get('composite_schedule', {}).get('status') == 'waiting'):
-            raise HTTPException(409, '任务未运行；立即运行不能启动已停止的循环')
-        kind = 'cycle:' if result.get('optimization_cycle', {}).get('status') == 'running' else 'agent:' if experiment['status'] == 'generating' else 'composite:'
+        cycle = result.get('optimization_cycle') or {}
+        with store.connection() as connection:
+            if cycle.get('stop_request'):
+                raise HTTPException(409, '用户已停止任务')
+            if task_leases.cycle_active(connection, payload.experiment_id, cycle):
+                kind = 'cycle:'
+            elif task_leases.agent_active(connection, payload.experiment_id, result,
+                                          legacy_generating=bool(experiment and experiment['status'] == 'generating')):
+                kind = 'agent:'
+            elif composite_active(connection, payload.experiment_id, result.get('composite_schedule') or {}):
+                kind = 'composite:'
+            else:
+                raise HTTPException(409, '任务未运行；立即运行不能启动已停止的循环')
         set_run_now(store, kind + payload.experiment_id)
     return {'status': 'resuming', 'message': '已临时忽略时段限制；高峰期间按高峰价计费', 'off_peak_only': runtime_settings()['off_peak_only']}
 
@@ -2001,11 +2005,13 @@ def create_composite(run_id: str, payload: PaidActionRequest | None = None):
     try:
         from .paid_schedule import pause_state, start_scheduled_composite
         scheduled=(experiment or {}).get('result',{}).get('composite_schedule',{})
-        if scheduled.get('status') in {'waiting','running'}:
-            return {'status':'scheduled',**scheduled}
+        from .paid_schedule import composite_active
+        with store.connection() as connection:
+            if composite_active(connection, run_id, scheduled):
+                return {**scheduled, 'status': 'scheduled'}
         if pause_state(store, 'composite:' + run_id)['paused']:
             state = start_scheduled_composite(store, ai_service.provider, run_id)
-            return {'status': 'scheduled', **state}
+            return {**state, 'status': 'scheduled'}
         return store.create_composite(run_id, ai_service.provider)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
@@ -2108,13 +2114,12 @@ def start_followup(run_id: str, group: Literal['review', 'max', 'high', 'low']):
 @read_view()
 def evaluation_run(run_id: str, light: bool = False):
     if store.superseded_evaluation(run_id):raise HTTPException(status_code=404,detail='Evaluation run not found')
-    run = store.evaluation_run(run_id,light=light)
-    if light:
-        if run is None:raise HTTPException(status_code=404,detail='Evaluation run not found')
-        return run
+    run = store.evaluation_run(run_id, light=light)
     if run is None:
         raise HTTPException(status_code=404, detail="Evaluation run not found")
-    run=persisted_evaluation_progress(run)
+    run = persisted_evaluation_progress(run)
+    if light:
+        return run
     from . import verdict
     from .agent_inputs import prepare_baseline_rows
     use_final = verdict.uses_final(run['result'])
@@ -2425,19 +2430,21 @@ def designate_baseline(payload: BaselineDesignationRequest):
 
 
 def require_idle_cycle(experiment):
-    if experiment and experiment['result'].get('optimization_cycle',{}).get('status') == 'running':
+    from .optimization_cycle import cycle_occupied
+    if cycle_occupied(store, experiment):
         raise HTTPException(409,'优化批次正在运行，请等待批次结束')
 
 
 @app.post('/api/experiments/{run_id}/run-cycle', status_code=201, dependencies=[Depends(require_trusted_origin)])
 def run_optimization_cycle(run_id: str, current_round_only: bool = False):
-    from .optimization_cycle import claim_cycle, run_until_qualified
+    from .optimization_cycle import claim_cycle, run_until_qualified, take_cycle_claim
     try:
         state=claim_cycle(store,run_id,current_round_only=current_round_only)
     except ValueError as error:
         raise HTTPException(409,str(error)) from error
+    token = take_cycle_claim(store, run_id)
     threading.Thread(target=contextvars.copy_context().run,
-        args=(lambda:run_until_qualified(store,ai_service,run_id,claimed=True),),daemon=True).start()
+        args=(lambda:run_until_qualified(store, ai_service, run_id, lease_token=token),), daemon=True).start()
     return state
 
 

@@ -4,7 +4,8 @@ from copy import deepcopy
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from api_fixture import main
-from app.optimization_cycle import claim_cycle, run_until_qualified
+from app import task_leases
+from app.optimization_cycle import claim_cycle, run_until_qualified, take_cycle_claim
 import test_candidate_resume as candidate_fixture
 
 
@@ -37,22 +38,25 @@ class ManualCycleTests(unittest.TestCase):
 
     def test_cycle_stop_api_stops_active_sandbox_and_does_not_restart_it(self):
         claim_cycle(self.store,self.exp)
-        key,items,config,candidate,baseline=self.runner.start_candidate(self.cid,automatic=True)
-        old_baseline=deepcopy(self.store.evaluation_run(self.baseline['id']))
-        client=TestClient(main.app)
-        with patch.object(main,'store',self.store):
-            denied=client.post(f'/api/experiments/{self.exp}/stop-cycle',headers={'Origin':'https://untrusted.example'})
-            self.assertEqual(denied.status_code,403)
-            response=client.post(f'/api/experiments/{self.exp}/stop-cycle')
-            self.assertEqual(response.status_code,200,response.text)
-            self.assertTrue(response.json()['stop_request'])
-            self.assertEqual(client.post('/api/experiments/missing/stop-cycle').status_code,404)
-        self.assertTrue(self.store.evaluation_run(key)['result']['stop_request'])
-        self.runner.execute_candidate(key,items,config,candidate,baseline)
-        result=run_until_qualified(self.store,self.runtime,self.exp,claimed=True)
-        self.assertEqual(result['status'],'stopped')
-        self.assertEqual(self.runtime.answers,[])
-        self.assertEqual(self.store.evaluation_run(self.baseline['id']),old_baseline)
+        token = take_cycle_claim(self.store, self.exp)
+        with task_leases.work(self.store, 'cycle:' + self.exp, token):
+            key,items,config,candidate,baseline=self.runner.start_candidate(self.cid,automatic=True)
+            old_baseline=deepcopy(self.store.evaluation_run(self.baseline['id']))
+            client=TestClient(main.app)
+            with patch.object(main,'store',self.store):
+                denied=client.post(f'/api/experiments/{self.exp}/stop-cycle',headers={'Origin':'https://untrusted.example'})
+                self.assertEqual(denied.status_code,403)
+                response=client.post(f'/api/experiments/{self.exp}/stop-cycle')
+                self.assertEqual(response.status_code,200,response.text)
+                self.assertTrue(response.json()['stop_request'])
+                self.assertEqual(client.post('/api/experiments/missing/stop-cycle').status_code,404)
+            self.assertTrue(self.store.evaluation_run(key)['result']['stop_request'])
+            self.runner.execute_candidate(key,items,config,candidate,baseline)
+            result=run_until_qualified(self.store,self.runtime,self.exp,claimed=True)
+            self.assertEqual(result['status'],'stopped')
+            self.assertEqual(self.runtime.answers,[])
+            self.assertEqual(self.store.evaluation_run(self.baseline['id']),old_baseline)
+
 
     def test_stop_during_last_price_check_does_not_wait_for_next_off_peak(self):
         from types import SimpleNamespace

@@ -10,9 +10,14 @@ D_FACTS_VERSION = 'winner-refinement-3'
 
 
 def retryable_d_decision(previous):
-    return not previous or not previous.get('candidate_id') and (
-        previous.get('status') == 'failed' or previous.get('status') == 'no_effective_composite'
-        and previous.get('facts', {}).get('version') != D_FACTS_VERSION)
+    if not previous:
+        return True
+    if previous.get('candidate_id'):
+        return False
+    status = previous.get('status')
+    return (status == 'failed'
+            or status == 'analyzing' and previous.get('lease_checkpoint')
+            or status == 'no_effective_composite' and previous.get('facts', {}).get('version') != D_FACTS_VERSION)
 
 
 def pipeline_config(config):

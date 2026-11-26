@@ -8,7 +8,8 @@ import json
 import math
 import hashlib
 import re
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
+from . import task_leases
 from datetime import datetime, timezone
 from collections import Counter
 
@@ -902,8 +903,11 @@ class OptimizationAgent:
             connection.execute('BEGIN IMMEDIATE')
             row=connection.execute('SELECT status,result_json FROM experiments WHERE id=?',(experiment_id,)).fetchone()
             context=json.loads(row['result_json'])
-            if row['status']!='generating' or context.get('agent_generation',{}).get('token')!=generation_token:
+            key = 'agent:' + experiment_id
+            task_leases.require(connection, key, generation_token)
+            if row['status'] != 'generating':
                 raise ValueError('Optimization Context 已变化，不能保存生成断点')
+            task_leases.set_state(connection, key, generation_token, task_leases.progress_state({**context, **updates}))
             connection.execute('UPDATE experiments SET result_json=? WHERE id=?',
                 (json.dumps({**context,**updates},ensure_ascii=False,allow_nan=False),experiment_id))
 
@@ -923,7 +927,11 @@ class OptimizationAgent:
         finally:_request_checkpoint.reset(token)
 
     @provider_task('agent')
-    def generate(self, baseline_run_id: str, trigger_id: str | None = None, experiment_id: str | None = None):
+    def generate(self, baseline_run_id: str, trigger_id: str | None = None, experiment_id: str | None = None, *, recovering=False):
+        with ExitStack() as stack:
+            return self._generate(stack, baseline_run_id, trigger_id, experiment_id, recovering=recovering)
+
+    def _generate(self, stack, baseline_run_id, trigger_id, experiment_id, *, recovering):
         # Check identity before budget reads; the short claim serializes duplicate starts.
         self.store.require_current_baseline(baseline_run_id)
         # Real model requests must share the current foundation before claiming work.
@@ -969,7 +977,7 @@ class OptimizationAgent:
             with restore_paid_context(self.store,binding,
                     reopen=confirmed_context.get('agent_provider_retry', {}).get('state') == 'blocked'
                     and (existing or {}).get('status') != 'generating'):
-                return self.generate(baseline_run_id,trigger_id,experiment_id=existing_id)
+                return self.generate(baseline_run_id,trigger_id,experiment_id=existing_id,recovering=recovering)
         if binding and current_binding() != binding:
             raise ValueError('当前请求与实验费用授权不一致')
         trigger = trigger or self.store.optimization_trigger(confirmed_context.get("trigger_id"))
@@ -980,7 +988,8 @@ class OptimizationAgent:
         base_config.pop("run_target", None)
         base_config.pop("knowledge_identity", None)
         base_config = {k:v for k,v in base_config.items() if k in ALLOWED_SEARCH_SPACE}
-        experiment_id, prior_candidates, round_number, completed, generation_token = self.store.claim_agent_generation(baseline_run_id, trigger_id, existing_id)
+        experiment_id, prior_candidates, round_number, completed, generation_token = self.store.claim_agent_generation(baseline_run_id, trigger_id, existing_id, recovering=recovering)
+        stack.enter_context(task_leases.work(self.store, 'agent:' + experiment_id, generation_token))
         if not existing or existing['status']!='generating':
             clear_run_now(self.store,'agent:'+experiment_id)
         from .agent_mechanism import CONTRACT, fault_stage, faults_for_cases, saved_passed
@@ -1316,6 +1325,8 @@ class OptimizationAgent:
             audit["validation_stage"] = "persistence"
             self.store.save_agent_round(experiment_id, batch, {**result, **audit, "generation_status":"insufficient_evidence" if result.get("decision_stop") else "partial" if audit["rejected_candidates"] else "completed" if batch else "no_candidates", "requested_candidate_count":len(labels), "generated_candidate_count":len(batch), "validation_stage": "completed", "round": round_number, "evaluation_budget": evaluation_budget}, generation_token=generation_token)
             return self.store.experiment(experiment_id)
+        except task_leases.LeaseLost:
+            raise
         except Exception as error:
             if isinstance(error,ProposalValidationExhausted):
                 audit.update(generation_status='analysis_exhausted',validation_error=str(error),provider_error=None)

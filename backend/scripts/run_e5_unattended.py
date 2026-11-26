@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import sys
 import time
+from contextlib import ExitStack
 from datetime import datetime, timezone
 from unittest.mock import patch
 from urllib.request import urlopen
@@ -13,7 +14,7 @@ from urllib.request import urlopen
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from app import governance, optimization_cycle as cycle, paid_policy, paid_schedule, rules, verdict
+from app import governance, optimization_cycle as cycle, paid_policy, paid_schedule, rules, verdict, task_leases
 from app.ai_service import AiService
 from app.composite import pipeline_config
 from app.config import load_settings
@@ -133,16 +134,6 @@ def find_experiment(store):
         raise ValueError('E5 的模式、Baseline 或引用 A 不一致')
     write(marker, experiment_id)
     return experiment_id
-
-
-def verify_owner(state):
-    owner = state.get('owner_pid')
-    if state.get('status') == 'running' and type(owner) is int and owner != os.getpid():
-        try:
-            os.kill(owner, 0)
-        except ProcessLookupError:
-            return
-        raise ValueError(f'E5 仍由进程 {owner} 执行')
 
 
 def restore_candidate(store, runner, baseline, candidate):
@@ -378,6 +369,18 @@ class Run:
         persist()
 
     def execute(self):
+        with ExitStack() as stack:
+            try:
+                return self._execute(stack)
+            except task_leases.LeaseLost:
+                raise
+            except Exception as error:
+                if self.owns_cycle:
+                    status = 'stopped' if isinstance(error, InterruptedError) else 'blocked' if permanent_provider_error(error) else 'failed'
+                    cycle._save_state(self.store, self.experiment_id, status=status, last_error=str(error))
+                raise
+
+    def _execute(self, stack):
         self.store = store = governance.GovernanceStore(DB, migrate=False)
         baseline = store.require_current_baseline(BASE)
         snapshot = json.loads(baseline['dataset_snapshot_json'])
@@ -395,7 +398,6 @@ class Run:
             raise ValueError('真实 Provider 或冻结模型不可用')
         self.experiment_id = eid = find_experiment(store)
         state = store.experiment(eid, light=True)['result'].get('optimization_cycle', {})
-        verify_owner(state)
         binding = {'task': '120b', 'experiment_id': eid, 'baseline': BASE,
                    'evaluation_identity': baseline['judge']['evaluation_identity']}
 
@@ -404,11 +406,14 @@ class Run:
                 raise ValueError('E5 当前索引知识身份已变化')
             return binding
 
+        cycle.claim_cycle(store, eid, external=True)
+        token = cycle.take_cycle_claim(store, eid)
+        stack.enter_context(task_leases.work(store, 'cycle:' + eid, token))
+        self.owns_cycle = True
         limits = {**REQUEST_LIMITS, **baseline['judge']['execution_snapshot']['request_limits']}
         self.budget = Budget(PRIVATE, binding, check_identity, limits)
         self.budget.check_stop = self.heartbeat
         runner = E5Runner(store, runtime, self.budget, eid)
-        self.owns_cycle = True
         original_save = cycle._save_state
 
         def progress_save(run_store, experiment_id, **updates):
@@ -476,8 +481,6 @@ def main():
         except Exception as error:
             status = 'stopped' if isinstance(error, InterruptedError) else 'blocked' if permanent_provider_error(error) else 'failed'
             message = str(error)
-            if run.owns_cycle:
-                cycle._save_state(run.store, run.experiment_id, status=status, last_error=message)
             run.progress(status, message)
             print(f'{status}: {message}', flush=True)
             return 1

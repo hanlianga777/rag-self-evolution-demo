@@ -6,7 +6,8 @@ import os
 import json
 import time
 import math
-from . import rules, verdict
+from . import rules, verdict, task_leases
+from functools import wraps
 from .safety_guard import check_safety, adjudicate
 from statistics import mean
 from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims, validate_business_judgment, business_check_roles, quote_present
@@ -193,6 +194,45 @@ def gate_details(cases: list[dict], gates: list[dict], *, statistics_version='fr
         failed = [item for item in contributions if item["value"] is not None and (item["value"] < gate["threshold"] if gate["operator"] == ">=" else item["value"] > gate["threshold"])]
         details.append({**gate, "formula": formula, "included_cases": len(contributions), "contributing_cases": contributions, "failed_cases": failed})
     return details
+
+
+def evaluation_worker(*, recover=False, finalize=False):
+    """Keep the same token through checkpointing, comparison and recommendation."""
+    def decorate(function):
+        @wraps(function)
+        def execute(self, run_id, *args, **kwargs):
+            key = 'evaluation:' + run_id
+            if task_leases.current(self.store, key):
+                return function(self, run_id, *args, **kwargs)
+            run = self.store.evaluation_run(run_id)
+            if not run:
+                raise ValueError('Evaluation run not found')
+            candidate_id = run['config'].get('candidate_id')
+            token = self.store.claim_evaluation_worker(
+                run_id, recovering=recover, candidate_finalize=finalize and bool(candidate_id))
+            if not token:
+                return self.store.candidate(candidate_id) if finalize and not recover and candidate_id else run
+            try:
+                with task_leases.work(self.store, key, token):
+                    try:
+                        return function(self, run_id, *args, **kwargs)
+                    except task_leases.LeaseLost:
+                        raise
+                    except Exception as error:
+                        from .providers import permanent_provider_error
+                        if not recover or not (isinstance(error, (ValueError, InterruptedError)) or permanent_provider_error(error)):
+                            raise
+                        saved = self.store.evaluation_run(run_id)
+                        if not task_leases.complete_evaluation(saved['status'], saved['result']):
+                            result = saved['result']
+                            result.setdefault('auto_recovery', {}).update(state='blocked', error=str(error))
+                            self.store.finish_evaluation_run(run_id, 'partial' if self.store.evaluation_case_results(run_id)
+                                                             else 'failed', result, str(error))
+                        raise
+            except task_leases.LeaseLost:
+                return self.store.candidate(candidate_id) if finalize and not recover and candidate_id else self.store.evaluation_run(run_id)
+        return execute
+    return decorate
 
 
 def frozen_run_judge(function):
@@ -610,6 +650,7 @@ class EvaluationRunner:
         limits = judge.get('execution_snapshot', {}).get('request_limits')
         # The Baseline scope is carried into each experiment via its own namespace.
         def check_stop():
+            task_leases.check(self.store)
             if self.store.evaluation_run(run_id, light=True)['result'].get('stop_request'):
                 raise InterruptedError('用户停止复核，断点已保存')
         with judge_thinking(effort), execution_limits(limits), accounting_only():
@@ -960,7 +1001,7 @@ class EvaluationRunner:
 
     def start_replay(self, source_id):
         source = self.store.evaluation_run(source_id)
-        if not source or source['status'] != 'completed':
+        if not source or not task_leases.complete_evaluation(source['status'], source.get('result', {})):
             raise ValueError('仅完整历史运行支持答案回放')
         snapshot = json.loads(source['dataset_snapshot_json'])
         saved = {r['question_id']: r for r in self.store.evaluation_case_results(source_id)}
@@ -985,13 +1026,13 @@ class EvaluationRunner:
         self.store.update_evaluation_progress(run_id,result)
         return run_id, items, executions
 
+    @evaluation_worker()
     @frozen_run_judge
     def execute_replay(self, run_id, items, executions):
         from .evaluation_stage import perform_stage, checkpoint_usage, correction_for
         from .providers import permanent_provider_error, provider_error_details
         run=self.store.evaluation_run(run_id)
-        if run['status']=='completed':return run
-        if run['result'].get('auto_recovery',{}).get('enabled') and not self.store.claim_evaluation_worker(run_id):return self.store.evaluation_run(run_id)
+        if task_leases.complete_evaluation(run['status'], run['result']):return run
         run=self.store.evaluation_run(run_id)
         cases=self.store.evaluation_case_results(run_id)
         saved={case['question_id'] for case in cases}
@@ -1015,6 +1056,7 @@ class EvaluationRunner:
             from .sqlite_support import retry_storage
             return retry_storage(lambda:self.store.update_evaluation_progress(run_id,progress(),checkpoint_id=item['id'] if item else None))
         def check_stop():
+            task_leases.check(self.store)
             if self.store.evaluation_run(run_id,light=True)['result'].get('stop_request'):
                 raise InterruptedError('用户停止运行，断点已保存')
         try:
@@ -1065,13 +1107,13 @@ class EvaluationRunner:
         except Exception as error:
             return self.store.finish_evaluation_run(run_id,'partial' if cases else 'failed',progress(),str(error))
 
+    @evaluation_worker()
     @frozen_run_judge
     def execute_baseline(self, run_id, approved, config):
         from .paid_run import execution_limits,accounting_only
         run=self.store.evaluation_run(run_id)
-        if run['status']=='completed':return run
+        if task_leases.complete_evaluation(run['status'], run['result']):return run
         self._require_generation_contract(run['judge'])
-        if run['result'].get('auto_recovery',{}).get('enabled', run['result'].get('auto_recovery',{}).get('authorized')) and not self.store.claim_evaluation_worker(run_id):return self.store.evaluation_run(run_id)
         limits=run['judge'].get('execution_snapshot',{}).get('request_limits')
         with execution_limits(limits),accounting_only():return self._execute_baseline(run_id,approved,config)
 
@@ -1114,6 +1156,8 @@ class EvaluationRunner:
             for attempt in range(8):
                 try:
                     return self.store.update_evaluation_progress(run_id, progress(), checkpoint_id=item['id'] if item else None)
+                except task_leases.LeaseLost:
+                    raise
                 except (OSError, __import__('sqlite3').OperationalError):
                     if attempt == 7:raise
                     time.sleep(min(8, .5 * 2 ** attempt))
@@ -1131,6 +1175,7 @@ class EvaluationRunner:
                 raise ValueError('Saved evaluation cases do not match frozen snapshot')
             automatic=lineage.get('auto_recovery',{}).get('enabled', lineage.get('auto_recovery',{}).get('authorized')) is True
             def check_stop():
+                task_leases.check(self.store)
                 if self.store.evaluation_run(run_id,light=True)['result'].get('stop_request'):
                     raise InterruptedError('用户停止运行，断点已保存')
             def perform(phase,action):
@@ -1249,6 +1294,8 @@ class EvaluationRunner:
             if automatic:lineage['auto_recovery']['state']='completed'
             return self.store.finish_evaluation_run(run_id, 'completed', {
                 **progress(complete=True), **final_summary, 'evaluation_complete':True})
+        except task_leases.LeaseLost:
+            raise
         except Exception as error:
             if item is not None:
                 checkpoint = checkpoints.setdefault(item['id'], {'attempts':[]})
@@ -1274,6 +1321,7 @@ class EvaluationRunner:
             if lineage.get('auto_recovery'):lineage['auto_recovery'].update(state=state,error=str(error))
             return self.store.finish_evaluation_run(run_id, 'partial' if cases or any('execution' in c for c in checkpoints.values()) else 'failed', progress(), str(error))
 
+    @evaluation_worker(recover=True, finalize=True)
     def recover_run(self,run_id):
         from .evaluation_snapshot import require_resume_snapshot, shared_judge
         from .paid_run import PaidRun, controlled_run, accounting_only, current_paid_run
@@ -1468,6 +1516,7 @@ class EvaluationRunner:
             candidate = self.store.candidate(candidate_id)
         return run_id, approved, config, candidate, baseline
 
+    @evaluation_worker(finalize=True)
     def execute_candidate(self, run_id, approved, config, candidate, baseline):
         from contextlib import nullcontext
         from .paid_policy import restore_paid_context
@@ -1475,7 +1524,7 @@ class EvaluationRunner:
         binding = self.store.experiment(candidate['experiment_id'], light=True)['result'].get('paid_run')
         with restore_paid_context(self.store, binding) if binding else nullcontext():
             run = self.execute_baseline(run_id, approved, config)
-        if run['status'] in {'queued','running'}:return self.store.candidate(candidate['id'])
+        if run['status'] in {'queued','running','recovering'}:return self.store.candidate(candidate['id'])
         if run['status']!='completed' or not run['result'].get('evaluation_complete'):
             result={**run['result'],'evaluation_run_id':run_id,'baseline_run_id':baseline['id'],'error':run.get('error_message'),
                     'evaluation_identity':run['judge'].get('evaluation_identity'),'regression':{'status':'NOT_EVALUABLE','passed':None},
@@ -1485,7 +1534,11 @@ class EvaluationRunner:
         return self.finalize_saved_candidate(run, candidate, baseline)
 
     def finalize_saved_candidate(self, run, candidate, baseline):
-        """Recalculate a completed saved Sandbox without executing any question."""
+        """Recalculate a completed saved Sandbox under its original execution key."""
+        return self._finalize_saved_candidate(run['id'], run, candidate, baseline)
+
+    @evaluation_worker(finalize=True)
+    def _finalize_saved_candidate(self, run_id, run, candidate, baseline):
         if run['status']!='completed' or not run['result'].get('evaluation_complete'):
             raise ValueError('保存的Sandbox尚未完成')
         run_id = run['id']

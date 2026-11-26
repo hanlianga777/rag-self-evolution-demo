@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 class CycleTests(unittest.TestCase):
     def run_cycle(self, *, qualified_at=None, used=0, empty=False, technical=False):
-        from app.optimization_cycle import run_until_qualified
+        from app.optimization_cycle import _run_owned_cycle
         experiment = {'id':'exp','baseline_run_id':'base','result':{},'evaluation_budget':{'used':used},'candidates':[]}
         calls, states = [], []
         import tempfile
@@ -36,8 +36,8 @@ class CycleTests(unittest.TestCase):
                 calls.append(cid);experiment['evaluation_budget']['used']+=1
                 c.update(status='failed' if technical else 'evaluated',result={'qualification':{'qualified':qualified_at is not None and int(cid)>=qualified_at}})
                 return c
-        with patch('app.optimization_cycle.wait_for_off_peak'),patch('app.optimization_cycle.claim_cycle'),patch('app.optimization_cycle._save_state',side_effect=lambda s,e,**kw:states.append(kw)),patch('app.optimization_cycle.OptimizationAgent',Agent),patch('app.optimization_cycle.EvaluationRunner',Runner):
-            result=run_until_qualified(Store(), SimpleNamespace(provider=object()), 'exp')
+        with patch('app.optimization_cycle.wait_for_off_peak'),patch('app.optimization_cycle._save_state',side_effect=lambda s,e,**kw:states.append(kw)),patch('app.optimization_cycle.OptimizationAgent',Agent),patch('app.optimization_cycle.EvaluationRunner',Runner):
+            result=_run_owned_cycle(Store(), SimpleNamespace(provider=object()), 'exp')
         return result,experiment,calls,states
 
     def test_no_qualified_returns_to_analysis_and_reserves_d(self):

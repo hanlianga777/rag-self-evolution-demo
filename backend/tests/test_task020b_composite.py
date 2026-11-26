@@ -113,7 +113,17 @@ class CompositeRecoveryTests(unittest.TestCase):
             state = json.loads(db.execute('select result_json from experiments where id=?', (self.experiment,)).fetchone()[0])
             state['composite'] = {'status':'failed'}
             db.execute('update experiments set result_json=? where id=?', (json.dumps(state), self.experiment))
-        with patch.object(schedule, 'wait_for_off_peak'), patch.object(self.store, 'create_composite', return_value={'status':'no_effective_composite'}):
+        from threading import Thread
+        from types import SimpleNamespace
+        workers = []
+        def worker_factory(**kwargs):
+            worker = Thread(**kwargs)
+            workers.append(worker)
+            return worker
+        with patch.object(schedule, 'threading', SimpleNamespace(Thread=worker_factory)), \
+                patch.object(schedule, 'wait_for_off_peak'), \
+                patch.object(self.store, 'create_composite', return_value={'status': 'no_effective_composite'}):
             result = schedule.start_scheduled_composite(self.store, self.provider(), self.experiment)
-            self.assertIn(result['status'], {'waiting','running','completed'})
-            schedule._composite_workers[(str(self.store.database_path), self.experiment)].join(5)
+            self.assertIn(result['status'], {'waiting', 'running', 'completed'})
+            workers[0].join(5)
+            self.assertFalse(workers[0].is_alive())

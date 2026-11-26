@@ -284,27 +284,33 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertFalse(risk['diagnostic_view']['target_eligible'])
 
     def test_live_owner_survives_import_cleanup_and_old_callbacks(self):
+        from app import task_leases
         from unittest.mock import patch
-        experiment, *_ = self.store.claim_agent_generation('EVAL-test')
-        claim = self.store.experiment(experiment)['result'].get('agent_generation')
-        self.store.interrupt_agent_generations()
-        self.assertEqual(self.store.experiment(experiment)['status'], 'generating')
-        self.assertTrue(claim)
-        self.store.save_agent_trace(experiment, 'failed', {}, 'current failure', generation_token=claim['token'])
-        self.store.claim_agent_generation('EVAL-test', experiment_id=experiment)
-        current = self.store.experiment(experiment)['result']['agent_generation']
-        self.store.save_agent_trace(experiment, 'failed', {}, 'late failure', generation_token=claim['token'])
-        self.assertEqual(self.store.experiment(experiment)['status'], 'generating')
-        with self.assertRaises(ValueError):
-            self.store.save_agent_round(experiment, [], {}, generation_token=claim['token'])
-        self.store.save_agent_round(experiment, [], {}, generation_token=current['token'])
-        self.store.save_agent_trace(experiment, 'failed', {}, 'late same-token failure', generation_token=current['token'])
+
+        experiment, *_, token = self.store.claim_agent_generation('EVAL-test')
+        key = 'agent:' + experiment
+        with task_leases.work(self.store, key, token):
+            self.store.interrupt_agent_generations()
+            self.assertEqual(self.store.experiment(experiment)['status'], 'generating')
+            self.store.save_agent_trace(experiment, 'failed', {}, 'current failure', generation_token=token)
+        *_, current = self.store.claim_agent_generation('EVAL-test', experiment_id=experiment)
+        with task_leases.work(self.store, key, current):
+            with self.assertRaises(task_leases.LeaseLost):
+                self.store.save_agent_trace(experiment, 'failed', {}, 'late failure', generation_token=token)
+            with self.assertRaises(task_leases.LeaseLost):
+                self.store.save_agent_round(experiment, [], {}, generation_token=token)
+            self.assertEqual(self.store.experiment(experiment)['status'], 'generating')
+            self.store.save_agent_round(experiment, [], {}, generation_token=current)
+            with self.assertRaises(task_leases.LeaseLost):
+                self.store.save_agent_trace(experiment, 'failed', {}, 'late same-token failure', generation_token=current)
         self.assertEqual(self.store.experiment(experiment)['status'], 'completed')
         self.store.claim_agent_generation('EVAL-test', experiment_id=experiment)
-        with patch('app.governance.os.kill', side_effect=ProcessLookupError):
+        with self.store.connection() as db:
+            expires = task_leases.row(db, key)['lease_expires_at']
+        with patch.object(task_leases, 'now', return_value=expires + 1):
             self.store.interrupt_agent_generations()
         self.assertEqual(self.store.experiment(experiment)['status'], 'generating')
-        self.assertIn('agent_interruption',self.store.experiment(experiment)['result'])
+        self.assertIn('agent_interruption', self.store.experiment(experiment)['result'])
 
     def test_persistence_response_reuse_revalidates_without_second_provider_call(self):
         import hashlib

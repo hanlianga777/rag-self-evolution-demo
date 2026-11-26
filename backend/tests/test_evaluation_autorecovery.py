@@ -129,10 +129,16 @@ class AutomaticRecoveryTests(unittest.TestCase):
     def test_startup_does_not_auto_authorize_legacy_partial_or_duplicate_live_owner(self):
         from api_fixture import main
         key,items,config=EvaluationRunner(self.store,Runtime(fail=None)).start_baseline(automatic=True)
-        self.assertTrue(self.store.claim_evaluation_worker(key));self.store.interrupt_evaluation_runs()
-        with patch.object(main,'store',self.store),patch('app.main.threading.Thread') as worker:
-            main.recover_authorized_evaluations();worker.assert_not_called()
-        result=self.store.evaluation_run(key)['result'];self.store.finish_evaluation_run(key,'partial',result,'fixture terminal')
+        from app import task_leases
+        token = self.store.claim_evaluation_worker(key)
+        self.assertTrue(token)
+        self.store.interrupt_evaluation_runs()
+        with patch.object(main, 'store', self.store), patch('app.main.threading.Thread') as worker:
+            main.recover_authorized_evaluations()
+            worker.assert_not_called()
+        result = self.store.evaluation_run(key)['result']
+        with task_leases.work(self.store, 'evaluation:' + key, token):
+            self.store.finish_evaluation_run(key, 'partial', result, 'fixture terminal')
         with patch.object(main,'store',self.store),patch('app.main.threading.Thread') as worker:
             main.recover_authorized_evaluations();worker.assert_not_called()
 

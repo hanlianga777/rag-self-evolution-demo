@@ -253,8 +253,13 @@ def provider_task(task):
 
 @contextmanager
 def controlled_run(run):
+    from .task_leases import LeaseLost
+
     token = _run.set(run)
     try: yield
+    except LeaseLost:
+        # A replaced worker cannot stop the authorization used by its successor.
+        raise
     except Exception as error:
         if run is not None: run.stop(type(error).__name__)
         raise

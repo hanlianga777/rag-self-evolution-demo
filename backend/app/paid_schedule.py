@@ -1,12 +1,12 @@
 """Price-window policy for authorized batch work; never authorizes a new task."""
 import json
-import os
 import threading
 import time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from .telemetry import price_config
+from . import task_leases
 
 
 def utc_now():
@@ -20,12 +20,15 @@ def _settings(store):
         return {row['key']: json.loads(row['value_json']) for row in db.execute('SELECT * FROM paid_schedule_settings')}
 
 
+def _write_setting(db, key, value):
+    db.execute('CREATE TABLE IF NOT EXISTS paid_schedule_settings (key TEXT PRIMARY KEY,value_json TEXT NOT NULL)')
+    db.execute('INSERT INTO paid_schedule_settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json',
+               (key, json.dumps(value, ensure_ascii=False)))
+
+
 def _write(store, key, value):
     with store.connection() as db:
-        db.execute('CREATE TABLE IF NOT EXISTS paid_schedule_settings (key TEXT PRIMARY KEY,value_json TEXT NOT NULL)')
-        db.execute('INSERT INTO paid_schedule_settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json',
-                   (key, json.dumps(value, ensure_ascii=False)))
-
+        _write_setting(db, key, value)
 
 def set_settings(store, off_peak_only):
     _write(store, 'off_peak_only', off_peak_only)
@@ -78,10 +81,10 @@ def schedule_status(store, *, at=None):
             'price_config_version': (prices or {}).get('price_config_version')}
 
 
-def pause_state(store, task_key):
+def pause_state(store, task_key, *, ignore_override=False):
     status = schedule_status(store)
     settings = _settings(store)
-    override = settings.get('override:' + task_key, False)
+    override = not ignore_override and settings.get('override:' + task_key, False)
     # Sandbox belongs to the cycle/Agent task whose explicit override was saved.
     if task_key.startswith('evaluation:') and not override:
         run = store.evaluation_run(task_key.split(':', 1)[1], light=True)
@@ -89,12 +92,14 @@ def pause_state(store, task_key):
         candidate = store.candidate(cid) if cid else None
         experiment_id = (candidate or {}).get('experiment_id')
         experiment = store.experiment(experiment_id, light=True) if experiment_id else None
-        active_cycle = (experiment or {}).get('result', {}).get('optimization_cycle', {}).get('status') == 'running'
+        from .optimization_cycle import cycle_occupied
+        active_cycle = cycle_occupied(store, experiment)
         override = bool(active_cycle and settings.get('override:cycle:' + experiment_id))
     if task_key.startswith('agent:'):
         experiment_id=task_key.split(':',1)[1]
         experiment=store.experiment(experiment_id,light=True)
-        active_cycle=(experiment or {}).get('result',{}).get('optimization_cycle',{}).get('status')=='running'
+        from .optimization_cycle import cycle_occupied
+        active_cycle = cycle_occupied(store, experiment)
         override = override or bool(active_cycle and settings.get('override:cycle:' + experiment_id, False))
     paused = status['off_peak_only'] and not override and status['peak_now'] is not False
     return {'paused': bool(paused), 'resume_at': status['next_off_peak_at'], 'resume_at_toronto': status['resume_at_toronto'],
@@ -106,8 +111,9 @@ def pause_state(store, task_key):
 def wait_for_off_peak(store, task_key, on_state, check_stop=lambda: None):
     previous = None
     while True:
+        task_leases.check(store)
         check_stop()
-        if task_key.startswith(('agent:','cycle:')):
+        if task_key.startswith(('agent:', 'cycle:', 'composite:')):
             from .optimization_cycle import check_cycle_stop
             check_cycle_stop(store,task_key.split(':',1)[1])
         pause = pause_state(store, task_key)
@@ -119,76 +125,121 @@ def wait_for_off_peak(store, task_key, on_state, check_stop=lambda: None):
         time.sleep(1)
 
 
+def _write_schedule(db, experiment_id, result, updates):
+    state = {**result.get('composite_schedule', {}), **updates, 'updated_at': utc_now().isoformat()}
+    result['composite_schedule'] = state
+    db.execute('UPDATE experiments SET result_json=? WHERE id=?', (json.dumps(result, ensure_ascii=False), experiment_id))
+    return state
+
+
 def save_composite_schedule(store, experiment_id, **updates):
+    key = 'composite:' + experiment_id
+    with store.connection() as db:
+        db.execute('BEGIN IMMEDIATE')
+        row = db.execute('SELECT result_json FROM experiments WHERE id=?', (experiment_id,)).fetchone()
+        if not row:
+            raise ValueError('实验不存在')
+        task_leases.require(db, key, task_leases.current(store, key), legacy=True)
+        state = _write_schedule(db, experiment_id, json.loads(row['result_json']), updates)
+        status = {'waiting': 'queued', 'unknown': 'blocked'}.get(state.get('status'), state.get('status'))
+        if status in {'queued', 'running', 'recovering'} and (state.get('price_pause') or {}).get('paused'):
+            status = 'paused'
+        if status in task_leases.STATES:
+            task_leases.update_state(db, store, key, status)
+        return state
+
+
+def composite_active(db, experiment_id, state):
+    return task_leases.active(db, 'composite:' + experiment_id,
+                              legacy_pid=state.get('owner_pid') if state.get('status') in {'waiting', 'running'} else None,
+                              legacy_at=state.get('updated_at'))
+
+
+def claim_composite(store, experiment_id, *, recover=False, scheduled=False):
+    key = 'composite:' + experiment_id
     with store.connection() as db:
         db.execute('BEGIN IMMEDIATE')
         row = db.execute('SELECT result_json FROM experiments WHERE id=?', (experiment_id,)).fetchone()
         if not row:
             raise ValueError('实验不存在')
         result = json.loads(row['result_json'])
-        state = {**result.get('composite_schedule', {}), **updates}
-        result['composite_schedule'] = state
-        db.execute('UPDATE experiments SET result_json=? WHERE id=?', (json.dumps(result, ensure_ascii=False), experiment_id))
-        return state
+        if not result.get('report_confirmation'):
+            raise ValueError('需要Gate 2确认合格方案')
+        cycle = result.get('optimization_cycle') or {}
+        state = result.get('composite_schedule') or {}
+        if task_leases.cycle_active(db, experiment_id, cycle) and not task_leases.current(store, 'cycle:' + experiment_id):
+            if recover:
+                return None, state
+            raise ValueError('优化批次正在运行')
+        if cycle.get('stop_request'):
+            if recover:
+                return None, _write_schedule(db, experiment_id, result, {'status': 'paused', 'error': '用户停止运行'})
+            raise InterruptedError('用户停止运行')
+        if composite_active(db, experiment_id, state):
+            return None, state
+        previous = result.get('composite') or {}
+        pending = state.get('status') in {'waiting', 'running', 'recovering'}
+        if recover and not pending:
+            return None, state
+        if previous.get('status') == 'analyzing' and not previous.get('lease_checkpoint'):
+            if recover:
+                return None, _write_schedule(db, experiment_id, result, {'status': 'unknown',
+                    'error': '历史组合请求结果未知，保留记录，不重复调用'})
+            raise ValueError('历史组合请求结果未知，请先核对已保存记录')
+        if recover and previous.get('status') in {'generated', 'no_effective_composite'}:
+            return None, _write_schedule(db, experiment_id, result, {'status': 'completed', 'error': None})
+        token = task_leases.claim(db, key, recovering=recover or pending)
+        updates = {'status': 'recovering' if recover or pending else 'waiting' if scheduled else 'running',
+                   'error': None}
+        if scheduled:
+            reset_override = not recover and not pending
+            updates['price_pause'] = pause_state(store, key, ignore_override=reset_override)
+            if reset_override:
+                _write_setting(db, 'override:' + key, False)
+        state = _write_schedule(db, experiment_id, result, updates)
+        return token, state
 
 
-_composite_lock = threading.Lock()
-_composite_workers = {}
+def composite_status(outcome):
+    if outcome.get('outcome') == 'provider_blocked':
+        return 'blocked'
+    return 'failed' if outcome.get('status') == 'failed' else 'completed'
 
 
 def start_scheduled_composite(store, provider, experiment_id, *, recover=False):
-    """Persist only an explicitly requested D; the monitor cannot invent one."""
+    """Run only a previously authorized and persisted D decision."""
+    key = 'composite:' + experiment_id
+    token, state = claim_composite(store, experiment_id, recover=recover, scheduled=True)
+    if not token:
+        return state
+
     def work():
         try:
-            wait_for_off_peak(store, 'composite:' + experiment_id,
-                lambda pause: save_composite_schedule(store, experiment_id, price_pause=pause))
-            save_composite_schedule(store, experiment_id, status='running')
-            outcome=store.create_composite(experiment_id, provider)
-            save_composite_schedule(store, experiment_id,
-                status='blocked' if outcome.get('outcome')=='provider_blocked' else
-                       'running' if outcome.get('status')=='analyzing' else 'completed',
-                error=outcome.get('reason') if outcome.get('outcome')=='provider_blocked' else None)
-        except Exception as error:
-            save_composite_schedule(store, experiment_id, status='failed', error=str(error))
-    with _composite_lock:
-        key = (str(store.database_path), experiment_id)
-        thread = _composite_workers.get(key)
-        if thread and thread.is_alive():
-            return store.experiment(experiment_id, light=True)['result']['composite_schedule']
-        experiment = store.experiment(experiment_id, light=True)
-        if not experiment or not experiment['result'].get('report_confirmation'):
-            raise ValueError('需要Gate 2确认合格方案')
-        if recover:
-            state = experiment['result'].get('composite_schedule', {})
-            if state.get('status') not in {'waiting', 'running'}: return state
-            owner = state.get('owner_pid')
-            if owner != os.getpid() and type(owner) is int:
-                try: os.kill(owner, 0)
-                except ProcessLookupError: pass
-                except PermissionError: return state
-                else: return state
-            composite = experiment['result'].get('composite')
-            if composite:
-                complete = composite.get('status') in {'generated', 'no_effective_composite'}
-                return save_composite_schedule(store, experiment_id, status='completed' if complete else 'unknown',
-                    error=None if complete else '组合请求的结果未知，保留记录，不重复调用')
-        elif experiment['result'].get('composite') and not (
-                experiment['result']['composite'].get('status') == 'failed'
-                and not experiment['result']['composite'].get('candidate_id')):
-            raise ValueError('方案 D 已处理，请刷新查看结果')
-        elif experiment['result'].get('composite_schedule', {}).get('status') not in {'waiting', 'running'}:
-            clear_run_now(store, 'composite:' + experiment_id)
-        state = save_composite_schedule(store, experiment_id, status='waiting', owner_pid=os.getpid(),
-                                        price_pause=pause_state(store, 'composite:' + experiment_id))
-        thread = threading.Thread(target=work, daemon=True)
-        _composite_workers[key] = thread
-        thread.start()
-        return state
+            with task_leases.work(store, key, token):
+                try:
+                    wait_for_off_peak(store, key,
+                                      lambda pause: save_composite_schedule(store, experiment_id, price_pause=pause))
+                    save_composite_schedule(store, experiment_id, status='running')
+                    outcome = store.create_composite(experiment_id, provider)
+                    save_composite_schedule(store, experiment_id,
+                                            status=composite_status(outcome), error=outcome.get('reason'))
+                except task_leases.LeaseLost:
+                    raise
+                except InterruptedError as error:
+                    save_composite_schedule(store, experiment_id, status='paused', error=str(error))
+                except Exception as error:
+                    save_composite_schedule(store, experiment_id, status='failed', error=str(error))
+        except task_leases.LeaseLost:
+            return
+
+    threading.Thread(target=work, daemon=True).start()
+    return state
 
 
 def recover_scheduled_composites(store, provider):
     with store.connection() as db:
-        ids = [row['id'] for row in db.execute("SELECT id FROM experiments WHERE json_extract(result_json,'$.composite_schedule.status') IN ('waiting','running')")]
+        ids = [row['id'] for row in db.execute("""SELECT id FROM experiments
+            WHERE json_extract(result_json,'$.composite_schedule.status') IN ('waiting','running','recovering')""")]
     for experiment_id in ids:
         start_scheduled_composite(store, provider, experiment_id, recover=True)
 
@@ -200,20 +251,26 @@ def active_pauses(store):
         if pause and pause.get('paused'):
             result.append({'task_label':label,'price_pause':pause,'target':target})
     with store.connection() as db:
-        for row in db.execute("SELECT id,config_json,json_extract(result_json,'$.price_pause') pause FROM evaluation_runs WHERE status IN ('queued','running')"):
+        for row in db.execute("SELECT * FROM evaluation_runs WHERE status IN ('queued','running','recovering')"):
+            if not task_leases.evaluation_active(db, row):
+                continue
             config=json.loads(row['config_json']);candidate_id=config.get('candidate_id','')
             label=candidate_id.rsplit('-',1)[-1]
             name='方案 '+label+' · Sandbox 试跑' if label in 'ABCD' and label else 'Baseline 评测'
             if config.get('run_target')=='answer_replay':name='历史回答判分回放'
-            add(name,json.loads(row['pause']) if row['pause'] else None,{'evaluation_id':row['id']})
-        for row in db.execute("SELECT id,status,json_object('optimization_cycle',json_extract(result_json,'$.optimization_cycle'),'price_pause',json_extract(result_json,'$.price_pause'),'composite_schedule',json_extract(result_json,'$.composite_schedule')) result_json FROM experiments"):
+            add(name, json.loads(row['result_json']).get('price_pause'), {'evaluation_id':row['id']})
+        for row in db.execute("""SELECT id,status,json_object(
+            'optimization_cycle',json_extract(result_json,'$.optimization_cycle'),
+            'price_pause',json_extract(result_json,'$.price_pause'),
+            'agent_generation',json_extract(result_json,'$.agent_generation'),
+            'composite_schedule',json_extract(result_json,'$.composite_schedule')) result_json FROM experiments"""):
             saved={key:value for key,value in json.loads(row['result_json']).items() if value is not None}
-            if saved.get('optimization_cycle',{}).get('status')=='running':
+            if task_leases.cycle_active(db, row['id'], saved.get('optimization_cycle') or {}):
                 pauses=[saved['optimization_cycle'].get('price_pause'),saved.get('price_pause')]
                 add('Agent 优化循环',next((pause for pause in pauses if pause and pause.get('paused')),None),{'experiment_id':row['id']})
-            elif row['status']=='generating':
+            elif task_leases.agent_active(db, row['id'], saved, legacy_generating=row['status'] == 'generating'):
                 add('Agent 生成方案',saved.get('price_pause'),{'experiment_id':row['id']})
-            if saved.get('composite_schedule',{}).get('status') in {'waiting','running'}:
+            if composite_active(db, row['id'], saved.get('composite_schedule') or {}):
                 add('方案 D · 合并方案',saved['composite_schedule'].get('price_pause'),{'experiment_id':row['id']})
         for row in db.execute("SELECT r.id,json_extract(a.hard_validation_json,'$.price_pause') pause FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id WHERE r.status IN ('queued','running','generating','coverage','validation','validating','probing','qc')"):
             add('Golden 出题与质检',json.loads(row['pause']) if row['pause'] else None,{'generation_id':row['id']})
