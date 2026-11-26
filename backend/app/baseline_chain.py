@@ -3,6 +3,7 @@ import json
 import threading
 from datetime import datetime, timezone
 
+from . import verdict
 from .paid_schedule import _settings, _write, unattended_authorization
 from .policy import DEFAULT_PIPELINE_CONFIG, MAX_EVALS
 
@@ -93,6 +94,10 @@ def advance_chain(store, runtime):
                 from .agent_strategy import NEW_EXPERIMENT_STRATEGY
                 context = {**NEW_EXPERIMENT_STRATEGY, 'chain_baseline_id':run['id'], 'audit_note':state['audit_note']}
                 context.update({k:state[k] for k in ('round_policy','paid_run','causal_evidence') if k in state})
+                if verdict.records(store, run['id'], connection=db):
+                    launch = store.new_verdict_experiment(db, run['id'])
+                    context = {**context, **launch,
+                               'round_policy': {**launch['round_policy'], **context.get('round_policy', {})}}
                 db.execute('INSERT INTO experiments VALUES (?,?,?,?,?)', (experiment_id,run['id'],'analyzing',json.dumps(context,ensure_ascii=False),datetime.now(timezone.utc).isoformat()))
                 state['experiment_id'] = experiment_id
                 db.execute('UPDATE paid_schedule_settings SET value_json=? WHERE key=?', (json.dumps(state,ensure_ascii=False),KEY))

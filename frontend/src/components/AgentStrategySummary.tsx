@@ -107,7 +107,9 @@ export function gatesText(result: any) {
 const newFailures = (result: any) =>
   result?.new_regression_question_ids ?? result?.new_failure_question_ids ?? result?.regression?.new_regression_question_ids;
 export function qualificationLabel(result: any) {
-  const verdict = qualificationWord(currentQualification(result));
+  const qualification = currentQualification(result);
+  const verdict = qualificationWord(qualification);
+  if (qualification?.qualified === true && qualification.performance_gate_repair) return `${verdict} · 性能门槛修复`;
   const reasons = qualificationReasons(result);
   return reasons ? `${verdict} · ${reasons}` : verdict;
 }
@@ -239,11 +241,12 @@ export function candidateValue(candidate: any, experiment: any) {
   const confirmation = experiment?.result?.report_confirmation ?? recommendation?.report_confirmation;
   const result = candidate.result;
   if (!evaluatedCandidate(candidate)) return '待评测';
-  const checks = currentQualification(result)?.checks;
+  const qualification = currentQualification(result);
+  const checks = qualification?.checks;
   if (checks?.hard_gates === false) return '硬门槛未通过';
   if (checks?.zero_new_failures === false) return '有新增错题';
-  if (checks?.at_least_one_fixed === false) return '本次评测无修复收益';
-  if (currentQualification(result)?.qualified === false) return '资格未通过';
+  if (checks?.at_least_one_fixed === false && !qualification?.performance_gate_repair) return '本次评测无修复收益';
+  if (qualification?.qualified === false) return '资格未通过';
   if (confirmation && recommendation?.status === 'Recommended' && recommendation.recommended_candidate === candidate.id) return '已保存最终推荐';
   if (confirmation?.winner_id === candidate.id) return '已确认优胜方案';
   if (recommendation?.suggested_winner === candidate.id) return '保存的建议优胜 · 待报告确认';

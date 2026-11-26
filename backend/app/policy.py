@@ -27,6 +27,8 @@ GATE_DEFINITIONS = (
 )
 
 QUALITY_METRICS = tuple(gate["metric"] for gate in GATE_DEFINITIONS if gate['operator'] == '>=')
+PERFORMANCE_METRICS = tuple(gate['metric'] for gate in GATE_DEFINITIONS if gate['operator'] == '<=')
+SAFETY_METRICS = ('safe_rejection_rate', 'safety_critical_accuracy', 'prompt_injection_resistance')
 ALLOWED_SEARCH_SPACE = rules.PIPELINE_VALUES
 FIXED_PIPELINE_PARAMETERS = {'temperature': rules.BASELINE['temperature']}
 
@@ -92,6 +94,18 @@ def evaluate_gates(metrics: dict) -> dict:
     return {"passed": passed_count == len(gates), "passed_count": passed_count, "total": len(gates), "gates": gates}
 
 
+def all_gates_pass(gates):
+    rows = gates.get('gates') or []
+    return (gates.get('passed') is True and len(rows) == len(GATE_DEFINITIONS)
+            and {row.get('metric') for row in rows} == {gate['metric'] for gate in GATE_DEFINITIONS}
+            and all(row.get('passed') is True for row in rows))
+
+
+def failed_performance_gates(gates):
+    return [row['metric'] for row in gates or []
+            if row.get('metric') in PERFORMANCE_METRICS and row.get('status') == 'FAIL']
+
+
 def evaluate_regression(*, new_critical_failures: int, new_ordinary_failures: int) -> dict:
     valid = all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in (new_critical_failures, new_ordinary_failures))
     critical_limit = rules.QUALIFICATION['max_new_critical']
@@ -120,7 +134,8 @@ def qualification_description():
             f"相对 Baseline 新错不超过 {rule['max_new_failures']} 道，至少修好 {rule['min_fixed']} 道")
 
 
-def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int, baseline_bad_case_count: int, candidate_bad_case_count: int, *, rule_version: str | None = None) -> dict:
+def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int, baseline_bad_case_count: int, candidate_bad_case_count: int, *,
+                      rule_version: str | None = None, performance_reference=None, performance_reference_id=None) -> dict:
     counts_valid = all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in (target_bad_cases_fixed, baseline_bad_case_count, candidate_bad_case_count))
     checks = {
         "hard_gates": gates.get("passed") is True,
@@ -136,7 +151,15 @@ def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int
         version['rule_version'] = rule_version
     if rule_version == CANDIDATE_QUALIFICATION_VERSION:
         checks['no_severe_risk'] = regression.get('severe_risk_question_ids') == []
-    qualified = all(checks.values())
+    performance_repaired = False
+    if rule_version == CANDIDATE_QUALIFICATION_VERSION and performance_reference is not None:
+        repaired = failed_performance_gates(performance_reference.get('gates'))
+        checks['no_safety_violation'] = regression.get('safety_violation_question_ids') == []
+        if (performance_reference_id and repaired and all_gates_pass(gates)
+                and all(value for key, value in checks.items() if key != 'at_least_one_fixed')):
+            performance_repaired = True
+            version['performance_gate_repair'] = {'reference_run_id': performance_reference_id, 'metrics': repaired}
+    qualified = performance_repaired or all(checks.values())
     return {**version, "qualified": qualified, "status": "QUALIFIED" if qualified else "NOT_QUALIFIED", "checks": checks,
             "target_bad_cases_fixed": target_bad_cases_fixed if counts_valid else None,
             "bad_case_reduction": baseline_bad_case_count - candidate_bad_case_count if counts_valid else None}
@@ -260,6 +283,9 @@ def d_regression_vs_winner(d, winner):
     worse = sorted((d_new - w_new) | (w_fixed - d_fixed))
     if worse:
         return 'Winner 答对而 D 答错：' + '、'.join(worse)
+    repair = d.get('result', {}).get('qualification', {}).get('performance_gate_repair') or {}
+    if repair and repair.get('reference_run_id') == winner.get('result', {}).get('evaluation_run_id'):
+        return None
     d_bad, w_bad = d.get('result', {}).get('bad_case_count'), winner.get('result', {}).get('bad_case_count')
     if not (type(d_bad) is int and type(w_bad) is int and d_bad < w_bad):
         return '与 Winner 打平（失败题集合没有变少）'

@@ -32,7 +32,7 @@ def bad_case_groups(cases, *, questions=None, diagnoses=None):
             for (layer, subtype), ids in sorted(groups.items())]
 
 
-def validate_strategy(response, prior, audit, targets):
+def validate_strategy(response, prior, audit, targets, *, performance_gates=()):
     review = response.get('prior_round_review')
     if not isinstance(review, dict) or not isinstance(review.get('summary'), str) or not review['summary'].strip():
         raise ValueError('前几轮总结必须有summary，第1轮写无')
@@ -49,7 +49,12 @@ def validate_strategy(response, prior, audit, targets):
             raise ValueError('Candidate须由Agent明确写出参数调整、预期题号和风险，不能自动补写')
         validate_bad_case_references(candidate, ids)
         predicted = candidate.get('predicted_fixed_question_ids')
-        if not isinstance(predicted, list) or not predicted or any(not isinstance(q, str) or q not in targets for q in predicted) or len(set(predicted)) != len(predicted):
+        references = candidate.get('target_bad_cases')
+        performance = (performance_gates and isinstance(references, list) and references
+                       and all(isinstance(ref, str) and ref in performance_gates for ref in references))
+        if performance and predicted == []:
+            continue
+        if not isinstance(predicted, list) or not predicted or any(not isinstance(q, str) or q not in targets for q in predicted) or len(set(predicted)) != len(predicted) or performance:
             raise ValueError('每个Candidate必须写预计修好题号predicted_fixed_question_ids，引用当前保存题号')
 
 
@@ -135,7 +140,8 @@ def save_parameter_lessons(review, candidates, baseline):
         result = candidate['result']
         if new_failure_ids(result) or cid in harmed or assessed in {'有害', '有副作用'}:
             assessment = '有副作用'
-        elif assessed == '无效' or result.get('no_effect') or result.get('all_fixed_question_ids') == []:
+        elif assessed == '无效' or result.get('no_effect') or (
+                result.get('all_fixed_question_ids') == [] and not result.get('qualification', {}).get('performance_gate_repair')):
             assessment = '无效'
         else:
             continue

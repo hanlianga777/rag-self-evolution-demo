@@ -2914,21 +2914,24 @@ class GovernanceStore:
     @staticmethod
     def new_verdict_experiment(connection, baseline_run_id, min_bad_cases=None):
         from .agent_mechanism import CONTRACT
+        from .policy import failed_performance_gates
 
         if min_bad_cases is None:
             min_bad_cases = rules.LAUNCH['min_bad_cases']
         saved = verdict.records(None, baseline_run_id, connection=connection)
         passed = verdict.final_verdicts(baseline_run_id, connection=connection, saved=saved)
-        if sum(not value for value in passed.values()) < min_bad_cases:
+        row = connection.execute('SELECT dataset_snapshot_json, result_json FROM evaluation_runs WHERE id=?',
+                                 (baseline_run_id,)).fetchone()
+        gates = (_load(row['result_json'], {}).get('gates') or {}) if row else {}
+        if sum(not value for value in passed.values()) < min_bad_cases and not failed_performance_gates(gates.get('gates')):
             message = f'Baseline 最终判定错题少于 {min_bad_cases} 道'
             if min_bad_cases == rules.LAUNCH['min_bad_cases']:
                 message += '，需按二.7 加难'
             raise ValueError(message)
-        row = connection.execute('SELECT dataset_snapshot_json FROM evaluation_runs WHERE id=?',
-                                 (baseline_run_id,)).fetchone()
-        verdict.require_baseline(None, {'id': baseline_run_id, 'dataset_snapshot_json': row[0]},
+        verdict.require_baseline(None, {'id': baseline_run_id, 'dataset_snapshot_json': row['dataset_snapshot_json']},
                                  connection=connection, saved=saved)
         return {'verdict_version': rules.RULES_VERSION, 'mechanism_contract': CONTRACT, 'mode': 'initial',
+                'bad_case_decision_version': rules.BAD_CASE_DECISION_VERSION,
                 'parameter_effect_ledger': {'current': [], 'historical': []},
                 'round_policy': {'stop_rule': 'staged-v1'}}
 
@@ -2954,7 +2957,7 @@ class GovernanceStore:
                     from .composite import pipeline_config
                     from .optimization import load_retrieval_preview, require_retrieval_preview
 
-                    baseline = connection.execute('SELECT status,config_json,dataset_snapshot_json FROM evaluation_runs WHERE id=?',
+                    baseline = connection.execute('SELECT status,config_json,dataset_snapshot_json,result_json FROM evaluation_runs WHERE id=?',
                                                   (baseline_run_id,)).fetchone()
                     active = connection.execute("SELECT config_json FROM production_versions WHERE status='active' ORDER BY created_at DESC LIMIT 1").fetchone()
                     config = _load(baseline['config_json'], {}) if baseline else {}
@@ -2964,7 +2967,10 @@ class GovernanceStore:
                         raise ValueError('持续优化要求已完成的 Baseline 配置等于当前生产版本')
                     context.update(self.new_verdict_experiment(connection, baseline_run_id, rules.LAUNCH['continuous_min_bad_cases']))
                     foundation = _load(baseline['dataset_snapshot_json'], {}).get('corpus_fingerprint')
-                    require_retrieval_preview(load_retrieval_preview(self, baseline_run_id, foundation=foundation), {})
+                    from .policy import failed_performance_gates
+                    gates = (_load(baseline['result_json'], {}).get('gates') or {}).get('gates')
+                    if not failed_performance_gates(gates):
+                        require_retrieval_preview(load_retrieval_preview(self, baseline_run_id, foundation=foundation), {})
                 else:
                     context.update(self.new_verdict_experiment(connection, baseline_run_id))
                 context['mode'] = mode
@@ -2984,7 +2990,7 @@ class GovernanceStore:
         from .composite import parameter_diff, pipeline_config
         from .evaluation import candidate_comparison
         from .evaluation_snapshot import shared_judge
-        from .policy import evaluate_regression, qualify_candidate, validate_candidate_config
+        from .policy import evaluate_regression, failed_performance_gates, qualify_candidate, validate_candidate_config
 
         source = db.execute('SELECT baseline_run_id FROM experiments WHERE id=?',
                             (reference['experiment_id'],)).fetchone()
@@ -3048,14 +3054,23 @@ class GovernanceStore:
         regression.update(comparison, severe_risk_question_ids=sorted(
             qid for qid, row in saved.items() if any(s['risk'] for s in row['samples'])))
         gates = run_result.get('gates') or {}
+        base_config = pipeline_config(base_config)
+        changes = parameter_diff(config, base_config)
+        performance = {}
+        targets = reasoning.get('performance_targets') or []
+        if (context.get('bad_case_decision_version') == rules.BAD_CASE_DECISION_VERSION
+                and targets and not reasoning.get('observed_evidence') and changes
+                and all(rules.performance_reduction(key, value, base_config.get(key)) for key, value in changes.items())):
+            reference = _load(base['result_json'], {}).get('gates') or {}
+            if set(targets) <= set(failed_performance_gates(reference.get('gates'))):
+                performance = {'performance_reference': reference, 'performance_reference_id': baseline_id}
+                regression['safety_violation_question_ids'] = verdict.safety_violation_question_ids(saved)
         qualification = qualify_candidate({**gates, 'passed': all_gates_pass(gates)}, regression,
                                           comparison['target_bad_cases_fixed'], sum(not p for p in before.values()),
-                                          comparison['bad_case_count'], rule_version=rules.RULES_VERSION)
+                                          comparison['bad_case_count'], rule_version=rules.RULES_VERSION, **performance)
         provenance = {'source_experiment_id': reference['experiment_id'], 'source_candidate_id': candidate['id'],
                       'source_run_id': run_id, 'generated_by': 'Agent', 'reuse': '用户授权沿用'}
         cid = f'{experiment_id}-R1-A'
-        base_config = pipeline_config(base_config)
-        changes = parameter_diff(config, base_config)
         reasoning = {key: value for key, value in reasoning.items() if key != 'sandbox_attempts'} | {
             **provenance, 'changed_parameters': changes, 'changed_parameters_vs_baseline': changes}
         result = {key: run_result[key] for key in ('metrics', 'overall_score', 'safety_metrics', 'group_metrics', 'total')
@@ -3163,6 +3178,7 @@ class GovernanceStore:
             row = connection.execute("SELECT * FROM experiments WHERE id=?", (experiment_id,)).fetchone()
             self.require_current_baseline(row["baseline_run_id"], connection)
             persisted = _load(row["result_json"], {})
+            result = {key: value for key, value in result.items() if key != 'bad_case_decision_version'}
             if verdict.current(persisted):
                 verdict.require_empty_history(persisted.get('parameter_effect_ledger'))
                 verdict.require_empty_history(result.get('parameter_effect_ledger'))
@@ -3440,6 +3456,11 @@ class GovernanceStore:
                     current = [entry for entry in ledger['current'] if entry['candidate_id'] != candidate_id]
                     current.extend(candidate_effects(connection, experiment, candidate, small))
                     ledger['current'] = sorted(current, key=lambda entry: (entry['candidate_id'], entry['question_id']))
+                    reasoning = _load(candidate['reasoning_json'], {})
+                    hypothesis = context.get('hypothesis_chain', {}).get(str(reasoning.get('round')), {})
+                    if status == 'evaluated' and hypothesis.get('candidate_id') == candidate_id and hypothesis.get('performance_targets'):
+                        repaired = small.get('qualification', {}).get('performance_gate_repair', {}).get('metrics', [])
+                        hypothesis['performance_outcome'] = 'true' if set(hypothesis['performance_targets']) <= set(repaired) else 'false'
                     connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (_json(context), experiment['id']))
         return self.candidate(candidate_id)
 

@@ -6,6 +6,7 @@ import os
 import json
 import time
 import math
+from contextlib import nullcontext
 from . import rules, verdict, task_leases
 from functools import wraps
 from .safety_guard import check_safety, adjudicate
@@ -1131,8 +1132,12 @@ class EvaluationRunner:
             baseline_cases = {c['question_id']: c for c in verdict.final_cases(
                 self.store, experiment['baseline_run_id'], use_final=verdict.current(experiment['result']))}
         lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay','manual_resume','experiment_config_identity','final_retry_started','price_pause','provider_retry') if k in run['result']}
-        from .request_reuse import matching_configuration, question_scope, reused_case
-        reusable_cases = matching_configuration(self.store, run) if config.get('candidate_id') and experiment['result'].get('causal_evidence') else {}
+        from .request_reuse import bypass_reuse, matching_configuration, question_scope, reused_case
+        measure_performance = (bool(config.get('candidate_id')) and
+                               experiment['result'].get('bad_case_decision_version') == rules.BAD_CASE_DECISION_VERSION
+                               and bool(owner['reasoning'].get('performance_targets')))
+        reusable_cases = (matching_configuration(self.store, run) if config.get('candidate_id')
+                          and experiment['result'].get('causal_evidence') and not measure_performance else {})
         summary_cache = {}
         def progress(*, complete=False):
             from .telemetry import cost_fields
@@ -1225,7 +1230,7 @@ class EvaluationRunner:
                         if 'execution' not in checkpoint and lineage.get('judge_replay') and not replay_new:
                             raise ValueError('Judge-only Replay execution missing; generation is forbidden')
                         if 'execution' not in checkpoint:
-                            with question_scope(item['id']):
+                            with question_scope(item['id']), (bypass_reuse() if measure_performance else nullcontext()):
                                 checkpoint['execution']=perform(phase,lambda:self.runtime.answer(item['question'],config))
                             persist()
                         if lineage.get('judge_replay') and not replay_new:
@@ -1368,6 +1373,7 @@ class EvaluationRunner:
 
     def candidate_inputs(self, candidate_id: str):
         from .agent_round_contract import layered, layered_winner, validate_layered_limits
+        from .policy import failed_performance_gates
         from .providers import ProviderIdentityError
 
         candidate = self.store.candidate(candidate_id)
@@ -1461,8 +1467,15 @@ class EvaluationRunner:
                 else:
                     comparison = base
                     changes = {k:v for k,v in source['config'].items() if v!=base.get(k)}
-                validate_intervention({**r, 'target_bad_cases':r.get('observed_evidence',[]),
-                                       'why':r.get('proposal'), 'config_diff':changes}, targets, comparison)
+                performance_targets = r.get('performance_targets') or []
+                allowed_metrics = []
+                if performance_targets and experiment['result'].get('bad_case_decision_version') == rules.BAD_CASE_DECISION_VERSION:
+                    reference_id = r.get('inherited_from')
+                    reference = self.store.candidate(reference_id) if reference_id else baseline
+                    allowed_metrics = failed_performance_gates((reference['result'].get('gates') or {}).get('gates'))
+                validate_intervention({**r, 'target_bad_cases': [*r.get('observed_evidence', []), *performance_targets],
+                                       'why':r.get('proposal'), 'config_diff':changes}, targets, comparison,
+                                      performance_gates=allowed_metrics)
         snapshot = json.loads(baseline["dataset_snapshot_json"])
         from .paid_run import current_paid_run
         limits = baseline['judge'].get('execution_snapshot',{}).get('request_limits')
@@ -1548,7 +1561,8 @@ class EvaluationRunner:
             return candidate
         current = run['result'].get('verdict_version') == rules.RULES_VERSION
         from .agent_round_contract import all_gates_pass, layered
-        use_layered = layered(self.store.experiment(candidate['experiment_id'], light=True)['result']) if current else False
+        state = self.store.experiment(candidate['experiment_id'], light=True)['result'] if current else {}
+        use_layered = layered(state)
         baseline_cases = {item['question_id']: item for item in verdict.final_cases(self.store, baseline['id'], use_final=current)}
         raw_candidate_cases = self.store.evaluation_case_results(run_id)
         candidate_cases = {item['question_id']: item for item in verdict.final_cases(
@@ -1571,9 +1585,35 @@ class EvaluationRunner:
         labelled = candidate['reasoning'].get('candidate_label') in {'A', 'B', 'C', 'D'}
         version = CANDIDATE_QUALIFICATION_VERSION if current else LEGACY_CANDIDATE_QUALIFICATION_VERSION if labelled else None
         gates = run['result']['gates']
+        performance = {}
+        reasoning = candidate['reasoning']
+        if state.get('bad_case_decision_version') == rules.BAD_CASE_DECISION_VERSION and (
+                reasoning.get('performance_targets') and not reasoning.get('observed_evidence')
+                or reasoning.get('candidate_label') == 'D'):
+            from .composite import parameter_diff, pipeline_config
+            from .policy import failed_performance_gates
+
+            parent_id = reasoning.get('winner_id') or reasoning.get('inherited_from')
+            parent = self.store.candidate(parent_id) if parent_id else baseline
+            parent_run = parent['result'].get('evaluation_run_id') if parent_id else baseline['id']
+            reference_gates = parent['result'].get('gates') or {}
+            failed_latency = failed_performance_gates(reference_gates.get('gates'))
+            reference_config = pipeline_config(parent['config'])
+            changes = parameter_diff(candidate['config'], reference_config)
+            if (failed_latency and set(reasoning.get('performance_targets') or failed_latency) <= set(failed_latency)
+                    and changes and all(rules.performance_reduction(key, value, reference_config.get(key))
+                                        for key, value in changes.items())):
+                before = verdict.final_verdicts(parent_run, store=self.store) if parent_id else {
+                    q: case['passed'] for q, case in baseline_cases.items()}
+                no_new = (before.keys() == candidate_cases.keys()
+                          and all(not passed or candidate_cases[q].get('passed') is True for q, passed in before.items()))
+                if no_new:
+                    performance = {'performance_reference': reference_gates, 'performance_reference_id': parent_run}
+                regression['safety_violation_question_ids'] = verdict.safety_violation_question_ids(saved)
+                regression['performance_reference_non_regression'] = no_new
         qualification = qualify_candidate({**gates, 'passed': all_gates_pass(gates)} if use_layered else gates,
                                           regression, comparison['target_bad_cases_fixed'], len(failed), comparison['bad_case_count'],
-                                          rule_version=version)
+                                          rule_version=version, **performance)
         if run['status'] != 'completed':
             qualification = {**qualification, 'qualified': False}
         result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], "error": run.get("error_message"), **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "release_qualification": qualify_release(run["result"]["gates"], regression, len(comparison["all_fixed_question_ids"]), len(failed), comparison['bad_case_count']), "recommendation": None}
@@ -1597,7 +1637,9 @@ class EvaluationRunner:
             newly_failed = sorted(q for q, passed in winner_passed.items() if passed and candidate_passed.get(q) is False)
             newly_fixed = sorted(q for q, passed in winner_passed.items() if not passed and candidate_passed.get(q) is True)
             if current:
-                passed = not newly_failed and set(winner_passed) == set(candidate_passed) and (bool(newly_fixed) or not use_layered)
+                performance_repaired = bool(qualification.get('performance_gate_repair'))
+                passed = (not newly_failed and set(winner_passed) == set(candidate_passed)
+                          and (bool(newly_fixed) or not use_layered or performance_repaired))
                 checks = {**result['qualification']['checks'], 'winner_non_regression': passed}
                 if not passed:
                     result['qualification'] = {**result['qualification'], 'qualified': False, 'status': 'NOT_QUALIFIED'}

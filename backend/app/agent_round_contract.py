@@ -4,12 +4,14 @@ from itertools import combinations
 from . import rules, verdict
 from .agent_mechanism import fault_stage, validate_mechanism
 from .composite import parameter_diff, pipeline_config
-from .policy import GATE_DEFINITIONS, candidate_rank, validate_candidate_config
+from .policy import (PERFORMANCE_METRICS, SAFETY_METRICS, all_gates_pass, candidate_rank,
+                     failed_performance_gates, validate_candidate_config)
 
 STOP_REASON = '证据不足以继续'
 COMBINATION = '组合探索，不可归因'
 LAYERED_VERSION = '2026-11-25'
-LAYERS = ('safety', 'retrieval', 'generation')
+LAYERS = rules.BAD_CASE_LAYERS
+LEGACY_LAYERS = ('safety', 'retrieval', 'generation')
 GENERATION_REQUIRED = '前置条件未满足：需先对当前底座做生成诊断'
 
 
@@ -27,29 +29,39 @@ def layered(context):
 
 
 def fault_layer(code):
-    return 'retrieval' if code in ('recall', 'ranking', 'final') else code
+    return rules.BAD_CASE_TYPES.get(code, (code, None))[0]
 
 
-def target_layer(remaining_failures, gate_failures, severe_safety):
-    failures = [fault_layer(code) for code in remaining_failures]
-    counts = {layer: failures.count(layer) for layer in LAYERS}
+def target_layer(remaining_failures, gate_failures, severe_safety, *, decision_version=None):
+    current = decision_version == rules.BAD_CASE_DECISION_VERSION
+    layers = LAYERS if current else LEGACY_LAYERS
+    failures = [fault_layer(code) for code in remaining_failures if code != 'performance']
+    counts = {layer: failures.count(layer) for layer in layers}
     gates = [fault_layer(code) for code in gate_failures]
-    priority = max((layer for layer in LAYERS if layer in gates), key=counts.get, default=None)
+    severities = {}
+    if current:
+        for code in (*remaining_failures, *gate_failures):
+            if code in rules.BAD_CASE_TYPES:
+                layer, label = rules.BAD_CASE_TYPES[code]
+                severities[layer] = max(severities.get(layer, -1), rules.BAD_CASE_SEVERITY.index(label))
+
+    def priority_key(layer):
+        return severities.get(layer, -1), counts[layer]
+
+    priority = max((layer for layer in layers if layer in gates), key=priority_key, default=None)
     if severe_safety:
         layer, reason = 'safety', '存在严重安全违规'
     elif priority:
         layer, reason = priority, '优先修复未过门槛的根因层'
     else:
-        layer = max((layer for layer in LAYERS if counts[layer]), key=counts.get, default=None)
+        layer = max((layer for layer in layers if counts[layer]), key=priority_key, default=None)
         reason = '剩余错题最多，同数时按上游顺序' if layer else '剩余错题无已知根因层'
-    return {'layer': layer, 'reason': reason, 'counts': counts}
-
-
-def all_gates_pass(gates):
-    rows = gates.get('gates') or []
-    return (gates.get('passed') is True and len(rows) == len(GATE_DEFINITIONS)
-            and {row.get('metric') for row in rows} == {gate['metric'] for gate in GATE_DEFINITIONS}
-            and all(row.get('passed') is True for row in rows))
+        if current and layer:
+            reason = '按最高严重度、错题数和上游顺序选择'
+    result = {'layer': layer, 'reason': reason, 'counts': counts}
+    if current:
+        result['severity_by_layer'] = {key: rules.BAD_CASE_SEVERITY[value] for key, value in severities.items()}
+    return result
 
 
 def saved_final_map(store, run_id, *, connection=None, saved=None):
@@ -60,6 +72,7 @@ def saved_final_map(store, run_id, *, connection=None, saved=None):
 
 def layered_winner(store, baseline, candidates, *, connection=None):
     current = saved_final_map(store, baseline['id'], connection=connection)
+    current_run = baseline['id']
     identity = baseline['judge'].get('evaluation_identity')
     winner = None
     eligible = [c for c in candidates if c['status'] == 'evaluated'
@@ -76,12 +89,16 @@ def layered_winner(store, baseline, candidates, *, connection=None):
             improvements = []
             for candidate in peers:
                 result = saved_final_map(store, candidate['result'].get('evaluation_run_id'), connection=connection)
-                if result.keys() == current.keys() and (
-                        {q for q, passed in current.items() if passed} < {q for q, passed in result.items() if passed}):
+                before = {q for q, passed in current.items() if passed}
+                after = {q for q, passed in result.items() if passed}
+                repair = candidate['result']['qualification'].get('performance_gate_repair', {})
+                if current and result.keys() == current.keys() and (
+                        before < after or before == after and repair.get('reference_run_id') == current_run):
                     improvements.append((candidate, result))
             if improvements:
                 winner, current = min(improvements, key=lambda pair: (
                     sum(not passed for passed in pair[1].values()), candidate_rank(pair[0])))
+                current_run = winner['result']['evaluation_run_id']
     return winner
 
 
@@ -139,13 +156,18 @@ def validate_combinations(candidates):
 
 
 def round_opportunities(targets, base, baseline, prior, preview, current, historical, *, blocked=(),
-                        use_layered=False, reserved_keys=(), combination_used=False):
+                        use_layered=False, reserved_keys=(), combination_used=False, performance_gates=()):
     """Check every supported single change and each potentially evidenced combination."""
     preview = preview or {}
     effective = {**baseline, **base['changes']}
     trial_changes = [{key: value} for key in rules.AGENT['tunable']
                      for value in (rules.AGENT['thinking_values'] if key == 'generation_thinking' else rules.PIPELINE_VALUES[key])
                      if not (type(value) is type(effective.get(key)) and value == effective.get(key))]
+    if performance_gates and not combination_used:
+        reductions = [change for change in trial_changes if all(
+            rules.performance_reduction(key, value, effective.get(key)) for key, value in change.items())]
+        trial_changes.extend({**left, **right} for left, right in combinations(reductions, 2)
+                             if not left.keys() & right.keys())
     for variant in preview.get('configs', []):
         trial = {**effective, **variant.get('change', {})}
         changes = parameter_diff(trial, effective)
@@ -182,7 +204,9 @@ def round_opportunities(targets, base, baseline, prior, preview, current, histor
         'ranking': '核对交付片段，补做同底座检索预演',
         'final': '核对交付片段，补做同底座检索预演',
         'generation': '在独立诊断中复测回答和 Judge，检查推理档位',
+        'over_refuse': '在独立诊断中复测回答和 Judge，检查推理档位',
         'safety': '用安全专项复核危险操作和拒答规则',
+        'safety_violation': '用安全专项复核危险操作和拒答规则',
         'unknown': '补齐逐题证据、检索 Trace 或判分依据',
     }
     rows = {}
@@ -203,6 +227,15 @@ def round_opportunities(targets, base, baseline, prior, preview, current, histor
         rows[question] = {'display_question_id': view.get('display_question_id') or question, 'fault': fault,
                           'available': available, 'next_action': action,
                           'reason': None if available else '无仍可提交且通过机制校验的未试配置'}
+    if performance_gates:
+        available = [{'changes': changes, 'decision': '放行'} for changes in valid
+                     if all(rules.performance_reduction(key, value, effective.get(key))
+                            for key, value in changes.items())]
+        for metric in performance_gates:
+            rows[metric] = {'display_question_id': metric, 'fault': {'code': 'performance', 'stage': '性能门槛',
+                            'severity': rules.BAD_CASE_TYPES['performance'][1]},
+                            'available': available, 'next_action': '全题复测耗时和逐题判定',
+                            'reason': None if available else '当前底座没有可用的降耗改动'}
     return rows
 
 
@@ -225,9 +258,9 @@ def layer_capacity(rows, layer, count):
                 and len(set().union(*group)) == sum(map(len, group))), default=(0, 0))
 
 
-def layer_plan(rows, gate_faults, severe, ledger, base_id, labels):
+def layer_plan(rows, gate_faults, severe, ledger, base_id, labels, *, decision_version=None):
     codes = [row['fault']['code'] for row in rows.values()]
-    target = target_layer(codes, gate_faults, severe)
+    target = target_layer(codes, gate_faults, severe, decision_version=decision_version)
     selected = target
     skipped = []
     generation_checked = any(row['source'] == '生成诊断' and row['base_id'] == base_id for row in ledger)
@@ -241,20 +274,28 @@ def layer_plan(rows, gate_faults, severe, ledger, base_id, labels):
         skipped.append({'layer': layer, 'reason': '当前底座无可用机会'})
         excluded = {item['layer'] for item in skipped}
         selected = target_layer([code for code in codes if fault_layer(code) not in excluded],
-                                [code for code in gate_faults if fault_layer(code) not in excluded], False)
+                                [code for code in gate_faults if fault_layer(code) not in excluded], False,
+                                decision_version=decision_version)
     return {**target, 'layer': None, 'reason': '没有仍可验证的目标层机会',
             'fallbacks': skipped, 'capacity': 0, 'proposal_count': 0}
 
 
-def layer_signals(store, run_id, gates, faults):
+def layer_signals(store, run_id, gates, faults, *, decision_version=None):
     from .evaluation import gate_details
 
     cases = verdict.gate_cases(store, run_id)
-    failed = [gate for gate in gates if gate.get('status') == 'FAIL' and not gate['metric'].startswith('latency_')]
+    current = decision_version == rules.BAD_CASE_DECISION_VERSION
+    separate = (*PERFORMANCE_METRICS, *SAFETY_METRICS) if current else PERFORMANCE_METRICS
+    failed = [gate for gate in gates if gate.get('status') == 'FAIL' and gate['metric'] not in separate]
     gate_faults = [faults[item['question_id']]['code'] for gate in gate_details(cases, failed)
                    for item in gate['failed_cases'] if item['question_id'] in faults]
     saved = verdict.records(store, run_id)
     severe = any(any(s['risk'] for s in saved.get(qid, {}).get('samples', [])) for qid in faults)
+    if current:
+        gate_faults.extend('performance' for _ in failed_performance_gates(gates))
+        if any(gate.get('status') == 'FAIL' and gate['metric'] in SAFETY_METRICS for gate in gates):
+            gate_faults.append('safety')
+        severe = severe or any(fault['code'] == 'safety_violation' for fault in faults.values())
     return gate_faults, severe
 
 
@@ -280,8 +321,13 @@ def previous_commitment(context, number):
     statuses = [outcomes.get(q, '未知') for q in previous['question_ids']]
     outcome = ('false' if any(s in {'无效', '弄坏'} for s in statuses) else
                'true' if statuses and all(s == '修好' for s in statuses) else 'unknown')
-    return {'round': number - 1, 'outcome': outcome, 'expected': previous.get(f'if_{outcome}'),
-            'question_outcomes': dict(zip(previous['question_ids'], statuses))}
+    result = {'round': number - 1, 'outcome': outcome, 'expected': previous.get(f'if_{outcome}'),
+              'question_outcomes': dict(zip(previous['question_ids'], statuses))}
+    if previous.get('performance_targets'):
+        outcome = previous.get('performance_outcome', 'unknown')
+        result.update(outcome=outcome, expected=previous.get(f'if_{outcome}'),
+                      performance_targets=previous['performance_targets'])
+    return result
 
 
 def check_commitment(previous, action, *, changes=(), reason=None):
@@ -295,7 +341,7 @@ def check_commitment(previous, action, *, changes=(), reason=None):
             'reason': None if fulfilled else reason.strip()}
 
 
-def validate_hypothesis(plan, candidates, inherited, excluded, previous):
+def validate_hypothesis(plan, candidates, inherited, excluded, previous, *, performance_gates=()):
     if not isinstance(plan, dict) or not isinstance(plan.get('hypothesis'), str) or not plan['hypothesis'].strip():
         raise ValueError('须写本轮 hypothesis_plan.hypothesis')
     test = next((c for c in candidates if c['id'] == plan.get('test_candidate')), None)
@@ -316,4 +362,6 @@ def validate_hypothesis(plan, candidates, inherited, excluded, previous):
                              reason=plan.get('deviation_reason'))
     return {**{key: plan[key] for key in ('hypothesis', 'test_candidate', 'if_true', 'if_false')},
             'inherit': inherited, 'exclude': excluded, 'question_ids': test['predicted_fixed_question_ids'],
+            **({'performance_targets': test['target_bad_cases']}
+               if performance_gates and test['predicted_fixed_question_ids'] == [] else {}),
             'previous_check': check}

@@ -477,7 +477,7 @@ def staged_decision(round_number, qualified_count, used, *, version=None,
                     remaining_count=None, untried_layers=(), has_combination=False):
     """规则总表五.6，纯函数，方便单测。返回 'next_round' / 'composite' / 'finish_winner' / 'agent_failed'。"""
     if layered({'verdict_version': version}):
-        if remaining_count == 0 and qualified_count:
+        if remaining_count == 0 and qualified_count and 'performance' not in untried_layers:
             return 'finish_winner'
         at_limit = round_number >= rules.AGENT['max_rounds'] or used >= MAX_EVALS - 1
         if not at_limit and (round_number == 0 or untried_layers):
@@ -508,12 +508,16 @@ def layered_stage_facts(store, experiment, baseline, winner, number):
     from .agent_round_contract import fault_layer, round_base, round_opportunities, saved_final_map
     from .composite import parameter_diff, pipeline_config
     from .optimization import gate_harming_changes, load_retrieval_preview, require_retrieval_preview
-    from .policy import validate_candidate_config
+    from .policy import failed_performance_gates, validate_candidate_config
 
     run_id = winner['result']['evaluation_run_id'] if winner else baseline['id']
     final = saved_final_map(store, run_id)
     remaining = {q for q, passed in final.items() if not passed}
-    if not remaining:
+    decision_version = experiment['result'].get('bad_case_decision_version')
+    reference = winner or baseline
+    performance_gates = (failed_performance_gates((reference['result'].get('gates') or {}).get('gates'))
+                         if decision_version == rules.BAD_CASE_DECISION_VERSION else [])
+    if not remaining and not performance_gates:
         return {'remaining_count': 0, 'untried_layers': [], 'has_combination': False}
     candidates = experiment['candidates']
     baseline_config = pipeline_config(baseline['config'])
@@ -523,7 +527,7 @@ def layered_stage_facts(store, experiment, baseline, winner, number):
     cases = verdict.final_cases(store, run_id)
     present = {row['question_id'] for row in failures}
     references = failures + [{'id': q, 'question_id': q} for q in sorted(remaining - present)]
-    faults = faults_for_cases(baseline, cases, references)
+    faults = faults_for_cases(baseline, cases, references, decision_version=decision_version)
     targets = [{**row, 'mechanism_fault': faults[row['question_id']]} for row in failures
                if row['question_id'] in faults and is_optimization_target(row)]
     current = experiment['result']['parameter_effect_ledger']['current']
@@ -532,7 +536,7 @@ def layered_stage_facts(store, experiment, baseline, winner, number):
     gates = (baseline['result'].get('gates') or {}).get('gates')
     blocked = [row['config_diff'] for row in gate_harming_changes(candidates, gates)]
     options = round_opportunities(targets, base, baseline_config, candidates, preview, current, [],
-                                 blocked=blocked, use_layered=True)
+                                 blocked=blocked, use_layered=True, performance_gates=performance_gates)
     untried = {fault_layer(row['fault']['code']) for row in options.values() if row['available']}
     if len(base['changes']) < rules.AGENT['d_max_changed_parameters']:
         remaining_layers = {fault_layer(row['code']) for row in faults.values()}

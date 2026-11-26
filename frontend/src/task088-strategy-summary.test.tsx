@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { EvolutionPage } from './pages/EvolutionPage';
+import { candidateValue, qualificationLabel } from './components/AgentStrategySummary';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 let root: ReturnType<typeof createRoot>;
@@ -20,6 +21,15 @@ const strategy = { bad_case_summary: { groups: [
   { layer: '检索层问题', question_ids: ['Q16'], count: 1 },
   { layer: '检索层问题', question_ids: ['Q20'], count: 1 },
 ] } };
+
+it('显示零修题的性能门槛修复资格', () => {
+  const performance = { ...candidate, result: { ...candidate.result, all_fixed_question_ids: [],
+    qualification: { qualified: true, checks: { at_least_one_fixed: false },
+      performance_gate_repair: { reference_run_id: 'BASE', metrics: ['latency_p99_seconds'] } } } };
+  expect(qualificationLabel(performance.result)).toBe('合格 · 性能门槛修复');
+  expect(candidateValue(performance, { recommendation: { suggested_winner: candidate.id } }))
+    .toBe('保存的建议优胜 · 待报告确认');
+});
 
 async function mount(result: object, candidates: object[], tab = 'route', experimentId = 'EXP') {
   history.replaceState(null, '', `#evolution?tab=${tab}`);

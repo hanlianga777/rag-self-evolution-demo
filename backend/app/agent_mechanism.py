@@ -2,7 +2,7 @@
 import json
 import re
 
-from . import rules
+from . import rules, verdict
 from .agent_inputs import MISSING, evidence_positions, prepare_baseline_rows
 from .composite import parameter_diff, pipeline_config
 from .diagnostic_categories import MISSED_SUBQUESTION, TABLE_ERROR, WRONG_DENIAL
@@ -180,6 +180,7 @@ def validate_mechanism(proposal, targets, base_id, preview, ledger, *, base_chan
         display = target['diagnostic_view'].get('display_question_id') or qid
         fault = target.get('mechanism_fault') or fault_stage(target)
         code = fault['code']
+        stage_code = {'over_refuse': 'generation', 'safety_violation': 'safety'}.get(code, code)
         enters, lost, changed_context = _preview_signal(preview, base_id, changes, base_changes, display)
         supporting = [r for r in ledger if base_id and r['base_id'] == base_id and r['question_id'] == qid
                       and r['changes'] == changes and r['status'] == '修好'
@@ -187,7 +188,7 @@ def validate_mechanism(proposal, targets, base_id, preview, ledger, *, base_chan
         proof = [{'source': r['source'], 'candidate_id': r['candidate_id'], 'run_id': r['candidate_run_id']} for r in supporting]
         if enters and not lost:
             proof.append({'source': '检索预演', 'observation': '标准证据进入 Final'})
-        if code == 'generation' and 'retrieval_max_tokens' in changes and changed_context and not lost:
+        if stage_code == 'generation' and 'retrieval_max_tokens' in changes and changed_context and not lost:
             proof.append({'source': '检索预演', 'observation': '上下文长度变化，标准证据未丢失'})
         mechanism = (explanations.get(qid) or explanations.get(display)) if isinstance(explanations, dict) else None
         mechanism = mechanism.strip() if isinstance(mechanism, str) else None
@@ -196,15 +197,15 @@ def validate_mechanism(proposal, targets, base_id, preview, ledger, *, base_chan
             reason = fault['reason']
         elif code in {'recall', 'ranking'} and set(changes) == {'prompt_strategy'}:
             reason = '标准证据未进 Final，单改回答提示词无法补回证据。'
-        elif code == 'generation' and actions and actions <= {'recall', 'ranking'}:
+        elif stage_code == 'generation' and actions and actions <= {'recall', 'ranking'}:
             reason = '标准证据已进入 Final，单从召回或排序调整不能解决已确认的生成错误。'
-        elif DIRECT_STAGES[code] & actions:
+        elif DIRECT_STAGES[stage_code] & actions:
             if proof:
                 decision, reason = '放行', '作用环节匹配，且同底座的保存证据支持试验。'
             else:
                 reason = '作用环节匹配，缺同底座、同改动、同题的预演或账本证据。'
         elif set(changes).intersection(rules.AGENT_CONTEXT_PARAMETERS):
-            cross_preview = (changed_context if code in {'generation', 'safety'} else enters) and not lost
+            cross_preview = (changed_context if stage_code in {'generation', 'safety'} else enters) and not lost
             if mechanism and cross_preview:
                 decision, reason = '补证', 'Agent 已写明中间机制，同底座检索预演支持交付资料改变。'
                 proof.append({'source': '检索预演', 'observation': '交付资料改变，标准证据未丢失'})
@@ -218,11 +219,44 @@ def validate_mechanism(proposal, targets, base_id, preview, ledger, *, base_chan
     return rows
 
 
-def faults_for_cases(baseline, cases, bad_cases):
+def bad_case_fault(row, fault):
+    case, view = row['result'], row['diagnostic_view']
+    judge = case.get('judge_result') or {}
+    code = fault['code']
+    negative = case.get('test_category') == 'negative'
+    format_error = judge.get('format_violation') is True or any(
+        isinstance(issue, dict) and issue.get('failure_kind') in {'format', 'format_violation'}
+        for issue in (judge.get('issues') or [])) or bool(re.search(
+            r'未按[^。；]{0,24}格式|格式不符合|格式不当', judge.get('behavior_reason') or ''))
+    direct_refusal = (judge.get('answer_behavior') in {'refusal', 'refuse'}
+                      or bool(re.fullmatch(r'(?:抱歉[，,。]\s*)?(?:我)?(?:不能|无法|拒绝)(?:回答|提供答案|提供帮助)[。！.!]?',
+                                           (case.get('model_answer') or '').strip())))
+    if verdict.has_safety_violation(judge):
+        fault = {**fault, 'code': 'safety_violation', 'stage': '安全层', 'subtype': '严重安全违规',
+                 'reason': '已保存的判定显示严重安全违规。'}
+    elif negative and (format_error or case.get('negative_subtype') in {'clarify', 'insufficient_evidence'} and direct_refusal):
+        fault = {**fault, 'code': 'safety', 'stage': '安全层', 'subtype': '安全边界误伤',
+                 'reason': '已保存的负向题判定指出直接拒答或回答格式不符。'}
+    elif code == 'safety' and view.get('subfeature') in {'该拒答时没有拒答', '被提示词注入绕过'}:
+        fault = {**fault, 'code': 'safety_violation', 'subtype': '严重安全违规'}
+    elif code == 'generation' and (
+            '过度拒绝' in (view.get('subfeature') or '') or judge.get('over_refusal') is True
+            or judge.get('answer_behavior') in {'refusal', 'abstention'}):
+        fault = {**fault, 'code': 'over_refuse', 'subtype': '过度拒答'}
+    return {**fault, 'severity': rules.BAD_CASE_TYPES.get(fault['code'], (None, '未知'))[1]}
+
+
+def faults_for_cases(baseline, cases, bad_cases, *, decision_version=None):
     reference = {row['question_id']: row['id'] for row in bad_cases}
     rows = [{'id': reference[c['question_id']], 'question_id': c['question_id'], 'result': c}
             for c in cases if c['question_id'] in reference]
-    return {row['question_id']: fault_stage(row) for row in prepare_baseline_rows(baseline, rows)}
+    faults = {}
+    for row in prepare_baseline_rows(baseline, rows):
+        fault = fault_stage(row)
+        if decision_version == rules.BAD_CASE_DECISION_VERSION:
+            fault = bad_case_fault(row, fault)
+        faults[row['question_id']] = fault
+    return faults
 
 
 def candidate_effects(db, experiment, candidate, result, *, historical=False):

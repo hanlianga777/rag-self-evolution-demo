@@ -20,7 +20,11 @@ def release_review_view(store, candidate_id=None):
     version = qualification.get('rule_version')
     if version in {CANDIDATE_QUALIFICATION_VERSION, LEGACY_CANDIDATE_QUALIFICATION_VERSION}:
         checks = qualification.get('checks', {})
-        required = ['regression', 'comparison_complete', 'zero_new_failures', 'at_least_one_fixed']
+        required = ['regression', 'comparison_complete', 'zero_new_failures']
+        if qualification.get('performance_gate_repair'):
+            required.append('no_safety_violation')
+        else:
+            required.append('at_least_one_fixed')
         if version == CANDIDATE_QUALIFICATION_VERSION:
             required.append('no_severe_risk')
             if (candidate or {}).get('reasoning', {}).get('candidate_label') == 'D':

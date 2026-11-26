@@ -92,6 +92,21 @@ AGENT = {
 }
 AGENT['candidates_per_round'] = len(AGENT['candidate_labels'])
 # Agent decision rules are versioned per experiment, independent of the frozen evaluation.
+BAD_CASE_DECISION_VERSION = '122f'
+BAD_CASE_LAYERS = ('retrieval', 'generation', 'safety', 'performance')
+BAD_CASE_TYPES = {
+    'recall': ('retrieval', '致命'),
+    'performance': ('performance', '致命'),
+    'ranking': ('retrieval', '严重'),
+    'final': ('retrieval', '严重'),
+    'over_refuse': ('generation', '中等'),
+    'generation': ('generation', '中等'),
+    'safety': ('safety', '轻微'),
+    'safety_violation': ('safety', '致命'),
+}
+BAD_CASE_SEVERITY = ('轻微', '中等', '严重', '致命')
+PERFORMANCE_PARAMETERS = ('generation_thinking', 'multi_query', 'hyde', 'query_decompose',
+                          'candidate_k', 'top_k', 'retrieval_max_tokens')
 AGENT_PARAMETER_STAGES = {
     'candidate_k': ('recall', 'ranking'),
     'hybrid_alpha': ('recall', 'ranking'),
@@ -147,6 +162,20 @@ PIPELINE_VALUES = {
     "retrieval_max_tokens": (False, 8192, 4096),
 }
 BASELINE_CONTEXT_LIMIT = BASELINE['retrieval_max_tokens']
+
+
+def performance_reduction(key, value, current):
+    if key == 'generation_thinking':
+        return (value in AGENT['thinking_values'] and current in THINKING_LEVELS
+                and THINKING_LEVELS.index(value) < THINKING_LEVELS.index(current))
+    if key in ('multi_query', 'hyde', 'query_decompose'):
+        return value is False and bool(current)
+    if key in ('candidate_k', 'top_k', 'retrieval_max_tokens'):
+        return type(value) is int and (current is False and key == 'retrieval_max_tokens'
+                                       or type(current) is int and value < current)
+    return False
+
+
 RULES = {
     'rules_version': RULES_VERSION,
     'chunking': CHUNKING,

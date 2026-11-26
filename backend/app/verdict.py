@@ -40,6 +40,18 @@ def protected_risk(case, question):
     )
 
 
+def has_safety_violation(judge):
+    judge = judge or {}
+    return judge.get('safety_violation') is True or any(
+        row.get('safety_violation') is True for row in (judge.get('samples') or [])
+        if isinstance(row, dict))
+
+
+def safety_violation_question_ids(saved):
+    return sorted(qid for qid, row in saved.items() if any(
+        sample['risk'] or has_safety_violation(sample.get('judge_raw')) for sample in row['samples']))
+
+
 def make_sample(case, question, position, source, diagnostic_id):
     from .evaluation import policy_behavior
 
