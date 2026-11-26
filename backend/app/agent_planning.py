@@ -5,6 +5,7 @@ from . import rules, verdict
 from .agent_inputs import evidence_positions
 from .telemetry import collect_usage
 from .composite import pipeline_config
+from .corpus import require_knowledge_binding, require_retrieval_identity
 from .judge_replay import resolve_question_ids
 
 VERSION = '123b'
@@ -84,7 +85,13 @@ class DirectedPlanning:
         self.base = pipeline_config(self.run['config'])
         self.before = verdict.records(self.store, base_run_id)
         self.baseline_id = engine.experiment()['baseline_run_id']
-        self.baseline = pipeline_config(self.store.evaluation_run(self.baseline_id)['config'])
+        baseline = self.store.evaluation_run(self.baseline_id)
+        self.baseline = pipeline_config(baseline['config'])
+        frozen = json.loads(baseline['dataset_snapshot_json']).get('corpus_fingerprint')
+        self.knowledge_identity = require_knowledge_binding(baseline['config'], frozen)
+        if self.knowledge_identity:
+            require_knowledge_binding(self.run['config'], frozen)
+            require_retrieval_identity(self.snapshot, frozen)
         self.questions = {q['id']: q for q in self.snapshot['questions']}
         self.limit = D_CHECK_LIMIT if number == 'D' else CHECK_LIMIT
         binding = [base_id, base_run_id, rules.canonical_hash(self.snapshot), self.base,
@@ -188,7 +195,9 @@ class DirectedPlanning:
 
     def _trace(self, qid):
         saved = self.before[qid]
-        return verdict.decision_case({}, saved, saved['final_passed'])['programmatic_metrics']['retrieval_trace']
+        trace = verdict.decision_case({}, saved, saved['final_passed'])['programmatic_metrics']['retrieval_trace']
+        require_retrieval_identity(trace, self.knowledge_identity)
+        return trace
 
     def _retrieve(self, qid, config):
         from .evaluation_stage import perform_stage, reopen_blocked_requests
@@ -203,16 +212,20 @@ class DirectedPlanning:
             self.engine.check_stop()
             reopen_blocked_requests(checkpoint)
             limits = self.run['judge'].get('execution_snapshot', {}).get('request_limits')
-            runtime_config = {**config, 'run_target': 'sandbox_candidate'}
+            runtime_config = {**config, 'run_target': 'sandbox_candidate',
+                              **({'knowledge_identity': self.knowledge_identity} if self.knowledge_identity else {})}
             with execution_limits(limits), experiment_scope(self.store, self.experiment_id), question_scope(qid):
                 evidence, budget, _, trace, _ = perform_stage(
                     checkpoint, 'retrieval', lambda: self.engine.runtime.retrieve_context(
                         self.questions[qid]['question'], runtime_config),
                     self.experiment_id + ':' + key, automatic=False, check_stop=self.engine.check_stop, on_state=save)
+                require_retrieval_identity(trace, self.knowledge_identity)
                 fingerprint = getattr(self.engine.runtime, 'generation_request_fingerprint', None)
                 request = fingerprint(self.questions[qid]['question'], runtime_config, evidence, budget) if fingerprint else None
             checkpoint['retrieval'] = {'trace': {**trace, 'final': evidence}, 'request': request}
             save()
+        else:
+            require_retrieval_identity(checkpoint['retrieval']['trace'], self.knowledge_identity)
         return checkpoint['retrieval']
 
     def _retrieval_result(self, qid, config):
@@ -230,6 +243,7 @@ class DirectedPlanning:
         for check in self.state['checks']:
             key = rules.canonical_hash(check)
             if key in self.state['groups']:
+                require_retrieval_identity(self.state['groups'][key], self.knowledge_identity)
                 continue
             self.engine.check_stop()
             selected = check['target_question_ids'] + check['risk_question_ids']
@@ -244,7 +258,8 @@ class DirectedPlanning:
                                             [check['changes']], [qid], REPETITIONS, base_key=self.base_id)
                     [result] = diagnosis['questions']
                     results.append({k: result[k] for k in ('question_id', 'passed', 'risk', 'unknown')})
-            self.state['groups'][key] = {**check, 'results': results}
+            self.state['groups'][key] = {**check, 'results': results,
+                                        **({'corpus_fingerprint': self.knowledge_identity} if self.knowledge_identity else {})}
             self.save()
         return [self.state['groups'][rules.canonical_hash(check)] for check in self.state['checks']]
 
@@ -282,8 +297,10 @@ class DirectedPlanning:
                     sample['generation_request_sha256'] == trial['request']
                     and same_final(sample['final_context'], trial['trace']['final']) is True
                     for sample in rows[qid]['samples'])}
-            configs[key] = {'config': config, 'matching_runs': list(comparison)}
+            configs[key] = {'config': config, 'matching_runs': list(comparison),
+                            **({'corpus_fingerprint': self.knowledge_identity} if self.knowledge_identity else {})}
             self.save()
+        require_retrieval_identity(configs[key], self.knowledge_identity)
         if configs[key]['matching_runs']:
             raise ValueError(f"{NO_EFFECT}：冻结题卷的 Final 和生成请求与已完成评测一致（{', '.join(configs[key]['matching_runs'])}）")
 
@@ -332,6 +349,8 @@ class DirectedPlanning:
         self.execute_checks()
 
     def review_input(self):
+        for row in self.state['no_effect'].values():
+            require_retrieval_identity(row, self.knowledge_identity)
         return {'planning_stage': 'candidates', 'pre_review_prediction': self.state['pre_review_prediction'],
                 'directed_checks': self.execute_checks(), 'remaining_checks': self.limit - len(self.state['checks']),
                 'generation_samples_remaining': SAMPLE_LIMIT - generation_sample_count(self.state['checks']),

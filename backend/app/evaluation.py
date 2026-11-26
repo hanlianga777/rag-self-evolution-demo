@@ -428,11 +428,11 @@ class EvaluationRunner:
     def diagnostic_retest(self, run_id, question_ids, *, repetitions=3, config_override=None, resume=None):
         """Read a frozen scheme and score fresh trials without evaluation writes."""
         from uuid import uuid4
-        from .corpus import current_manifest, manifest_identity
+        from .corpus import current_manifest, manifest_identity, require_knowledge_binding, require_retrieval_identity
         from .evaluation_stage import _request_checkpoint
         from .judge_replay import resolve_question_ids
         from .paid_run import accounting_only, execution_limits
-        from .providers import judge_thinking
+        from .providers import ProviderIdentityError, judge_thinking
         from .request_reuse import bypass_reuse, experiment_scope, reuse_experiment
 
         if type(repetitions) is not int or repetitions < 1:
@@ -450,7 +450,8 @@ class EvaluationRunner:
             raise ValueError('复测对象的冻结题卷、Judge 或模型合同不匹配')
         if (snapshot.get('corpus_fingerprint') != manifest_identity(current_manifest())
                 or run['config'].get('knowledge_identity', snapshot['corpus_fingerprint']) != snapshot['corpus_fingerprint']):
-            raise ValueError('复测对象的知识库身份不一致')
+            raise ProviderIdentityError('复测对象的知识库身份不一致')
+        bound = require_knowledge_binding(run['config'], snapshot['corpus_fingerprint'])
         selected = resolve_question_ids(snapshot, question_ids)
         frozen = {q['id']: q for q in snapshot['questions']}
         if any('test_category' not in frozen.get(q, {}) for q in selected):
@@ -464,10 +465,12 @@ class EvaluationRunner:
                 row = saved[question_id]
                 case = verdict.decision_case({}, row, row['final_passed'])
                 trace = case['programmatic_metrics']['retrieval_trace']
+                require_retrieval_identity(trace, bound)
                 if not isinstance(trace['final'], list):
                     raise ValueError(f'{question_id} 缺少底座已保存的 Final')
                 traces[question_id] = trace
             run = {**run, 'config': {**run['config'], **config_override}}
+            require_knowledge_binding(run['config'], snapshot['corpus_fingerprint'])
         items = self.snapshot_items({**snapshot, 'question_ids': selected})
         effort = judge.get('judge_thinking', {}).get('reasoning_effort', 'off')
         limits = judge.get('execution_snapshot', {}).get('request_limits')
@@ -1445,6 +1448,7 @@ class EvaluationRunner:
 
     def candidate_inputs(self, candidate_id: str):
         from .agent_round_contract import layered, layered_winner, validate_layered_limits
+        from .corpus import require_knowledge_binding
         from .policy import failed_performance_gates
         from .providers import ProviderIdentityError
 
@@ -1549,6 +1553,7 @@ class EvaluationRunner:
                                        'why':r.get('proposal'), 'config_diff':changes}, targets, comparison,
                                       performance_gates=allowed_metrics)
         snapshot = json.loads(baseline["dataset_snapshot_json"])
+        bound = require_knowledge_binding(baseline['config'], snapshot.get('corpus_fingerprint'))
         from .paid_run import current_paid_run
         limits = baseline['judge'].get('execution_snapshot',{}).get('request_limits')
         if limits is not None:
@@ -1563,7 +1568,7 @@ class EvaluationRunner:
         approved = self.snapshot_items(snapshot)
         if baseline['judge'].get('model') != self.runtime.model:
             raise ProviderIdentityError('Sandbox 必须使用 Baseline 冻结的 Judge Model')
-        config = {**{k:baseline["config"].get(k,DEFAULT_PIPELINE_CONFIG[k]) for k in ("generation_thinking","retrieval_max_tokens")}, **candidate["config"], **({"knowledge_identity": baseline["config"]["knowledge_identity"]} if baseline["config"].get("knowledge_identity") else {}), "run_target": "sandbox_candidate", "candidate_id": candidate_id}
+        config = {**{k:baseline["config"].get(k,DEFAULT_PIPELINE_CONFIG[k]) for k in ("generation_thinking","retrieval_max_tokens")}, **candidate["config"], **({"knowledge_identity": bound} if bound else {}), "run_target": "sandbox_candidate", "candidate_id": candidate_id}
         return approved, config, candidate, baseline
 
     def candidate_resume_plan(self,candidate_id, *, manual_resume=False):

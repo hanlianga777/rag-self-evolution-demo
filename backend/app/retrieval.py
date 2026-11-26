@@ -292,7 +292,8 @@ class VectorRetriever:
         stages = stages if stages is not None else []
         stage_start = len(stages)
         if config.get('knowledge_identity') and config['knowledge_identity'] != (self._bundle or {}).get('manifest', {}).get('knowledge_identity'):
-            raise ValueError('Retrieval configuration belongs to another Knowledge Pipeline')
+            from .providers import ProviderIdentityError
+            raise ProviderIdentityError('检索配置的知识库身份与实际索引不一致')
         aliases = aliases or {}
         rewritten = question
         for alias, canonical in aliases.items():

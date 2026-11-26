@@ -247,6 +247,24 @@ def manifest_identity(manifest):
     return {**identity, 'sources': manifest['sources']} if identity else manifest['sources']
 
 
+def require_knowledge_binding(config, frozen):
+    """Validate a versioned Corpus binding while allowing unbound Legacy runs."""
+    from .providers import ProviderIdentityError
+
+    bound = config.get('knowledge_identity')
+    if bound or isinstance(frozen, dict) and frozen.get('pipeline_version_id'):
+        if not bound or bound != frozen:
+            raise ProviderIdentityError('运行配置的知识库身份与冻结快照不一致或缺失')
+    return bound
+
+
+def require_retrieval_identity(trace, bound):
+    from .providers import ProviderIdentityError
+
+    if bound and (trace or {}).get('corpus_fingerprint') != bound:
+        raise ProviderIdentityError('检索 Trace 的知识库身份与冻结快照不一致或缺失')
+
+
 class CorpusStore:
     """Read-only view of persisted source-faithful corpus metadata."""
 

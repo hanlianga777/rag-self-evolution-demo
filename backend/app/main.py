@@ -1,4 +1,4 @@
-from .corpus import manifest_identity
+from .corpus import manifest_identity, require_knowledge_binding
 import csv
 import io
 import hashlib
@@ -39,7 +39,7 @@ from .diagnostic_categories import DIAGNOSTIC_CATEGORIES
 from .product_diagnostics import product_diagnostics
 from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, FIXED_PIPELINE_PARAMETERS, qualification_description, require_gate_request_actor, search_space_contract, validate_candidate_config
 from .telemetry import price_config
-from .providers import DeepSeekProvider, ProviderTimeout, ProviderUnavailable
+from .providers import DeepSeekProvider, ProviderIdentityError, ProviderTimeout, ProviderUnavailable
 from .retrieval import RetrievalUnavailable
 
 
@@ -2522,12 +2522,21 @@ def preview_scheme(payload: SchemePreviewRequest):
             config, version, source = version_row["config"], version_row["id"], "production"
         else:
             raise HTTPException(status_code=404, detail="Scheme not found")
-    if source == 'candidate':
-        execution = store.evaluation_run(candidate.get('result', {}).get('evaluation_run_id'))
-        bound = (execution or {}).get('config', {}).get('knowledge_identity')
-    elif source == 'production': bound = version_row.get('snapshot', {}).get('knowledge_identity')
-    else: bound = config.get('knowledge_identity')
-    result = ai_service.answer(payload.question, {**config, **({'knowledge_identity': bound} if bound else {})})
+    try:
+        if source == 'candidate':
+            owner = store.experiment(candidate['experiment_id'], light=True)
+            base = store.evaluation_run(owner['baseline_run_id'], light=True)
+            execution = store.evaluation_run(candidate.get('result', {}).get('evaluation_run_id'), light=True)
+            frozen = (base or {}).get('dataset_snapshot', {}).get('corpus_fingerprint')
+            bound = require_knowledge_binding((execution or {}).get('config', {}), frozen)
+        elif source == 'production':
+            bound = version_row.get('snapshot', {}).get('knowledge_identity')
+        else:
+            frozen = json.loads(run['dataset_snapshot_json']).get('corpus_fingerprint')
+            bound = require_knowledge_binding(config, frozen)
+        result = ai_service.answer(payload.question, {**config, **({'knowledge_identity': bound} if bound else {})})
+    except ProviderIdentityError as error:
+        raise HTTPException(409, str(error)) from error
     return {"pipeline": source, "question": payload.question, "scheme_id": scheme_id, "version": version, "config": config, "status": "completed", **result, "evidence": result["retrieval"], "fallback_reason": None}
 
 

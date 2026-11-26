@@ -511,6 +511,7 @@ def layered_stage_facts(store, experiment, baseline, winner, number):
     from .optimization import gate_harming_changes, load_retrieval_preview, require_retrieval_preview
     from .policy import failed_performance_gates, validate_candidate_config
 
+    abc_exhausted = bool(experiment['result'].get('decision_stop'))
     run_id = winner['result']['evaluation_run_id'] if winner else baseline['id']
     final = saved_final_map(store, run_id)
     remaining = {q for q, passed in final.items() if not passed}
@@ -574,7 +575,7 @@ def layered_stage_facts(store, experiment, baseline, winner, number):
             if other.keys() == final.keys() and any(other[q] for q in remaining):
                 combined = True
                 break
-        if number >= rules.AGENT['max_rounds'] or experiment['evaluation_budget']['used'] >= MAX_EVALS - 1:
+        if abc_exhausted or number >= rules.AGENT['max_rounds'] or experiment['evaluation_budget']['used'] >= MAX_EVALS - 1:
             if directed:
                 checked = [group for plan in experiment['result'].get('round_planning', {}).values()
                            if plan['base_id'] == base['id'] for group in plan['directed_checks']]
@@ -582,7 +583,8 @@ def layered_stage_facts(store, experiment, baseline, winner, number):
                     {'directed_checks': checked}, current, [], blocked=blocked, use_layered=True,
                     performance_gates=performance_gates)
             combined = combined or any(row['available'] for row in options.values())
-    return {'remaining_count': len(remaining), 'untried_layers': sorted(untried), 'has_combination': combined}
+    return {'remaining_count': len(remaining), 'untried_layers': [] if abc_exhausted else sorted(untried),
+            'has_combination': combined}
 
 
 def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, runner, agent):
@@ -669,7 +671,17 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
             baseline = store.require_current_baseline(experiment['baseline_run_id'])
             use_layered = layered(experiment['result'])
             if stop := experiment['result'].get('decision_stop'):
-                return save('stopped', 'review', stop['reason'])
+                qualified = _qualified_abc(experiment)
+                winner = layered_winner(store, baseline, qualified) if use_layered else None
+                if not winner:
+                    return save('stopped', 'review', stop['reason'])
+                used = experiment['evaluation_budget']['used']
+                facts = layered_stage_facts(store, experiment, baseline, winner, stop['round'])
+                decision = staged_decision(stop['round'], 1, used,
+                                           version=experiment['result']['verdict_version'], **facts)
+                state['staged_decision'] = {'round': stop['round'], 'qualified': [c['id'] for c in qualified],
+                                            'used': used, 'decision': decision, 'winner_id': winner['id'], **facts}
+                return finish(experiment, [winner], decision)
             if experiment['result'].get('report_confirmation'):
                 terminal = state.get('staged_decision', {}).get('decision')
                 return finish(experiment, _qualified_abc(experiment),
@@ -734,12 +746,7 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                     save('running','analysis')
                 if experiment['result'].get('mechanism_contract') != MECHANISM_CONTRACT:
                     wait_for_off_peak(store,'cycle:'+experiment_id,price_state,lambda:check_cycle_stop(store,experiment_id))
-                generated = engine.generate_next(agent)
-                if stop := (generated or {}).get('result', {}).get('decision_stop'):
-                    if use_layered and winner:
-                        state['staged_decision']['decision'] = 'finish_winner'
-                        return finish(experiment, [winner], 'finish_winner')
-                    return save('stopped', 'review', stop['reason'])
+                engine.generate_next(agent)
             except ProposalValidationExhausted as error:
                 failures = state.setdefault('proposal_generation_failures', [])
                 failures.append({'round':number+1, 'reason':str(error), 'sandbox_budget_used':0,

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from . import optimization_cycle as cycle, rules, task_leases, verdict
 from .agent_round_contract import GenerationDiagnosisRequired, layered
+from .corpus import require_knowledge_binding, require_retrieval_identity
 from .evaluation import EvaluationRunner
 from .evaluation_stage import perform_stage, reopen_blocked_requests
 from .generation_probe import SOURCE, run_probe
@@ -231,6 +232,7 @@ class WorkflowEngine:
         if (frozen['id'] != ledger.identity.get('snapshot_id') or len(frozen['question_ids']) != 50
                 or not policy_current(judge) or judge['evaluation_identity'] != evaluation_identity(frozen, judge)
                 or not self.runtime.live_enabled or self.runtime.model != judge['model']
+                or not baseline['config'].get('knowledge_identity')
                 or baseline['config'].get('knowledge_identity') != frozen['corpus_fingerprint']
                 or self.runtime.corpus.index_info()['knowledge_identity'] != frozen['corpus_fingerprint']
                 or ledger.prices != E5_PRICES or ledger.output_limits != {**REQUEST_LIMITS, **judge['execution_snapshot']['request_limits']}
@@ -482,6 +484,7 @@ class WorkflowEngine:
         return str(path.resolve())
 
     def verify_production(self, published, candidate, snapshot, receipt, prefix, *, resume_blocked):
+        bound = require_knowledge_binding(published['snapshot'], snapshot.get('corpus_fingerprint'))
         authorization = self.release_authorization()
         audit = published['snapshot'].get('human_release', {})
         at = (authorization or {}).get('authorized_at')
@@ -514,6 +517,7 @@ class WorkflowEngine:
             with bypass_reuse():
                 response = perform_stage(saved, 'generation', lambda: self.runtime.baseline_preview(question),
                     key, automatic=False, check_stop=self.check_stop, on_state=persist)
+            require_retrieval_identity(response.get('retrieval_trace'), bound)
             if (response['version'] != published['id'] or response['mode'] != 'live'
                     or not response['answer'] or not response['evidence']
                     or self.store.active_production()['id'] != published['id']):

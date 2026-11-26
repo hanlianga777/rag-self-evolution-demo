@@ -3235,14 +3235,16 @@ class GovernanceStore:
             if result.get('hypothesis_plan') is not None:
                 chain = dict(persisted.get('hypothesis_chain', {}))
                 chain[str(result['round'])] = result['hypothesis_plan']
-                result = {**result, 'hypothesis_chain': chain, 'decision_stop': None}
+                result['hypothesis_chain'] = chain
+                result['decision_stop'] = result.get('decision_stop') if not candidates else None
             if verdict.current(persisted) and 'parameter_effect_ledger' in result:
                 # The trace keeps the prompt's snapshot; the experiment keeps newer evidence too.
                 result = {**result, 'parameter_effect_ledger': persisted['parameter_effect_ledger']}
             if 'planning' in result:
                 result['round_planning'] = {**persisted.get('round_planning', {}), str(result['round']): result['planning']}
             if persisted.get('seed_round_planned') is False and result.get('round') == 1:
-                result = {**result, 'seed_round_planned': True, 'decision_stop': None}
+                result['seed_round_planned'] = True
+                result['decision_stop'] = result.get('decision_stop') if not candidates else None
             connection.execute("UPDATE experiments SET status='completed', result_json=? WHERE id=?", (_json({**persisted, **result, 'prior_round_reviews':reviews, 'agent_strategies':strategies}), experiment_id))
 
     def restore_round_reviews(self, experiment_id):
@@ -3789,7 +3791,7 @@ class GovernanceStore:
         rejection_reason = next((row['validation_error'] for row in reversed((previous or {}).get('attempts', []))
                                  if row.get('validation_error')), None)
         from .optimization_cycle import check_cycle_stop
-        from .providers import permanent_provider_error
+        from .providers import ProviderIdentityError, permanent_provider_error
         from .evaluation_stage import checkpoint_usage, request_checkpoint_scope
         def check_stop():
             check_cycle_stop(self, experiment_id)
@@ -3986,7 +3988,7 @@ class GovernanceStore:
                         if field not in suggestion:raise ValueError('D建议缺少字段：'+field)
                 decision.update(status='generated' if suggestion['should_generate_d'] else 'no_effective_composite', outcome='generated' if suggestion['should_generate_d'] else 'declined', suggestion=suggestion)
                 break
-            except (task_leases.LeaseLost, InterruptedError):
+            except (task_leases.LeaseLost, InterruptedError, ProviderIdentityError):
                 raise
             except (ValueError, TypeError, KeyError) as error:
                 rejection_reason = str(error)

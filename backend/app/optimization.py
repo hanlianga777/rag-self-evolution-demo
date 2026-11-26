@@ -13,7 +13,7 @@ from . import task_leases
 from datetime import datetime, timezone
 from collections import Counter
 
-from .providers import ProviderRequestError, provider_error_details
+from .providers import ProviderIdentityError, ProviderRequestError, provider_error_details
 from .diagnostics import diagnostic_view
 from .diagnostic_categories import DIAGNOSTIC_CATEGORIES
 from .agent_inputs import prepare_baseline_rows, retrieval_facts, is_optimization_target, is_unstable_case, baseline_bad_case_rows, new_failure_ids
@@ -1347,6 +1347,8 @@ class OptimizationAgent:
                             for _, config, _ in batch:
                                 planning.require_effect(config)
                             break
+                        except ProviderIdentityError:
+                            raise
                         except (ValueError, TypeError, KeyError) as error:
                             rejection = str(error)
                             audit['validation_retries'].append({'attempt': attempt + 1, 'reason': rejection,

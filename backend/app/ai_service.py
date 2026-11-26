@@ -1,5 +1,5 @@
 from . import rules
-from .corpus import manifest_identity
+from .corpus import manifest_identity, require_knowledge_binding, require_retrieval_identity
 import time
 import math
 import json
@@ -12,7 +12,7 @@ import numpy as np
 
 from .telemetry import measure, collect_usage, cost_fields
 from .policy import DEFAULT_PIPELINE_CONFIG
-from .providers import ProviderTimeout, ProviderUnavailable, ProviderInvalidResponse, ProviderRequestError, thinking_task, thinking_config
+from .providers import ProviderTimeout, ProviderUnavailable, ProviderInvalidResponse, ProviderRequestError, ProviderIdentityError, thinking_task, thinking_config
 from .retrieval import VectorRetriever
 from .corpus import current_manifest, CorpusStore
 from .full_text import CORPUS_LOCK, validate_bundle
@@ -263,6 +263,7 @@ class AiService:
             evidence = trace['final']
             context_budget = trace.get('context_budget') or {'generation_allowed': True}
             stages, auxiliary_usage = [], []
+        require_retrieval_identity(trace, config.get('knowledge_identity'))
         return self._generate(question, config, started_at, evidence, context_budget, stages, trace, auxiliary_usage, on_token)
 
     @provider_task('answer')
@@ -272,19 +273,24 @@ class AiService:
         与 answer() 同属 'answer' 任务，辅助查询的复用键一致：扫描时生成的改写结果，正式跑时会被原样复用。"""
         config = {**DEFAULT_PIPELINE_CONFIG, **(config or {})}
         stages, trace = [], {}
-        with measure(stages, "query_processing"), collect_usage() as auxiliary_usage:
-            queries = self._retrieval_queries(question, config, trace=trace, stages=stages)
-        aliases = self.store.approved_aliases() if hasattr(self.store, "approved_aliases") and config.get("alias_mapping", False) else {}
+        bound = config.get('knowledge_identity')
         retriever = self.retriever
-        if isinstance(retriever, VectorRetriever) and isinstance(self.corpus, CorpusStore) and self.corpus.index_info().get('knowledge_identity'):
+        if (isinstance(retriever, VectorRetriever) and isinstance(self.corpus, CorpusStore)
+                and (bound or self.corpus.index_info().get('knowledge_identity'))):
             from .knowledge_pipeline import index_for_config
             try:
                 path = index_for_config(self.corpus.index_dir, config)
             except ValueError as error:
+                if bound:
+                    raise ProviderIdentityError('冻结知识库身份对应的索引不可用') from error
                 raise ProviderUnavailable(str(error)) from error
             if path.resolve() != self.corpus.index_dir.resolve(): retriever = VectorRetriever(CorpusStore(path))
+        with measure(stages, "query_processing"), collect_usage() as auxiliary_usage:
+            queries = self._retrieval_queries(question, config, trace=trace, stages=stages)
+        aliases = self.store.approved_aliases() if hasattr(self.store, "approved_aliases") and config.get("alias_mapping", False) else {}
         with measure(stages, "retrieval"), (retriever.snapshot() if isinstance(retriever,VectorRetriever) else nullcontext()) as bundle:
             evidence = retriever.retrieve(question, config, aliases=aliases, queries=queries, stages=stages, **({"trace": trace} if isinstance(retriever, VectorRetriever) else {}))
+            require_retrieval_identity(trace, bound)
             if bundle:
                 evidence=attach_heading_scopes(evidence,bundle['chunks'])
                 if 'final' in trace:trace['final']=evidence
@@ -1250,7 +1256,7 @@ class AiService:
         if candidate is None:
             return {"pipeline": "candidate", "question": question, "status": "not_run", **identity, "answer": "暂无可比较候选；请先完成当前 Baseline 的真实 Evaluation 与 Sandbox。", "latency_ms": 0, "evidence": [], "retrieval": [], "fallback_reason": None}
         execution = self.store.evaluation_run(candidate.get('result', {}).get('evaluation_run_id'))
-        bound = (execution or {}).get('config', {}).get('knowledge_identity')
+        bound = require_knowledge_binding((execution or {}).get('config', {}), identity.get('current_corpus_fingerprint'))
         result = self.answer(question, {**candidate['config'], **({'knowledge_identity': bound} if bound else {})})
         return {"pipeline": "candidate", "source": "candidate", **identity, "question": question, "version": candidate["id"], "config": candidate["config"], "status": "evaluated", **result, "evidence": result["retrieval"], "fallback_reason": None}
 
