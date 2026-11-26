@@ -2120,12 +2120,14 @@ class GovernanceStore:
         from .retrieval import evidence_coverage
         from .full_text import search_full_text
         from .golden_v2 import answer_supported, validate_golden_candidate
+        from .reviewed_import import FRIEND_CONTRACT, FRIEND_NEGATIVE_BEHAVIORS
         if item is None:
             item, execution = self.capture_quality(question_id)
         evidence = item["evidence"]
         expected_chunks = {chunk_id for source in evidence for chunk_id in source.get("source_chunk_ids", [])}
         available_chunks = {chunk.get("chunk_id") for chunk in chunks}
         positive = item["test_category"] != "negative"
+        friend_contract = item['raw'].get('golden_contract') == FRIEND_CONTRACT
         expected_behavior = item["raw"].get("expected_behavior")
         programmatic = {
             "question": bool(item["question"].strip()),
@@ -2156,8 +2158,8 @@ class GovernanceStore:
         governed = bool(item['raw'].get('business_requirements'))
         validation = validate_golden_candidate({**item['raw'],**item},chunks,validation_context={'original_tables':tables}) if governed else None
         # 朋友同款题卷（friend-golden-v1）的答案锚点与导入硬校验保持一致：允许结构化排版和适度润色，数字/名称/计数仍须在证据里。
-        from .golden_v2 import FRIEND_CONTRACT, friend_answer_supported
-        anchor = friend_answer_supported if item['raw'].get('golden_contract') == FRIEND_CONTRACT else answer_supported
+        from .golden_v2 import friend_answer_supported
+        anchor = friend_answer_supported if friend_contract else answer_supported
         programmatic['answer_anchor'] = validation['valid'] if governed else anchor(item['reference_answer'] or '', [{**chunk,'original_tables':tables.get(chunk['chunk_id'], [])} for chunk in sources]) if positive else True
         if positive and (item.get('planner_version') or item['raw'].get('construction_type')):
             programmatic['candidate_legality'] = validate_golden_candidate({**item['raw'],**item}, chunks, validation_context={'original_tables':tables})['valid']
@@ -2169,10 +2171,14 @@ class GovernanceStore:
         corpus_matches = [chunk_id for chunk_id, text in source_texts.items() if normalized_query and normalized_query in _normalized(text)]
         entity_tokens = [token for token in item["question"].replace("/", " ").replace("-", " ").split() if len(token) > 1 and any(character.isdigit() or character.isascii() and character.isalpha() for character in token)]
         entity_matches = [chunk_id for chunk_id, text in source_texts.items() if any(token.lower() in text.lower() for token in entity_tokens)]
-        subtype = item.get("negative_subtype") if item["legacy_question_type"] == "v1_mini" else expected_behavior
-        subtype = subtype or expected_behavior
-        behavior = "prompt_injection_resistance" if subtype == "prompt_injection" else "safe_rejection" if subtype == "safety_critical" else subtype
-        subtype_mismatch = behavior != expected_behavior
+        if friend_contract and not positive:
+            subtype = item.get("negative_subtype")
+            subtype_mismatch = expected_behavior not in FRIEND_NEGATIVE_BEHAVIORS.get(subtype, ())
+        else:
+            subtype = item.get("negative_subtype") if item["legacy_question_type"] == "v1_mini" else expected_behavior
+            subtype = subtype or expected_behavior
+            behavior = "prompt_injection_resistance" if subtype == "prompt_injection" else "safe_rejection" if subtype == "safety_critical" else subtype
+            subtype_mismatch = behavior != expected_behavior
         subtype_semantic = None
         if not positive and not subtype_mismatch and subtype in {"safe_rejection", "safety_critical", "prompt_injection"}:
             explicit = re.search(r"(忽略|覆盖|泄露).{0,16}(系统提示|系统指令|内部规则)|忽略规则并伪造|越狱", item["question"]) if subtype == "prompt_injection" else re.search(r"(绕过|禁用|关闭|短接).{0,8}(安全|保护|急停)", item["question"])
@@ -2202,7 +2208,7 @@ class GovernanceStore:
         parse_coverage = raw_full_text.get('coverage') or {}
         parse_complete = parse_coverage.get('effective_status', parse_coverage.get('status')) == 'complete'
         uncertain = not positive and ((subtype_semantic is not None and subtype_semantic.get('matched') is None) or (ambiguous_negative and answerability.get('answerable') is None) or (subtype in {'insufficient_evidence', 'clarify'} and not parse_complete))
-        negative_passed = behavior == expected_behavior and not subtype_mismatch and not uncertain and (not ambiguous_negative or answerability.get("answerable") is False)
+        negative_passed = not subtype_mismatch and not uncertain and (not ambiguous_negative or answerability.get("answerable") is False)
         full_text = {"mode": "evidence" if positive else "fake_negative_check", "phrases": phrases, "matched_phrases": matched, "source_checks": source_checks, "normalized_query": normalized_query, "corpus_match_chunk_ids": corpus_matches, "entity_match_chunk_ids": entity_matches, "passed": bool(source_checks) and all(check["text_available"] for check in source_checks) if positive else negative_passed}
         evidence_valid = all(programmatic.values()) and full_text["passed"]
         full_text['answer_anchor_supported'] = None if governed else programmatic['answer_anchor'] if positive else None

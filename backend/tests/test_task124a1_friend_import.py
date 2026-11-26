@@ -13,7 +13,7 @@ from app.evaluation import EvaluationRunner
 from app.golden_v2 import validate_golden_candidate
 from app.governance import GovernanceStore
 from app.providers import DeepSeekProvider
-from app.reviewed_import import validate_friend_content
+from app.reviewed_import import FRIEND_CONTRACT, validate_friend_content
 from app.rubric_judge import aggregate_samples
 from scripts.import_friend_golden import main, to_candidate
 
@@ -37,6 +37,90 @@ def store(tmp_path):
 
 def import_csv(store, path, *options):
     return main(['--database', str(store.database_path), '--csv', str(path), '--apply', *options])
+
+
+@pytest.fixture
+def negative_probe(store):
+    class Retriever:
+        def search(self, question, limit):
+            return [{'chunk_id': 'fixture', 'score': .9, 'content': '相关资料'}]
+
+        def full_text_probe(self, question):
+            return {'matches': [], 'coverage': {'status': 'complete'}}
+
+    def run(subtype, behavior, *, answerable=False, matched=True, contract=FRIEND_CONTRACT):
+        candidate = {'question': '设备需要哪些操作条件？', 'test_category': 'negative',
+                     'negative_subtype': subtype, 'expected_behavior': behavior,
+                     'golden_contract': contract, 'import_row': 1}
+        key, = store.save_business_candidates([candidate], 'offline.csv', 'offline')
+
+        def answerability_judge(question, hits, signals):
+            assert signals['negative_subtype'] == subtype
+            return {'answerable': answerable, 'reason': '本地可答性检查'}
+
+        def subtype_judge(question, hits, signals):
+            assert signals == {'negative_subtype': subtype, 'expected_behavior': behavior}
+            return {'matched': matched, 'detected_subtype': subtype, 'reason': '本地语义检查'}
+
+        return store.run_probe(key, Retriever(), [], answerability_judge,
+                               subtype_judge=subtype_judge, fail_on_judge_error=True)
+
+    return run
+
+
+@pytest.mark.parametrize(('subtype', 'behavior'), [
+    ('insufficient_evidence', 'insufficient_evidence'),
+    ('insufficient_evidence', 'refuse_insufficient'),
+    ('insufficient_evidence', 'partial_answer'),
+    ('clarify', 'clarify'),
+    ('clarify', 'conditional_answer'),
+    ('safety_critical', 'safe_rejection'),
+    ('safety_critical', 'refuse_unsafe'),
+    ('safety_critical', 'partial_refuse'),
+    ('prompt_injection', 'prompt_injection_resistance'),
+    ('prompt_injection', 'resist_injection'),
+])
+def test_friend_negative_probe_accepts_legal_subtype_behavior(negative_probe, subtype, behavior):
+    probe = negative_probe(subtype, behavior)
+    assert probe['classification'] == 'NEGATIVE_VALID'
+    checks = probe['probe_details']['negative_checks']
+    if subtype in {'clarify', 'insufficient_evidence'}:
+        assert checks['answerability']['answerable'] is False
+    else:
+        assert checks['subtype_semantic']['detected_subtype'] == subtype
+
+
+def test_friend_negative_probe_rejects_behavior_from_wrong_subtype(negative_probe):
+    probe = negative_probe('insufficient_evidence', 'resist_injection')
+    assert probe['classification'] == 'NEGATIVE_SUBTYPE_MISMATCH'
+    assert not probe['passed']
+
+
+@pytest.mark.parametrize(('subtype', 'behavior'), [
+    ('insufficient_evidence', 'partial_answer'),
+    ('clarify', 'conditional_answer'),
+])
+def test_friend_negative_probe_rejects_fully_answerable_questions(negative_probe, subtype, behavior):
+    probe = negative_probe(subtype, behavior, answerable=True)
+    assert probe['classification'] == 'FAKE_NEGATIVE_RISK'
+    assert not probe['passed']
+
+
+@pytest.mark.parametrize(('subtype', 'behavior'), [
+    ('safety_critical', 'partial_refuse'),
+    ('prompt_injection', 'resist_injection'),
+])
+def test_friend_negative_probe_rejects_semantic_mismatch(negative_probe, subtype, behavior):
+    probe = negative_probe(subtype, behavior, matched=False)
+    assert probe['probe_details']['negative_checks']['subtype_semantic']['matched'] is False
+    assert probe['classification'] == 'NEGATIVE_SUBTYPE_MISMATCH'
+    assert not probe['passed']
+
+
+def test_legacy_negative_probe_keeps_exact_behavior_match(negative_probe):
+    probe = negative_probe('insufficient_evidence', 'partial_answer', contract=None)
+    assert probe['classification'] == 'NEGATIVE_SUBTYPE_MISMATCH'
+    assert not probe['passed']
 
 
 def test_final_csv_60_rows_validate_and_persist_raw_fields(store):
