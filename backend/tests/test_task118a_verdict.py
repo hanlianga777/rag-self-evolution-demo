@@ -125,6 +125,80 @@ def test_baseline_wrong_becomes_right(env):
     assert env.store.evaluation_run(env.base)['result'] == formal
 
 
+def save_judge_trials(env, second_attempt, third_case):
+    failure = {
+        'diagnostic_id': 'DIAG-failed',
+        'execution': {'answer': '原回答', 'retrieval_trace': {'final': [{'chunk_id': '原证据'}]}},
+        'attempts': [second_attempt],
+    }
+    third = {'diagnostic_id': 'DIAG-third', 'scored_result': third_case} if third_case else failure
+    env.store.save_job_checkpoint(env.base, 'verdict:trial:Q1',
+                                  {'verdict_trials': {'2': failure, '3': third}})
+
+
+@pytest.fixture
+def judge_exhausted():
+    return {'phase': 'judge', 'status': 'error', 'error_type': 'ProviderInvalidResponse',
+            'provider_error': {'failure_class': 'bounded_retry_stopped'},
+            'retryable': False, 'request_execution_unknown': False, 'error': '无效摘录'}
+
+
+@pytest.mark.parametrize('first,third,expected', [(True, True, True), (False, False, False), (True, None, False)])
+def test_baseline_can_finish_from_exhausted_judge_checkpoint(tmp_path, monkeypatch, judge_exhausted, first, third, expected):
+    env = OfflineEvaluation(tmp_path, monkeypatch, {'Q1': scored(first)})
+    save_judge_trials(env, judge_exhausted, None if third is None else scored(third))
+    rows = env.runner.recheck_baseline(env.base)
+    verdict.require_baseline(env.store, env.baseline)
+    row = rows['Q1']
+    assert row['final_passed'] is expected
+    assert [s['passed'] for s in row['samples']] == [first, None, third]
+    assert row['samples'][1]['judge_status'] == 'retry_exhausted'
+    assert row['samples'][1]['answer'] == '原回答'
+    assert row['samples'][1]['final_context'] == [{'chunk_id': '原证据'}]
+    env.answer.assert_not_called()
+    env.runner.score_execution.assert_not_called()
+    if third is None:
+        from app.agent_mechanism import bad_case_fault, fault_stage
+        bad_case, = baseline_bad_case_rows(env.store, env.baseline)
+        assert bad_case_fault(bad_case, fault_stage(bad_case))['reason'] == 'Judge 技术失败'
+        gate_case, = verdict.gate_cases(env.store, env.base)
+        assert gate_case['programmatic_metrics']['behavior_contract']['effective_pass'] is None
+
+
+def test_baseline_exhausted_judge_cannot_break_split_vote(tmp_path, monkeypatch, judge_exhausted):
+    env = OfflineEvaluation(tmp_path, monkeypatch, {'Q1': scored(True)})
+    save_judge_trials(env, judge_exhausted, scored(False))
+    with pytest.raises(ValueError, match='未形成多数'):
+        env.runner.recheck_baseline(env.base)
+    assert verdict.records(env.store, env.base) == {}
+    env.runner.score_execution.assert_not_called()
+
+
+def test_baseline_still_needs_judge_when_retry_window_is_open(tmp_path, monkeypatch, judge_exhausted):
+    env = OfflineEvaluation(tmp_path, monkeypatch, {'Q1': scored(True)})
+    save_judge_trials(env, {**judge_exhausted, 'retryable': True}, scored(True))
+    env.responses['Q1'] = [scored(True)]
+    rows = env.runner.recheck_baseline(env.base)
+    assert all(s['passed'] is True for s in rows['Q1']['samples'])
+    env.answer.assert_not_called()
+    env.runner.score_execution.assert_called_once()
+
+
+def test_designate_baseline_without_comparison_requires_final_verdict(tmp_path, monkeypatch, judge_exhausted):
+    env = OfflineEvaluation(tmp_path, monkeypatch, {'Q1': scored(True)})
+    with pytest.raises(ValueError, match='最终判定'):
+        env.store.designate_baseline(env.base, None, '总指挥', '代用户确认')
+    save_judge_trials(env, judge_exhausted, scored(True))
+    env.runner.recheck_baseline(env.base)
+    audit = env.store.designate_baseline(env.base, None, '总指挥', '代用户确认')
+    assert audit['baseline_run_id'] == env.base
+    assert audit['comparison_run_id'] is None
+    assert audit['comparison_label'] is None
+    assert audit['actor'] == '总指挥' and audit['reason'] == '代用户确认'
+    assert 'comparison_unavailable_reason' not in audit
+    assert env.store.designate_baseline(env.base, None, '总指挥', '代用户确认') == audit
+
+
 def test_baseline_right_becomes_wrong_uses_failed_trace(env):
     rows = env.stable_baseline({'Q6': [scored(False, '失败的证据', category='ablation'),
                                       scored(False, '另一次失败', category='ablation')]})

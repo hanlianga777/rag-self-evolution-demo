@@ -2612,12 +2612,14 @@ class GovernanceStore:
         pinned_run = connection.execute('SELECT dataset_version_id FROM evaluation_runs WHERE id=?',(result['baseline_run_id'],)).fetchone()
         if not current_golden or not pinned_run or pinned_run['dataset_version_id'] != current_golden['id']:
             return None
-        if not connection.execute('SELECT 1 FROM evaluation_runs WHERE id=?',(result['comparison_run_id'],)).fetchone():
+        if result['comparison_run_id'] == '':
+            result.update(comparison_run_id=None, comparison_label=None)
+        elif not connection.execute('SELECT 1 FROM evaluation_runs WHERE id=?',(result['comparison_run_id'],)).fetchone():
             result.update(comparison_run_id=None, comparison_label=None, comparison_unavailable_reason='对照记录已删除')
         return result
 
     def designate_baseline(self, baseline_id, comparison_id, actor, reason):
-        """One audited operator action selects roles and discards the unsaved draft."""
+        """Audit the selected Baseline, with a saved comparison when supplied."""
         if not actor.strip() or not reason.strip() or baseline_id==comparison_id:
             raise ValueError('请填写确认人、原因和不同的对照运行')
         with self.connection() as connection:
@@ -2626,7 +2628,7 @@ class GovernanceStore:
             if not golden:raise ValueError('缺少当前冻结题卷')
             frozen=_load(golden['snapshot_json'],{})
             compared = []
-            for key in (baseline_id,comparison_id):
+            for key in (baseline_id,) if comparison_id is None else (baseline_id, comparison_id):
                 row=connection.execute('SELECT * FROM evaluation_runs WHERE id=?',(key,)).fetchone()
                 snapshot=_load(row['dataset_snapshot_json'],{}) if row else {}
                 config=_load(row['config_json'],{}) if row else {}
@@ -2639,14 +2641,23 @@ class GovernanceStore:
                     or any(snapshot.get(k)!=frozen.get(k) for k in ('questions','question_ids','corpus_fingerprint'))):
                     raise ValueError('只能指定当前题卷下完整且无技术失败的真实Baseline')
                 compared.append((_load(row['judge_json'],{}).get('judge_thinking',{}).get('reasoning_effort'), config.get('generation_thinking')))
-            comparison_label = (f'判分档位对照（当前 {compared[0][0]} / 原 {compared[1][0]}，回答 {compared[0][1]}）'
-                                if compared[0][0] != compared[1][0] else
-                                f'Thinking 档位对照（回答 {compared[1][1] or "未知"}）' if compared[0][1] != compared[1][1] else
-                                f'保存回答对照（回答 {compared[1][1] or "未知"}）')
+            if comparison_id is None:
+                verdict.require_baseline(self, row, connection=connection)
+                previous = self.baseline_designation(connection)
+                if previous and (previous['baseline_run_id'], previous['comparison_run_id'], previous['actor'], previous['reason']) == (
+                        baseline_id, None, actor.strip(), reason.strip()):
+                    return previous
+                comparison_label = ''
+            else:
+                comparison_label = (f'判分档位对照（当前 {compared[0][0]} / 原 {compared[1][0]}，回答 {compared[0][1]}）'
+                                    if compared[0][0] != compared[1][0] else
+                                    f'Thinking 档位对照（回答 {compared[1][1] or "未知"}）' if compared[0][1] != compared[1][1] else
+                                    f'保存回答对照（回答 {compared[1][1] or "未知"}）')
             connection.execute('CREATE TABLE IF NOT EXISTS baseline_designations (id INTEGER PRIMARY KEY, baseline_run_id TEXT NOT NULL, comparison_run_id TEXT NOT NULL, comparison_label TEXT NOT NULL, actor TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL)')
             connection.execute('INSERT INTO baseline_designations(baseline_run_id,comparison_run_id,comparison_label,actor,reason,created_at) VALUES (?,?,?,?,?,?)',
-                (baseline_id,comparison_id,comparison_label,actor.strip(),reason.strip(),_now()))
-            connection.execute('DELETE FROM pipeline_config_draft')
+                (baseline_id,comparison_id or '',comparison_label,actor.strip(),reason.strip(),_now()))
+            if comparison_id is not None:
+                connection.execute('DELETE FROM pipeline_config_draft')
         return self.baseline_designation()
 
     def require_current_baseline(self, run_id=None, connection=None):

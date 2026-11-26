@@ -580,7 +580,9 @@ class EvaluationRunner:
 
     def _collect_verdicts(self, run, items, cases, checkpoints, persist, check_stop, *,
                           experiment_id, baseline=None, winner=None, automatic=False):
-        """Resume by question and sample. Only publish after every required slot succeeds."""
+        """Resume by question and sample and publish the complete verdict wave."""
+        from .evaluation_stage import exhausted_judge_attempt
+        from .providers import ProviderInvalidResponse
         from .request_reuse import experiment_scope
 
         run_id = run['id']
@@ -608,9 +610,20 @@ class EvaluationRunner:
                     for position in (2, 3):
                         trial = trials.setdefault(str(position), {'attempts': []})
                         source = 'baseline_recheck' if original else 'recheck'
-                        samples.append(self._verdict_trial(
-                            item, run['config'], trial, run_id, position, source,
-                            lambda: persist(key), check_stop, automatic=automatic))
+                        failure = exhausted_judge_attempt(trial) if original else None
+                        if failure is None:
+                            try:
+                                sample = self._verdict_trial(
+                                    item, run['config'], trial, run_id, position, source,
+                                    lambda: persist(key), check_stop, automatic=automatic)
+                            except ProviderInvalidResponse:
+                                failure = exhausted_judge_attempt(trial) if original else None
+                                if failure is None:
+                                    raise
+                                persist(key)
+                        if failure is not None:
+                            sample = verdict.failed_judge_sample(trial, item['raw'], position, failure)
+                        samples.append(sample)
                 final[key] = verdict.record(run_id, key, samples, reason)
         return verdict.save_records(self.store, run_id, final)
 

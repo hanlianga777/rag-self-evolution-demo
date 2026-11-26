@@ -57,6 +57,9 @@ def fault_stage(row):
     positions = (row.get('retrieval_facts') or {}).get('standard_evidence_positions')
     if not isinstance(positions, list):
         positions = _diagnostic_positions(view)
+    if case.get('final_failure_reason') == verdict.JUDGE_TECHNICAL_FAILURE:
+        return {'code': 'judge_technical_failure', 'stage': '未知', 'subtype': None,
+                'reason': verdict.JUDGE_TECHNICAL_FAILURE, 'evidence_positions': positions or MISSING}
     code, reason, detail = 'unknown', '标准证据位置或已保存诊断不足。', None
     if saved_passed(case) is True:
         reason = '对照底座已答对。'
@@ -244,6 +247,8 @@ def bad_case_fault(row, fault):
     case, view = row['result'], row['diagnostic_view']
     judge = case.get('judge_result') or {}
     code = fault['code']
+    if code == 'judge_technical_failure':
+        return {**fault, 'severity': '未知'}
     negative = case.get('test_category') == 'negative'
     format_error = judge.get('format_violation') is True or any(
         isinstance(issue, dict) and issue.get('failure_kind') in {'format', 'format_violation'}

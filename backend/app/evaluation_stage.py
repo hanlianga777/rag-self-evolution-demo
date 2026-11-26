@@ -121,6 +121,20 @@ def judge_request_count(checkpoint, run_id):
                and (attempt.get('status') == 'ok' or attempt.get('error_type') == 'ProviderInvalidResponse'))
 
 
+def exhausted_judge_attempt(checkpoint):
+    """Recognize a saved, terminal Judge format error on an existing answer."""
+    execution = checkpoint.get('execution') or {}
+    if checkpoint.get('inflight') or 'scored_result' in checkpoint or not isinstance(execution.get('answer'), str):
+        return None
+    attempt = next((a for a in reversed(checkpoint.get('attempts', [])) if a.get('phase') == 'judge'), {})
+    if (attempt.get('status') == 'error' and attempt.get('error_type') == 'ProviderInvalidResponse'
+            and attempt.get('retryable') is False and attempt.get('request_execution_unknown') is False
+            and (attempt.get('provider_error', {}).get('failure_class') == 'bounded_retry_stopped'
+                 or judge_request_count(checkpoint, attempt.get('recorded_by_run_id')) >= 4)):
+        return attempt
+    return None
+
+
 def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state):
     from .providers import ProviderInvalidResponse,ProviderTimeout,provider_error_details,stage_deadline,permanent_provider_error
     # Explicit Resume starts a new retry window; process recovery of this Run keeps its failures.

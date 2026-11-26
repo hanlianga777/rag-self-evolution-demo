@@ -9,12 +9,21 @@ BASELINE_ORIGINAL_ID = 'EVAL-20261120213645613191'
 RECORDS_KEY = 'verdict:final'
 DIMENSIONS = ('correctness', 'faithfulness', 'completeness')
 PREVIOUS_VERDICT_VERSION = '2026-11-24'
+JUDGE_TECHNICAL_FAILURE = 'Judge 技术失败'
+
+
+def judge_failed(sample):
+    return sample.get('judge_status') == 'retry_exhausted' and sample.get('passed') is None
 
 
 def resolve(samples):
-    if len(samples) not in (1, 3) or any(type(sample.get('passed')) is not bool or type(sample.get('risk')) is not bool for sample in samples):
+    if len(samples) not in (1, 3) or any(type(s.get('risk')) is not bool or
+            (type(s.get('passed')) is not bool and not (len(samples) == 3 and judge_failed(s))) for s in samples):
         raise ValueError('最终判定需要 1 份或 3 份有效样本')
-    return not any(sample['risk'] for sample in samples) and sum(s['passed'] for s in samples) > len(samples) // 2
+    valid = [s['passed'] for s in samples if not judge_failed(s)]
+    if len(valid) == 2 and valid[0] != valid[1]:
+        raise ValueError('Judge 重试已用尽，两份有效样本未形成多数')
+    return not any(sample['risk'] for sample in samples) and sum(valid) > len(samples) // 2
 
 
 def recheck_reason(first, baseline, winner=None):
@@ -26,6 +35,9 @@ def recheck_reason(first, baseline, winner=None):
 
 
 def median_scores(samples):
+    samples = [s for s in samples if not judge_failed(s)]
+    if not samples:
+        return {}
     return {key: median(s['rubric_scores'][key] for s in samples)
             for key in DIMENSIONS if all(s['rubric_scores'].get(key) is not None for s in samples)}
 
@@ -78,9 +90,23 @@ def make_sample(case, question, position, source, diagnostic_id):
     }
 
 
+def failed_judge_sample(trial, question, position, failure):
+    execution = trial['execution']
+    sample = make_sample({
+        'model_answer': execution['answer'],
+        'judge_result': {'samples': list(trial.get('verdict_judgments', {}).values())},
+        'programmatic_metrics': {k: execution[k] for k in (
+            'retrieval_trace', 'latency_ms', 'generation_request_sha256', 'token_usage') if k in execution},
+    }, question, position, 'baseline_recheck', trial.get('diagnostic_id'))
+    return {**sample, 'judge_status': 'retry_exhausted', 'judge_error': failure['error']}
+
+
 def record(run_id, question_id, samples, reason=None):
-    return {'question_id': question_id, 'run_id': run_id, 'final_passed': resolve(samples),
-            'samples': samples, 'rechecked': len(samples) == 3, 'recheck_reason': reason}
+    result = {'question_id': question_id, 'run_id': run_id, 'final_passed': resolve(samples),
+              'samples': samples, 'rechecked': len(samples) == 3, 'recheck_reason': reason}
+    if sum(judge_failed(s) for s in samples) >= 2:
+        result['final_failure_reason'] = JUDGE_TECHNICAL_FAILURE
+    return result
 
 
 def records(store, run_id, *, connection=None):
@@ -143,9 +169,10 @@ def final_cases(store, run_id, *, use_final=True, connection=None, cases=None):
 
 def decision_case(case, row, passed):
     samples = row['samples']
+    technical_failure = row.get('final_failure_reason')
     chosen = next((sample for sample in samples if sample['risk']), None)
     if chosen is None:
-        chosen = next(sample for sample in samples if sample['passed'] == passed)
+        chosen = samples[0] if technical_failure else next(sample for sample in samples if sample['passed'] == passed)
     evidence = chosen['case']
     metrics = evidence['programmatic_metrics']
     trace = {**metrics['retrieval_trace'], 'candidates': chosen['candidates'],
@@ -156,7 +183,8 @@ def decision_case(case, row, passed):
             'programmatic_metrics': {**metrics, 'retrieval_trace': trace},
             'passed': passed, 'final_passed': passed,
             'evaluation_outcome': {**(evidence.get('evaluation_outcome') or {}), 'verdict': state},
-            'verdict_sample_no': chosen['sample_no']}
+            'verdict_sample_no': chosen['sample_no'],
+            **({'final_failure_reason': technical_failure} if technical_failure else {})}
 
 
 def gate_cases(store, run_id):
@@ -171,8 +199,9 @@ def gate_case(case, row):
     scores = median_scores(samples)
     judge = dict(case.get('judge_result') or {})
     judge.update({name: score / (25 if name == 'correctness' else 100) for name, score in scores.items()})
-    behavior = [s['behavior_pass'] for s in samples]
-    effective = sum(v is True for v in behavior) > len(behavior) // 2 if None not in behavior else None
+    behavior = [s['behavior_pass'] for s in samples if not judge_failed(s)]
+    majority = len(samples) // 2
+    effective = sum(v is True for v in behavior) > majority if len(behavior) > majority and None not in behavior else None
     return {**case, 'passed': row['final_passed'], 'judge_result': judge,
             'programmatic_metrics': {**case['programmatic_metrics'],
                 'behavior_contract': {'effective_pass': effective}, 'latency_ms': samples[0]['latency_ms']}}
@@ -182,8 +211,9 @@ def require_baseline(store, run, *, connection=None, saved=None):
     expected = set(json.loads(run['dataset_snapshot_json'])['question_ids'])
     if saved is None:
         saved = records(store, run['id'], connection=connection)
-    if not expected or set(saved) != expected or any(len(row['samples']) != 3 for row in saved.values()):
-        raise ValueError('Baseline 每题须保存三份有效样本并生成最终判定')
+    if (not expected or set(saved) != expected or any(len(row['samples']) != 3
+            or resolve(row['samples']) is not row['final_passed'] for row in saved.values())):
+        raise ValueError('Baseline 每题须保存三份样本记录并生成最终判定')
 
 
 def current(experiment_result):
