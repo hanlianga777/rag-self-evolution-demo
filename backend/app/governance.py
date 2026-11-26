@@ -424,6 +424,8 @@ class GovernanceStore:
         if stage:
             query += " WHERE stage = ?"
             args.append(stage)
+        if stage == 'golden':
+            query += " AND coalesce(json_extract(raw_json,'$.import_pool'),'') != 'backup'"
         query += " ORDER BY id"
         with self.connection() as connection:
             return [self._row(row) for row in connection.execute(query, args)]
@@ -632,7 +634,7 @@ class GovernanceStore:
             status = 'owner_delegated_approved' if delegated else 'human_approved' if human else 'needs_human_review' if reasons else 'machine_qualified'
             # Historical safe rows retain their completed machine evidence; audit failures block current rows.
             result.append({**{key:item.get(key) for key in ('id','stage','review_status','probe_status','qc_status','question','test_category','negative_subtype','construction_type','created_at','updated_at')},
-                'raw': {key:item['raw'].get(key) for key in ('generation_run_id','coverage_slot','topic_cluster','source','source_positive_id','source_reference','replaces_question_id','classification_status')},
+                'raw': {key:item['raw'].get(key) for key in ('generation_run_id','coverage_slot','topic_cluster','source','source_positive_id','source_reference','replaces_question_id','classification_status','import_pool')},
                 'slot':item['raw'].get('coverage_slot'), 'topic_cluster':item['raw'].get('topic_cluster'),
                 'probe':{'id':item['probe_id'],'probe_details':{'classification':item['classification']}}, 'qc':{'id':item['qc_id'],'priority':item['priority'],'score':item['qc_score'],'threshold':rules.QC_REVIEW_SCORE,'rule_version':qc.get('rule_version')},
                 'qualification_status':status,'qualification_source':'owner_delegated' if delegated else 'human' if human else 'machine' if status=='machine_qualified' else None,
@@ -650,6 +652,7 @@ class GovernanceStore:
                 json_extract(a.hard_validation_json,'$.corpus_fingerprint') AS fingerprint,
                 json_extract(a.hard_validation_json,'$.slot_persistence_v1') AS slots
                 FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id
+                WHERE coalesce(json_extract(r.profile_json,'$.name'),'') != 'backup'
                 ORDER BY r.created_at DESC,r.rowid DESC""").fetchall()
         for row in rows:
             run = {**dict(row), 'profile':_load(row['profile_json'],{}), 'question_ids':_load(row['question_ids_json'],[])}
@@ -668,7 +671,7 @@ class GovernanceStore:
         parents = {row['id']: row['raw'].get('replaces_question_id') or (row['raw'].get('source_reference') or {}).get('question_id') for row in rows}
         current = {}
         for row in rows:
-            if row['stage'] == 'superseded' or not (row['raw'].get('generation_run_id') or row['raw'].get('source') == 'business_import'):
+            if row['stage'] == 'superseded' or row['raw'].get('import_pool') == 'backup' or not (row['raw'].get('generation_run_id') or row['raw'].get('source') == 'business_import'):
                 continue
             root, visited = row['id'], set()
             while parents.get(root) and root not in visited:
@@ -771,12 +774,15 @@ class GovernanceStore:
 
     def preview_pool_run(self, profile_name, question_ids, chunks, plan_id=None, *, embeddings=None, question_embedder=None, preferred_ids=()):
         from .golden_v2 import validate_golden_candidate, match_pool
-        plan = self.resolve_coverage_plan(profile_name, chunks, plan_id, embeddings)
         if len(set(question_ids)) != len(question_ids):
             raise ValueError('不可重复选择')
+        items = {key: self.question(key) for key in question_ids}
+        if any(item['raw'].get('import_pool') == 'backup' for item in items.values()):
+            raise ValueError('备用池题目只能按替换槽位用于 M3')
+        plan = self.resolve_coverage_plan(profile_name, chunks, plan_id, embeddings)
         validations, seen, source_plans = {}, set(), {}
         for key in sorted(question_ids, key=lambda key: (key not in preferred_ids, key)):
-            item = self.question(key)
+            item = items[key]
             context = {'seen': seen, 'corpus_fingerprint': manifest_identity(current_manifest())}
             if item['test_category'] == 'negative' and question_embedder:
                 try:
@@ -845,6 +851,8 @@ class GovernanceStore:
         """Migrate a working profile by copying only current, validated quality evidence."""
         from .golden_v2 import match_pool
         source = self.generation_run(source_run_id, qualification=False)
+        if source and source['profile'].get('name') == 'backup':
+            raise ValueError('备用池不能重组为当前题卷')
         if not source or source['artifacts']['hard_validation'].get('corpus_fingerprint') != plan['corpus_fingerprint']:
             raise ValueError('Source Corpus identity does not match current plan')
         if plan['profile'] != {'name': profile_name, **GENERATION_PROFILES[profile_name]}:
@@ -1513,6 +1521,8 @@ class GovernanceStore:
             if row is None or snapshot is None:
                 raise ValueError('Saved source Snapshot and current question required')
             current=self._row(row)
+            if current['raw'].get('import_pool') == 'backup':
+                raise ValueError('已冻结的备用池题目不能重新打开修订')
             frozen=next((q for q in _load(snapshot[0],{}).get('questions',[]) if q.get('id')==question_id),None)
             if frozen != current['raw'] or current['stage']!='golden':
                 raise ValueError('Source Snapshot does not match current approved edition')
@@ -1966,11 +1976,13 @@ class GovernanceStore:
         with CORPUS_LOCK:
             return self._create_dataset_snapshot(approved, generation_run_id)
 
-    def _create_dataset_snapshot(self, approved=None, generation_run_id=None, writer=None):
+    def _create_dataset_snapshot(self, approved=None, generation_run_id=None, writer=None, *, backup=False):
         approved = approved if approved is not None else self.questions("golden")
         if not approved:raise ValueError('Snapshot requires approved Golden questions')
         for supplied in approved:
             item=self.question(supplied['id'])
+            if (item['raw'].get('import_pool') == 'backup') != backup:
+                raise ValueError('备用池须独立冻结，不能设为当前题卷')
             if item['stage']!='golden' or item['review_status']!='approved' or not self.approval_eligibility(item['id'])['can_approve']:
                 raise ValueError('Snapshot requires current approved Golden quality')
             if item['raw'].get('source') == 'reviewed_csv':
@@ -1998,6 +2010,8 @@ class GovernanceStore:
         from .corpus import current_manifest
         fingerprint = manifest_identity(current_manifest())
         run = self.generation_run(generation_run_id, qualification=False) if generation_run_id else None
+        if ((run or {}).get('profile', {}).get('name') == 'backup') != backup:
+            raise ValueError('备用池须独立冻结，不能设为当前题卷')
         run_fingerprint = (run or {}).get('artifacts', {}).get('hard_validation', {}).get('corpus_fingerprint')
         if run_fingerprint is not None and run_fingerprint != fingerprint:
             raise ValueError('Corpus 已变化；不能将旧 Run 冻结为当前 Corpus Snapshot')
@@ -2012,10 +2026,11 @@ class GovernanceStore:
         if all(q.get("business_requirements") is not None for q in snapshot["questions"]):
             from .scoring_contract import snapshot_manifest
             snapshot["scoring_contract_manifest"] = snapshot_manifest(snapshot)
-        version_id = f"GD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        stamp = datetime.now(timezone.utc)
+        version_id = stamp.strftime('GD-BACKUP-%Y%m%d%H%M%S%f' if backup else 'GD-%Y%m%d%H%M%S')
         from contextlib import nullcontext
         with (nullcontext(writer) if writer is not None else self.connection()) as connection:
-            connection.execute("INSERT INTO dataset_versions (id, status, source, snapshot_json, created_at) VALUES (?, ?, ?, ?, ?)", (version_id, "approved", "human_review", _json(snapshot), _now()))
+            connection.execute("INSERT INTO dataset_versions (id, status, source, snapshot_json, created_at) VALUES (?, ?, ?, ?, ?)", (version_id, 'backup_frozen' if backup else 'approved', "human_review", _json(snapshot), _now()))
         return {"id": version_id, **snapshot}
 
     @staticmethod
@@ -2056,12 +2071,17 @@ class GovernanceStore:
             raise ValueError(f"同一 Generation Run 的 {expected} 道题必须全部完成人工批准后才能创建 Snapshot")
         if any(set(item["question_ids"]) & set(question_ids) for item in self.revision_runs(generation_run_id) if item["status"] in {"queued", "generating", "validating", "preview_ready", "probing", "qc", "interrupted"}):
             raise ValueError("仍有未完成的局部修订，不能创建 Snapshot")
-        existing = next((item['snapshot'] for item in self.dataset_snapshots() if item['snapshot'].get('generation_run_id') == generation_run_id and item['snapshot'].get('question_ids') == question_ids), None)
+        backup = run['profile'].get('name') == 'backup'
+        snapshots = connection.execute("""SELECT id,snapshot_json FROM dataset_versions
+            WHERE status=? AND json_extract(snapshot_json,'$.generation_run_id')=? ORDER BY created_at DESC""",
+            ('backup_frozen' if backup else 'approved', generation_run_id))
+        existing = next(({'id': row['id'], **snapshot} for row in snapshots
+                         if (snapshot := _load(row['snapshot_json'], {})).get('question_ids') == question_ids), None)
         if existing:
             saved=existing.get('questions',[])
             if len(saved)!=len(approved) or any(self._quality_content({**item,'raw':raw})!=self._quality_content(item) for item,raw in zip(approved,saved)):
                 raise ValueError('当前内容与已有Snapshot不同；请使用新的Generation Run')
-        return existing or self._create_dataset_snapshot(approved, generation_run_id, writer=connection)
+        return existing or self._create_dataset_snapshot(approved, generation_run_id, writer=connection, backup=backup)
 
     def run_probe(self, question_id: str, retriever, chunks: list[dict], answerability_judge=None, *, subtype_judge=None, fail_on_judge_error: bool = False):
         from .retrieval import RetrievalUnavailable, evidence_coverage

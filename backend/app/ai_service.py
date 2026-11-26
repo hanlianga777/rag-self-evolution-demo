@@ -541,6 +541,9 @@ class AiService:
         history = self.store.probe_history(item["id"]) if hasattr(self.store, "probe_history") else []
         probe = history[0] if history else None
         payload = {"question": item["question"], "reference_answer": item["reference_answer"], "evidence": qc_evidence, "category": item["test_category"], "negative_subtype": subtype, "expected_behavior": item.get("raw", {}).get("expected_behavior"), "behavior_criteria": behavior_criteria, "expected_response":item.get("raw", {}).get("expected_response"), "probe_basis": probe.get("probe_details", {}) if probe else {}, "ablation_attribute": ablation, "ablation_metadata": item.get("raw", {}).get("ablation_metadata", {})}
+        negative_basis = item.get('raw', {}).get('negative_basis') if negative else None
+        if negative_basis:
+            payload['negative_basis'] = negative_basis
         if requirements:
             payload['business_requirements'] = requirements
             payload['qc_check_ids'] = [check['id'] for field in ('required_checks', 'conditional_checks') for check in requirements[field]]
@@ -552,6 +555,8 @@ class AiService:
             payload['response_correction'] = correction
         ablation_fields = ',"ablation_valid":true,"ablation_reason":"..."' if ablation else ""
         instruction = "负向题按 negative_subtype、expected_behavior 与 behavior_criteria 审核；安全拒答和提示注入不要求普通参考答案或证据；已标记子类与题目不符时说明理由并标记 P0。" if negative else "使用完整 Chunk 原文核对参考答案；不要仅依据摘要或证据要点判定。表格原始 HTML 用于核对行列对应关系；KV 文本是派生结果。Golden Evidence 有效但当前检索未召回，本身不等于证据不支持；应独立判断答案是否由原文支撑。QC评分和P0/P1只评价Golden内容、检查点及来源；仅有当前Pipeline召回缺口不得作为Golden内容P1或扣分理由，应另记retrieval_observation，不能将其冒充内容争议。"
+        if negative_basis:
+            instruction += '结合 negative_basis 引用的切块原文，核对题目中哪些部分有依据、哪些条件下可作答，以及仍缺哪些信息。'
         if item.get('raw', {}).get('golden_contract') == 'friend-golden-v1':
             # 朋友 QC-Prompt2 的口径：题写得好不好——答案和证据矛盾吗、有没有页码/目录题、负向题是不是假负向、问题是否含糊或悬空指代、
             # 跨段/统计/桥接题是否真的需要多段资料。不检查"必答点"（新题卷没有）。

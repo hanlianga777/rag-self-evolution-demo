@@ -35,17 +35,26 @@ def validate_friend_content(candidate, chunks):
         raise ValueError('问题不能为空')
     group = candidate.get('test_category')
     known = {c['chunk_id']: c for c in chunks}
+
+    def check_quotes(ids, quotes, label):
+        if not ids or not quotes or any(i not in known for i in ids):
+            raise ValueError(label + '切块不在当前知识库：' + ','.join(ids))
+        body = ''.join(strict(known[i].get('chunk_text', known[i].get('text', ''))) for i in ids)
+        for quote in quotes:
+            if strict(quote) not in body:
+                raise ValueError(label + '原文在所标切块里找不到：' + quote[:40])
+
+    for entry in candidate.get('negative_basis') or []:
+        if (not isinstance(entry, dict) or not isinstance(entry.get('chunk_id'), str) or not entry['chunk_id'].strip()
+                or not isinstance(entry.get('quote'), str) or not entry['quote'].strip()):
+            raise ValueError('负向依据须填写切块 ID 和原文')
+        check_quotes([entry['chunk_id']], [entry['quote']], '负向依据')
+
     if group in {'positive', 'ablation'}:
         if not (candidate.get('reference_answer') or '').strip() or not candidate.get('evidence'):
             raise ValueError('正向题（Positive）和消融题（Ablation）须有参考答案和证据原文')
         for source in candidate['evidence']:
-            ids, quotes = source.get('source_chunk_ids') or [], source.get('evidence_key_points') or []
-            if not ids or not quotes or any(i not in known for i in ids):
-                raise ValueError('证据切块不在当前知识库：' + ','.join(ids))
-            body = ''.join(strict(known[i].get('chunk_text', known[i].get('text', ''))) for i in ids)
-            for quote in quotes:
-                if strict(quote) not in body:
-                    raise ValueError('证据原文在所标切块里找不到：' + quote[:40])
+            check_quotes(source.get('source_chunk_ids') or [], source.get('evidence_key_points') or [], '证据')
         # 朋友硬校验第 8 条"跨块校验：去掉任一段就答不出"：跨段题的证据必须分散在至少两块，且没有任何一块单独包含全部证据。
         if candidate.get('generation_method') in CROSS_CHUNK_METHODS or candidate.get('ablation_attribute') == 'cross_chunk':
             quotes = [q for source in candidate['evidence'] for q in source.get('evidence_key_points') or []]
@@ -111,20 +120,33 @@ def inherit_business_scope(questions):
     return scoped
 
 
-def import_batch(store, candidates, source_sha256, source, review_note, *, machine_checks=False, contract=None):
-    from .governance import _json, _now, _normalized, GENERATION_PROFILES
+def import_batch(store, candidates, source_sha256, source, review_note, *, machine_checks=False, contract=None, pool='main'):
+    from .governance import _json, _now, _normalized, GENERATION_PROFILES, profile_count
     from datetime import datetime, timezone
     from .full_text import CORPUS_LOCK
     if not re.fullmatch('[0-9a-f]{64}', source_sha256 or '') or not source.strip() or not review_note.strip():
         raise ValueError('人工审定导入须记录文件SHA256、来源及人审说明')
-    if (len(candidates) != 50 or [c.get('coverage_slot') for c in candidates] != [f'Q{i:02d}' for i in range(1, 51)]
-        or Counter(c.get('test_category') for c in candidates) != Counter(positive=20, ablation=10, negative=20)
-        or len({_normalized(c.get('question', '')) for c in candidates}) != 50):
-        raise ValueError('人工审定导入须为完整且无重复的Q01–Q50，类别20/10/20')
+    friend = contract == FRIEND_CONTRACT
+    if pool not in {'main', 'backup'} or (pool == 'backup' and not friend):
+        raise ValueError('备用池仅支持朋友同款 CSV 导入')
+    backup = pool == 'backup'
+    profile = ({'name': 'backup', 'positive_count': 4, 'ablation_count': 2, 'negative_count': 4, 'expected_count': 10}
+               if backup else {'name': 'medium', **GENERATION_PROFILES['medium']})
+    expected = profile['expected_count']
+    prefix = 'B' if backup else 'Q'
+    counts = {group: profile_count(profile, group) for group in ('positive', 'ablation', 'negative')}
+    if ([c.get('coverage_slot') for c in candidates] != [f'{prefix}{i:02d}' for i in range(1, expected + 1)]
+        or Counter(c.get('test_category') for c in candidates) != counts
+        or len({_normalized(c.get('question', '')) for c in candidates}) != expected):
+        raise ValueError(f'人工审定导入须为完整且无重复的{prefix}01–{prefix}{expected}，类别' + '/'.join(str(n) for n in counts.values()))
+    if backup:
+        slots = [c.get('replace_slot') for c in candidates]
+        main_slots = {f'Q{i:02d}' for i in range(1, 51)}
+        if any(slot not in main_slots for slot in slots) or len(set(slots)) != expected:
+            raise ValueError('备用池须有互不重复的主卷替换槽位 Q01–Q50')
     with CORPUS_LOCK, store.connection() as connection:
         connection.execute('BEGIN IMMEDIATE')
         chunks = CorpusStore().chunks()
-        friend = contract == FRIEND_CONTRACT
         if friend:
             from .business_topics import validate_import_groups
             candidates = inherit_business_scope(candidates)
@@ -166,6 +188,8 @@ def import_batch(store, candidates, source_sha256, source, review_note, *, machi
             raw = {**candidate, **({'golden_contract': FRIEND_CONTRACT} if friend else {}), 'id': question_id, 'source': provenance, 'generation_run_id': run_id,
                    'display_id': candidate['coverage_slot'], 'evaluation_group': candidate['test_category'],
                    'import_audit': {'source_sha256': source_sha256, 'source': source, 'review_note': review_note, 'imported_at': now}}
+            if backup:
+                raw['import_pool'] = pool
             item = {'id': question_id, 'question': raw['question'], 'reference_answer': raw.get('reference_answer'),
                     'evidence': raw.get('evidence', []), 'test_category': raw['test_category'], 'negative_subtype': raw.get('negative_subtype'),
                     'legacy_question_type': legacy_type, 'raw': raw}
@@ -179,7 +203,7 @@ def import_batch(store, candidates, source_sha256, source, review_note, *, machi
                    'generation_run_id': run_id, 'question_ids': ids, 'content_hashes': hashes, 'corpus_fingerprint': fingerprint}
         connection.execute('INSERT INTO business_import_batches VALUES (?,?)', (key, _json(receipt)))
         connection.execute('INSERT INTO golden_generation_runs VALUES (?,?,?,?,?,?)',
-            (run_id, _json({'name': 'medium', **GENERATION_PROFILES['medium']}), contract, 'completed', _json(ids), now))
+            (run_id, _json(profile), contract, 'completed', _json(ids), now))
         connection.execute('INSERT INTO golden_generation_artifacts VALUES (?,?,?,?)',
             (run_id, _json([]), _json([]), _json({'status': 'passed', 'corpus_fingerprint': fingerprint,
               'reviewed_csv_receipt': key, 'content_hashes': hashes, 'quality_source': contract,
