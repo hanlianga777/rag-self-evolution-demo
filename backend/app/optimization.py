@@ -617,7 +617,8 @@ def normalize_agent_candidate(candidate):
     return candidate
 
 
-def prepare_response(content,base_config,bad_cases,prior_candidates,completed,round_number,labels,trigger_id,monitoring_target_event_ids,audit):
+def prepare_response(content,base_config,bad_cases,prior_candidates,completed,round_number,labels,trigger_id,
+                     monitoring_target_event_ids,audit, *, planning=None):
     """One offline validation path for fresh and already-paid responses; no semantic repairs."""
     from .agent_mechanism import CONTRACT, same_base, validate_mechanism
     from .composite import parameter_diff, pipeline_config
@@ -651,11 +652,14 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
         audit.update(failed_field="candidates", actual_value=result.get("candidates") if isinstance(result, dict) else result, expected_type="array", allowed_values=None)
         raise ValueError("Agent 输出必须包含 candidates 数组")
     audit["parsed_candidates"] = result['candidates']
+    if planning:
+        for proposal in result['candidates']:
+            planning.check_submitted_effect(proposal)
     if verdict.current(audit):
         verdict.require_empty_history(audit.get('parameter_effect_ledger'))
         verdict.require_empty_history(result.get('parameter_effect_ledger'))
         offered = result['candidates']
-        if len(offered) < len(labels):
+        if len(offered) < len(labels) or (not offered and 'directed_evidence' in audit):
             reason = result.get('insufficient_evidence')
             if not isinstance(reason, str) or not reason.strip():
                 raise ValueError('少于本轮方案数量时须填写 insufficient_evidence')
@@ -812,7 +816,8 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
                     'code': 'unknown', 'stage': '未知', 'subtype': None, 'reason': '实际对照底座缺少该题的已保存诊断。'}}
                            for item in selected]
                 ledger = audit['parameter_effect_ledger']
-                decisions = validate_mechanism(candidate, targets, comparison_id, audit.get('retrieval_preview') or {},
+                decisions = validate_mechanism(candidate, targets, comparison_id,
+                    audit.get('directed_evidence') or audit.get('retrieval_preview') or {},
                     ledger['current'] + ledger['historical'],
                     base_changes=parameter_diff(effective_base, pipeline_config(base_config)))
                 candidate['mechanism_checks'] = audit['mechanism_checks'][candidate['id']] = decisions
@@ -911,9 +916,10 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
 
 
 class OptimizationAgent:
-    def __init__(self, store, provider):
+    def __init__(self, store, provider, *, runtime=None):
         self.store = store
         self.provider = provider
+        self.runtime = runtime
 
     def _checkpoint(self, experiment_id, generation_token, updates):
         with self.store.connection() as connection:
@@ -1017,10 +1023,15 @@ class OptimizationAgent:
         use_layered = layered(context)
         v2 = context.get('mechanism_contract') == CONTRACT
         use_final = verdict.current(context)
-        requires_preview = v2 or use_final
+        from .agent_planning import enabled
+
+        directed = enabled(context)
+        requires_preview = not directed and (v2 or use_final)
         frozen = json.loads(baseline.get('dataset_snapshot_json') or '{}')
-        retrieval_preview = (load_retrieval_preview(self.store, baseline_run_id, foundation=frozen.get('corpus_fingerprint'))
-                             if requires_preview else load_retrieval_preview(self.store, baseline_run_id))
+        retrieval_preview = None
+        if not directed:
+            retrieval_preview = (load_retrieval_preview(self.store, baseline_run_id, foundation=frozen.get('corpus_fingerprint'))
+                                 if requires_preview else load_retrieval_preview(self.store, baseline_run_id))
         if v2:
             from .agent_round_contract import (STOP_REASON, available_labels, check_commitment, inherited_repairs,
                                                previous_commitment, round_base, round_opportunities)
@@ -1126,15 +1137,18 @@ class OptimizationAgent:
                 'code': 'unknown', 'stage': '未知', 'subtype': None, 'reason': '当前 Winner 缺少该题的已保存诊断。'}}
                        for item in failures]
             seed_changes = [c['reasoning']['changed_parameters'] for c in seeds]
-            opportunities = round_opportunities(targets, base, base_config, prior_candidates, retrieval_preview,
-                                             ledger['current'], ledger['historical'], blocked=blocked, use_layered=use_layered,
-                                             reserved_keys={key for diff in seed_changes for key in diff},
-                                             combination_used=any(len(diff) > 1 for diff in seed_changes),
-                                             performance_gates=performance_gates)
-            # Some frozen failures lack the persisted diagnosis required by the Sandbox entry point.
-            for item in failures:
-                if item not in bad_cases:
-                    opportunities[item['question_id']].update(available=[], reason='缺少可用于 Sandbox 的已保存目标记录')
+            def opportunity_rows(preview, ledger, *, before_checks=False):
+                result = round_opportunities(
+                    targets, base, base_config, prior_candidates, preview, ledger['current'], ledger['historical'],
+                    blocked=blocked, use_layered=use_layered, reserved_keys={key for diff in seed_changes for key in diff},
+                    combination_used=any(len(diff) > 1 for diff in seed_changes),
+                    performance_gates=performance_gates, before_directed_checks=before_checks)
+                for item in failures:
+                    if item not in bad_cases:
+                        result[item['question_id']].update(available=[], reason='缺少可用于 Sandbox 的已保存目标记录')
+                return result
+
+            opportunities = opportunity_rows(retrieval_preview, ledger, before_checks=directed)
             labels = labels[:evaluation_budget['remaining_for_abc']]
             if use_layered:
                 from .agent_round_contract import GENERATION_REQUIRED, GenerationDiagnosisRequired, layer_plan, layer_signals
@@ -1143,13 +1157,14 @@ class OptimizationAgent:
                 gate_faults, severe = layer_signals(self.store, base_run, current_gates, faults[base['id']],
                                                    decision_version=decision_version)
                 target = layer_plan(opportunities, gate_faults, severe, ledger['current'], base['id'], labels,
-                                    decision_version=decision_version)
+                                    decision_version=decision_version, directed=directed)
                 audit['round_target_layer'] = target
                 if performance_gates:
                     audit['performance_gates'] = [gate for gate in current_gates if gate['metric'] in performance_gates]
-                    if target['layer'] not in ('performance', None):
+                    if not directed and target['layer'] not in ('performance', None):
                         require_round_preview()
-                labels = labels[:target['proposal_count']]
+                layer_labels = labels
+                labels = labels if directed and target['layer'] else labels[:target['proposal_count']]
                 if target.get('generation_precondition'):
                     self.store.save_agent_trace(experiment_id, 'failed', {
                         'generation_status': 'failed', 'validation_stage': 'generation_diagnosis_precondition',
@@ -1292,6 +1307,65 @@ class OptimizationAgent:
                     reopen_blocked_requests(checkpoint)
             def payment_context():
                 return restore_paid_context(self.store, binding) if binding else nullcontext()
+
+            if directed:
+                from .agent_planning import CANDIDATE_SYSTEM, post_predictions, pre_prediction_facts
+                from .workflow_engine import WorkflowEngine
+
+                if self.runtime is None:
+                    raise ValueError('新实验需要由统一编排器运行定向检查')
+                engine = WorkflowEngine(self.store, self.runtime, experiment_id)
+                planning = engine.directed_planning(round_number, base['id'], base_run)
+                with payment_context():
+                    planning.begin(pre_prediction_facts(prompt, base_config),
+                                   lambda instructions, facts: planning.ask(self.provider, instructions, facts))
+                    rejection = None
+                    for attempt in range(4):
+                        try:
+                            while True:
+                                review_input = planning.review_input()
+                                current_ledger = self.store.experiment(experiment_id, light=True)['result']['parameter_effect_ledger']
+                                check_preview = {'directed_checks': review_input['directed_checks']}
+                                opportunities = opportunity_rows(check_preview, current_ledger)
+                                target = layer_plan(opportunities, gate_faults, severe, current_ledger['current'],
+                                                    base['id'], layer_labels, decision_version=decision_version, directed=True)
+                                current_labels = layer_labels[:target['proposal_count']]
+                                audit.update(round_target_layer=target, round_opportunities=opportunities,
+                                             directed_evidence=check_preview, parameter_effect_ledger=current_ledger)
+                                request = {**prompt, **review_input, 'round_target_layer': target,
+                                           'round_opportunities': opportunities, 'parameter_effect_ledger': current_ledger,
+                                           'goal': {**prompt['goal'], 'candidate_labels': current_labels},
+                                           'round_contract': {**prompt['round_contract'], 'count': len(current_labels)}}
+                                if rejection:
+                                    request['validation_rejection'] = rejection
+                                content = planning.ask(self.provider, system + CANDIDATE_SYSTEM, request)
+                                audit['provider_raw_text'] = content
+                                if not planning.apply_revision(content):
+                                    break
+                            result, batch = prepare_response(content, base_config, bad_cases, prior_candidates, completed,
+                                round_number, current_labels, trigger_id, monitoring_target_event_ids, audit, planning=planning)
+                            for _, config, _ in batch:
+                                planning.require_effect(config)
+                            break
+                        except (ValueError, TypeError, KeyError) as error:
+                            rejection = str(error)
+                            audit['validation_retries'].append({'attempt': attempt + 1, 'reason': rejection,
+                                                                 'sandbox_budget_used': 0})
+                            if attempt == 3:
+                                raise ProposalValidationExhausted('实验方案连续校验被拒：' + rejection) from error
+                saved_plan = planning.publish(post_predictions([(f'{experiment_id}-{cid}', config, reasoning)
+                                                                 for cid, config, reasoning in batch]))
+                events = planning.usage()
+                audit.update(planning=saved_plan, token_usage=events,
+                             **cost_fields(getattr(getattr(self.provider, 'settings', None), 'model', None), events))
+                if not batch and not result.get('decision_stop'):
+                    result['decision_stop'] = {'round': round_number, 'reason': result.get('insufficient_evidence')
+                                               or '定向检查后没有可进入 Sandbox 的方案'}
+                self.store.save_agent_round(experiment_id, batch, {**result, **audit, 'validation_stage': 'completed',
+                    'generation_status': 'completed' if batch else 'insufficient_evidence',
+                    'requested_candidate_count': len(current_labels), 'generated_candidate_count': len(batch)},
+                    generation_token=generation_token)
+                return self.store.experiment(experiment_id)
 
             stages = []
             recovered_usage=[]

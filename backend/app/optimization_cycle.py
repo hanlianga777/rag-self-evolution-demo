@@ -243,7 +243,7 @@ def _run_until_qualified(store, runtime, experiment_id):
     from .providers import permanent_provider_error
     from .workflow_engine import WorkflowEngine
     engine = WorkflowEngine(store, runtime, experiment_id)
-    runner, agent = EvaluationRunner(store, runtime), OptimizationAgent(store, runtime.provider)
+    runner, agent = EvaluationRunner(store, runtime), OptimizationAgent(store, runtime.provider, runtime=runtime)
     empty_rounds = 0
     state = dict(store.experiment(experiment_id, light=True)['result'].get('optimization_cycle', {}))
     state.pop('provider_retry', None)
@@ -307,7 +307,7 @@ def _run_until_qualified(store, runtime, experiment_id):
             return save('recommended', 'before_release')
         check_cycle_stop(store,experiment_id)
         save('running', 'composite')
-        composite = store.create_composite(experiment_id, runtime.provider)
+        composite = engine.generate_composite()
         if composite.get('outcome') == 'provider_blocked':
             return save('blocked', 'composite', composite.get('reason'))
         if composite.get('status') in {'analyzing','unknown'}:
@@ -505,6 +505,7 @@ def layered_stage_facts(store, experiment, baseline, winner, number):
     from . import verdict
     from .agent_inputs import baseline_bad_case_rows, is_optimization_target
     from .agent_mechanism import faults_for_cases
+    from .agent_planning import enabled
     from .agent_round_contract import fault_layer, round_base, round_opportunities, saved_final_map
     from .composite import parameter_diff, pipeline_config
     from .optimization import gate_harming_changes, load_retrieval_preview, require_retrieval_preview
@@ -531,14 +532,18 @@ def layered_stage_facts(store, experiment, baseline, winner, number):
     targets = [{**row, 'mechanism_fault': faults[row['question_id']]} for row in failures
                if row['question_id'] in faults and is_optimization_target(row)]
     current = experiment['result']['parameter_effect_ledger']['current']
-    foundation = json.loads(baseline['dataset_snapshot_json']).get('corpus_fingerprint')
-    preview = load_retrieval_preview(store, baseline['id'], foundation=foundation)
+    directed = enabled(experiment['result'])
+    preview = None
+    if not directed:
+        foundation = json.loads(baseline['dataset_snapshot_json']).get('corpus_fingerprint')
+        preview = load_retrieval_preview(store, baseline['id'], foundation=foundation)
     gates = (baseline['result'].get('gates') or {}).get('gates')
     blocked = [row['config_diff'] for row in gate_harming_changes(candidates, gates)]
     options = round_opportunities(targets, base, baseline_config, candidates, preview, current, [],
-                                 blocked=blocked, use_layered=True, performance_gates=performance_gates)
+                                 blocked=blocked, use_layered=True, performance_gates=performance_gates,
+                                 before_directed_checks=directed)
     untried = {fault_layer(row['fault']['code']) for row in options.values() if row['available']}
-    if len(base['changes']) < rules.AGENT['d_max_changed_parameters']:
+    if not directed and len(base['changes']) < rules.AGENT['d_max_changed_parameters']:
         remaining_layers = {fault_layer(row['code']) for row in faults.values()}
         if 'generation' in remaining_layers and not any(
                 row['source'] == '生成诊断' and row['base_id'] == base['id'] for row in current):
@@ -570,6 +575,12 @@ def layered_stage_facts(store, experiment, baseline, winner, number):
                 combined = True
                 break
         if number >= rules.AGENT['max_rounds'] or experiment['evaluation_budget']['used'] >= MAX_EVALS - 1:
+            if directed:
+                checked = [group for plan in experiment['result'].get('round_planning', {}).values()
+                           if plan['base_id'] == base['id'] for group in plan['directed_checks']]
+                options = round_opportunities(targets, base, baseline_config, candidates,
+                    {'directed_checks': checked}, current, [], blocked=blocked, use_layered=True,
+                    performance_gates=performance_gates)
             combined = combined or any(row['available'] for row in options.values())
     return {'remaining_count': len(remaining), 'untried_layers': sorted(untried), 'has_combination': combined}
 
@@ -775,7 +786,7 @@ def recover_agent_generations(store, runtime):
 
     def recover(experiment_id, baseline_id):
         try:
-            OptimizationAgent(store, runtime.provider).generate(baseline_id, experiment_id=experiment_id, recovering=True)
+            OptimizationAgent(store, runtime.provider, runtime=runtime).generate(baseline_id, experiment_id=experiment_id, recovering=True)
         except Exception:
             logging.exception('Agent generation recovery failed: %s', experiment_id)
 

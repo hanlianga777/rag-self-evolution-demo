@@ -57,7 +57,9 @@ def test_agent_allows_high_excludes_max_from_proposals_and_prompt():
     assert [option['changes'] for option in opportunities['Q01']['available']] == [{'generation_thinking': 'high'}]
 
 
-def test_continuous_launch_checks_production_two_bad_cases_and_preview(setup):
+def test_continuous_launch_checks_production_two_bad_cases_without_preview(setup):
+    from app.agent_planning import VERSION
+
     env, preview = setup
     store = env.store
     with pytest.raises(ValueError, match='少于 5'):
@@ -72,8 +74,8 @@ def test_continuous_launch_checks_production_two_bad_cases_and_preview(setup):
         db.execute("UPDATE production_versions SET config_json=? WHERE id='A'",
                    (json.dumps({**rules.BASELINE, 'candidate_k': 24, 'top_k': 6}),))
     preview.unlink()
-    with pytest.raises(ValueError, match='检索预演'):
-        store.create_experiment(env.base, mode='continuous')
+    new_experiment = store.create_experiment(env.base, mode='continuous')
+    assert store.experiment(new_experiment)['result']['agent_planning_version'] == VERSION
 
 
 def test_probe_saves_independent_trials_and_unlocks_same_base_only(setup):

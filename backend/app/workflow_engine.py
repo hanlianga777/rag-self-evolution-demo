@@ -220,11 +220,26 @@ class WorkflowEngine:
             raise ValueError(candidate['result'].get('error') or 'Sandbox 未完成，请核对续跑断点')
         self.save(status='completed', phase='sandbox', active_candidate=None, last_error=None)
 
+    def generate_composite(self):
+        from .agent_planning import enabled
+
+        experiment = self.experiment()
+        if experiment and enabled(experiment['result']):
+            return self.store.create_composite(self.id, self.runtime.provider, workflow=self)
+        return self.store.create_composite(self.id, self.runtime.provider)
+
+    def directed_planning(self, number, base_id, base_run_id):
+        from .agent_planning import DirectedPlanning
+
+        return DirectedPlanning(self, number, base_id, base_run_id)
+
     def generate_next(self, agent=None, *, resume_blocked=False):
         experiment = self.experiment()
         baseline_id = experiment['baseline_run_id']
-        agent = agent or OptimizationAgent(self.store, self.runtime.provider)
-        if not layered(experiment['result']):
+        agent = agent or OptimizationAgent(self.store, self.runtime.provider, runtime=self.runtime)
+        from .agent_planning import enabled
+
+        if enabled(experiment['result']) or not layered(experiment['result']):
             return agent.generate(baseline_id, experiment_id=self.id)
         e5 = self.is_e5(experiment)
         key = '120b:probe-plan' if e5 else 'workflow:probe-plan'

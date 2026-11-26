@@ -101,6 +101,8 @@ def test_all_correct_slow_baseline_generates_and_qualifies_by_measured_results(t
     env = OfflineEvaluation(tmp_path, monkeypatch, first)
     env.stable_baseline()
     experiment = env.store.create_experiment(env.base)
+    from test_task118a_verdict import mark_legacy_planning
+    mark_legacy_planning(env.store, experiment)
     assert env.store.experiment(experiment)['result']['bad_case_decision_version'] == VERSION
     monkeypatch.setattr('app.optimization.wait_for_off_peak', Mock())
     provider = Mock(spec=['complete'])

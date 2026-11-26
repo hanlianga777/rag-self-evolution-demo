@@ -7,7 +7,7 @@ from app import rules, verdict
 from app.optimization import OptimizationAgent
 from app.policy import GATE_DEFINITIONS
 
-from test_task118a_verdict import OfflineEvaluation, scored
+from test_task118a_verdict import OfflineEvaluation, mark_legacy_planning, scored
 
 
 @pytest.fixture
@@ -74,6 +74,7 @@ def test_off_layer_requires_a_shortage_and_a_reason():
 def test_generation_precondition_blocks_without_stop(saved_runs, tmp_path, monkeypatch):
     env, _ = saved_runs
     exp = env.store.create_experiment(env.base, decision_contract_v2=True)
+    mark_legacy_planning(env.store, exp)
     directory = tmp_path / 'retrieval_preview'
     directory.mkdir()
     (directory / f'{env.base}.json').write_text(json.dumps({
@@ -172,6 +173,7 @@ def test_seed_a_reuses_saved_run_and_keeps_round_one_open(saved_runs, tmp_path, 
         db.execute("UPDATE evaluation_runs SET judge_json=? WHERE id=?", (original_judge, run))
     e5 = store.create_experiment(env.base, decision_contract_v2=True,
                                  seed_candidates=reference)
+    mark_legacy_planning(store, e5)
     exp = store.experiment(e5)
     [seed] = exp['candidates']
     provenance = {'source_experiment_id': source, 'source_candidate_id': a, 'source_run_id': run,

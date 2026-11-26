@@ -15,6 +15,13 @@ from app.optimization import prepare_response
 from app.policy import DEFAULT_PIPELINE_CONFIG, MAX_EVALS, validate_candidate_config
 
 
+def mark_legacy_planning(store, experiment):
+    """Represent an experiment saved before 123b introduced a planning version."""
+    with store.connection() as db:
+        db.execute("UPDATE experiments SET result_json=json_remove(result_json,'$.agent_planning_version') WHERE id=?",
+                   (experiment,))
+
+
 def scored(passed, answer='原样本', *, category='positive', subtype=None, risk=False, scores=None, latency=1000):
     trace = {key: [{'chunk_id': answer, 'content': answer}] for key in ('candidates', 'reranked', 'final')}
     scores = scores or dict(correctness=90, faithfulness=90, completeness=90 if passed else 72)
@@ -385,6 +392,7 @@ def test_current_agent_distinguishes_preview_precondition_from_stop(tmp_path, mo
     env = OfflineEvaluation(tmp_path, monkeypatch, first, evidence=[{'source_chunk_ids': ['standard']}])
     env.stable_baseline()
     experiment = env.store.create_experiment(env.base)
+    mark_legacy_planning(env.store, experiment)
     target = tmp_path / 'retrieval_preview' / f'{env.base}.json'
     target.parent.mkdir()
     preview = {'baseline_run_id': env.base, 'configs': [{
@@ -421,6 +429,7 @@ def test_current_planning_blocks_uncovered_winner(env, monkeypatch, entry):
 
     env.stable_baseline()
     experiment = env.store.create_experiment(env.base)
+    mark_legacy_planning(env.store, experiment)
     base = env.raw_cases(env.base)
     args = env.start_candidate(experiment, 'A', {**base, 'Q1': scored(True)}, top_k=6)
     winner = env.finish_candidate(args, {'Q1': [scored(True), scored(True)]})

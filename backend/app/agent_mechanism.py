@@ -135,7 +135,24 @@ def effect_entries(changes, source, questions, bad_cases, before, after, *, hist
     return entries
 
 
-def _preview_signal(preview, base_id, changes, base_changes, display_id):
+def _preview_signal(preview, base_id, changes, base_changes, display_id, qid):
+    if 'directed_checks' in preview:
+        row = next((row for group in preview['directed_checks']
+                    if group['kind'] == 'retrieval' and group['changes'] == changes
+                    for row in group['results'] if row['question_id'] == qid), None)
+        if row is None:
+            return False, False, False
+
+        def positions(value):
+            return {item['chunk_id']: item['final'] for item in value} if isinstance(value, list) else {}
+
+        before, after = positions(row['before']), positions(row['after'])
+        absent = {'未知', '未进入', '记录缺失'}
+        lost = any(value not in absent and after.get(chunk) == '未进入'
+                   for chunk, value in before.items())
+        enters = (bool(after) and all(value not in absent for value in after.values())
+                  and any(before.get(chunk) == '未进入' for chunk in after))
+        return enters, lost, row['context_changed']
     variants = preview.get('configs') or []
     if set(changes) - PREVIEW_KEYS or base_id != 'Baseline' and base_changes is None:
         # A preview cannot distinguish configurations whose generation strategy changed.
@@ -169,7 +186,7 @@ def _preview_signal(preview, base_id, changes, base_changes, display_id):
             bool(left and right and left != right))
 
 
-def validate_mechanism(proposal, targets, base_id, preview, ledger, *, base_changes=None):
+def validate_mechanism(proposal, targets, base_id, preview, ledger, *, base_changes=None, hypothesis_only=False):
     changes = proposal['config_diff']
     stages = {key: rules.AGENT_PARAMETER_STAGES.get(key, ()) for key in changes}
     actions = {stage for values in stages.values() for stage in values}
@@ -181,15 +198,15 @@ def validate_mechanism(proposal, targets, base_id, preview, ledger, *, base_chan
         fault = target.get('mechanism_fault') or fault_stage(target)
         code = fault['code']
         stage_code = {'over_refuse': 'generation', 'safety_violation': 'safety'}.get(code, code)
-        enters, lost, changed_context = _preview_signal(preview, base_id, changes, base_changes, display)
+        enters, lost, changed_context = _preview_signal(preview, base_id, changes, base_changes, display, qid)
         supporting = [r for r in ledger if base_id and r['base_id'] == base_id and r['question_id'] == qid
                       and r['changes'] == changes and r['status'] == '修好'
                       and (code not in {'recall', 'ranking'} or r['final_added'] is True and r['final_lost'] is False)]
         proof = [{'source': r['source'], 'candidate_id': r['candidate_id'], 'run_id': r['candidate_run_id']} for r in supporting]
         if enters and not lost:
-            proof.append({'source': '检索预演', 'observation': '标准证据进入 Final'})
+            proof.append({'source': '定向检查' if 'directed_checks' in preview else '检索预演', 'observation': '标准证据进入 Final'})
         if stage_code == 'generation' and 'retrieval_max_tokens' in changes and changed_context and not lost:
-            proof.append({'source': '检索预演', 'observation': '上下文长度变化，标准证据未丢失'})
+            proof.append({'source': '定向检查' if 'directed_checks' in preview else '检索预演', 'observation': '上下文长度变化，标准证据未丢失'})
         mechanism = (explanations.get(qid) or explanations.get(display)) if isinstance(explanations, dict) else None
         mechanism = mechanism.strip() if isinstance(mechanism, str) else None
         decision = '拒绝'
@@ -200,15 +217,19 @@ def validate_mechanism(proposal, targets, base_id, preview, ledger, *, base_chan
         elif stage_code == 'generation' and actions and actions <= {'recall', 'ranking'}:
             reason = '标准证据已进入 Final，单从召回或排序调整不能解决已确认的生成错误。'
         elif DIRECT_STAGES[stage_code] & actions:
-            if proof:
+            if hypothesis_only:
+                decision, reason = '待检查', '参数作用环节匹配，可申请定向检查。'
+            elif proof:
                 decision, reason = '放行', '作用环节匹配，且同底座的保存证据支持试验。'
             else:
                 reason = '作用环节匹配，缺同底座、同改动、同题的预演或账本证据。'
         elif set(changes).intersection(rules.AGENT_CONTEXT_PARAMETERS):
             cross_preview = (changed_context if stage_code in {'generation', 'safety'} else enters) and not lost
-            if mechanism and cross_preview:
+            if hypothesis_only:
+                decision, reason = '待检查', '可能跨层改变交付资料，可申请定向检查。'
+            elif mechanism and cross_preview:
                 decision, reason = '补证', 'Agent 已写明中间机制，同底座检索预演支持交付资料改变。'
-                proof.append({'source': '检索预演', 'observation': '交付资料改变，标准证据未丢失'})
+                proof.append({'source': '定向检查' if 'directed_checks' in preview else '检索预演', 'observation': '交付资料改变，标准证据未丢失'})
             else:
                 reason = '跨层作用缺少逐题中间机制或同底座预演证据。'
         else:

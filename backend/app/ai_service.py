@@ -295,8 +295,27 @@ class AiService:
         if 'final' in trace: trace['final'] = evidence
         return evidence, context_budget, stages, trace, auxiliary_usage
 
+    @staticmethod
+    def _answer_task(config):
+        return {'baseline': 'baseline', 'sandbox_candidate': 'candidate'}.get(config.get('run_target'), 'generation')
+
+    def _answer_messages(self, question, config, evidence):
+        context = generation_context(evidence, numbered=self.generation_prompt_version in NUMBERED_PROMPT_VERSIONS)
+        return (generation_system_prompt(self.generation_prompt_version, config.get('prompt_strategy')),
+                f"问题：{question}\n证据：\n{context}")
+
+    @provider_task('answer')
+    def generation_request_fingerprint(self, question, config, evidence, context_budget):
+        """Build the same Provider payload as generation, without sending it."""
+        if not self.live_enabled or not evidence or not context_budget['generation_allowed']:
+            return None
+        effort = config.get('generation_thinking') or rules.BASELINE['generation_thinking']
+        with thinking_task(self._answer_task(config), effort):
+            return self.provider.request_summary(*self._answer_messages(question, config, evidence),
+                stream=True, temperature=rules.BASELINE['temperature'])['request_sha256']
+
     def _generate(self, question, config, started_at, evidence, context_budget, stages, trace, auxiliary_usage, on_token):
-        generation_task = 'baseline' if config.get('run_target') == 'baseline' else 'candidate' if config.get('run_target') == 'sandbox_candidate' else 'generation'
+        generation_task = self._answer_task(config)
         # 规则总表三.3：配置写的档位就是实际请求的档位。
         effort = config.get('generation_thinking') or rules.BASELINE['generation_thinking']
         if effort not in {'off', 'low', 'high', 'max'}:
@@ -317,14 +336,13 @@ class AiService:
                 "stages": stages, "token_usage": {"auxiliary_queries": auxiliary_usage, "generation": None}, **cost_fields(self.model, auxiliary_usage), **retrieval_fields,
             }
         with measure(stages, "context_build"):
-            context = generation_context(evidence, numbered=self.generation_prompt_version in NUMBERED_PROMPT_VERSIONS)
+            messages = self._answer_messages(question, config, evidence)
         if not self.live_enabled:
             raise ProviderRequestError("未配置 DEEPSEEK_API_KEY")
         from .providers import answer_content
         with measure(stages, "generation"), thinking_task(generation_task, effort), answer_content(on_token):
             response = self.provider.complete_with_metrics(
-                generation_system_prompt(self.generation_prompt_version, config.get("prompt_strategy")),
-                f"问题：{question}\n证据：\n{context}",
+                *messages,
                 stream=True, temperature=rules.BASELINE['temperature'],
             )
         return {"answer": response["content"], "generation_request_sha256": response.get("request_sha256"), "reused_from": response.get("reused_from"), "mode": "live", "model": self.provider.settings.model, "latency_ms": round((time.perf_counter() - started_at) * 1000) + (response.get("generation_ms", 0) if response.get("reused_from") else 0), "timing_provenance": "检索本次实测，生成复用来源实测" if response.get("reused_from") else "本次实测", "ttft_ms": response["ttft_ms"], "retrieval": citations, "citation_markers": {f"[{n}]": int(n) - 1 for n in re.findall(r"\[([1-9]\d*)\]", response["content"]) if int(n) <= len(citations)}, "input_tokens": response["input_tokens"], "output_tokens": response["output_tokens"], "stages": stages, "token_usage": {"auxiliary_queries": auxiliary_usage, "generation": response.get("usage", {})}, **cost_fields(self.model, [*auxiliary_usage, *([response["usage"]] if response.get("usage") else [])]), **retrieval_fields}

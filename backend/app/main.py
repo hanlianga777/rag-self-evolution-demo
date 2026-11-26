@@ -163,7 +163,7 @@ def start_recovery_monitor():
                 recover_pending(store, ai_service)
                 recover_agent_generations(store,ai_service)
                 from .paid_schedule import recover_scheduled_composites
-                recover_scheduled_composites(store,ai_service.provider)
+                recover_scheduled_composites(store,ai_service.provider, runtime=ai_service)
                 from .evidence_resolver import recover_diagnostic_batches
                 recover_diagnostic_batches(store,ai_service)
                 followup_jobs.recover()
@@ -1922,7 +1922,7 @@ def run_experiments(payload: ExperimentRequest | None = None):
     if current_id:
         require_idle_cycle(store.experiment(current_id))
     try:
-        return OptimizationAgent(store, ai_service.provider).generate(completed["id"], payload.trigger_id if payload else None)
+        return OptimizationAgent(store, ai_service.provider, runtime=ai_service).generate(completed["id"], payload.trigger_id if payload else None)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 
@@ -2127,9 +2127,9 @@ def create_composite(run_id: str, payload: PaidActionRequest | None = None):
             if composite_active(connection, run_id, scheduled):
                 return {**scheduled, 'status': 'scheduled'}
         if pause_state(store, 'composite:' + run_id)['paused']:
-            state = start_scheduled_composite(store, ai_service.provider, run_id)
+            state = start_scheduled_composite(store, ai_service.provider, run_id, runtime=ai_service)
             return {**state, 'status': 'scheduled'}
-        return store.create_composite(run_id, ai_service.provider)
+        return WorkflowEngine(store, ai_service, run_id).generate_composite()
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 

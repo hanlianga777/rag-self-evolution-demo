@@ -206,7 +206,7 @@ def composite_status(outcome):
     return 'failed' if outcome.get('status') == 'failed' else 'completed'
 
 
-def start_scheduled_composite(store, provider, experiment_id, *, recover=False):
+def start_scheduled_composite(store, provider, experiment_id, *, recover=False, runtime=None):
     """Run only a previously authorized and persisted D decision."""
     key = 'composite:' + experiment_id
     token, state = claim_composite(store, experiment_id, recover=recover, scheduled=True)
@@ -220,7 +220,11 @@ def start_scheduled_composite(store, provider, experiment_id, *, recover=False):
                     wait_for_off_peak(store, key,
                                       lambda pause: save_composite_schedule(store, experiment_id, price_pause=pause))
                     save_composite_schedule(store, experiment_id, status='running')
-                    outcome = store.create_composite(experiment_id, provider)
+                    if runtime:
+                        from .workflow_engine import WorkflowEngine
+                        outcome = WorkflowEngine(store, runtime, experiment_id).generate_composite()
+                    else:
+                        outcome = store.create_composite(experiment_id, provider)
                     save_composite_schedule(store, experiment_id,
                                             status=composite_status(outcome), error=outcome.get('reason'))
                 except task_leases.LeaseLost:
@@ -236,12 +240,12 @@ def start_scheduled_composite(store, provider, experiment_id, *, recover=False):
     return state
 
 
-def recover_scheduled_composites(store, provider):
+def recover_scheduled_composites(store, provider, *, runtime=None):
     with store.connection() as db:
         ids = [row['id'] for row in db.execute("""SELECT id FROM experiments
             WHERE json_extract(result_json,'$.composite_schedule.status') IN ('waiting','running','recovering')""")]
     for experiment_id in ids:
-        start_scheduled_composite(store, provider, experiment_id, recover=True)
+        start_scheduled_composite(store, provider, experiment_id, recover=True, runtime=runtime)
 
 
 def active_pauses(store):

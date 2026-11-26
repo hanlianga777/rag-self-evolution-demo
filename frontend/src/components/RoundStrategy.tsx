@@ -169,7 +169,16 @@ export function RoundConclusion({experiment,round}:{experiment:any;round:number|
  const saved=experiment?.result?.round_conclusions?.[String(round)];
  const plans = saved?.status === 'saved' ? saved.review?.plans : undefined;
  const comparison = saved?.prediction_comparison;
+ const metrics = saved?.prediction_metrics;
  return <section className="panel agent-round-conclusion" aria-label="本轮结论"><h3>本轮结论</h3>{plans ? <>
+  {metrics && <ul aria-label="定向检查预测指标">
+    {([['pre_review_precision', '预演前预测命中率'], ['repair_coverage', '实际修复覆盖率'],
+      ['risk_hit_rate', '风险预测命中率']] as const).map(([key, label]) => {
+      const metric = metrics[key];
+      return <li key={key}>{label} {typeof metric?.rate === 'number'
+        ? `${(metric.rate * 100).toFixed(1)}%（${metric.hits}/${metric.total}）` : '未知'}</li>;
+    })}
+  </ul>}
   {plans.map((plan: any) => {
     const candidate = experiment?.candidates?.find((item: any) => item.id === plan.candidate_id);
     const reasoning = candidate?.reasoning;

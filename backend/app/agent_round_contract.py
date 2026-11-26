@@ -156,7 +156,8 @@ def validate_combinations(candidates):
 
 
 def round_opportunities(targets, base, baseline, prior, preview, current, historical, *, blocked=(),
-                        use_layered=False, reserved_keys=(), combination_used=False, performance_gates=()):
+                        use_layered=False, reserved_keys=(), combination_used=False, performance_gates=(),
+                        before_directed_checks=False):
     """Check every supported single change and each potentially evidenced combination."""
     preview = preview or {}
     effective = {**baseline, **base['changes']}
@@ -168,6 +169,8 @@ def round_opportunities(targets, base, baseline, prior, preview, current, histor
             rules.performance_reduction(key, value, effective.get(key)) for key, value in change.items())]
         trial_changes.extend({**left, **right} for left, right in combinations(reductions, 2)
                              if not left.keys() & right.keys())
+    trial_changes.extend(row['changes'] for row in preview.get('directed_checks', [])
+                         if row['kind'] == 'retrieval' and len(row['changes']) > 1)
     for variant in preview.get('configs', []):
         trial = {**effective, **variant.get('change', {})}
         changes = parameter_diff(trial, effective)
@@ -220,7 +223,7 @@ def round_opportunities(targets, base, baseline, prior, preview, current, histor
             # explanation. The actual proposal must still supply its own explanation.
             [check] = validate_mechanism({'config_diff': changes, 'cross_layer_mechanisms': {question: '待方案逐题说明'}},
                                          [{**target, 'mechanism_fault': fault}], base['id'], preview, ledger,
-                                         base_changes=base['changes'])
+                                         base_changes=base['changes'], hypothesis_only=before_directed_checks)
             if check['decision'] != '拒绝':
                 available.append({'changes': changes, 'decision': check['decision']})
         action = ('表格结构化或数据处理，再独立复测' if fault['subtype'] == '表格归类' else next_actions[fault['code']])
@@ -258,12 +261,12 @@ def layer_capacity(rows, layer, count):
                 and len(set().union(*group)) == sum(map(len, group))), default=(0, 0))
 
 
-def layer_plan(rows, gate_faults, severe, ledger, base_id, labels, *, decision_version=None):
+def layer_plan(rows, gate_faults, severe, ledger, base_id, labels, *, decision_version=None, directed=False):
     codes = [row['fault']['code'] for row in rows.values()]
     target = target_layer(codes, gate_faults, severe, decision_version=decision_version)
     selected = target
     skipped = []
-    generation_checked = any(row['source'] == '生成诊断' and row['base_id'] == base_id for row in ledger)
+    generation_checked = directed or any(row['source'] == '生成诊断' and row['base_id'] == base_id for row in ledger)
     while layer := selected['layer']:
         relevant = {qid: row for qid, row in rows.items() if fault_layer(row['fault']['code']) == layer}
         capacity, count = layer_capacity(rows, layer, len(labels))

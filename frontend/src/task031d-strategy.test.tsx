@@ -31,6 +31,20 @@ it('shows original Trace provenance and the saved prediction comparison',async()
  expect(container.textContent).toContain('生成方向 0/1 次');
 });
 
+it('shows the three saved 123b metrics and leaves a zero denominator unknown', async () => {
+ const container=document.createElement('div');document.body.append(container);root=createRoot(container);
+ const prediction_metrics = {
+   pre_review_precision: {hits: 1, total: 2, rate: 0.5},
+   repair_coverage: {hits: 1, total: 1, rate: 1},
+   risk_hit_rate: {hits: 0, total: 0, rate: null},
+ };
+ const experiment = {result: {round_conclusions: {1: {status: 'saved', review: {plans: []}, prediction_metrics}}}};
+ await act(async()=>root!.render(<RoundConclusion experiment={experiment} round={1}/>));
+ expect(container.textContent).toContain('预演前预测命中率 50.0%（1/2）');
+ expect(container.textContent).toContain('实际修复覆盖率 100.0%（1/1）');
+ expect(container.textContent).toContain('风险预测命中率 未知');
+});
+
 it('links all three saved decisions to the current round schemes', async () => {
  const container=document.createElement('div');document.body.append(container);root=createRoot(container);
  const decisions = ['采纳', '拒绝', '例外探索'];

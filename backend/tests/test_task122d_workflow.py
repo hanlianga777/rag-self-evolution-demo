@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app import rules
+from test_task118a_verdict import mark_legacy_planning
 from test_task120a2_layered import saved_runs
 
 
@@ -13,6 +14,7 @@ def test_next_round_runs_required_diagnosis_before_requesting_proposals(saved_ru
 
     env, _ = saved_runs
     experiment_id = env.store.create_experiment(env.base, decision_contract_v2=True)
+    mark_legacy_planning(env.store, experiment_id)
     directory = tmp_path / 'retrieval_preview'
     directory.mkdir()
     (directory / f'{env.base}.json').write_text(json.dumps({
@@ -82,6 +84,7 @@ def _seed_matrix(directory, monkeypatch):
     set_settings(store, False)
     set_unattended_authorization(store, True, '用户')
     experiment = store.create_experiment(env.base, decision_contract_v2=True)
+    mark_legacy_planning(store, experiment)
     store.save_candidate(experiment, 'R1-A', {**DEFAULT_PIPELINE_CONFIG, 'top_k': 6},
                          {'candidate_label': 'A', 'round': 1, 'changed_parameters': {'top_k': 6},
                           'observed_evidence': ['Q17']})
@@ -208,7 +211,7 @@ def _install_matrix(directory, monkeypatch, *, inject=True, kill=False, authoriz
         return {'version': active['id'], 'mode': 'live', 'answer': 'fixture result',
                 'evidence': ['fixture evidence']}
 
-    runtime = SimpleNamespace(model='fixture', provider=adapter, answer=answer, baseline_preview=preview)
+    runtime = SimpleNamespace(model='fixture', provider=adapter, answer=answer, baseline_preview=preview, force_mock=True)
     monkeypatch.setattr(main, 'ai_service', runtime)
     monkeypatch.setattr(EvaluationRunner, 'score_execution', score)
 

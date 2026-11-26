@@ -432,6 +432,14 @@ def conclude_round(store, runtime, experiment_id, *, final_d=False):
         if use_final:
             verdict.require_empty_history(ledger)
         prompt['parameter_effect_ledger'] = ledger
+    planning = experiment['result'].get('round_planning', {}).get(str(number))
+    if planning:
+        from .agent_planning import metrics_for_round
+
+        saved['prediction_metrics'] = metrics_for_round(store, planning, evaluated)
+        prompt['prediction_metrics'] = saved['prediction_metrics']
+        prompt['pre_review_prediction'] = planning['pre_review_prediction']
+        prompt['post_review_prediction'] = planning['post_review_prediction']
     system = ('你是RAG优化Agent。只读本实验保存事实，撰写解释，输出JSON。case_comparisons是程序事实。'
               '标准证据在最终资料的位置与辅助查询新增命中是不同的记录。引用时以对应字段为准，缺失写未知。'
               'plans逐一覆盖已跑过的Candidate（跳过的不算），每项给candidate_id。实际修好、新错、预测命中题号和数量由程序填写。'
@@ -484,6 +492,8 @@ def conclude_round(store, runtime, experiment_id, *, final_d=False):
                 saved['prediction_comparison'] = prediction_comparison(review, evaluated, prompt.get('winner_comparison'))
                 if not final_d:
                     saved['parameter_findings'] = save_parameter_lessons(review, evaluated, baseline)
+            if planning:
+                review['prediction_metrics'] = saved['prediction_metrics']
             saved.update(status='saved', case_facts=case_facts, review=review)
             saved.update(cost_fields(getattr(getattr(runtime.provider,'settings',None),'model',None), [u for a in saved['attempts'] for u in a.get('token_usage', [])]))
             _save(store, experiment_id, number, saved)
