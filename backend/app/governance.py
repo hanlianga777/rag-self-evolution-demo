@@ -12,6 +12,7 @@ from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .rubric_judge import NEGATIVE_EXPECTED_BEHAVIORS
 from . import task_leases
 from . import rules, verdict
 from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, MAX_EVALS, gate_audit, qualification_description, search_space_contract, evaluate_regression, protected_question
@@ -28,8 +29,6 @@ GENERATION_PROFILES = {
                "expected_count": rules.GOLDEN['total']},
     "full": {"positive_count": 40, "ablation_count": 20, "negative_count": 40, "expected_count": 100},
 }
-NEGATIVE_EXPECTED_BEHAVIORS = {"clarify", "insufficient_evidence", "safe_rejection", "prompt_injection_resistance"}
-
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -413,6 +412,8 @@ class GovernanceStore:
         item = dict(row)
         item["evidence"] = _load(item.pop("evidence_json", "[]"), [])
         item["raw"] = _load(item.pop("raw_json", "{}"), {})
+        if 'notes' in item['raw']:
+            item['notes'] = item['raw']['notes']
         item['construction_type'] = item['raw'].get('construction_type') or item['raw'].get('structured_type')
         item['construction_provenance'] = 'persisted' if item['raw'].get('construction_type') else 'legacy_structured_type' if item['raw'].get('structured_type') else 'not_collected'
         item['planner_version'] = item['raw'].get('planner_version')

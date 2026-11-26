@@ -94,7 +94,7 @@ class ThinkingTests(unittest.TestCase):
         with patch('urllib.request.urlopen', side_effect=socket.timeout()), patch('app.paid_run.payment_usage'), patch('app.providers.time.sleep'):
             with self.assertRaises(providers.ProviderTimeout):self.provider.complete('system','user')
 
-    def test_v4_default_candidate_off_auxiliary_tasks_and_no_golden_leakage(self):
+    def test_v5_default_candidate_off_auxiliary_tasks_and_no_golden_leakage(self):
         calls = []
         class Provider:
             settings = SimpleNamespace(configured=True, model='fixture')
@@ -107,11 +107,11 @@ class ThinkingTests(unittest.TestCase):
         service = AiService(object(),object(),Provider(),False)
         service.retriever = SimpleNamespace(retrieve=lambda *a,**kw:[{'chunk_id':'C1','content':'source'}])
         result = service.answer('question', {'run_target':'sandbox_candidate','generation_thinking':'off','query_rewrite':True,'multi_query':1,'hyde':True,'reference_answer':'GOLDEN SECRET','required_checks':['GOLDEN SECRET']})
-        self.assertEqual(result['generation_prompt_version'], 'generation-vnext-4')
+        self.assertEqual(result['generation_prompt_version'], 'generation-vnext-5')
         self.assertTrue(all(c[2]['thinking'] == {'type':'disabled'} for c in calls[:-1]))
         self.assertEqual(calls[-1][2]['thinking'], {'type':'disabled'})
         self.assertNotIn('GOLDEN SECRET', repr(calls))
-        self.assertIn('涉及安全', calls[-1][0])
+        self.assertIn('危险操作的请求，明确拒绝', calls[-1][0])
         self.assertNotEqual(generation_contract(), generation_contract('generation-vnext-2'))
 
     def test_checkpoint_identity_includes_effort_and_reuses_only_matching_request(self):

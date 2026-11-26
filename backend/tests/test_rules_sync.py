@@ -321,7 +321,7 @@ def test_tablecheck_request_has_general_column_rule(table):
     strict = generation_system_prompt(GENERATION_PROMPT_VERSION, STRICT)
     prompt = generation_system_prompt(GENERATION_PROMPT_VERSION, TABLE_CHECK)
     context = generation_context([{'content': table}], numbered=True)
-    assert hashlib.sha256(strict.encode()).hexdigest() == 'a4c1510da62a9ec7525d4c3b453704a4db50cc31ce517b48c40a40a565bad6ae'
+    assert hashlib.sha256(strict.encode()).hexdigest() == '39f696680fb4cc81bb9c5d0818f8311a43ffa989b3183e9742c3f14c59f4b785'
     assert "按实际表头列名和单元格内容归类" in prompt
     assert "不得把不同周期、条件或型号对应的项目混在一起" in prompt
     assert '36个月' not in prompt and '12个月' not in prompt

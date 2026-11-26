@@ -170,20 +170,20 @@ def test_m1_clarification_contract(answer, expected_pass):
     assert rubric_verdict(category, result)["passed"] is expected_pass
 
 
-def test_m1_derived_fact_and_optional_point_contract():
+def test_derived_fact_and_audit_contract():
     from app.providers import DeepSeekProvider
 
     def mock_complete(system, user, **kwargs):
         assert "确定性计算" in system and "等价表达算正确" in system
-        assert "以“（补充）”开头" in system and "漏答不扣完整性" in system
+        assert "（补充）" not in system and "额外说出的内容仍按正确性和忠实度核验" in system
         data = json.loads(user)
         assert data["实际回答"] == "前者比后者高 2 kg。"
         assert data["检索资料"] == ["[1] A 为 7 kg", "[2] B 为 5 kg"]
-        return pos(100, 100, 100)
+        return pos(100, 100, 100, fact_hits=[{"fact": "差值 2 kg", "matched": True}])
 
     result = DeepSeekProvider._judge_rubric(
         type("MockProvider", (), {"complete": staticmethod(mock_complete)})(),
-        "相差多少？", "差值 2 kg。\n（补充）两个原始读数为 7 kg 和 5 kg。", "前者比后者高 2 kg。",
+        "相差多少？", "差值 2 kg。", "前者比后者高 2 kg。",
         {"category": "positive", "final_texts": ["A 为 7 kg", "B 为 5 kg"]})
     assert rubric_verdict("positive", result)["passed"]
 

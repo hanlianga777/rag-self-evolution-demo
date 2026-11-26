@@ -9,7 +9,7 @@ from .policy import DEFAULT_PIPELINE_CONFIG, search_space_contract
 def _versions(judge):
     from .ai_service import GENERATION_PROMPT_VERSION, generation_system_prompt
     from .optimization import ROUND_LABELS, build_agent_prompt
-    from .rubric_judge import RUBRIC_JUDGE_PROMPT
+    from .rubric_judge import LEGACY_RUBRIC_JUDGE_PROMPT, LEGACY_RUBRIC_PROMPT_VERSION, RUBRIC_JUDGE_PROMPT
 
     generation_version = judge.get('generation_prompt_version', GENERATION_PROMPT_VERSION)
     # Enable every optional system-message paragraph. Case data affects only the user message.
@@ -17,7 +17,10 @@ def _versions(judge):
         retrieval_preview={'configs': []}, round_policy={'mode': 'full_rounds'}, causal_evidence=True)
     prompts = {strategy: generation_system_prompt(generation_version, strategy)
                for strategy in rules.PIPELINE_VALUES['prompt_strategy']}
-    prompts.update(judge=RUBRIC_JUDGE_PROMPT, agent_system=agent_system)
+    judge_version = judge.get('prompt_version')
+    legacy_judge = judge_version == LEGACY_RUBRIC_PROMPT_VERSION or (
+        judge_version is None and generation_version in {'generation-vnext-2', 'generation-vnext-3', 'generation-vnext-4'})
+    prompts.update(judge=LEGACY_RUBRIC_JUDGE_PROMPT if legacy_judge else RUBRIC_JUDGE_PROMPT, agent_system=agent_system)
     return {
         'rules_hash': rules.RULES_HASH,
         'search_space_version': rules.canonical_hash({key: spec['allowed'] for key, spec in search_space_contract(for_agent=True).items()}),

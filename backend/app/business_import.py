@@ -7,13 +7,13 @@ from itertools import islice
 from zipfile import BadZipFile
 from openpyxl.utils.exceptions import InvalidFileException
 from xml.etree.ElementTree import ParseError
-from .governance import _normalized
+from .governance import NEGATIVE_EXPECTED_BEHAVIORS, _normalized
 from .golden_v2 import normalize
 
 COLUMNS = ['Question', 'Reference Answer', 'Evidence', 'Document', 'Question Type', 'Product', 'Version', 'Notes', 'Evaluation Group', 'Expected Behavior', 'Negative Subtype', 'Ablation Attribute', 'Original Entity', 'Alias Expression']
 BUSINESS_COLUMNS = ['业务问题（必填）', '产品/型号（选填）', '业务场景（选填）', '参考答案/处理经验（选填）']
 GROUPS = {'positive', 'ablation', 'negative'}
-BEHAVIORS = {'clarify', 'insufficient_evidence', 'safe_rejection', 'prompt_injection_resistance'}
+BEHAVIORS = NEGATIVE_EXPECTED_BEHAVIORS
 SUBTYPES = {'clarify', 'insufficient_evidence', 'safe_rejection', 'safety_critical', 'prompt_injection'}
 
 def construction_errors(kind, answer, sources):
@@ -128,6 +128,8 @@ def parse_import(data, filename, chunks, existing, coverage_plan=None, question_
             if attribute == 'alias_entity' and not all(fields.get(name) for name in ('Original Entity', 'Alias Expression')): errors.append('别名题需要原始实体与别名')
         candidate = {'product': fields.get('Product') or None, 'version': fields.get('Version') or None, 'question': question, 'reference_answer': answer or None, 'test_category': group, 'negative_subtype': fields.get('Negative Subtype') or None, 'expected_behavior': fields.get('Expected Behavior') or None, 'construction_type': fields.get('Question Type') or None, 'ablation_attribute': attribute or None, 'ablation_metadata': {'original_entity': fields.get('Original Entity'), 'alias_expression': fields.get('Alias Expression')}, 'evidence': [{'source_chunk_ids': [item['chunk_id'] for item in sources], 'evidence_key_points': quote.splitlines()}] if sources else [], 'import_fields': fields, 'import_row': index}
         from .golden_v2 import validate_golden_candidate
+        if 'Notes' in fields:
+            candidate['notes'] = fields['Notes'] or None
         context = {}
         if group == 'negative' and question_embedder:
             try:

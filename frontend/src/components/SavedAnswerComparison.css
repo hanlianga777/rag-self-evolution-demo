@@ -129,5 +129,4 @@
  .saved-answer-comparison .comparison-qlist { min-height:0; max-height:calc(100dvh - 280px); overflow:auto; }
 }
 .saved-answer-comparison .structured-answer { font-size:13px; }
-.saved-answer-comparison .answer-boundary { margin-inline:20px; }
 .saved-answer-comparison .comparison-sources { padding:10px 20px 14px; }

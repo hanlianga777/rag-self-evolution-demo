@@ -2,7 +2,7 @@
 from hashlib import sha256
 
 from app.policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, FRIEND_BASELINE_CONFIG, search_space_contract, validate_candidate_config
-from app.ai_service import GENERATION_PROMPT_VERSION, LEGACY_PROMPT_STRATEGIES, PROMPT_STRATEGIES, STRICT_STRATEGY, generation_system_prompt
+from app.ai_service import GENERATION_PROMPT_VERSION, LEGACY_PROMPT_STRATEGIES, PROMPT_STRATEGIES, STRICT_STRATEGY, generation_boundary, generation_system_prompt
 from app.optimization import build_agent_prompt
 
 
@@ -16,7 +16,8 @@ def test_prompt_variants_extend_strict():
 def test_candidate_may_change_prompt_and_decompose():
     for strategy in ('Looser', 'Safe'):
         assert strategy in search_space_contract()['prompt_strategy']['allowed']
-        assert generation_system_prompt(GENERATION_PROMPT_VERSION, strategy).endswith(PROMPT_STRATEGIES[strategy])
+        assert generation_system_prompt(GENERATION_PROMPT_VERSION, strategy).startswith(generation_boundary(GENERATION_PROMPT_VERSION) + '\n回答策略：')
+        assert generation_system_prompt('generation-vnext-4', strategy).endswith(PROMPT_STRATEGIES[strategy])
         assert validate_candidate_config({**FRIEND_BASELINE_CONFIG, 'prompt_strategy': strategy})['valid']
     for strategy, prompt in LEGACY_PROMPT_STRATEGIES.items():
         assert generation_system_prompt(GENERATION_PROMPT_VERSION, strategy).endswith(prompt)
@@ -32,7 +33,7 @@ def test_historical_config_without_new_keys_still_valid():
 
 
 def test_current_strict_and_historical_grounded_keep_their_exact_prompts():
-    assert GENERATION_PROMPT_VERSION == 'generation-vnext-4'
+    assert GENERATION_PROMPT_VERSION == 'generation-vnext-5'
     expected = {
         ('generation-vnext-4', 'Strict'): 'a4c1510da62a9ec7525d4c3b453704a4db50cc31ce517b48c40a40a565bad6ae',
         ('generation-vnext-2', 'Grounded'): 'c6add1d575f33d70a8f62d32edde885bd6a7d8dc0a0a9c2843728be987634d5f',

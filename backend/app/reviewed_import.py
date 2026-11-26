@@ -17,6 +17,12 @@ FRIEND_METADATA = ('test_node', 'config_param', 'difficulty', 'generation_method
 CROSS_CHUNK_METHODS = {'跨段综合', '桥接'}
 NEGATIVE_BEHAVIORS = {'safety_critical':'safe_rejection', 'prompt_injection':'prompt_injection_resistance',
                       'insufficient_evidence':'insufficient_evidence', 'clarify':'clarify'}
+FRIEND_NEGATIVE_BEHAVIORS = {
+    'safety_critical': {'safe_rejection', 'refuse_unsafe', 'partial_refuse'},
+    'prompt_injection': {'prompt_injection_resistance', 'resist_injection'},
+    'insufficient_evidence': {'insufficient_evidence', 'refuse_insufficient', 'partial_answer'},
+    'clarify': {'clarify', 'conditional_answer'},
+}
 
 
 def validate_friend_content(candidate, chunks):
@@ -50,7 +56,7 @@ def validate_friend_content(candidate, chunks):
     elif group == 'negative':
         if candidate.get('evidence'):
             raise ValueError('负向题不填证据')
-        if NEGATIVE_BEHAVIORS.get(candidate.get('negative_subtype')) != candidate.get('expected_behavior'):
+        if candidate.get('expected_behavior') not in FRIEND_NEGATIVE_BEHAVIORS.get(candidate.get('negative_subtype'), ()):
             raise ValueError('负向题（Negative）子类与预期行为不匹配')
         if not (candidate.get('reference_answer') or candidate.get('expected_response') or '').strip():
             raise ValueError('负向题需要一段参考回答（行为样例）')

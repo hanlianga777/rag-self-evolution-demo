@@ -1,5 +1,6 @@
 """Frozen normative sources; never claim these are retrieved Final evidence."""
 from .evaluation_contract import normalize_display
+from .rubric_judge import NEGATIVE_EXPECTED_BEHAVIORS
 
 
 def full_norms(question,chunks):
@@ -29,7 +30,7 @@ def optimization_preflight(question,chunks):
     negative=question.get('test_category')=='negative'
     if not negative and not norms:errors.append('必要规范缺失：先经现有资料/Revision流程补齐，禁止评分后删题')
     if not negative and not question.get('reference_answer'):errors.append('必要回答要求未提供')
-    if negative and question.get('expected_behavior') not in {'safe_rejection','insufficient_evidence','clarify','prompt_injection_resistance'}:
+    if negative and question.get('expected_behavior') not in NEGATIVE_EXPECTED_BEHAVIORS:
         errors.append('负向题（Negative）预期拒答/澄清/安全边界未确认')
     return {'ready':not errors,'blocking_errors':errors,'source_roles':sorted({n['role'] for n in norms}),
         'optimization_parameters':list(search_space_contract()),'diagnostic_capture':['candidates','reranked','final','answer','stages'],

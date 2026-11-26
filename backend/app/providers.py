@@ -587,10 +587,12 @@ class DeepSeekProvider:
     def _judge_rubric(self, question, expected, answer, context):
         from .rubric_judge import RUBRIC_JUDGE_PROMPT, rubric_input, parse_rubric_output
         _response_metadata.set({})
-        content = self.complete(RUBRIC_JUDGE_PROMPT, rubric_input(question, expected, answer, context.get('category'), context.get('negative_subtype'), context.get('final_texts', [])),
-                                json_mode=True, temperature=rules.JUDGE['temperature'])
+        category, behavior = context.get('category'), context.get('expected_behavior')
+        payload = rubric_input(question, expected, answer, category, context.get('negative_subtype'),
+                               context.get('final_texts', []), expected_behavior=behavior)
+        content = self.complete(RUBRIC_JUDGE_PROMPT, payload, json_mode=True, temperature=rules.JUDGE['temperature'])
         try:
-            result = parse_rubric_output(content, context.get('category'))
+            result = parse_rubric_output(content, category, reference=expected or '', expected_behavior=behavior)
             return {**result, 'raw_provider_response': content, 'response_metadata': _response_metadata.get()}
         except (ValueError, KeyError, TypeError) as error:
             raise ProviderInvalidResponse(f'Rubric Judge输出格式无效：{error}', raw_provider_response=content,

@@ -551,6 +551,8 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
     context = validation_context or {}
     c = {**candidate.get('raw', {}), **candidate}
     errors, warnings, locations = [], [], []
+    if c.get('notes') is not None and not isinstance(c['notes'], str):
+        errors.append('invalid notes')
     group, question = c.get('test_category', c.get('evaluation_group')), c.get('question')
     if not isinstance(question, str) or not question.strip() or group not in GROUPS:
         errors.append('invalid question/category')

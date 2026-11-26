@@ -98,26 +98,6 @@ export function citationText(answer:string,evidence:AnswerSource[],numbered:Answ
 }
 const plainQuote=(text:string)=>citationText(text,[]).text.replace(sourceToken,'').replace(/[（(]同上[^）)\n]*[）)]/g,'').replace(/\*\*|__|[*_`#>]|\s/g,'');
 
-const sourceLimit = String.raw`(?:\*\*)?(?:(?:如果|若|如)[^\n。！？]{0,80}，\s*)?(?:(?:当前|现有)\s*)?(?:说明书|手册)(?:里|中)?(?:没有|未|并未)(?:提到|提及|说明|给出|覆盖|明确)?`;
-const followUp = String.raw`(?:建议|请|可)?联系[^\n。！？]*售后[^\n。！？]*`;
-const trailingReference = String.raw`(?:[。！？][^\S\n]*(?:\[\d+\])+)?[。！？]?`;
-const boundaryEnding = new RegExp(String.raw`(?:^|[\n。！？])[^\S\n]*(${sourceLimit}[^\n。！？]*(?:[。！？][^\S\n]*(?:\[\d+\][^\S\n]*)*)?${followUp}${trailingReference})\s*$`);
-
-function splitBoundary(text:string) {
-  const notes:string[] = [];
-  let body = text.split(/\r?\n/).filter(line => {
-    if(!/^(?:证据边界|资料边界|未确认条件)[：:]/.test(line.replace(/[*_#>]/g,'').trim())) return true;
-    notes.push(line);
-    return false;
-  }).join('\n').trimEnd();
-  const ending = body.match(boundaryEnding);
-  if(ending) {
-    notes.unshift(ending[1]);
-    body = body.slice(0, body.length - ending[1].length).trimEnd();
-  }
-  return {body, boundary:notes.join('\n')};
-}
-
 export function answerPageLocation(document:string|undefined,page:number|undefined) {
   const range = document?.match(/第\s*\d+\s*部分[_\s-]+p(\d+)[-–—](\d+)(?=[_\s.]|$)/i);
   if (!range || page == null) return {book:page, pdf:page};
@@ -160,11 +140,9 @@ export function StructuredAnswer({text:answer,evidence=[],numberedEvidence,refer
   }, [answer, expanded, streaming]);
 
   const readable = reference ? answer : answerCitationDisplay(answer,numberedEvidence || []).text;
-  const {body,boundary} = reference ? {body:readable,boundary:''} : splitBoundary(readable);
-  const display=citationText(boundary ? `${body}\n\uE002${boundary}` : body,evidence,numberedEvidence);
-  const [mainText,boundaryText] = display.text.split('\uE002');
-  const hasBody = !!mainText.trim();
-  const tree=answerMarkup(mainText,reference ? 'reference' : 'model');
+  const display=citationText(readable,evidence,numberedEvidence);
+  const hasBody = !!display.text.trim();
+  const tree=answerMarkup(display.text,reference ? 'reference' : 'model');
   if(!display.sources.length && !reference) for(const source of numberedEvidence || []) {
     const document = source.document || source.document_name;
     if(document && !display.sources.some(item=>item.document===document && item.page===source.page_start)) {
@@ -215,8 +193,6 @@ export function StructuredAnswer({text:answer,evidence=[],numberedEvidence,refer
   }
   const knownSources = display.sources.filter(source => source.document).sort((a,b) => a.number-b.number);
   const decoratedBody = decorate(tree);
-  // Boundary text shares citation numbering but stays out of comparison quote matching.
-  offset = text.length;
   return <div className="structured-answer">
     {hasBody && <div className="comparison-body">
       <div id={contentId} ref={limit} className={!expanded && !streaming ? `answer-preview${overflow ? ' is-overflowing' : ''}` : undefined} onFocusCapture={event => {
@@ -224,7 +200,6 @@ export function StructuredAnswer({text:answer,evidence=[],numberedEvidence,refer
       }}>{decoratedBody}</div>
       {!streaming && (overflow || expanded) && <button type="button" className="answer-toggle" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded(value => !value)}>{expanded ? '收起回答' : '展开回答'}</button>}
     </div>}
-    {boundaryText && <aside className="answer-boundary" aria-label="资料边界"><strong>资料边界</strong>{decorate(answerMarkup(boundaryText, hasBody ? undefined : 'model'))}</aside>}
     {!!knownSources.length && <footer className="comparison-sources"><div className="comparison-source-title">引用来源</div><ol>{knownSources.map(source=>{
       const location = citationLocation(source);
       const page = location.book_page_start, end = location.book_page_end;

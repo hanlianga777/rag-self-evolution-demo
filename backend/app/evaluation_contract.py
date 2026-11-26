@@ -9,9 +9,9 @@ from .rules import JUDGE
 from .safety_guard import SAFETY_IDENTITY
 
 # 规则总表第二节：新评测改用朋友同款三维 Rubric Judge（rubric_judge.py）。旧 business-vnext-1 结果只读。
-from .rubric_judge import RUBRIC_VERSION, RUBRIC_JUDGE_PROMPT, RUBRIC_PROMPT_VERSION
+from .rubric_judge import RUBRIC_VERSION, RUBRIC_JUDGE_PROMPT, RUBRIC_PROMPT_VERSION, RUBRIC_INPUT_VERSION, RUBRIC_OUTPUT_VERSION
 LEGACY_BUSINESS_VERSIONS = {'gate_statistics_version':'frozen-negative-subtype-2', 'prompt_version': 'judge-vnext-6.4-omission-evidence-protocol', 'evidence_matcher_version': 'evidence-vnext-2-fact-scope', 'scoring_policy': 'business-vnext-1', 'output_parser_version': 'business-output-6.2-atomic-consistency', 'judge_input_version':'independent-frozen-atoms-4', **SAFETY_IDENTITY}
-VERSIONS = {'gate_statistics_version':'frozen-negative-subtype-2', 'prompt_version': RUBRIC_PROMPT_VERSION, 'evidence_matcher_version': 'evidence-vnext-2-fact-scope', 'scoring_policy': RUBRIC_VERSION, 'output_parser_version': RUBRIC_VERSION, 'judge_input_version':'rubric-text-source-2', **SAFETY_IDENTITY}
+VERSIONS = {'gate_statistics_version':'frozen-negative-subtype-2', 'prompt_version': RUBRIC_PROMPT_VERSION, 'evidence_matcher_version': 'evidence-vnext-2-fact-scope', 'scoring_policy': RUBRIC_VERSION, 'output_parser_version': RUBRIC_OUTPUT_VERSION, 'judge_input_version': RUBRIC_INPUT_VERSION, **SAFETY_IDENTITY}
 CURRENT_JUDGE_PROMPT = RUBRIC_JUDGE_PROMPT
 
 

@@ -296,7 +296,7 @@ class EvaluationRunner:
                     raise ValueError('历史Snapshot缺少完整题目/类别，不能按当前题目补造')
                 current = {'id':key, **frozen[key], 'raw':frozen[key]}
             raw = frozen.get(key, current['raw'])
-            items.append({**current, 'question': raw['question'], 'reference_answer': raw.get('reference_answer'), 'expected_behavior': raw.get('expected_behavior'), 'evidence': raw.get('evidence', raw.get('acceptable_evidence', [])), 'raw': raw, 'test_category': raw.get('test_category', current['test_category']), 'negative_subtype': raw.get('negative_subtype', current.get('negative_subtype'))})
+            items.append({**current, 'question': raw['question'], 'reference_answer': raw.get('reference_answer'), 'notes': raw.get('notes'), 'expected_behavior': raw.get('expected_behavior'), 'evidence': raw.get('evidence', raw.get('acceptable_evidence', [])), 'raw': raw, 'test_category': raw.get('test_category', current['test_category']), 'negative_subtype': raw.get('negative_subtype', current.get('negative_subtype'))})
         return items
 
     def baseline_inputs(self, resume_source_id=None):
@@ -869,9 +869,11 @@ class EvaluationRunner:
         trace = execution.get('retrieval_trace') or {}
         final = trace.get('final', execution.get('retrieval', [])) or []
         category = item['test_category']
-        expected = item.get('reference_answer') or (item.get('raw') or {}).get('reference_answer') or (item.get('raw') or {}).get('expected_behavior', '拒答或澄清')
+        raw = item.get('raw') or {}
+        behavior = (item.get('expected_behavior') or raw.get('expected_behavior')) if category == 'negative' else None
+        expected = item.get('reference_answer') or raw.get('reference_answer') or behavior or ''
         context = {'contract_version': RUBRIC_VERSION, 'category': category, 'negative_subtype': item.get('negative_subtype'),
-                   'final_texts': final_texts(final)}
+                   'expected_behavior': behavior, 'final_texts': final_texts(final)}
         required = {c for e in item.get('evidence', []) for c in e.get('source_chunk_ids', [])}
         coverage = evidence_coverage(trace, required)
         if 'equivalence_version' in coverage:

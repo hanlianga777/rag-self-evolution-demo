@@ -70,7 +70,7 @@ class ContextTests(unittest.TestCase):
 
     def test_single_judge_input_contains_context_and_data_boundary(self):
         provider=DeepSeekProvider(Settings('fixture','https://example.invalid','fixture'))
-        with patch.object(provider,'complete',return_value=json.dumps(rubric_judge_output('positive'))) as call:
+        with patch.object(provider,'complete',return_value=json.dumps({**rubric_judge_output('positive'), 'fact_hits': [{'fact':'reference', 'matched':True}]})) as call:
             provider.judge('question','reference','answer',context={'contract_version':RUBRIC_VERSION,'category':'positive','final_texts':final_texts(self.entries)})
         self.assertEqual(call.call_count,1)
         self.assertEqual(call.call_args.args[0],RUBRIC_JUDGE_PROMPT)

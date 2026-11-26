@@ -17,7 +17,7 @@ const part = { document: 'ABB_IRB1300_第4部分_p553-736.pdf', document_id: 'pa
 
 it('preserves the original numbering and opens the source in Final order with book and local PDF pages', () => {
   const open = vi.fn();
-  const row = { model_answer: '结论先说 [3][1]。\n\n### 操作\n1. 第一步。 2. 第二步。\n\n注意：核对型号。\n\n说明书里没有提到其余条件，建议联系售后 [3]。', programmatic_metrics: { retrieval_trace: { final: [{ ...part, document: '普通手册.pdf', parent_page_start: 2, parent_page_end: 2 }, {}, part] } } };
+  const row = { model_answer: '结论先说 [3][1]。\n\n### 操作\n1. 第一步。\n2. 第二步。\n\n注意：核对型号。\n\n说明书里没有提到其余条件，建议联系售后 [3]。', programmatic_metrics: { retrieval_trace: { final: [{ ...part, document: '普通手册.pdf', parent_page_start: 2, parent_page_end: 2 }, {}, part] } } };
   const original = JSON.stringify(row);
   render(<ComparisonAnswer row={row} points={[]} side="before" onOpenCitation={open} />);
   expect(document.querySelector('.answer-lead')?.textContent).toContain('结论先说');
@@ -28,15 +28,15 @@ it('preserves the original numbering and opens the source in Final order with bo
   expect(document.querySelector('h5')?.textContent).toBe('操作');
   expect(document.querySelectorAll('.case-answer ol > li')).toHaveLength(2);
   expect(document.querySelector('.answer-warning')?.textContent).toContain('核对型号');
-  expect(document.querySelector('.answer-boundary')?.textContent).toContain('说明书里没有提到其余条件，建议联系售后');
-  expect(document.querySelector('.comparison-body')?.textContent).not.toContain('售后');
+  expect(document.querySelector('.answer-boundary')).toBeNull();
+  expect(document.querySelector('.comparison-body')?.textContent).toContain('说明书里没有提到其余条件，建议联系售后');
   expect(JSON.stringify(row)).toBe(original);
 });
 
-it('labels frozen reference points and keeps supplemental text visible as non-required', () => {
+it('preserves the lines of a frozen reference without displaying legacy labels', () => {
   render(<CaseAnswer reference text={'1. 重量 77 kg。\n2. 型号为 IRB 1300。\n（补充）重量不含工具。'} />);
-  expect([...document.querySelectorAll('.answer-point-label')].map(node => node.textContent)).toEqual(['要点 1', '要点 2', '非必答']);
-  expect(document.querySelector('.answer-optional')?.textContent).toContain('重量不含工具。');
+  expect(document.querySelector('.case-answer')?.textContent).not.toMatch(/要点|（补充）|非必答/);
+  expect([...document.querySelectorAll('.case-answer li, .case-answer p')].map(node => node.textContent)).toEqual(['重量 77 kg。', '型号为 IRB 1300。', '重量不含工具。']);
 });
 
 it('does not bind an out-of-range number to other retrieved chunks or split embedded citations into false steps', () => {
@@ -59,11 +59,18 @@ it('keeps a two-sentence closing caveat together and leaves the opening citation
   render(<CaseAnswer text={text} final={[part]} />);
   expect(document.querySelector('.answer-lead')?.textContent).toContain('可确认。 1');
   expect(document.querySelector('.answer-lead')?.textContent).not.toContain('其余内容如下');
-  expect(document.querySelector('.answer-boundary')?.textContent).toContain('说明书里没有给出其它条件。1 建议联系售后。');
+  expect(document.querySelector('.comparison-body')?.textContent).toContain('说明书里没有给出其它条件。1 建议联系售后。');
 });
 
 it('keeps a boundary-only answer prominent without adding an empty body before it', () => {
   render(<CaseAnswer text="说明书里没有给出价格，建议联系售后。" final={[]} />);
-  expect(document.querySelector('.comparison-body')).toBeNull();
-  expect(document.querySelector('.answer-boundary .answer-lead')?.textContent).toBe('说明书里没有给出价格，建议联系售后。');
+  expect(document.querySelector('.answer-boundary')).toBeNull();
+  expect(document.querySelector('.comparison-body .answer-lead')?.textContent).toBe('说明书里没有给出价格，建议联系售后。');
+});
+
+it('leaves inline steps on their original line for historical answers', () => {
+  render(<CaseAnswer text={'先检查。\n1. 检查型号。 2. 核对规格。\n注意：按标识核对。'} final={[]} />);
+  expect(document.querySelectorAll('.case-answer ol > li')).toHaveLength(1);
+  expect(document.querySelector('.case-answer li')?.textContent).toBe('检查型号。 2. 核对规格。');
+  expect(document.querySelector('.answer-warning')?.textContent).toBe('注意：按标识核对。');
 });

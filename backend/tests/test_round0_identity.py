@@ -76,8 +76,9 @@ class BaselineConfigTests(unittest.TestCase):
         self.assertEqual(config['generation_thinking'],'off')
         self.assertEqual(judge['judge_thinking']['thinking'],{'type':'disabled'})
         self.assertEqual(config['temperature'],0)
-        self.assertEqual(judge['rules_version'],'2026-11-20')
-        self.assertEqual(judge['generation_prompt_version'],'generation-vnext-4')
+        from app.rules import RULES_VERSION
+        self.assertEqual(judge['rules_version'], RULES_VERSION)
+        self.assertEqual(judge['generation_prompt_version'], 'generation-vnext-5')
 
     def test_current_draft_is_consumed_but_stale_draft_blocks(self):
         from app.policy import DEFAULT_PIPELINE_CONFIG

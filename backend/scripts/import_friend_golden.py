@@ -48,6 +48,8 @@ def to_candidate(row):
                  'business_topic': (row.get('业务主题') or '').strip() or None,
                  'business_group': (row.get('业务分组') or '').strip() or None,
                  'golden_contract': 'friend-golden-v1'}
+    if 'notes' in row:
+        candidate['notes'] = row['notes'] or None
     if method == '统计':
         candidate['aggregation_items'] = [item.strip() for item in (row.get('统计条目') or '').split('｜') if item.strip()]
     if group == 'ablation':

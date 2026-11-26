@@ -10,17 +10,18 @@ const inline = (text: string): ReactNode => text.split(/(\*\*[^*]+\*\*|__[^_]+__
   return part;
 });
 const marker = /^(\s*)(?:(\d+)[.、)）](?!\d)\s*|[-*+]\s+)(.+)$/;
-const optional = /^[（(]补充[）)]\s*[：:]?\s*/;
+const referenceLabel = /(^|\n|<(?:p|div|li|br)\s*\/?>)([^\S\n]*(?:\d+[.、)）](?!\d)[^\S\n]*|[-*+][^\S\n]+)?)(?:\*\*|__)?(?:要点[^\S\n]*\d+|[（(]补充[）)])(?:\*\*|__)?[^\S\n]*[：:]?[^\S\n]*/gi;
+const boundaryLabel = /(^|\n|<(?:p|div|li|br)\s*\/?>)([^\S\n]*(?:#{1,6}[^\S\n]+)?)(?:\*\*|__)?(?:证据边界|资料边界|未确认条件)[^\S\n]*(?:\*\*|__)?[：:](?:\*\*|__)?[^\S\n]*/gi;
 const warning = /^(?:\*\*|__)?(?:注意|警告|危险|提醒)(?:\*\*|__)?\s*[：:]/;
 
-function markdown(text: string): ReactNode[] {
+function markdown(text: string, expandSteps: boolean): ReactNode[] {
   // Only split a run that starts at 1 and continues sequentially. Numbers inside
   // decimals, model names, versions and chapter references are not list markers.
-  const normalized = text.replace(/(^|[：:。；;！!？?\s])1[.、)）](?!\d)\s*([^\n]+)(?=\n|$)/gm, (whole, prefix: string, body: string) => {
+  const normalized = expandSteps ? text.replace(/(^|[：:。；;！!？?\s])1[.、)）](?!\d)\s*([^\n]+)(?=\n|$)/gm, (whole, prefix: string, body: string) => {
     let expected = 2;
     const expanded = body.replace(/([。；;！!？?\s])(\d+)[.、)）](?!\d)\s*/g, (match, separator: string, number: string) => Number(number) === expected ? (expected++, `${separator}\n${number}. `) : match);
     return expected > 2 ? `${prefix}\n1. ${expanded}` : whole;
-  });
+  }) : text;
   const lines = normalized.replace(/\r\n?/g, '\n').split('\n');
   let cursor = 0;
   function blocks(indent = 0): ReactNode[] {
@@ -57,14 +58,14 @@ function markdown(text: string): ReactNode[] {
 }
 
 
-function parseAnswer(text: string): ReactNode[] {
-  if (!/<\/?[a-z][^>]*>/i.test(text)) return markdown(text);
+function parseAnswer(text: string, expandSteps: boolean): ReactNode[] {
+  if (!/<\/?[a-z][^>]*>/i.test(text)) return markdown(text, expandSteps);
   const document = new DOMParser().parseFromString(text, 'text/html');
   const allowed = new Set(['p', 'div', 'br', 'ol', 'ul', 'li', 'strong', 'b', 'em', 'i', 'code', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span']);
   function node(value: Node, index: number): ReactNode {
     if (value.nodeType === 3) {
       const text = value.textContent || '';
-      return ['BODY', 'P', 'DIV', 'LI', 'BLOCKQUOTE'].includes(value.parentElement?.tagName || '') && /(?:^|[\n：:])\s*(?:\d+[.、)）](?!\d)|[-*+]\s|#{1,6}\s)/.test(text) ? markdown(text) : inline(text);
+      return ['BODY', 'P', 'DIV', 'LI', 'BLOCKQUOTE'].includes(value.parentElement?.tagName || '') && /(?:^|[\n：:])\s*(?:\d+[.、)）](?!\d)|[-*+]\s|#{1,6}\s)/.test(text) ? markdown(text, expandSteps) : inline(text);
     }
     if (value.nodeType !== 1) return null;
     const element = value as HTMLElement, tag = element.tagName.toLowerCase();
@@ -84,40 +85,36 @@ const textOf = (node: ReactNode): string => typeof node === 'string' || typeof n
 
 /** Format saved text without inferring a conclusion or changing the source. */
 export function answerMarkup(text: string, mode?: 'model' | 'reference') {
-  const blocks = parseAnswer(text);
+  if (mode === 'reference') text = text.replace(referenceLabel, '$1$2');
+  if (mode === 'model') text = text.replace(boundaryLabel, '$1$2');
+  const blocks = parseAnswer(text, !mode);
   if (!mode) return <div className="case-answer">{blocks}</div>;
-  let opening = true, point = 0;
+  let opening = true;
   const structure = (block: ReactNode): ReactNode => {
     const value = textOf(block).trim();
     if (!value) return block;
     const element = isValidElement<{ children?: ReactNode; className?: string }>(block) ? block : null;
     const children = element ? element.props.children : block;
     const list = element?.type === 'ol' || element?.type === 'ul';
-    if (list) return cloneElement(element, mode === 'reference' ? { className: 'answer-points' } : {}, Children.map(children, structure));
+    if (list) return cloneElement(element, {}, Children.map(children, structure));
     // Safe HTML can wrap Markdown blocks inside a div or list item.
     const nodes = Children.toArray(children).filter(node => node !== '');
     if (element?.type === 'div' && nodes.some(node => isValidElement(node) && ['p', 'div', 'ol', 'ul', 'h5'].includes(String(node.type)))) {
       return cloneElement(element, {}, nodes.map(structure));
     }
-    const heading = element?.type === 'h5' || (element?.type === 'p' && !warning.test(value) && !optional.test(value) &&
+    const heading = element?.type === 'h5' || (element?.type === 'p' && !warning.test(value) &&
       value.length <= 24 && (/^[^：:。！？\uE000]+[：:]$/.test(value) || nodes.length === 1 && isValidElement(nodes[0]) && nodes[0].type === 'strong'));
     if (heading) return <h5 key={element?.key}>{children}</h5>;
     const lead = opening;
     opening = false;
     const notice = warning.test(value);
-    const supplemental = mode === 'reference' && optional.test(value);
     // Keep the first existing sentence prominent instead of promoting an entire long paragraph.
     const first = nodes[0];
     const sentence = typeof first === 'string' && first.match(/^.+?[。！？](?:[^\S\n]*\uE000\d+\uE001)*(?![^\S\n]*\uE000)(?=[^\S\n]*\S)/);
     const body = lead && sentence
-      ? <><span className={mode === 'model' && element?.type !== 'li' ? 'answer-lead answer-lead-line' : 'answer-lead'}>{sentence[0]}</span>{first.slice(sentence[0].length)}{nodes.slice(1)}</>
+      ? <><span className="answer-lead">{sentence[0]}</span>{first.slice(sentence[0].length)}{nodes.slice(1)}</>
       : children;
-    const className = [lead && !sentence && 'answer-lead', notice && 'answer-warning', supplemental && 'answer-optional'].filter(Boolean).join(' ');
-    if (mode === 'reference') {
-      const content = <><span className="answer-point-label">{supplemental ? '非必答' : `要点 ${++point}`}</span>{body}</>;
-      if (element?.type === 'li') return cloneElement(element, { className }, content);
-      return <ol className="answer-points" start={point || 1} key={element?.key}><li className={className}>{content}</li></ol>;
-    }
+    const className = [lead && !sentence && 'answer-lead', notice && 'answer-warning'].filter(Boolean).join(' ');
     return element ? cloneElement(element, { className }, body) : <span className={className}>{body}</span>;
   };
   return <div className="case-answer">{Children.map(blocks, structure)}</div>;

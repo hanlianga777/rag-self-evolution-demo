@@ -43,11 +43,11 @@ it('keeps FAIL as Bad Case while diagnosis remains part of Agent processing', ()
   expect(cards[2].textContent).toContain('本题未保存可对齐的逐要点判分，检索路径未知。');
 });
 it('formats mixed HTML and markdown lists and turns behavior enums into the saved business expectation', () => {
-  render(<BaselineCaseDetails item={{ question_id: 'offline', reference_answer: 'safe_rejection', raw: { expected_response: '拒绝高压水枪；按说明书清洁。' }, model_answer: '<p>处理步骤：1. **停止使用**。 2. 查看第4.2章节和第40页 [C115]。</p>', diagnostic_view: {} }} snapshot={{}} config={{}} gates={[]} />);
+  render(<BaselineCaseDetails item={{ question_id: 'offline', reference_answer: 'safe_rejection', raw: { expected_response: '拒绝高压水枪；按说明书清洁。' }, model_answer: '<p>处理步骤：\n1. **停止使用**。\n2. 查看第4.2章节和第40页 [C115]。</p>', diagnostic_view: {} }} snapshot={{}} config={{}} gates={[]} />);
   const stack = document.querySelector('.case-answer-stack')!;
   expect(stack.textContent).toContain('拒绝高压水枪；按说明书清洁。');
   expect(stack.textContent).not.toContain('safe_rejection');
-  const actual = stack.querySelector('.comparison-body:not(:has(.answer-points))')!;
+  const actual = stack.querySelectorAll('.comparison-body')[1];
   expect(actual.querySelector('ol')?.children).toHaveLength(2);
   expect(actual.querySelector('strong')?.textContent).toBe('停止使用');
   expect(stack.textContent).toContain('第4.2章节和第40页 [C115]');
@@ -70,4 +70,12 @@ it.each(['confirmed','disputed','needs_review'])('keeps historical and Agent sha
   expect(document.querySelectorAll('.bad-case-details > section')).toHaveLength(4);
   expect(business).not.toMatch(/Safety · 安全|可信度|Confirmed|Needs Review|Disputed|已确认|评测争议/);
   expect(JSON.stringify(item)).toBe(before);
+});
+
+it('keeps a saved boundary sentence inline and hides the missing Judge record label', () => {
+  const item = { passed: false, reference_answer: '要点 1：检查型号。\n（补充）保留维修记录。', model_answer: '先查看铭牌。\n资料边界：缺少其他型号的信息。', diagnostic_view: { missing_points: '记录缺失：未保存完整的要点判分记录' } };
+  render(<CaseDetails item={item} snapshot={{}} config={{}} gates={[]} />);
+  const stack = document.querySelector('.case-answer-stack')!;
+  expect(stack.textContent).not.toMatch(/要点|（补充）|资料边界|记录缺失/);
+  expect([...stack.querySelectorAll('.case-answer p')].map(node => node.textContent)).toEqual(['检查型号。', '保留维修记录。', '先查看铭牌。', '缺少其他型号的信息。']);
 });

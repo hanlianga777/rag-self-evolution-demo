@@ -23,42 +23,16 @@
 .structured-answer .case-answer li { margin: 0.3em 0; }
 .structured-answer .case-answer h5,
 .structured-answer .case-answer .answer-lead { color: var(--ui-ink); font-weight: 700; }
-.structured-answer .answer-lead-line { display: block; margin-bottom: 0.35em; }
 .structured-answer .case-answer h5:not(:first-child) { margin-top: 0.8em; }
 
-.structured-answer .case-answer .answer-points { list-style: none; padding-inline-start: 0; }
-.structured-answer .answer-point-label {
-  display: inline-block;
-  margin-inline-end: 0.6em;
-  color: var(--ui-ink-2);
-  font-weight: 600;
-  font-size: 0.85em;
-}
-.structured-answer .case-answer .answer-optional {
-  padding: 0.4em 0.65em;
-  border-radius: 5px;
-  background: var(--ui-rule-2);
-  color: var(--ui-muted);
-  font-weight: 400;
-}
-
-.structured-answer .case-answer .answer-warning,
-.structured-answer .answer-boundary {
-  padding: 0.55em 0.75em;
-  border-radius: 4px;
-}
+.structured-answer .case-answer { white-space: pre-line; }
 .structured-answer span.answer-warning { display: block; }
 .structured-answer .case-answer .answer-warning {
+  padding: 0.55em 0.75em;
+  border-radius: 4px;
   border-inline-start: 3px solid var(--ui-amber);
   background: color-mix(in srgb, var(--ui-amber) 7%, var(--ui-surface));
 }
-.structured-answer .answer-boundary {
-  background: var(--ui-rule-2);
-  color: var(--ui-ink-2);
-  font-size: 0.93em;
-  margin: 0.65em 0;
-}
-.structured-answer .answer-boundary p:last-child { margin-bottom: 0; }
 
 .structured-answer :is(.answer-citation, .answer-citation-missing, .comparison-cite) {
   display: inline-block;
