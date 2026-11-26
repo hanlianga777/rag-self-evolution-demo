@@ -43,17 +43,28 @@ class SwitchStartupTests(unittest.TestCase):
                 (root/'corpus_state.json').write_text(json.dumps({'knowledge_identity':{'corpus_snapshot_id':'wrong'}}))
                 with self.assertRaisesRegex(ValueError,'inconsistent'):require_consistent_switch(root/'index')
 
-    def test_direct_api_import_stops_before_database_writes(self):
+    def test_api_opens_when_unrepairable_switch_blocks_corpus_mutations(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)
             (root/'q02-switch.json').write_text(json.dumps({'phase':'prepared'}))
             env={**os.environ,'PYTHONPATH':str(Path(__file__).resolve().parents[1]),'RAG_DEMO_INDEX_DIR':str(root/'index'),'RAG_DEMO_DB_PATH':str(root/'demo.db'),
                  'RAG_DEMO_DOCUMENTS_DIR':str(root/'documents'),'RAG_DEMO_UPLOADS_DIR':str(root/'uploads'),
-                 'RAG_DEMO_ENV_PATH':str(root/'absent.env'),'RAG_FORCE_MOCK':'1'}
-            result=subprocess.run([sys.executable,'-c','import app.main'],env=env,capture_output=True,text=True,timeout=30)
-            self.assertNotEqual(result.returncode,0)
-            self.assertIn('Incomplete Q02 switch',result.stderr)
-            self.assertFalse((root/'demo.db').exists())
+                 'RAG_DEMO_ENV_PATH':str(root/'absent.env'),'RAG_FORCE_MOCK':'1','RAG_SAFE_START':'1'}
+            code = '''
+import os
+from app.governance import GovernanceStore
+from fastapi.testclient import TestClient
+GovernanceStore(os.environ['RAG_DEMO_DB_PATH'])
+from app.main import app
+with TestClient(app) as client:
+    assert client.get('/openapi.json').status_code == 200
+    response = client.post('/api/knowledge/repair', headers={'Origin':'http://127.0.0.1:5174'})
+    assert response.status_code == 409, response.text
+    assert client.get('/api/knowledge').json()['corpus_switch']['status'] == 'blocked'
+    assert client.post('/api/knowledge/rebuild').status_code == 503
+'''
+            result=subprocess.run([sys.executable,'-c',code],env=env,capture_output=True,text=True,timeout=30)
+            self.assertEqual(result.returncode,0,result.stderr)
 
 
 if __name__=='__main__':unittest.main()

@@ -17,7 +17,8 @@ import { displayText } from "../display";
 import type { Citation } from "../types";
 
 type CorpusOperation = { id: string; status: string; stage: string; completed: number; total: number; error?: string };
-const stageName: Record<string, string> = { queued: "排队", validate: "校验文件", build: "准备索引", parse: "解析 PDF", chunk: "生成 Parent / Child", coverage: "K-means 覆盖规划", embedding: "生成 Embedding", index: "更新索引", activate: "切换当前 Corpus", completed: "已完成", failed: "更新失败" };
+const isCorpusActive = (status?: string) => status === "running" || status === "recovering" || status === "retry_wait";
+const stageName: Record<string, string> = { queued: "排队", validate: "校验文件", build: "准备索引", parse: "解析 PDF", chunk: "生成 Parent / Child", coverage: "K-means 覆盖规划", embedding: "生成 Embedding", index: "更新索引", activate: "切换当前 Corpus", golden: "保存知识库状态", completed: "已完成", failed: "更新失败" };
 
 export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChanged }: { data: any; openedDocument?: { name?: string; citation?: Citation }; onOpenedDocument?: () => void; onChanged?: () => void }) {
   const knowledgeScope = JSON.stringify([data.workspace?.current_corpus_fingerprint, data.documents]);
@@ -32,7 +33,7 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
   useEffect(() => {
     // A changed document set must not join an older in-flight Pipeline read.
     if (previousDocuments.current !== documentVersion) { invalidateReads(); previousDocuments.current = documentVersion; }
-    let cancelled = false; setPipelineReady(!!goldenCached(knowledgeScope, "/api/pipeline")); void goldenFetch<any>(knowledgeScope, "/api/pipeline").then(value => { if (!cancelled) { setPipelineReady(true); setKnowledge(value.knowledge || {}); if (value.knowledge?.operation?.status === "running") { setOperation(value.knowledge.operation); setBusy(true); } } }).catch(reason => { if (!cancelled) { setPipelineReady(true); setError(String(reason)); } }); return () => { cancelled = true; };
+    let cancelled = false; setPipelineReady(!!goldenCached(knowledgeScope, "/api/pipeline")); void goldenFetch<any>(knowledgeScope, "/api/pipeline").then(value => { if (!cancelled) { setPipelineReady(true); setKnowledge(value.knowledge || {}); if (isCorpusActive(value.knowledge?.operation?.status)) { setOperation(value.knowledge.operation); setBusy(true); } } }).catch(reason => { if (!cancelled) { setPipelineReady(true); setError(String(reason)); } }); return () => { cancelled = true; };
   }, [documentVersion]);
   const [documentDetail, setDetail] = useState<any>();
   const detail = documentDetail || (selected ? cachedJson<any>(`/api/documents/${selected.id}`) : undefined);
@@ -53,14 +54,14 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
   useEffect(() => { if (!openedDocument) return; const document = data.documents.find((item: any) => item.id === openedDocument.citation?.document_id || item.name === openedDocument.name); if (document) open(document, openedDocument.citation); onOpenedDocument?.(); }, [openedDocument]);
   useEffect(() => { let cancelled = false; if (selected) detailJson(`/api/documents/${selected.id}`).then(value => { if (!cancelled) setDetail(value); }).catch(reason => { if (!cancelled) setDetail({ ...selected, load_error:String(reason) }); }); return () => { cancelled = true; }; }, [selected, knowledge.identity?.corpus_snapshot_id]);
   useEffect(() => {
-    if (!operation?.id || operation.status !== "running") return;
+    if (!operation?.id || !isCorpusActive(operation.status)) return;
     let cancelled = false;
     const poll = async () => {
       try {
         const next = await getJson<CorpusOperation>(`/api/corpus-operations/${operation.id}`);
         if (cancelled) return;
         setOperation(next);
-        if (next.status !== "running") { setBusy(false); void getJson<any>("/api/pipeline").then(value => { if (!cancelled) { setKnowledge(value.knowledge || {}); } }); onChanged?.(); }
+        if (!isCorpusActive(next.status)) { setBusy(false); void getJson<any>("/api/pipeline").then(value => { if (!cancelled) { setKnowledge(value.knowledge || {}); } }); onChanged?.(); }
       } catch (caught) { if (!cancelled) { setError(String(caught)); setBusy(false); } }
     };
     const timer = window.setInterval(() => void poll(), 1000);
@@ -73,7 +74,7 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail || `请求失败（${response.status}）`);
       setOperation(result); onChanged?.();
-      if (result.status !== "running") { setBusy(false); if (result.status === "completed") onChanged?.(); }
+      if (!isCorpusActive(result.status)) { setBusy(false); if (result.status === "completed") onChanged?.(); }
       return true;
     } catch (caught) { setError(caught instanceof Error ? caught.message : "请求失败"); setBusy(false); return false; }
   };
@@ -107,7 +108,8 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
 
     <ConfirmDialog open={!!modelAction} onOpenChange={open => !open && setModelAction(null)} title={modelAction?.title || "确认更新知识库"} busy={busy} onConfirm={() => { const next = modelAction; setModelAction(null); if (next) void start(next.url, next.method, next.file); }}><p>将更新知识库并重建索引，会调用 Embedding 模型并产生费用。</p><p>知识库变更后，Golden 和 Baseline 可能需要重新确认。</p></ConfirmDialog>
     {error && <p className="error-notice" role="alert">{error}</p>}
-    {operation && <div className={operation.status === "failed" ? "error-notice" : "success-notice"} role="status"><strong>{stageName[operation.stage] || "更新知识资产"}</strong>{operation.total > 0 && ` · ${operation.completed} / ${operation.total}`}{operation.error && <p>失败阶段：{stageName[operation.stage] || "更新知识资产"}；原因：{operation.error}</p>}</div>}
+    {knowledge.corpus_switch?.status === "blocked" && <p className="error-notice" role="alert">知识库索引待修复。{knowledge.corpus_switch.error}</p>}
+    {operation && <div className={operation.status === "failed" ? "error-notice" : "success-notice"} role="status"><strong>{operation.status === "recovering" ? "正在从断点恢复" : operation.status === "retry_wait" ? "有文档等待重试" : stageName[operation.stage] || "更新知识资产"}</strong>{operation.total > 0 && ` · ${operation.completed} / ${operation.total}`}{operation.error && <p>失败阶段：{stageName[operation.stage] || "更新知识资产"}；原因：{operation.error}</p>}</div>}
 
     {(!knowledge.identity || knowledge.operation?.status === "failed") && <p className="knowledge-notice">{knowledge.identity ? "知识资产更新失败，保留上一个有效版本。" : "当前知识资产属于 Legacy。新 Knowledge Pipeline 待重建；下方策略展示目标配置。"}{knowledge.operation?.error && ` ${knowledge.operation.error}`}</p>}
     <section className="panel">{!pipelineReady ? <LoadingSkeleton label="正在读取知识处理配置" /> : <KnowledgeFlow lanes={lanes} action={<button className="secondary" disabled={!(data.documents || []).length} onClick={() => setBrowserOpen(true)}>分块浏览器</button>} />}</section>

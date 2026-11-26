@@ -24,11 +24,11 @@ import zipfile
 import numpy as np
 
 from . import rules
-from .corpus import EMBEDDING_MODEL, source_fingerprint, _split_long_part
+from .corpus import EMBEDDING_MODEL, source_fingerprint, _split_long_part, write_checkpoint, write_checkpoint_json
 from .full_text import CORPUS_LOCK, checksum, validate_bundle, write_full_text
 from .providers import (ProviderUnavailable, ProviderAPIError, ProviderTimeout, ProviderNetworkError,
                         ProviderRequestError, ProviderInvalidResponse, redact_provider_error, request_timeout, save_paid_response,
-                        transient_provider_error)
+                        request_with_retries, transient_provider_error)
 
 CONFIG = {'parser': 'MinerU', 'parser_mode': 'vlm', 'table_normalize': 'table-kv-v1',
           'chunk_strategy': 'Parent-Child', 'parent_tokens': 1400, 'child_tokens': 400,
@@ -1032,7 +1032,7 @@ def download_mineru_result(url):
             pass
         finally:
             connection.close()
-    raise ProviderUnavailable('MinerU result CDN connection failed')
+    raise ProviderNetworkError('MinerU result CDN connection failed')
 
 
 class MinerUProvider:
@@ -1044,34 +1044,68 @@ class MinerUProvider:
         base = self.values.get('MINERU_BASE_URL', 'https://mineru.net').rstrip('/')
         request = urllib.request.Request(base + '/api/v4/' + path, data=json.dumps(payload).encode() if payload is not None else None,
                                          headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'})
-        try:
-            with urllib.request.urlopen(request, timeout=60) as response: body = json.load(response)
-        except (urllib.error.URLError, TimeoutError): raise ProviderUnavailable('MinerU request failed') from None
-        if body.get('code') != 0: raise ProviderUnavailable('MinerU rejected parsing request')
+        with urllib.request.urlopen(request, timeout=60) as response:
+            body = json.load(response)
+        if body.get('code') != 0:
+            raise ProviderUnavailable('MinerU rejected parsing request')
         return body['data']
 
-    def parse(self, path, document_id):
-        task = self._request('file-urls/batch', {'files': [{'name': path.name, 'data_id': document_id}], 'model_version': 'vlm', 'enable_table': True, 'enable_formula': True})
-        # Signed upload expects an empty Content-Type; urllib otherwise inserts form-urlencoded.
-        request = urllib.request.Request(task['file_urls'][0], data=path.read_bytes(), headers={'Content-Type': ''}, method='PUT')
-        try:
-            with urllib.request.urlopen(request, timeout=120): pass
-            deadline = time.monotonic() + 1200
-            while time.monotonic() < deadline:
-                batch = self._request('extract-results/batch/' + task['batch_id'])
-                item = batch['extract_result'][0]
-                if item['state'] == 'failed': raise ProviderUnavailable('MinerU VLM parsing failed')
-                if item['state'] == 'done':
-                    archive = download_mineru_result(item['full_zip_url'])
-                    with zipfile.ZipFile(BytesIO(archive)) as bundle:
-                        names = [n for n in bundle.namelist() if n.endswith('_content_list.json') or n.endswith('/content_list.json') or n == 'content_list.json']
-                        if len(names) != 1: raise ValueError('MinerU structured content list missing/ambiguous')
-                        blocks = json.loads(bundle.read(names[0]))
-                        if not isinstance(blocks, list): raise ValueError('MinerU content list invalid')
-                    return blocks, archive
-                time.sleep(2)
-        except (urllib.error.URLError, TimeoutError): raise ProviderUnavailable('MinerU upload/download failed') from None
-        raise ProviderUnavailable('MinerU parsing timed out; task retained remotely')
+    def parse(self, path, document_id, *, checkpoint=None):
+        state = json.loads(checkpoint.read_text()) if checkpoint and checkpoint.exists() else {}
+
+        def save(**fields):
+            state.update(fields)
+            if checkpoint:
+                write_checkpoint_json(checkpoint, state)
+
+        if not state:
+            task = request_with_retries(lambda: self._request('file-urls/batch', {
+                'files': [{'name': path.name, 'data_id': document_id}], 'model_version': 'vlm',
+                'enable_table': True, 'enable_formula': True}))
+            save(batch_id=task['batch_id'], upload_url=task['file_urls'][0])
+
+        def poll():
+            batch = request_with_retries(lambda: self._request('extract-results/batch/' + state['batch_id']))
+            return next(iter(batch['extract_result']), None)
+
+        item = None
+        if not state.get('uploaded'):
+            if state.get('upload_started'):
+                item = poll()
+            if not item or item['state'] in {'waiting-file', 'waiting_file'}:
+                # Signed upload expects an empty Content-Type.
+                request = urllib.request.Request(state['upload_url'], data=path.read_bytes(),
+                                                 headers={'Content-Type': ''}, method='PUT')
+                def upload():
+                    with urllib.request.urlopen(request, timeout=120):
+                        pass
+                save(upload_started=True)
+                request_with_retries(upload)
+                item = None
+            save(uploaded=True, upload_url=None)
+
+        deadline = time.monotonic() + 1200
+        while time.monotonic() < deadline:
+            item = item or poll()
+            if item and item['state'] == 'failed':
+                raise ProviderUnavailable('MinerU VLM parsing failed')
+            if item and item['state'] == 'done':
+                archive = request_with_retries(lambda: download_mineru_result(item['full_zip_url']))
+                return mineru_blocks(archive), archive
+            item = None
+            time.sleep(2)
+        raise ProviderTimeout('MinerU parsing timed out; task retained remotely')
+
+
+def mineru_blocks(archive):
+    with zipfile.ZipFile(BytesIO(archive)) as bundle:
+        names = [n for n in bundle.namelist() if n.endswith('_content_list.json') or n.endswith('/content_list.json') or n == 'content_list.json']
+        if len(names) != 1:
+            raise ValueError('MinerU structured content list missing/ambiguous')
+        blocks = json.loads(bundle.read(names[0]))
+    if not isinstance(blocks, list):
+        raise ValueError('MinerU content list invalid')
+    return blocks
 
 
 # 2026-11-19（总指挥复盘）：062、072 走 /api/knowledge/rebuild 时默认用了 v1 分块（按标题切 Parent，父子比约 1.2:1），
@@ -1087,21 +1121,28 @@ class CachedMinerUParser:
         self.cache_root = Path(cache_root); self.fallback_factory = fallback_factory; self._fallback = None
         self.hits, self.misses = [], []
 
-    def parse(self, path, document_id):
-        found = sorted(self.cache_root.glob(f'**/{document_id}-mineru.zip'), key=lambda p: p.stat().st_mtime, reverse=True) if self.cache_root.exists() else []
-        for candidate in found:
-            archive = candidate.read_bytes()
-            try:
-                with zipfile.ZipFile(BytesIO(archive)) as bundle:
-                    names = [n for n in bundle.namelist() if n.endswith('_content_list.json') or n.endswith('/content_list.json') or n == 'content_list.json']
-                    if len(names) != 1: continue
-                    blocks = json.loads(bundle.read(names[0]))
-                if isinstance(blocks, list):
-                    self.hits.append(document_id); return blocks, archive
-            except (zipfile.BadZipFile, ValueError, KeyError):
-                continue
+    def parse(self, path, document_id, *, checkpoint=None):
+        candidates = [self.cache_root / f'{document_id}-mineru.zip',
+                      *(self.cache_root.parent / 'index_versions').glob(f'*/{document_id}-mineru.zip')]
+        found = sorted((p for p in candidates if p.is_file()), key=lambda p: p.stat().st_mtime, reverse=True)
+        fingerprint = hashlib.sha256(path.read_bytes()).hexdigest()
+        if not checkpoint or not checkpoint.exists():
+            for candidate in found:
+                try:
+                    manifest = json.loads((candidate.parent / 'manifest.json').read_text())
+                    if manifest['sources'].get(document_id) != fingerprint:
+                        continue
+                    archive = candidate.read_bytes()
+                    blocks = mineru_blocks(archive)
+                except (OSError, zipfile.BadZipFile, ValueError, KeyError):
+                    continue
+                self.hits.append(document_id)
+                return blocks, archive
         self.misses.append(document_id)
-        if self._fallback is None: self._fallback = self.fallback_factory()
+        if self._fallback is None:
+            self._fallback = self.fallback_factory()
+        if checkpoint is not None and isinstance(self._fallback, MinerUProvider):
+            return self._fallback.parse(path, document_id, checkpoint=checkpoint)
         return self._fallback.parse(path, document_id)
 
 
@@ -1109,7 +1150,7 @@ class KnowledgePipeline:
     def __init__(self, index_dir, retriever):
         self.index_dir = Path(index_dir); self.retriever = retriever
 
-    def build(self, documents, values=None, *, progress=lambda *args: None, parser=None, embedder=None, counter=None, chunk_version='parent-child-v1'):
+    def build(self, documents, values=None, *, progress=lambda *args: None, parser=None, embedder=None, counter=None, chunk_version='parent-child-v1', operation_id=None, on_document=lambda *args: None):
         import faiss
         from .config import accounting_database
         from .governance import GENERATION_PROFILES
@@ -1131,81 +1172,161 @@ class KnowledgePipeline:
         if tokenizer_identity: config['tokenizer_artifact_id'] = tokenizer_identity
         identity = version_identity({doc['id']: source_fingerprint(doc) for doc in documents}, config)
         if any(not value for value in identity['sources'].values()): raise ValueError('Source PDF missing')
-        operation_id = 'KNOW-' + datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')
-        staging = self.index_dir.parent/'index_versions'/(operation_id + '-building'); staging.mkdir(parents=True)
+        operation_id = operation_id or 'KNOW-' + datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')
+        versions = self.index_dir.parent / 'index_versions'
+        staging = versions / (operation_id + '-building')
+        staging.mkdir(parents=True, exist_ok=True)
+        checkpoints = versions / (operation_id + '-checkpoints')
+        checkpoints.mkdir(exist_ok=True)
+        binding = checkpoints / 'identity.json'
+        if binding.exists() and json.loads(binding.read_text()) != identity:
+            raise ValueError('Source PDFs or chunk configuration changed since the saved build')
+        write_checkpoint_json(binding, identity)
         parser = parser or MinerUProvider(values)
         embedder = embedder or AlibabaProvider(values, ledger_database=accounting_database(values) if configured else None)
-        parents, children, records, pages = [], [], [], []
-        previous_volumes = {}
         if chunk_version == 'parent-child-v2':
             documents = sorted(documents, key=lambda doc: _MANUAL_VOLUME.sub(
                 lambda m: f'{m[1]}_第{int(m[2]):08d}部分', doc['name']))
-        try:
+        failures = {}
+        for retry in range(2):
+            parents, children, records, pages, noise, batches = [], [], [], [], [], []
+            previous_volumes = {}
             for number, doc in enumerate(documents, 1):
-                from .corpus import DOCUMENTS_DIR, UPLOADS_DIR
-                path = Path(doc['_source_path']) if doc.get('_source_path') else (UPLOADS_DIR if doc.get('storage') == 'uploads' else DOCUMENTS_DIR)/doc['name']
-                progress('parse', number - 1, len(documents))
-                blocks, archive = parser.parse(path, doc['id'])
-                (staging/(doc['id'] + '-mineru.zip')).write_bytes(archive)
-                progress('chunk', number - 1, len(documents))
-                if chunk_version == 'parent-child-v2':
-                    volume = _MANUAL_VOLUME.search(doc['name'])
+                doc_id = doc['id']
+                folder = checkpoints / digest(doc_id)
+                folder.mkdir(exist_ok=True)
+                phase = 'parse'
+                try:
+                    progress(phase, number - 1, len(documents))
+                    volume = _MANUAL_VOLUME.search(doc['name']) if chunk_version == 'parent-child-v2' else None
                     key = (volume[1].upper(), int(volume[2])) if volume else None
                     previous = previous_volumes.get((key[0], key[1] - 1)) if key else None
-                    ps, cs, parsed = parent_child_v2(doc, blocks, counter, previous_sections=previous)
+                    result_path = folder / ('chunks-' + digest(previous) + '.json')
+                    archive_path = folder / 'mineru.zip'
+                    if result_path.exists():
+                        ps, cs, parsed, record, doc_pages = json.loads(result_path.read_text())
+                    else:
+                        blocks, path = self._parsed_document(doc, folder, parser)
+                        phase = 'chunk'
+                        progress(phase, number - 1, len(documents))
+                        if chunk_version == 'parent-child-v2':
+                            ps, cs, parsed = parent_child_v2(doc, blocks, counter, previous_sections=previous)
+                        else:
+                            ps, cs, parsed = parent_child(doc, blocks, counter, parent_tokens=config['parent_tokens'],
+                                                          child_tokens=config['child_tokens'], overlap=config['overlap_tokens'])
+                        if not cs:
+                            raise ValueError('MinerU produced no searchable Child text')
+                        import pymupdf
+                        with pymupdf.open(path) as pdf:
+                            page_count = len(pdf)
+                        if any(p['page'] > page_count for p in parsed):
+                            raise ValueError('MinerU page outside source PDF')
+                        fingerprint = identity['sources'][doc_id]
+                        record = {**{k: v for k, v in doc.items() if not k.startswith('_')}, 'pages': page_count, 'chunks': len(cs),
+                                  'parent_chunks': len(ps), 'status': 'Indexed', 'parser': 'MinerU · VLM',
+                                  'chunk_strategy': config['chunk_strategy'], 'category': document_category(doc), 'source_fingerprint': fingerprint}
+                        doc_pages = []
+                        for page in range(1, page_count + 1):
+                            page_text = '\n'.join(p['text'] for p in parsed if p['page'] == page)
+                            doc_pages.append({'document_id': doc_id, 'page': page, 'parser': 'MinerU/vlm', 'text': page_text,
+                                              'text_checksum': checksum(page_text.encode()), 'source_fingerprint': fingerprint})
+                        write_checkpoint_json(result_path, [ps, cs, parsed, record, doc_pages])
                     if key and ps and ps[-1].get('numbered_section'):
                         previous_volumes[key] = dict(heading for title in ps[-1]['section_path'].split(' / ')
                                                      if (heading := _numbered_heading(title)))
-                else:
-                    ps, cs, parsed = parent_child(doc, blocks, counter, parent_tokens=config['parent_tokens'], child_tokens=config['child_tokens'], overlap=config['overlap_tokens'])
-                if not cs: raise ValueError('MinerU produced no searchable Child text')
-                parents.extend(ps); children.extend(cs)
-                (staging/(doc['id'] + '-blocks.json')).write_text(json.dumps(parsed, ensure_ascii=False))
-                import pymupdf
-                with pymupdf.open(path) as pdf: page_count = len(pdf)
-                if any(p['page'] > page_count for p in parsed): raise ValueError('MinerU page outside source PDF')
-                records.append({**{k: v for k, v in doc.items() if not k.startswith('_')}, 'pages': page_count, 'chunks': len(cs), 'parent_chunks': len(ps), 'status': 'Indexed', 'parser': 'MinerU · VLM', 'chunk_strategy': config['chunk_strategy'], 'category': document_category(doc), 'source_fingerprint': identity['sources'][doc['id']]})
-                for page in range(1, page_count + 1):
-                    text = '\n'.join(p['text'] for p in parsed if p['page'] == page)
-                    pages.append({'document_id': doc['id'], 'page': page, 'parser': 'MinerU/vlm', 'text': text, 'text_checksum': checksum(text.encode()), 'source_fingerprint': identity['sources'][doc['id']]})
-            progress('embedding', 0, len(children))
-            if chunk_version == 'parent-child-v2':
-                noise = []
-                for doc in documents:
-                    for part in json.loads((staging/(doc['id'] + '-blocks.json')).read_text()):
-                        if part.get('drop_reason'):
-                            noise.append({'document_id':doc['id'], 'document_name':doc['name'], 'page':part['page'], 'text':part['text'], 'reason':part['drop_reason']})
-                        noise.extend({'document_id':doc['id'], 'document_name':doc['name'], 'page':part['page'], **line} for line in part.get('removed_lines', []))
-                (staging/'denoise.json').write_text(json.dumps(noise, ensure_ascii=False))
-            vectors = embedder.embed([child_embedding_text(c) for c in children], config['dimension'])
-            for child in children: child['embedding_status'] = 'Indexed'
-            if vectors.shape != (len(children), config['dimension']): raise ValueError('Embedding artifact mismatch')
-            np.save(staging/'embeddings.npy', vectors)
-            progress('index', len(children), len(children))
-            index = faiss.IndexFlatIP(vectors.shape[1]); index.add(vectors); faiss.write_index(index, str(staging/'faiss.index'))
-            identity = {**identity, 'chunk_artifact_id': 'CHUNK-' + digest([parents, children])[:20], 'embedding_artifact_id': 'EMB-' + checksum(vectors.tobytes())[:20], 'index_artifact_id': 'IDX-' + checksum((staging/'faiss.index').read_bytes())[:20]}
-            identity['pipeline_version_id'] = 'KP-' + digest([config, identity['chunk_artifact_id'], identity['embedding_artifact_id'], identity['index_artifact_id']])[:20]
-            identity['corpus_snapshot_id'] = 'CORPUS-' + digest([identity['sources'], identity['pipeline_version_id']])[:20]
-            for name, data in [('documents.json', records), ('chunks.json', children), ('parents.json', parents)]: (staging/name).write_text(json.dumps(data, ensure_ascii=False))
-            manifest = {'schema': 4, 'sources': identity['sources'], 'embedding_model': config['embedding_model'], 'tokenizer_model': config['tokenizer_model'], 'knowledge_config': config, 'knowledge_identity': identity, 'target_tokens': config['child_tokens'], 'overlap_tokens': config['overlap_tokens']}
-            write_full_text(staging, manifest, records, pages)
-            full = json.loads((staging/'full_text.json').read_text()); full['parser_identity'] = 'MinerU/vlm'; (staging/'full_text.json').write_text(json.dumps(full, ensure_ascii=False))
-            manifest = json.loads((staging/'manifest.json').read_text()); manifest['artifacts']['full_text.json'] = checksum((staging/'full_text.json').read_bytes())
-            progress('coverage', 0, len(children))
-            coverage = build_plan(children, vectors, {'name': 'full', **GENERATION_PROFILES['full']}, identity, identity['embedding_artifact_id'])
-            (staging/'coverage.json').write_text(json.dumps(coverage, ensure_ascii=False))
-            manifest['coverage_plan_id'] = coverage['plan_id']
-            from .evidence_equivalence import build_equivalence, write_equivalence
-            write_equivalence(staging, build_equivalence(identity, records, children))
-            manifest['artifacts'].update({p.name: checksum(p.read_bytes()) for p in staging.iterdir() if p.is_file() and p.name != 'manifest.json'})
-            (staging/'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False))
-            if {doc['id']: source_fingerprint(doc) for doc in documents} != identity['sources']:
-                raise ValueError('Source PDFs changed during build')
-            validate_bundle(staging, require_full_text=True)
-            return staging, operation_id
-        except Exception:
-            # ponytail: failed staging retained for diagnosis; no automatic destructive cleanup.
-            raise
+                    phase = 'embedding'
+                    progress(phase, number - 1, len(documents))
+                    vectors = self._embed_document(cs, config['dimension'], folder, embedder)
+                    for child in cs:
+                        child['embedding_status'] = 'Indexed'
+                    parents.extend(ps)
+                    children.extend(cs)
+                    records.append(record)
+                    pages.extend(doc_pages)
+                    batches.append(vectors)
+                    write_checkpoint(staging / (doc_id + '-mineru.zip'), archive_path.read_bytes())
+                    write_checkpoint_json(staging / (doc_id + '-blocks.json'), parsed)
+                    if chunk_version == 'parent-child-v2':
+                        for part in parsed:
+                            if part.get('drop_reason'):
+                                noise.append({'document_id': doc_id, 'document_name': doc['name'], 'page': part['page'],
+                                              'text': part['text'], 'reason': part['drop_reason']})
+                            noise.extend({'document_id': doc_id, 'document_name': doc['name'], 'page': part['page'], **line}
+                                         for line in part.get('removed_lines', []))
+                    failures.pop(doc_id, None)
+                    on_document(doc_id, doc['name'], 'completed', phase, None)
+                except Exception as error:
+                    failures[doc_id] = f"{doc['name']} ({phase}): {redact_provider_error(str(error), None)}"
+                    on_document(doc_id, doc['name'], 'failed' if retry else 'retry_wait', phase, failures[doc_id])
+            if not failures:
+                break
+        if failures:
+            raise ValueError('文档构建失败：' + '；'.join(failures.values()))
+        if chunk_version == 'parent-child-v2':
+            write_checkpoint_json(staging / 'denoise.json', noise)
+        vectors = np.concatenate(batches)
+        np.save(staging / 'embeddings.npy', vectors)
+        progress('index', len(children), len(children))
+        index = faiss.IndexFlatIP(vectors.shape[1]); index.add(vectors); faiss.write_index(index, str(staging/'faiss.index'))
+        identity = {**identity, 'chunk_artifact_id': 'CHUNK-' + digest([parents, children])[:20], 'embedding_artifact_id': 'EMB-' + checksum(vectors.tobytes())[:20], 'index_artifact_id': 'IDX-' + checksum((staging/'faiss.index').read_bytes())[:20]}
+        identity['pipeline_version_id'] = 'KP-' + digest([config, identity['chunk_artifact_id'], identity['embedding_artifact_id'], identity['index_artifact_id']])[:20]
+        identity['corpus_snapshot_id'] = 'CORPUS-' + digest([identity['sources'], identity['pipeline_version_id']])[:20]
+        for name, data in [('documents.json', records), ('chunks.json', children), ('parents.json', parents)]: (staging/name).write_text(json.dumps(data, ensure_ascii=False))
+        manifest = {'schema': 4, 'sources': identity['sources'], 'embedding_model': config['embedding_model'], 'tokenizer_model': config['tokenizer_model'], 'knowledge_config': config, 'knowledge_identity': identity, 'target_tokens': config['child_tokens'], 'overlap_tokens': config['overlap_tokens']}
+        write_full_text(staging, manifest, records, pages)
+        full = json.loads((staging/'full_text.json').read_text()); full['parser_identity'] = 'MinerU/vlm'; (staging/'full_text.json').write_text(json.dumps(full, ensure_ascii=False))
+        manifest = json.loads((staging/'manifest.json').read_text()); manifest['artifacts']['full_text.json'] = checksum((staging/'full_text.json').read_bytes())
+        progress('coverage', 0, len(children))
+        coverage = build_plan(children, vectors, {'name': 'full', **GENERATION_PROFILES['full']}, identity, identity['embedding_artifact_id'])
+        (staging/'coverage.json').write_text(json.dumps(coverage, ensure_ascii=False))
+        manifest['coverage_plan_id'] = coverage['plan_id']
+        from .evidence_equivalence import build_equivalence, write_equivalence
+        write_equivalence(staging, build_equivalence(identity, records, children))
+        manifest['artifacts'].update({p.name: checksum(p.read_bytes()) for p in staging.iterdir() if p.is_file() and p.name != 'manifest.json'})
+        (staging/'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False))
+        if {doc['id']: source_fingerprint(doc) for doc in documents} != identity['sources']:
+            raise ValueError('Source PDFs changed during build')
+        validate_bundle(staging, require_full_text=True)
+        return staging, operation_id
+
+    @staticmethod
+    def _parsed_document(doc, folder, parser):
+        from .corpus import DOCUMENTS_DIR, UPLOADS_DIR
+        path = Path(doc['_source_path']) if doc.get('_source_path') else (
+            UPLOADS_DIR if doc.get('storage') == 'uploads' else DOCUMENTS_DIR) / doc['name']
+        blocks_path = folder / 'mineru-blocks.json'
+        archive_path = folder / 'mineru.zip'
+        if blocks_path.exists():
+            return json.loads(blocks_path.read_text()), path
+        if archive_path.exists() and isinstance(parser, (MinerUProvider, CachedMinerUParser)):
+            blocks = mineru_blocks(archive_path.read_bytes())
+        else:
+            if isinstance(parser, (MinerUProvider, CachedMinerUParser)):
+                blocks, archive = parser.parse(path, doc['id'], checkpoint=folder / 'remote.json')
+            else:
+                blocks, archive = parser.parse(path, doc['id'])
+            write_checkpoint(archive_path, archive)
+        write_checkpoint_json(blocks_path, blocks)
+        return blocks, path
+
+    @staticmethod
+    def _embed_document(children, dimension, folder, embedder):
+        texts = [child_embedding_text(child) for child in children]
+        vectors = []
+        for offset in range(0, len(texts), 10):
+            batch = texts[offset:offset + 10]
+            path = folder / f"vectors-{offset}-{digest(batch)}.npy"
+            if path.exists():
+                values = np.load(path, allow_pickle=False)
+            else:
+                values = np.asarray(embedder.embed(batch, dimension), dtype=np.float32)
+                if values.shape != (len(batch), dimension) or not np.isfinite(values).all() or np.any(np.linalg.norm(values, axis=1) == 0):
+                    raise ValueError('Embedding artifact mismatch')
+                buffer = BytesIO()
+                np.save(buffer, values, allow_pickle=False)
+                write_checkpoint(path, buffer.getvalue())
+            vectors.append(values)
+        return np.concatenate(vectors)
 
     def activate(self, staging, operation_id, *, after_activate=None):
         from .corpus_management import CorpusManager

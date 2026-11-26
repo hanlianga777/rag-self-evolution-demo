@@ -71,13 +71,25 @@ def discover_documents(extra: Path | None = None, exclude_id: str | None = None)
         catalog = known.get(source.name)
         if catalog is None:
             identifier = "DOC-" + hashlib.sha256(source.name.encode("utf-8")).hexdigest()[:12]
-            catalog = {"id": identifier, "name": source.name, "chunk_prefix": identifier, "storage": "uploads"}
+            catalog = {"id": identifier, "name": source.name, "chunk_prefix": identifier,
+                       **({"storage": "uploads"} if source.parent == UPLOADS_DIR else {})}
         if catalog["id"] == exclude_id:
             continue
         if extra is not None and source == extra:
             catalog = {**catalog, "_source_path": str(source)}
         records.append(catalog.copy())
     return records
+
+
+def write_checkpoint(path: Path, data: bytes) -> None:
+    """Publish a complete checkpoint with one atomic rename."""
+    temporary = path.with_name(path.name + '.tmp')
+    temporary.write_bytes(data)
+    temporary.replace(path)
+
+
+def write_checkpoint_json(path: Path, data) -> None:
+    write_checkpoint(path, json.dumps(data, ensure_ascii=False).encode('utf-8'))
 
 
 def _read_json(path: Path, fallback):

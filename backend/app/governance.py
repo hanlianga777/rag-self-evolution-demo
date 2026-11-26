@@ -948,7 +948,7 @@ class GovernanceStore:
                                    (run_id, prefix + key, _json(value)))
         return small
 
-    def start_generation_run(self, model_version: str, profile_name: str = "mini", *, coverage_plan=None):
+    def start_generation_run(self, model_version: str, profile_name: str = "mini", *, coverage_plan=None, corpus_operation_id=None):
         from .corpus import current_manifest
         if profile_name not in GENERATION_PROFILES:
             raise ValueError("Unknown Golden profile")
@@ -956,6 +956,14 @@ class GovernanceStore:
         run_id, now = f"GGEN-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", _now()
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            owner = pending_job_owner()
+            if corpus_operation_id:
+                existing = connection.execute(
+                    "SELECT generation_run_id FROM golden_generation_artifacts WHERE json_extract(hard_validation_json,'$.corpus_operation_id')=?",
+                    (corpus_operation_id,)).fetchone()
+                if existing:
+                    return existing[0]
+                owner = {'auto_resume': True, 'corpus_operation_id': corpus_operation_id}
             pending = next((row for row in connection.execute("SELECT r.profile_json, a.hard_validation_json FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id WHERE r.status='needs_regeneration'") if _load(row['hard_validation_json'], {}).get('corpus_fingerprint') == manifest_identity(current_manifest())), None)
             if pending:
                 old_mini = _load(pending["profile_json"], {}).get("name", "mini") == "mini"
@@ -963,8 +971,26 @@ class GovernanceStore:
             if connection.execute("SELECT 1 FROM golden_generation_runs WHERE status IN ('queued', 'coverage', 'generating', 'validation', 'probing', 'qc') LIMIT 1").fetchone():
                 raise ValueError("已有 Generation Run 正在执行")
             connection.execute("INSERT INTO golden_generation_runs (id, profile_json, model_version, status, question_ids_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(profile), model_version, "queued", _json([]), now))
-            connection.execute("INSERT INTO golden_generation_artifacts (generation_run_id, coverage_plan_json, question_plan_json, hard_validation_json) VALUES (?, ?, ?, ?)", (run_id, _json(coverage_plan["slots"] if coverage_plan else []), _json([]), _json({**pending_job_owner(), "slot_persistence_v1": True, "frozen_plan": coverage_plan, "corpus_fingerprint": manifest_identity(current_manifest()), "progress": {"stage": "queued", "completed_slots": 0, "total_slots": profile["expected_count"], "phase_processed": 0, "phase_total": profile["expected_count"], "processed_slot_ids": [], "probe_completed": 0, "qc_completed": 0, "started_at": now, "operation_id": run_id}})))
+            connection.execute("INSERT INTO golden_generation_artifacts (generation_run_id, coverage_plan_json, question_plan_json, hard_validation_json) VALUES (?, ?, ?, ?)", (run_id, _json(coverage_plan["slots"] if coverage_plan else []), _json([]), _json({**owner, "slot_persistence_v1": True, "frozen_plan": coverage_plan, "corpus_fingerprint": manifest_identity(current_manifest()), "progress": {"stage": "queued", "completed_slots": 0, "total_slots": profile["expected_count"], "phase_processed": 0, "phase_total": profile["expected_count"], "processed_slot_ids": [], "probe_completed": 0, "qc_completed": 0, "started_at": now, "operation_id": run_id}})))
         return run_id
+
+    def claim_generation_recovery(self, run_id, status, owner, *, quality_status, nested_owner):
+        """Only one service process may take over a stopped Golden worker."""
+        with self.connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("""SELECT r.status, a.hard_validation_json FROM golden_generation_runs r
+                JOIN golden_generation_artifacts a ON a.generation_run_id=r.id WHERE r.id=?""", (run_id,)).fetchone()
+            if row is None or row['status'] != status:
+                return False
+            audit = _load(row['hard_validation_json'], {})
+            quality = audit.get('quality_rerun', {})
+            target = quality if nested_owner else audit
+            if quality.get('status') != quality_status or any(target.get(key) != value for key, value in owner.items()):
+                return False
+            target.update(pending_job_owner())
+            connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?",
+                               (_json(audit), run_id))
+            return True
 
     def claim_regeneration(self, run_id: str, corpus_fingerprint):
         with self.connection() as connection:
@@ -1022,14 +1048,17 @@ class GovernanceStore:
                 raise ValueError(f"{slot} 已有活动 Candidate")
             if audit.get('slot_audit'):
                 audit = self._separate_generation_audit(connection, run_id, audit)
-            audit['slot_audit'] = {slot: slot_audit.get(slot, [])}
-            connection.execute("UPDATE golden_generation_runs SET status='generating' WHERE id=?", (run_id,))
             progress = audit.get("progress", {})
             finished = bool(candidate) if slot_complete is None else slot_complete
+            pass_id = [progress.get('operation_id'), progress.get('refill_round')]
+            cursor = progress.get('generation_cursor', {})
+            first_attempt = cursor['first_attempt'] if cursor.get('pass_id') == pass_id and cursor.get('slot') == slot else attempt
+            audit['slot_audit'] = {slot: slot_audit.get(slot, [])}
+            connection.execute("UPDATE golden_generation_runs SET status='generating' WHERE id=?", (run_id,))
             processed_ids = progress.get("processed_slot_ids", [])
             if finished and slot not in processed_ids:
                 processed_ids = [*processed_ids, slot]
-            audit["progress"] = {**progress, "stage": "generating", "slot": slot, "attempt": attempt, "completed_slots": len(ids) + bool(candidate), "processed_slot_ids": processed_ids, "phase_processed": progress.get("phase_processed", 0) + int(finished), "phase_total": progress.get("phase_total", 0)}
+            audit["progress"] = {**progress, "stage": "generating", "slot": slot, "attempt": attempt, "completed_slots": len(ids) + bool(candidate), "processed_slot_ids": processed_ids, "generation_cursor": {"slot": slot, "first_attempt": first_attempt, "slot_complete": finished, "pass_id": pass_id}, "phase_processed": progress.get("phase_processed", 0) + int(finished), "phase_total": progress.get("phase_total", 0)}
             if candidate:
                 question_id = f"V1G-{run_id[-12:]}-{int(slot[1:]):02d}"
                 now = _now()
@@ -1831,8 +1860,14 @@ class GovernanceStore:
         if item["qc_status"] in {"qc_passed","qc_failed"} and qc and qc[0]["created_at"] > applied_at:
             return "done"
         probe = self.probe_history(question_id)
-        if item["probe_status"] == "probe_passed" and probe and probe[0]["created_at"] > applied_at:
-            return "qc"
+        if probe and probe[0]["created_at"] > applied_at and probe[0].get('probe_details', {}).get('probe_execution_status') not in {'failed', 'uncertain'}:
+            _, identity = self.capture_quality(question_id)
+            binding = {key: value for key, value in identity.items() if key != 'probe_id'}
+            if all(probe[0].get('execution_identity', {}).get(key) == value for key, value in binding.items()):
+                if item["probe_status"] == "probe_passed":
+                    return "qc"
+                if item["probe_status"] == "probe_failed":
+                    return "skipped"
         return "probe"
 
     def resume_revision_quality(self, revision_id: str):

@@ -104,6 +104,126 @@ class GoldenSlotCheckpointTests(unittest.TestCase):
         self.assertEqual(requests.count('Q01'), 1)
         self.assertEqual(len(requests), 20)
 
+    def test_ssl_eof_and_restart_keep_completed_generation_probe_and_qc(self):
+        import ssl
+        from collections import Counter
+        from threading import Thread
+        from app.telemetry import record_usage
+
+        sends = Counter()
+        fault = dict.fromkeys(('eof', 'kill_generation', 'kill_quality_start', 'kill_qc', 'kill_quality_finish'), False)
+        original = self.provider.complete.side_effect
+
+        def generate(system, payload, **kwargs):
+            slot = json.loads(payload)['coverage_slot']
+            if fault['eof'] and slot == 'Q06':
+                fault['eof'] = False
+                sends['ssl_eof'] += 1
+                raise ssl.SSLEOFError('fixture SSL EOF')
+            sends['generate:' + slot] += 1
+            record_usage({'provider': 'fixture', 'status': 'ok', 'prompt_tokens': 11})
+            return original(system, payload, **kwargs)
+
+        def persist(run_id, candidate, *args, **kwargs):
+            if fault['kill_generation'] and kwargs['slot'] == 'Q06' and candidate:
+                fault['kill_generation'] = False
+                raise SystemExit('restart after response, before committing slot')
+            return original_persist(run_id, candidate, *args, **kwargs)
+
+        def probe(key, *_a, **_kw):
+            item, identity = self.store.capture_quality(key)
+            sends['probe:' + item['raw']['coverage_slot']] += 1
+            return self.store.record_probe_result(key, {'question_quality': 30, 'golden_answer_quality': 30,
+                'evidence_support': 40, 'reason': 'offline evidence',
+                'probe_details': {'probe_execution_status': 'completed'}}, execution=identity)
+
+        def qc(item):
+            sends['qc:' + item['raw']['coverage_slot']] += 1
+            return {'score': 95, 'priority': 'P2', 'reason': 'offline quality'}
+
+        def complete_quality(run_id, *, status, **kwargs):
+            if fault['kill_quality_finish'] and status == 'completed':
+                fault['kill_quality_finish'] = False
+                raise SystemExit('restart after QC batch completed, before completing generation')
+            return original_update(run_id, status=status, **kwargs)
+
+        def record(key, *args, **kwargs):
+            if fault['kill_qc'] and self.store.question(key)['raw']['coverage_slot'] == 'Q09':
+                fault['kill_qc'] = False
+                raise SystemExit('restart after QC response, before committing QC')
+            return original_record(key, *args, **kwargs)
+
+        run_generation = main._run_mini_generation
+        run_quality = main._run_quality_rerun
+
+        def quality(*args, **kwargs):
+            if fault['kill_quality_start']:
+                fault['kill_quality_start'] = False
+                raise SystemExit('restart after switching to Probe, before starting quality worker')
+            return run_quality(*args, **kwargs)
+
+        def execute(run_id, *_args, **kwargs):
+            try:
+                run_generation(run_id, self.store, self.service, self.corpus, **kwargs)
+            except SystemExit:
+                pass
+
+        def start_worker(run_id):
+            thread = Thread(target=execute, args=(run_id,))
+            thread.start()
+            thread.join(20)
+            self.assertFalse(thread.is_alive())
+
+        def recover(run_id):
+            main.recover_golden_jobs()
+            thread = main._golden_recovery_threads[run_id]
+            thread.join(20)
+            self.assertFalse(thread.is_alive())
+            del main._golden_recovery_threads[run_id]
+
+        def result(run_id):
+            run = self.store.generation_run(run_id, qualification=False)
+            self.assertEqual(run['status'], 'completed')
+            rows = [self.store.question(key) for key in run['question_ids']]
+            return [{key: item[key] for key in ('question', 'reference_answer', 'evidence', 'test_category',
+                                              'probe_status', 'qc_status', 'review_status')} for item in rows]
+
+        original_persist = self.store.persist_generation_attempt
+        original_record = self.store.record_qc
+        original_update = self.store.update_generation_run
+        self.provider.complete.side_effect = generate
+        self.service.quality_check.side_effect = qc
+        with patch.multiple(main, store=self.store, ai_service=self.service, corpus=self.corpus,
+                            _run_mini_generation=execute, _run_quality_rerun=quality), \
+             patch.object(self.store, 'persist_generation_attempt', side_effect=persist), \
+             patch.object(self.store, 'run_probe', side_effect=probe), \
+             patch.object(self.store, 'record_qc', side_effect=record), \
+             patch.object(self.store, 'update_generation_run', side_effect=complete_quality), \
+             patch('app.evaluation_stage.time.sleep'):
+            baseline = self.store.start_generation_run('mock-provider', 'mini')
+            start_worker(baseline)
+            expected, counts = result(baseline), sends.copy()
+            sends.clear()
+            fault.update(dict.fromkeys(fault, True))
+            interrupted = self.store.start_generation_run('mock-provider', 'mini')
+            start_worker(interrupted)
+            self.assertEqual(len(self.store.generation_run(interrupted)['question_ids']), 5)
+            recover(interrupted)
+            self.assertEqual(self.store.generation_run(interrupted)['status'], 'probing')
+            recover(interrupted)
+            self.assertEqual(self.store.generation_run(interrupted)['status'], 'qc')
+            recover(interrupted)
+            saved = self.store.generation_artifacts(interrupted)['hard_validation']['quality_rerun']
+            self.assertEqual(saved['status'], 'completed')
+            main.recover_golden_jobs()
+            self.assertNotIn(interrupted, main._golden_recovery_threads)
+            self.assertEqual(result(interrupted), expected)
+            self.assertEqual(self.store.generation_artifacts(interrupted)['hard_validation']['quality_rerun']['attempt_id'], saved['attempt_id'])
+            audit = self.store.generation_artifacts(interrupted)['slot_audit']
+            self.assertEqual(audit['Q06'][0]['token_usage'], self.store.generation_artifacts(baseline)['slot_audit']['Q06'][0]['token_usage'])
+            self.assertEqual(sends.pop('ssl_eof'), 1)
+            self.assertEqual(sends, counts)
+
     def test_full_generation_probe_qc_with_faults_and_large_rpc_payloads(self):
         from collections import Counter
         from http.client import IncompleteRead
@@ -284,6 +404,28 @@ class GoldenPendingWorkerTests(unittest.TestCase):
         audit = self.store.generation_run(key, qualification=False)['artifacts']['hard_validation']
         self.assertTrue(audit.get('auto_resume'))
         self.assertIsNone(audit['worker_thread'])
+
+    def test_activated_corpus_reuses_the_same_golden_run(self):
+        from types import SimpleNamespace
+        from app.governance import GovernanceStore
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_store = GovernanceStore(root / 'fixture.db')
+            fingerprint = main.manifest_identity(main.current_manifest())
+            plan = {'plan_id': 'fixture-plan', 'created_at': 'fixture', 'slots': [],
+                    'corpus_fingerprint': fingerprint, 'profile': {'name': 'full', **main.GENERATION_PROFILES['full']}}
+            (root / 'coverage.json').write_text(json.dumps(plan))
+            service = SimpleNamespace(live_enabled=True, model='offline-stub')
+            with patch.multiple(main, corpus=SimpleNamespace(index_dir=root, chunks=lambda: []), ai_service=service, store=run_store), \
+                 patch.dict('os.environ', {'RAG_SKIP_AUTO_GOLDEN': '0'}):
+                original = main.start_knowledge_golden('fixture-corpus-op')
+                self.assertEqual(main.start_knowledge_golden('fixture-corpus-op'), original)
+            owner = dict.fromkeys(('execution_owner_pid', 'worker_thread', 'worker_claimed_at'))
+            self.assertTrue(run_store.claim_generation_recovery(original, 'queued', owner, quality_status=None, nested_owner=False))
+            self.assertFalse(run_store.claim_generation_recovery(original, 'queued', owner, quality_status=None, nested_owner=False))
+            runs = run_store.generation_runs()
+            self.assertEqual([run['id'] for run in runs], [original])
 
     def test_same_process_pending_claim_expires(self):
         import os

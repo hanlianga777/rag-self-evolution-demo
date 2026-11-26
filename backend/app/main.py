@@ -26,7 +26,7 @@ from .ai_service import AiService
 from . import business_import, rules, task_leases
 from .corpus import CorpusStore, DOCUMENTS_DIR, UPLOADS_DIR, current_manifest
 from .full_text import CORPUS_LOCK
-from .corpus_management import CorpusManager, require_consistent_switch
+from .corpus_management import ACTIVE_OPERATIONS, CorpusManager, require_consistent_switch
 from .config import load_settings
 from .evaluation import EvaluationRunner, gate_details
 from .evaluation_contract import policy_current, VERSIONS, validate_business_judgment
@@ -67,7 +67,11 @@ TRUSTED_ORIGINS = ["http://localhost:5174", "http://127.0.0.1:5174"]
 app.add_middleware(CORSMiddleware, allow_origins=TRUSTED_ORIGINS, allow_methods=["*"], allow_headers=["*"], expose_headers=["X-Read-Version"])
 provider_settings = load_settings()
 corpus = CorpusStore()
-require_consistent_switch(corpus.index_dir, os.getenv("RAG_DEMO_DB_PATH") or None)
+corpus_switch = {'status': 'ready', 'error': None}
+try:
+    require_consistent_switch(corpus.index_dir, os.getenv("RAG_DEMO_DB_PATH") or None)
+except (OSError, ValueError, RuntimeError, KeyError, sqlite3.Error) as error:
+    corpus_switch = {'status': 'recovering', 'error': str(error)}
 safe_start = os.getenv("RAG_SAFE_START", "1") == "1"
 store = GovernanceStore(os.getenv("RAG_DEMO_DB_PATH") or None, migrate=not safe_start)
 register_display_summary_routes(app, store.database_path)
@@ -77,7 +81,7 @@ app.add_middleware(ReadCacheMiddleware, database_path=store.database_path,
                   Path(__file__).resolve().parents[2] / '.env'])
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=3)
 ai_service = AiService(store, corpus, DeepSeekProvider(provider_settings), os.getenv("RAG_FORCE_MOCK") == "1")
-corpus_manager = CorpusManager(ai_service.retriever, knowledge_pipeline=True, on_knowledge_activated=lambda: start_knowledge_golden())
+corpus_manager = CorpusManager(ai_service.retriever, knowledge_pipeline=True, on_knowledge_activated=lambda operation_id: start_knowledge_golden(operation_id))
 if not safe_start:
     store.interrupt_revision_runs()
     store.interrupt_generation_runs()
@@ -86,6 +90,14 @@ if not safe_start:
 
 
 _recovery_stop=threading.Event()
+
+
+@app.middleware('http')
+async def protect_corpus_binding(request, call_next):
+    if (corpus_switch['status'] in {'recovering', 'blocked'} and request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}
+            and request.url.path != '/api/knowledge/repair'):
+        return JSONResponse(status_code=503, content={'detail': {**corpus_switch, 'message': corpus_switch['error']}})
+    return await call_next(request)
 
 
 def recover_authorized_evaluations():
@@ -122,10 +134,21 @@ def recover_authorized_evaluations():
 def start_recovery_monitor():
     _recovery_stop.clear()
     def monitor():
+        global corpus_switch
         retention_due=not safe_start
         had_jobs=False
         while not _recovery_stop.is_set():
             try:
+                if not ai_service.force_mock and (corpus_manager.recover_pending() or corpus_manager.active()):
+                    _recovery_stop.wait(5)
+                    continue
+                if corpus_switch['status'] == 'recovering':
+                    repair = corpus_manager.repair_switch(store.database_path)
+                    if repair['status'] != 'recovering':
+                        corpus_switch = repair
+                if corpus_switch['status'] in {'recovering', 'blocked'}:
+                    _recovery_stop.wait(5)
+                    continue
                 from .history import has_active_jobs, prune_history
                 with store.connection() as connection:active=has_active_jobs(connection)
                 active=active or followup_jobs.has_active()
@@ -336,6 +359,16 @@ def require_current_baseline(run_id: str | None = None):
         raise HTTPException(status_code=409, detail=str(error)) from error
 
 
+def _full_coverage(identity, fallback):
+    with store.connection() as connection:
+        previews = connection.execute('SELECT plan_json FROM coverage_plan_previews ORDER BY created_at DESC').fetchall()
+    for preview in previews:
+        plan = json.loads(preview['plan_json'])
+        if plan['corpus_fingerprint'] == identity and plan['profile'] == {'name': 'full', **GENERATION_PROFILES['full']}:
+            return plan
+    return fallback
+
+
 @app.get('/api/knowledge')
 def knowledge():
     with CORPUS_LOCK:
@@ -343,29 +376,21 @@ def knowledge():
         index = corpus.index_info()
         manifest_path = corpus.index_dir/'manifest.json'
         manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
-        coverage = index.get('coverage')
-        # Profile plans are versioned separately; immutable index artifacts remain unchanged.
-        with store.connection() as connection:
-            previews = connection.execute('SELECT plan_json FROM coverage_plan_previews ORDER BY created_at DESC').fetchall()
-        for preview in previews:
-            plan = json.loads(preview['plan_json'])
-            if plan['corpus_fingerprint'] == index.get('knowledge_identity') and plan['profile'] == {'name': 'full', **GENERATION_PROFILES['full']}:
-                coverage = plan
-                break
+        coverage = _full_coverage(index.get('knowledge_identity'), index.get('coverage'))
         from .read_view import semantic_coverage
         coverage=semantic_coverage(coverage,corpus.chunks()) if coverage else None
         index={**index,'coverage':coverage}
         fresh = manifest.get('sources') == current_manifest()['sources']
         operations = [corpus_manager.operation(p.stem) for p in (corpus_manager.data_dir/'corpus_operations').glob('*.json')]
         operation = next(iter(sorted((o for o in operations if o), key=lambda o: o['id'].rsplit('-', 1)[-1], reverse=True)), None)
-        updating = bool(operation and operation['status'] == 'running')
-        if updating or not fresh: coverage = None
+        updating = bool(operation and operation['status'] in ACTIVE_OPERATIONS) or corpus_switch['status'] == 'recovering'
+        if updating or not fresh or corpus_switch['status'] == 'blocked': coverage = None
         documents = corpus.documents()
         return {'target_config': index.get('knowledge_config') or CONFIG, 'providers': provider_status(), 'index': index,
                 'identity': index.get('knowledge_identity'), 'legacy': not bool(index.get('knowledge_identity')),
                 'documents': len(documents), 'pages': sum(d.get('pages') or 0 for d in documents),
                 'coverage': coverage, 'coverage_plan_id': coverage.get('plan_id') if coverage else None, 'coverage_status': 'calculating' if updating else 'ready' if coverage else 'pending',
-                'operation': operation, 'sample_children': corpus.chunks()[:3] if index.get('knowledge_identity') else []}
+                'operation': operation, 'corpus_switch': corpus_switch, 'sample_children': corpus.chunks()[:3] if index.get('knowledge_identity') else []}
 
 
 @app.get('/api/knowledge/topics')
@@ -416,7 +441,7 @@ def knowledge_slot(slot_id: str):
         return {**slot, 'identity': state['identity'], 'coverage_plan_id': plan['plan_id'], 'material_children': [chunks[key] for key in slot['material_chunk_ids']], 'golden_candidates': [{key: q.get(key) for key in ('id', 'question', 'reference_answer', 'evidence', 'probe_status', 'qc_status', 'review_status')} for q in store.questions() if q.get('raw', {}).get('plan_id') == plan['plan_id'] and q.get('raw', {}).get('coverage_slot') == slot_id]}
 
 
-def start_knowledge_golden():
+def start_knowledge_golden(operation_id):
     """Continue real Full construction only; the existing workflow ends at Human Gate 1."""
     # 2026-11-18：题卷由总指挥亲自出（规则总表一.4a），换知识库后不自动付费生成题目；.env 设 RAG_SKIP_AUTO_GOLDEN=1 时跳过。
     from .config import load_values
@@ -424,15 +449,28 @@ def start_knowledge_golden():
         return None
     if not ai_service.live_enabled: raise ProviderUnavailable('DeepSeek missing; Corpus preserved, Golden not run')
     with CORPUS_LOCK:
-        state = knowledge()
-        plan = state['coverage']
-        if not plan: raise ValueError('Current Knowledge Coverage unavailable')
+        path = corpus.index_dir / 'coverage.json'
+        identity = manifest_identity(current_manifest())
+        plan = _full_coverage(identity, json.loads(path.read_text()) if path.is_file() else {})
+        if plan.get('corpus_fingerprint') != identity:
+            raise ValueError('Current Knowledge Coverage unavailable')
+        from .read_view import semantic_coverage
+        plan = semantic_coverage(plan, corpus.chunks())
         from .governance import _json
         with store.connection() as connection:
             connection.execute('INSERT OR IGNORE INTO coverage_plan_previews (id, plan_json, created_at) VALUES (?, ?, ?)', (plan['plan_id'], _json(plan), plan['created_at']))
-        run_id = store.start_generation_run(ai_service.model, 'full', coverage_plan=plan)
-    threading.Thread(target=_run_mini_generation, args=(run_id, store, ai_service, corpus), daemon=True).start()
-    return run_id
+        return store.start_generation_run(ai_service.model, 'full', coverage_plan=plan, corpus_operation_id=operation_id)
+
+
+@app.post('/api/knowledge/repair', dependencies=[Depends(require_trusted_origin)])
+def repair_knowledge():
+    global corpus_switch
+    repair = corpus_manager.repair_switch(store.database_path)
+    if repair['status'] != 'recovering':
+        corpus_switch = repair
+    if repair['status'] in {'blocked', 'recovering'}:
+        raise HTTPException(status_code=409, detail={**repair, 'message': repair['error']})
+    return repair
 
 
 @app.post('/api/knowledge/rebuild', status_code=202, dependencies=[Depends(require_trusted_origin)])
@@ -804,7 +842,9 @@ _golden_recovery_threads = {}
 
 
 def _golden_owner():
-    return {'auto_resume': True, 'execution_owner_pid': os.getpid(), 'worker_thread': threading.get_ident()}
+    from .paid_run import current_paid_run
+    return {'auto_resume': True, 'execution_owner_pid': os.getpid(), 'worker_thread': threading.get_ident(),
+            'controlled_paid_run': current_paid_run() is not None}
 
 
 def _wait_golden_price(run_id, run_store):
@@ -868,42 +908,63 @@ def recover_golden_jobs():
         thread.start()
     for row in generations:
         quality = row['quality_status'] == 'running'
-        owner = {'execution_owner_pid': row['quality_pid'] if quality else row['owner_pid'],
-                 'worker_thread': row['quality_thread'] if quality else row['worker_thread'],
-                 'worker_claimed_at': row['quality_claimed_at'] if quality else row['claimed_at']}
-        if not (row['quality_auto'] if quality else row['auto_resume']) or _golden_owner_alive(owner):
+        nested_owner = quality and (row['quality_auto'] or row['status'] not in {'probing', 'qc'})
+        owner = {'execution_owner_pid': row['quality_pid'] if nested_owner else row['owner_pid'],
+                 'worker_thread': row['quality_thread'] if nested_owner else row['worker_thread'],
+                 'worker_claimed_at': row['quality_claimed_at'] if nested_owner else row['claimed_at']}
+        if not (row['quality_auto'] if nested_owner else row['auto_resume']) or _golden_owner_alive(owner):
             continue
         run = store.generation_run(row['id'], qualification=False)
+        audit = run['artifacts']['hard_validation']
+        state = audit.get('quality_rerun', {})
+        if (state.get('controlled_paid_run') if quality else False) or (
+                row['status'] in {'queued', 'coverage', 'generating', 'validation', 'probing', 'qc'}
+                and audit.get('controlled_paid_run')):
+            error = '受限费用运行已中断，需要沿用原费用授权和账本恢复'
+            if quality:
+                store.update_quality_rerun(row['id'], {'status': 'failed', 'error': error})
+            if row['status'] in {'queued', 'coverage', 'generating', 'validation', 'probing', 'qc'}:
+                store.update_generation_run(row['id'], status='failed', validation={'error': error, 'failed_stage': row['status']})
+            continue
+        if not store.claim_generation_recovery(row['id'], row['status'], owner, quality_status=row['quality_status'], nested_owner=nested_owner):
+            continue
         if quality and row['status'] not in {'probing', 'qc'}:
-            state = run['artifacts']['hard_validation']['quality_rerun']
             ids = state.get('question_ids') or state.get('selected_question_ids') or run['question_ids']
-            start(row['id'], _run_quality_rerun, (row['id'], ids, store, ai_service, corpus))
+            start(row['id'], _run_quality_rerun, (row['id'], ids, store, ai_service, corpus), {'recovering': True})
         else:
             start(row['id'], _run_mini_generation, (row['id'], store, ai_service, corpus),
-                  {'resume_quality': row['status'] in {'probing', 'qc'}})
+                  {'resume_quality': row['status'] in {'probing', 'qc'}, 'recovering': True})
     for row in revisions:
         if not row['auto_resume'] or _golden_owner_alive({'execution_owner_pid': row['owner_pid'], 'worker_thread': row['worker_thread'], 'worker_claimed_at': row['claimed_at']}):
             continue
         run = store.revision_run(row['id'])
+        if run.get('controlled_paid_run'):
+            error = '受限费用运行已中断，需要沿用原费用授权和账本恢复'
+            if run.get('applied_at'):
+                store.finish_revision_quality(row['id'], run.get('quality_results') or {}, error=error)
+            else:
+                store.update_revision(row['id'], status='failed', error=error)
+            continue
+        draft_kind = (run.get('active_draft') or {}).get('kind')
         target = (_run_revision_quality if run.get('applied_at') else
-                  _regenerate_revision_draft if run.get('active_draft', {}).get('kind') in {'regenerate', 'reselect'} else
-                  _resume_revision_edit if run.get('active_draft', {}).get('kind') == 'edit' else _prepare_revision)
+                  _regenerate_revision_draft if draft_kind in {'regenerate', 'reselect'} else
+                  _resume_revision_edit if draft_kind == 'edit' else _prepare_revision)
         start(row['id'], target, (row['id'], store, ai_service, corpus))
 
 
-def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=False, resume_quality=False, paid_run=None):
+def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=False, resume_quality=False, recovering=False, paid_run=None):
     from .paid_run import controlled_run
     if paid_run is not None and (regenerate or not resume_quality):
         raise ValueError('Controlled paid run only permits existing quality work')
     # Pass the run explicitly: ContextVars are not inherited by background threads.
     with controlled_run(paid_run):
-        return _run_mini_generation_work(run_id,run_store,service,run_corpus,regenerate=regenerate,resume_quality=resume_quality)
+        return _run_mini_generation_work(run_id,run_store,service,run_corpus,regenerate=regenerate,resume_quality=resume_quality,recovering=recovering)
 
 
-def _run_mini_generation_work(run_id, run_store, service, run_corpus, *, regenerate=False, resume_quality=False):
+def _run_mini_generation_work(run_id, run_store, service, run_corpus, *, regenerate=False, resume_quality=False, recovering=False):
     from .paid_run import current_paid_run
-    stage = "generation"
     initial = run_store.generation_run(run_id, qualification=False)
+    stage = initial['status'] if resume_quality else 'generation'
     profile = initial["profile"]
     run_store.update_generation_run(run_id, status=initial['status'], validation=_golden_owner())
 
@@ -915,11 +976,20 @@ def _run_mini_generation_work(run_id, run_store, service, run_corpus, *, regener
         if slot != active_slot:
             _wait_golden_price(run_id, run_store)
             active_slot = slot
-        checkpoint = generation_checkpoints.setdefault(slot + ':' + str(attempt), {'attempts': []})
-        return perform_stage(checkpoint, 'generation', work, run_id + ':' + slot + ':' + str(attempt),
-                             automatic=False, check_stop=lambda: None,
-                             on_state=lambda *args, **kwargs: run_store.save_job_checkpoint(
-                                 run_id, 'generation:' + slot + ':' + str(attempt), checkpoint))
+        key = slot + ':' + str(attempt)
+        checkpoint = generation_checkpoints.setdefault(key, {'attempts': []})
+        if 'stage_result' not in checkpoint:
+            def save(*args, **kwargs):
+                run_store.save_job_checkpoint(run_id, 'generation:' + key, checkpoint)
+            checkpoint['stage_result'] = perform_stage(checkpoint, 'generation', work, run_id + ':' + key,
+                                                       automatic=False, check_stop=lambda: None, on_state=save)
+            save()
+        else:
+            from .evaluation_stage import checkpoint_usage
+            from .telemetry import collect_usage
+            with collect_usage() as usage:
+                usage.extend(checkpoint_usage(checkpoint))
+        return checkpoint['stage_result']
     def generate(**kwargs):
         _wait_golden_price(run_id, run_store)
         if isinstance(service, AiService):
@@ -932,31 +1002,49 @@ def _run_mini_generation_work(run_id, run_store, service, run_corpus, *, regener
         if stage == "generating":
             run_store.persist_generation_attempt(run_id, event.get("candidate"), event["slot_audit"], slot=event["slot"], attempt=event["attempt"], model=service.model, slot_complete=event.get("slot_complete"))
         else:
-            run_store.update_generation_run(run_id, status=stage, coverage_plan=event.get("coverage_plan"), progress={key: event[key] for key in ("stage", "slot", "attempt", "completed_slots") if key in event})
+            progress = {key: event[key] for key in ("stage", "slot", "attempt", "completed_slots") if key in event}
+            if stage == 'coverage':
+                current = run_store.generation_run(run_id, qualification=False)['artifacts']['hard_validation'].get('progress', {})
+                progress['planned_pass'] = [current.get('operation_id'), current.get('refill_round')]
+            run_store.update_generation_run(run_id, status=stage, coverage_plan=event.get("coverage_plan"), progress=progress)
 
     try:
         chunks = run_corpus.chunks()
-        frozen = run_store.generation_run(run_id)['artifacts']['hard_validation'].get('frozen_plan')
+        artifacts = initial['artifacts']
+        audit = artifacts['hard_validation']
+        fingerprint = manifest_identity(current_manifest())
+        if recovering and (audit.get('corpus_fingerprint') != fingerprint or initial['model_version'] != service.model):
+            raise ValueError('Corpus 或模型与原 Generation Run 不一致')
+        frozen = audit.get('frozen_plan')
         if frozen:
             from .golden_v2 import digest
             if frozen['corpus_fingerprint'] != manifest_identity(current_manifest()) or frozen['chunk_fingerprint'] != digest(sorted(chunks, key=lambda item: item['chunk_id'])):
                 raise ValueError('Coverage Plan 已失效：Corpus 已变化')
         complete = resume_quality
-        regenerate = regenerate or bool(run_store.generation_run(run_id, qualification=False)['question_ids'])
-        for round_number in ([] if resume_quality else range(1, 4 if regenerate and not (frozen and frozen.get('generation_strategy') == 'business_v2') else 2)):
-            if regenerate:
+        regenerate = regenerate or (bool(audit.get('regeneration_count')) if recovering else bool(initial['question_ids']))
+        progress = audit.get('progress', {})
+        current_pass = [progress.get('operation_id'), progress.get('refill_round')]
+        resume_plan = recovering and bool(artifacts['coverage_plan']) and (not regenerate or current_pass == progress.get('planned_pass'))
+        first_round = (progress.get('refill_round') or 1) if regenerate else 1
+        round_limit = 3 if regenerate and not (frozen and frozen.get('generation_strategy') == 'business_v2') else 1
+        for round_number in ([] if resume_quality else range(first_round, round_limit + 1)):
+            if regenerate or resume_plan:
                 run = run_store.generation_run(run_id)
+                progress = run['artifacts']['hard_validation'].get('progress', {})
                 remaining_before = len(run["artifacts"]["coverage_plan"]) - len(run["question_ids"])
+                if regenerate and resume_plan:
+                    remaining_before = progress.get('phase_total', remaining_before)
                 by_id = {chunk["chunk_id"]: chunk for chunk in chunks}
                 passed = [run_store.question(question_id) for question_id in run["question_ids"]]
-                existing = [{"coverage_slot": row["raw"]["coverage_slot"], "test_category": row["test_category"], "question": row["question"], "reference_answer": row["reference_answer"], "evidence": row["evidence"], "expected_behavior": row["raw"].get("expected_behavior"), "negative_subtype": row["negative_subtype"], "ablation_attribute": row["raw"].get("ablation_attribute")} for row in passed]
+                existing = [{**row['raw'], **{key: row[key] for key in (
+                    'test_category', 'question', 'reference_answer', 'evidence', 'negative_subtype')}} for row in passed]
                 prior_audit = run["artifacts"]["slot_audit"]
                 plan = []
                 for slot in run["artifacts"]["coverage_plan"]:
                     source_ids = slot.get("material_chunk_ids") or slot.get("evidence_chunk_ids") or []
                     if not source_ids or any(chunk_id not in by_id for chunk_id in source_ids):
                         raise ValueError(f"{slot['slot']} 原始 Coverage 材料不可用")
-                    if not run['artifacts']['hard_validation'].get('frozen_plan') and slot["slot"] in prior_audit and len(prior_audit[slot["slot"]]) > 2 and prior_audit[slot["slot"]][-1]["validation_error"]:
+                    if regenerate and not resume_plan and not frozen and slot["slot"] in prior_audit and len(prior_audit[slot["slot"]]) > 2 and prior_audit[slot["slot"]][-1]["validation_error"]:
                         original = by_id[source_ids[0]]
                         alternatives = [chunk for chunk in chunks if chunk["chunk_id"] not in source_ids and (chunk.get("document_id") == original.get("document_id") or original.get("product") and chunk.get("product") == original.get("product"))]
                         alternative = next(iter(sorted(alternatives, key=lambda chunk: chunk.get("document_id") != original.get("document_id"))), None)
@@ -964,7 +1052,12 @@ def _run_mini_generation_work(run_id, run_store, service, run_corpus, *, regener
                             source_ids = [alternative["chunk_id"]]
                             slot = {**slot, "material_chunk_ids": source_ids, "evidence_chunk_ids": source_ids if slot["test_category"] != "negative" else [], "selected_reason": "same_product_retry", "structured_type": None}
                     plan.append({**slot, "sources": [by_id[chunk_id] for chunk_id in source_ids]})
-                generated = generate(plan=plan, existing=existing, prior_audit=prior_audit, profile=profile, coverage_plan=run['artifacts']['hard_validation'].get('frozen_plan'))
+                pass_id = [progress.get('operation_id'), progress.get('refill_round')]
+                cursor = progress.get('generation_cursor', {})
+                resume = {'resume_cursor': cursor} if resume_plan and cursor.get('pass_id') == pass_id else {}
+                generated = generate(plan=plan, existing=existing, prior_audit=prior_audit, profile=profile,
+                                     coverage_plan=frozen, **resume)
+                resume_plan = False
             else:
                 frozen = run_store.generation_run(run_id)['artifacts']['hard_validation'].get('frozen_plan')
                 kwargs = {'profile': profile}
@@ -988,12 +1081,15 @@ def _run_mini_generation_work(run_id, run_store, service, run_corpus, *, regener
         import uuid
         ids = run_store.generation_run(run_id, qualification=False)['question_ids']
         prior = run_store.generation_run(run_id, qualification=False)['artifacts']['hard_validation'].get('quality_rerun',{})
-        for checkpoint in prior.get('checkpoints',{}).values():checkpoint.pop('final_retry_done',None)
-        for slot in prior.get('slots',{}).values():slot.pop('final_retry_done',None)
         stage = 'probing'
-        run_store.update_generation_run(run_id,status='probing',progress={'stage':'probing','probe_completed':0,'qc_skipped':0},
-            validation={'quality_rerun':{**prior,'status':'running','stage':'probe','attempt_id':uuid.uuid4().hex,'final_retry_started':False,
-                'error':None,'finished_at':None,'started_at':datetime.now(timezone.utc).isoformat()}})
+        if recovering and resume_quality and prior.get('status') == 'failed':
+            raise ProviderUnavailable(prior.get('error') or '原 Probe/QC 已结束并记录失败')
+        if not (recovering and prior.get('status') == 'running'):
+            for slot in prior.get('slots', {}).values():
+                slot.pop('final_retry_done', None)
+            run_store.update_generation_run(run_id,status='probing',progress={'stage':'probing','probe_completed':0,'qc_skipped':0},
+                validation={'quality_rerun':{**prior,**_golden_owner(),'status':'running','stage':'probe','attempt_id':uuid.uuid4().hex,'final_retry_started':False,
+                    'error':None,'finished_at':None,'started_at':datetime.now(timezone.utc).isoformat()}})
         _run_quality_rerun(run_id,ids,run_store,service,run_corpus,generation_progress=True)
         outcome=run_store.generation_run(run_id,qualification=False)['artifacts']['hard_validation']['quality_rerun']
         if outcome['status']=='failed':
@@ -1045,7 +1141,7 @@ def _quality_check(run_store, service, question_id):
     return qc, run_store.record_qc(question_id, qc, "failed" if qc.get("priority") == "P0" else "passed", execution=execution)
 
 
-def _run_quality_rerun(run_id, ids, run_store, service, run_corpus, *, generation_progress=False):
+def _run_quality_rerun(run_id, ids, run_store, service, run_corpus, *, generation_progress=False, recovering=False):
     from .evaluation_stage import perform_stage
     from .golden_v2 import validate_golden_candidate
     from .providers import permanent_provider_error
@@ -1079,6 +1175,8 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus, *, generatio
         persist(**values)
 
     try:
+        if recovering and validation_state.get('corpus_fingerprint') != manifest_identity(current_manifest()):
+            raise ValueError('Corpus 已变化，不能恢复原来的 Probe/QC')
         chunks=run_corpus.chunks(); peers=[run_store.question(key) for key in run_store.generation_run(run_id,qualification=False)['question_ids']]
         for item in peers:
             validation=validate_golden_candidate({**item['raw'],**item},chunks)
@@ -1132,8 +1230,17 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus, *, generatio
                                 cp.setdefault('manual_resume_history',[]).append({'provider_requests':retired,'reason':'retry of invalid quality response'})
                                 for request_key in retired:del requests[request_key]
                                 persist_checkpoint(key,cp,stage=phase,slot=slot)
-                        return perform_stage(cp,phase,action,stage_run_id,automatic=False,check_stop=lambda:None,
-                                             on_state=lambda *args,**kwargs:persist_checkpoint(key,cp,stage=phase,slot=slot))
+                        def save(*args, **kwargs):
+                            persist_checkpoint(key, cp, stage=phase, slot=slot)
+                        if phase not in {'qc', 'business_audit'}:
+                            return perform_stage(cp, phase, action, stage_run_id, automatic=False, check_stop=lambda: None, on_state=save)
+                        results = cp.setdefault('stage_results', {})
+                        saved = results.get(phase, {})
+                        if saved.get('run_id') != stage_run_id:
+                            results[phase] = {'run_id': stage_run_id, 'value': perform_stage(
+                                cp, phase, action, stage_run_id, automatic=False, check_stop=lambda: None, on_state=save)}
+                            save()
+                        return results[phase]['value']
                     row=run_store.candidate_rows([key])[0]
                     if item['raw'].get('generation_strategy')=='business_v2' and not row['quality_audit']:
                         audit=perform('business_audit',lambda:service.business_quality_audit(item,[q['question'] for q in peers if q['id']!=key]))
@@ -1406,11 +1513,13 @@ def _run_revision_quality(revision_id, run_store, service, run_corpus):
                     candidate = run_store.question(item_id)
                     if candidate['raw'].get('generation_strategy') == 'business_v2' and not run_store.candidate_rows([item_id])[0]['quality_audit']:
                         peers = [run_store.question(key)['question'] for key in run_store.generation_run(run['generation_run_id'], qualification=False)['question_ids'] if key != item_id]
-                        audit = _revision_attempt(run_store, revision_id, 'business_audit', service, lambda: service.business_quality_audit(candidate, peers))
+                        audit = _revision_attempt(run_store, revision_id, 'business_audit', service, lambda: service.business_quality_audit(candidate, peers), question_id=item_id)
                         run_store.save_quality_audit(item_id, audit)
                     completed = run_store.revision_quality_step(run, item_id)
-                    if completed == "done":
-                        results[item_id] = {"probe": "passed", "qc": candidate["qc_status"]}
+                    if completed in {"done", "skipped"}:
+                        results[item_id] = ({"probe": "passed", "qc": candidate["qc_status"]} if completed == "done"
+                                            else {"probe": "failed", "qc": "skipped",
+                                                  "probe_reason": run_store.probe_history(item_id)[0].get("reason")})
                         run_store.update_revision(revision_id, progress={"current": index, "total": len(run["question_ids"])}, quality_results=results)
                         continue
                     if completed == "qc":
@@ -1418,7 +1527,7 @@ def _run_revision_quality(revision_id, run_store, service, run_corpus):
                     else:
                         run_store.update_revision(revision_id, status="probing", stage="probe", progress={"current": index - 1, "total": len(run["question_ids"])}, quality_results=results)
                         run_store.reset_qc_for_rerun(item_id)
-                        probe = _revision_attempt(run_store, revision_id, "probe", service, lambda: run_store.run_probe(item_id, service.retriever, chunks, service.answerability_check, subtype_judge=service.negative_subtype_check, fail_on_judge_error=True))
+                        probe = _revision_attempt(run_store, revision_id, "probe", service, lambda: run_store.run_probe(item_id, service.retriever, chunks, service.answerability_check, subtype_judge=service.negative_subtype_check, fail_on_judge_error=True), question_id=item_id)
                         if probe.get('probe_details',{}).get('probe_execution_status') in {'failed','uncertain'}:
                             raise ProviderUnavailable('Revision Probe 判断未完成：'+json.dumps(probe.get('probe_details',{}),ensure_ascii=False))
                         results[item_id] = {"probe": probe["status"], "probe_reason": probe.get("reason")}
@@ -1426,7 +1535,7 @@ def _run_revision_quality(revision_id, run_store, service, run_corpus):
                         results[item_id] = {"probe": "passed", "probe_reason": (run.get("quality_results") or {}).get(item_id, {}).get("probe_reason")}
                     if results[item_id]["probe"] == "passed":
                         run_store.update_revision(revision_id, status="qc", stage="qc", quality_results=results)
-                        qc, saved = _revision_attempt(run_store, revision_id, "qc", service, lambda: _quality_check(run_store, service, item_id))
+                        qc, saved = _revision_attempt(run_store, revision_id, "qc", service, lambda: _quality_check(run_store, service, item_id), question_id=item_id)
                         results[item_id].update({"qc": saved["status"], "qc_reason": qc.get("reason")})
                     else:
                         results[item_id]["qc"] = "skipped"
@@ -1453,10 +1562,14 @@ def _revision_attempt(run_store, revision_id, stage, service, work, *, question_
     run = run_store.revision_run(revision_id)
     number = (run.get('active_draft') or {}).get('number', 0)
     key = 'revision:' + stage + ':' + str(number)
-    checkpoint = run_store.job_checkpoint(revision_id, key) if hasattr(run_store, 'job_checkpoint') else None
+    read_checkpoint = getattr(run_store, 'job_checkpoint', None)
+    checkpoint = read_checkpoint(revision_id, key) if read_checkpoint else None
     if question_id:
         key += ':' + question_id
-        checkpoint = run_store.job_checkpoint(revision_id, key) or checkpoint
+        # Older paired revisions shared a key. Reuse exact RPC payloads and give each question its own retry history.
+        saved_requests = dict((checkpoint or {}).get('provider_requests', {}))
+        checkpoint = read_checkpoint(revision_id, key) if read_checkpoint else None
+        checkpoint = checkpoint or {'attempts': [], 'provider_requests': saved_requests}
     checkpoint = checkpoint or {'attempts': []}
     previous = checkpoint['attempts'][-1] if checkpoint['attempts'] else {}
     if previous.get('status') == 'error' and (previous.get('error_type') in {'ProviderInvalidResponse', 'ValueError', 'JSONDecodeError'}

@@ -780,7 +780,7 @@ class AiService:
             raise ProviderUnavailable('修订业务元数据响应未符合契约') from error
         return {key:result[key] for key in ('business_scenario','user_intent')}
 
-    def generate_mini_golden(self, chunks: list[dict], on_progress=None, embeddings=None, *, plan=None, existing=None, prior_audit=None, profile=None, coverage_plan=None, stage_runner=None) -> dict:
+    def generate_mini_golden(self, chunks: list[dict], on_progress=None, embeddings=None, *, plan=None, existing=None, prior_audit=None, profile=None, coverage_plan=None, stage_runner=None, resume_cursor=None) -> dict:
         """Generate a coverage-planned Golden set; approval remains human-only."""
         if not self.live_enabled:
             raise ProviderRequestError("未配置 DEEPSEEK_API_KEY，无法生成 Golden Candidate")
@@ -794,18 +794,27 @@ class AiService:
         coverage = [{**{key: value for key, value in slot.items() if key != "sources"}, "material_chunk_ids": [source["chunk_id"] for source in slot["sources"]]} for slot in plan]
         if on_progress:
             on_progress({"stage": "coverage", "coverage_plan": coverage})
+        cursor_pending = bool(resume_cursor)
         for slot in plan:
+            at_cursor = cursor_pending and slot['slot'] == resume_cursor['slot']
+            if at_cursor:
+                cursor_pending = False
             if slot.get('generation_path') == 'business_question_first' and coverage_plan:
                 slot = self.business_slot_scope(slot,coverage_plan,chunks)
             attempts, candidate = list(slot_audit.get(slot["slot"], [])), None
             if any(item.get("coverage_slot") == slot["slot"] for item in candidates):
+                continue
+            if attempts and (cursor_pending or at_cursor and resume_cursor['slot_complete']):
+                failed_slots.append(slot["slot"])
                 continue
             pending_design = attempts.pop().get('business_design') if attempts and attempts[-1].get('validation_error') == 'evidence_verification_pending' else None
             from .paid_run import current_paid_run
             paid_scope = current_paid_run()
             final_replacement = bool(paid_scope and getattr(paid_scope, 'golden_replacement_round', None) == 2 and getattr(paid_scope, 'golden_replacement_run_id', None) == paid_scope.identity.get('generation_run_id') and coverage_plan and paid_scope.identity.get('plan_id') == coverage_plan['plan_id'])
             draft_revision = getattr(paid_scope, 'golden_draft_revisions', {}).get(slot['slot']) if paid_scope and getattr(paid_scope,'golden_revision_run_id',None) == paid_scope.identity.get('generation_run_id') and coverage_plan and paid_scope.identity.get('plan_id') == coverage_plan['plan_id'] else None
-            attempt_limit = min(1 if final_replacement else 2, max(0, (4 if final_replacement else 3) - len(attempts))) if slot.get('generation_path') == 'business_question_first' else 2
+            previous_attempts = resume_cursor['first_attempt'] - 1 if at_cursor else len(attempts)
+            attempt_limit = min(1 if final_replacement else 2, max(0, (4 if final_replacement else 3) - previous_attempts)) if slot.get('generation_path') == 'business_question_first' else 2
+            attempt_limit = max(0, attempt_limit - (len(attempts) - previous_attempts))
             if draft_revision and len(attempts) == 4:
                 pending_design, attempt_limit = draft_revision['business_design'], 1
             slot = {**slot, 'failed_business_intents':[a['business_design']['user_intent'] for a in attempts if (a.get('business_design') or {}).get('user_intent')]}
@@ -846,7 +855,8 @@ class AiService:
                     context = {'seen': seen, 'slot_id': slot['slot'], 'occupied_slots': [item['coverage_slot'] for item in candidates]}
                     if coverage_plan and slot['test_category'] == 'negative':
                         with collect_usage() as topic_usage:
-                            context['question_embedding'] = self.negative_topic_embedding(candidate['question'])
+                            work = lambda: np.asarray(self.negative_topic_embedding(candidate['question'])).tolist()
+                            context['question_embedding'] = stage_runner(slot['slot'] + ':topic', attempt, work) if stage_runner else work()
                         generated_usage.extend(topic_usage)
                     checks = validate_golden_candidate(candidate, chunks, coverage_plan, context)
                     errors = checks['blocking_errors']
@@ -870,7 +880,7 @@ class AiService:
                 if not error:
                     break
             slot_audit[slot["slot"]] = attempts
-            if attempts[-1]["validation_error"]:
+            if not attempts or attempts[-1]["validation_error"]:
                 failed_slots.append(slot["slot"])
         validation = self._hard_validate(candidates, chunks)
         expected_count = len(plan)
