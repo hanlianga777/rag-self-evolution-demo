@@ -22,7 +22,7 @@ def _versions(judge):
         judge_version is None and generation_version in {'generation-vnext-2', 'generation-vnext-3', 'generation-vnext-4'})
     prompts.update(judge=LEGACY_RUBRIC_JUDGE_PROMPT if legacy_judge else RUBRIC_JUDGE_PROMPT, agent_system=agent_system)
     return {
-        'rules_hash': rules.RULES_HASH,
+        'rules_hash': rules.EVALUATION_RULES_HASH,
         'search_space_version': rules.canonical_hash({key: spec['allowed'] for key, spec in search_space_contract(for_agent=True).items()}),
         'prompt_version': {name: hashlib.sha256(template.encode()).hexdigest() for name, template in prompts.items()},
     }

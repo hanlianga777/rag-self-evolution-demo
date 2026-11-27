@@ -33,7 +33,7 @@ def parameter_diff(config, base):
     return {k:v for k,v in pipeline_config(config).items() if k in ALLOWED_SEARCH_SPACE and (type(v) is not type(base.get(k)) or v != base.get(k))}
 
 
-def build_d_facts(store, baseline, winner, history):
+def build_d_facts(store, baseline, winner, history, *, decision_version=None):
     """Read the saved decision evidence for the Winner and its comparison runs."""
     questions = {q['id']:q for q in json.loads(baseline['dataset_snapshot_json']).get('questions', [])}
     base = pipeline_config(baseline['config'])
@@ -120,17 +120,20 @@ def build_d_facts(store, baseline, winner, history):
                          'margin':delta(metric(winner['result'],g['metric']),g['threshold']) if g['operator']=='>=' else delta(g['threshold'],metric(winner['result'],g['metric'])),
                          'unit':'秒' if 'latency' in g['metric'] else '百分点'} for g in GATE_DEFINITIONS],
         'missing_winner_cases':sorted(set(questions)-set(win_cases)), 'note':'仅保存结果；缺记录为未知，伴随出现不等于导致。前提不同的副作用是待验证风险，不能单独作为放弃理由。'}
-    facts['usable_repairs'] = usable_repairs(facts, allow_thinking=verdict.current(winner['result']))
+    facts['usable_repairs'] = usable_repairs(facts, allow_thinking=verdict.current(winner['result']),
+                                            decision_version=decision_version)
     return facts
 
 
-def usable_repairs(facts, *, allow_thinking):
+def usable_repairs(facts, *, allow_thinking, decision_version=None):
     """Identify historical repairs supported by saved Winner positions, not predicted gains."""
     base = facts['baseline_config']; winner = facts['winner_config']; repairs = []
     tunable = set(rules.AGENT['tunable'])
     if not allow_thinking:
         tunable.discard('generation_thinking')
-    limit = rules.AGENT['d_max_changed_parameters']
+    limit = rules.agent_change_limit(decision_version)
+    preserve_winner = decision_version == rules.BAD_CASE_DECISION_VERSION
+    inherited = parameter_diff(winner, base) if preserve_winner else {}
     for failure in facts['remaining_failures']:
         positions = failure['evidence_positions']
         if not isinstance(positions,list):continue
@@ -165,6 +168,9 @@ def usable_repairs(facts, *, allow_thinking):
                     config = {**winner,**selected}
                     delta = parameter_diff(config,base)
                     excess = max(0,len(delta)-limit)
+                    if preserve_winner and (excess or any(config[k] != v for k, v in inherited.items())
+                                            or len(parameter_diff(config, winner)) > rules.AGENT['max_changed_parameters']):
+                        continue
                     restorable = sorted((delta.keys() - selected.keys()) & tunable)
                     for restore in combinations(restorable,excess):
                         proposal = {**config, **{k:base[k] for k in restore}}
@@ -189,13 +195,13 @@ def effective_d_config(config, changes):
     return effective
 
 
-def validate_d_parameter_limit(config, base):
-    limit = rules.AGENT['d_max_changed_parameters']
+def validate_d_parameter_limit(config, base, *, decision_version=None):
+    limit = rules.agent_change_limit(decision_version)
     if len(parameter_diff(config, base)) > limit:
         raise ValueError(f"相对 Baseline 最多改 {limit} 个参数")
 
 
-def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
+def validate_d_refinement(suggestion, winner, history, baseline_config, facts, *, decision_version=None):
     diff = suggestion.get('proposed_config_diff')
     if not isinstance(diff,dict) or set(diff)-set(ALLOWED_SEARCH_SPACE):raise ValueError('非法Pipeline参数')
     if 'generation_thinking' in diff and diff['generation_thinking'] not in rules.AGENT['thinking_values']:
@@ -207,7 +213,7 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
     if effective_config is None:
         raise ValueError('取值不在Pipeline ALLOWED_SEARCH_SPACE选项里，hybrid_alpha仅在 Hybrid Search 开启时可选')
     changes = parameter_diff(config,winner_config)
-    validate_d_parameter_limit(effective_config, base)
+    validate_d_parameter_limit(effective_config, base, decision_version=decision_version)
     if not changes:raise ValueError('D必须不同于 Winner')
     rows = suggestion.get('changes')
     if not isinstance(rows,list) or len(rows)!=len(changes) or any(not isinstance(r,dict) for r in rows) or {r.get('parameter') for r in rows}!=set(changes):

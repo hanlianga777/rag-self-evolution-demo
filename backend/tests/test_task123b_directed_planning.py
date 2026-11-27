@@ -20,10 +20,14 @@ def hypothesis(changes=None, *, kind='retrieval', targets=('Q01',), risks=('Q07'
                         'risk_question_ids': list(risks)}]}
 
 
-def setup(saved_runs):
+def setup(saved_runs, decision_version='122f'):
     env, _ = saved_runs
     set_settings(env.store, False)
-    return env, env.store, env.store.create_experiment(env.base)
+    experiment = env.store.create_experiment(env.base)
+    with env.store.connection() as db:
+        db.execute("UPDATE experiments SET result_json=json_set(result_json,'$.bad_case_decision_version',?) WHERE id=?",
+                   (decision_version, experiment))
+    return env, env.store, experiment
 
 
 def test_new_requests_are_bounded_and_legacy_request_is_preserved(saved_runs, tmp_path):
@@ -264,10 +268,13 @@ def test_round_review_and_light_api_publish_actual_metrics(saved_runs, monkeypat
     assert response.json()['result']['round_conclusions']['1']['prediction_metrics'] == saved['prediction_metrics']
 
 
-def test_composite_uses_its_own_directed_checks_without_legacy_preview(saved_runs, monkeypatch):
-    env, store, experiment = setup(saved_runs)
+@pytest.mark.parametrize('decision_version', ['122f', '125a'])
+def test_composite_uses_its_own_directed_checks_without_legacy_preview(saved_runs, monkeypatch, decision_version):
+    env, store, experiment = setup(saved_runs, decision_version)
     save = saved_runs[1]
     winner, _ = save(experiment, 'A', 1, {'Q01', 'Q02'}, top_k=6)
+    if decision_version == '125a':
+        winner, _ = save(experiment, 'A', 2, {'Q01', 'Q02', 'Q04'}, top_k=6, rerank=False, query_rewrite=True)
     source, _ = save(experiment, 'B', 4, {'Q03'}, candidate_k=24)
     store.confirm_experiment_report(experiment, winner, '用户')
     change = {'candidate_k': 24}
@@ -318,6 +325,11 @@ def test_composite_uses_its_own_directed_checks_without_legacy_preview(saved_run
     plan = store.experiment(experiment)['result']['round_planning']['D']
     assert plan['pre_review_prediction'] == [request]
     assert plan['post_review_prediction'][0]['predicted_regression_question_ids'] == ['Q01']
+    if decision_version == '125a':
+        assert d['reasoning']['changed_parameters'] == {
+            'top_k': 6, 'rerank': False, 'query_rewrite': True, 'candidate_k': 24,
+        }
+        assert env.runner.start_candidate(d['id'])[3]['id'] == d['id']
 
 
 def test_prediction_metrics_use_actual_finals_and_show_unknown_denominators():

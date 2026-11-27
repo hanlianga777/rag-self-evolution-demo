@@ -1200,7 +1200,7 @@ class EvaluationRunner:
         lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay','manual_resume','experiment_config_identity','final_retry_started','price_pause','provider_retry') if k in run['result']}
         from .request_reuse import bypass_reuse, matching_configuration, question_scope, reused_case
         measure_performance = (bool(config.get('candidate_id')) and
-                               experiment['result'].get('bad_case_decision_version') == rules.BAD_CASE_DECISION_VERSION
+                               rules.uses_bad_case_layers(experiment['result'].get('bad_case_decision_version'))
                                and bool(owner['reasoning'].get('performance_targets')))
         reusable_cases = (matching_configuration(self.store, run) if config.get('candidate_id')
                           and experiment['result'].get('causal_evidence') and not measure_performance else {})
@@ -1473,11 +1473,13 @@ class EvaluationRunner:
         if not validate_candidate_config(candidate["config"])["valid"]:
             raise ValueError("Candidate 参数超出 Search Space")
         use_layered = layered(experiment['result'])
+        decision_version = experiment['result'].get('bad_case_decision_version')
         if use_layered:
             reasoning = candidate['reasoning']
             parent = reasoning.get('winner_id') or reasoning.get('inherited_from')
             current = next((c['config'] for c in experiment['candidates'] if c['id'] == parent), baseline['config'])
-            validate_layered_limits(candidate['config'], current, baseline['config'])
+            validate_layered_limits(candidate['config'], current, baseline['config'],
+                                    decision_version=decision_version)
         if candidate['reasoning'].get('intervention_contract_version') == 'winner-refinement-1':
             from .composite import build_d_facts, validate_d_refinement, parameter_diff, pipeline_config
             decision = experiment['result'].get('composite', {})
@@ -1487,9 +1489,10 @@ class EvaluationRunner:
                     or (experiment['result'].get('report_confirmation') or {}).get('winner_id')!=winner['id']):
                 raise ValueError('D缺少已确认 Winner 和保存建议')
             history = [c for c in experiment['candidates'] if c['status']=='evaluated' and c['reasoning'].get('candidate_label')!='D' and c['result'].get('evaluation_identity')==baseline['judge'].get('evaluation_identity')]
-            facts = build_d_facts(self.store,baseline,winner,history)
+            facts = build_d_facts(self.store, baseline, winner, history, decision_version=decision_version)
             if facts != decision.get('facts'):raise ValueError('D事实表对应的保存结果已变化')
-            config, changes = validate_d_refinement(decision['suggestion'],winner,history,baseline['config'],facts)
+            config, changes = validate_d_refinement(decision['suggestion'], winner, history, baseline['config'], facts,
+                                                   decision_version=decision_version)
             # normalized_fields 只是首次规划时的规整审计；保存的建议已经规整好，复验不会再产生，比较时不计。
             def _audit_free(rows):
                 return [{k:v for k,v in row.items() if k!='normalized_fields'} if isinstance(row,dict) else row for row in rows or []]
@@ -1545,7 +1548,7 @@ class EvaluationRunner:
                     changes = {k:v for k,v in source['config'].items() if v!=base.get(k)}
                 performance_targets = r.get('performance_targets') or []
                 allowed_metrics = []
-                if performance_targets and experiment['result'].get('bad_case_decision_version') == rules.BAD_CASE_DECISION_VERSION:
+                if performance_targets and rules.uses_bad_case_layers(decision_version):
                     reference_id = r.get('inherited_from')
                     reference = self.store.candidate(reference_id) if reference_id else baseline
                     allowed_metrics = failed_performance_gates((reference['result'].get('gates') or {}).get('gates'))
@@ -1664,7 +1667,7 @@ class EvaluationRunner:
         gates = run['result']['gates']
         performance = {}
         reasoning = candidate['reasoning']
-        if state.get('bad_case_decision_version') == rules.BAD_CASE_DECISION_VERSION and (
+        if rules.uses_bad_case_layers(state.get('bad_case_decision_version')) and (
                 reasoning.get('performance_targets') and not reasoning.get('observed_evidence')
                 or reasoning.get('candidate_label') == 'D'):
             from .composite import parameter_diff, pipeline_config

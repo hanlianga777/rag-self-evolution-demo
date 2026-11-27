@@ -189,11 +189,32 @@ def _preview_signal(preview, base_id, changes, base_changes, display_id, qid):
             bool(left and right and left != right))
 
 
-def validate_mechanism(proposal, targets, base_id, preview, ledger, *, base_changes=None, hypothesis_only=False):
+def preview_rejection(preview, ledger, base_id, changes, base_changes):
+    if any(row['base_id'] == base_id and row['changes'] == changes and row['status'] == '弄坏'
+           for row in ledger):
+        return '同底座检查已证实会让答对的题变错'
+    groups = [group for group in preview.get('directed_checks', [])
+              if group['kind'] == 'retrieval' and group['changes'] == changes]
+    for group in groups:
+        if any(_preview_signal({'directed_checks': [group]}, base_id, changes, base_changes,
+                               row['question_id'], row['question_id'])[1] for row in group['results']):
+            return '同底座定向检查已证实标准证据会掉出 Final'
+    if 'directed_checks' not in preview:
+        lost_ids = {qid for config in preview.get('configs', [])
+                    for qid in config.get('evidence_lost_from_final', [])}
+        if any(_preview_signal(preview, base_id, changes, base_changes, qid, qid)[1] for qid in lost_ids):
+            return '同底座检索预演已证实标准证据会掉出 Final'
+    return None
+
+
+def validate_mechanism(proposal, targets, base_id, preview, ledger, *, base_changes=None, hypothesis_only=False,
+                       decision_version=None):
     changes = proposal['config_diff']
     stages = {key: rules.AGENT_PARAMETER_STAGES.get(key, ()) for key in changes}
     actions = {stage for values in stages.values() for stage in values}
     explanations = proposal.get('cross_layer_mechanisms')
+    exploratory = decision_version == rules.BAD_CASE_DECISION_VERSION
+    rejection = preview_rejection(preview, ledger, base_id, changes, base_changes) if exploratory else None
     rows = []
     for target in targets:
         qid = target['question_id']
@@ -213,7 +234,24 @@ def validate_mechanism(proposal, targets, base_id, preview, ledger, *, base_chan
         mechanism = (explanations.get(qid) or explanations.get(display)) if isinstance(explanations, dict) else None
         mechanism = mechanism.strip() if isinstance(mechanism, str) else None
         decision = '拒绝'
-        if code == 'unknown':
+        if exploratory:
+            if rejection:
+                reason = rejection
+            else:
+                direct_stages = {'ranking', 'final'} if code == 'final' else DIRECT_STAGES.get(stage_code, set())
+                direct = bool(direct_stages & actions)
+                cross = bool(changes.keys() & set(rules.AGENT_CONTEXT_PARAMETERS))
+                if not direct and not cross and not proof and code != 'unknown':
+                    reason = '参数作用环节与该题的故障环节不匹配'
+                elif not direct and not (mechanism or hypothesis_only):
+                    reason = '跨层或错因未知的探索须写明逐题作用机制'
+                else:
+                    if not direct and cross and changed_context and not lost and stage_code in {'generation', 'safety'}:
+                        proof.append({'source': '定向检查' if 'directed_checks' in preview else '检索预演',
+                                      'observation': '交付资料改变，标准证据未丢失'})
+                    decision, reason = (('有证据', '同底座检查或保存结果支持该假设') if proof else
+                                        ('探索性', '带机制假设进入 Sandbox 验证'))
+        elif code == 'unknown':
             reason = fault['reason']
         elif code in {'recall', 'ranking'} and set(changes) == {'prompt_strategy'}:
             reason = '标准证据未进 Final，单改回答提示词无法补回证据。'
@@ -279,7 +317,7 @@ def faults_for_cases(baseline, cases, bad_cases, *, decision_version=None):
     faults = {}
     for row in prepare_baseline_rows(baseline, rows):
         fault = fault_stage(row)
-        if decision_version == rules.BAD_CASE_DECISION_VERSION:
+        if rules.uses_bad_case_layers(decision_version):
             fault = bad_case_fault(row, fault)
         faults[row['question_id']] = fault
     return faults

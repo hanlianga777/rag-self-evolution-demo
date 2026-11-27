@@ -504,7 +504,7 @@ def _qualified_abc(experiment):
 def layered_stage_facts(store, experiment, baseline, winner, number):
     from . import verdict
     from .agent_inputs import baseline_bad_case_rows, is_optimization_target
-    from .agent_mechanism import faults_for_cases
+    from .agent_mechanism import faults_for_cases, preview_rejection
     from .agent_planning import enabled
     from .agent_round_contract import fault_layer, round_base, round_opportunities, saved_final_map
     from .composite import parameter_diff, pipeline_config
@@ -516,9 +516,11 @@ def layered_stage_facts(store, experiment, baseline, winner, number):
     final = saved_final_map(store, run_id)
     remaining = {q for q, passed in final.items() if not passed}
     decision_version = experiment['result'].get('bad_case_decision_version')
+    fill_round = decision_version == rules.BAD_CASE_DECISION_VERSION
+    limit = rules.agent_change_limit(decision_version)
     reference = winner or baseline
     performance_gates = (failed_performance_gates((reference['result'].get('gates') or {}).get('gates'))
-                         if decision_version == rules.BAD_CASE_DECISION_VERSION else [])
+                         if rules.uses_bad_case_layers(decision_version) else [])
     if not remaining and not performance_gates:
         return {'remaining_count': 0, 'untried_layers': [], 'has_combination': False}
     candidates = experiment['candidates']
@@ -540,11 +542,18 @@ def layered_stage_facts(store, experiment, baseline, winner, number):
         preview = load_retrieval_preview(store, baseline['id'], foundation=foundation)
     gates = (baseline['result'].get('gates') or {}).get('gates')
     blocked = [row['config_diff'] for row in gate_harming_changes(candidates, gates)]
+    checked = [group for plan in experiment['result'].get('round_planning', {}).values()
+               if plan['base_id'] == base['id'] for group in plan['directed_checks']] if directed else []
+    if fill_round and directed:
+        preview = {'directed_checks': checked}
+        blocked.extend(parameter_diff(row['config'], baseline_config)
+                       for plan in experiment['result'].get('round_planning', {}).values()
+                       for row in plan.get('no_effect', []))
     options = round_opportunities(targets, base, baseline_config, candidates, preview, current, [],
                                  blocked=blocked, use_layered=True, performance_gates=performance_gates,
-                                 before_directed_checks=directed)
+                                 before_directed_checks=directed, decision_version=decision_version)
     untried = {fault_layer(row['fault']['code']) for row in options.values() if row['available']}
-    if not directed and len(base['changes']) < rules.AGENT['d_max_changed_parameters']:
+    if not fill_round and not directed and len(base['changes']) < limit:
         remaining_layers = {fault_layer(row['code']) for row in faults.values()}
         if 'generation' in remaining_layers and not any(
                 row['source'] == '生成诊断' and row['base_id'] == base['id'] for row in current):
@@ -568,21 +577,23 @@ def layered_stage_facts(store, experiment, baseline, winner, number):
             config = {**winner_config, **source_diff}
             delta = parameter_diff(config, winner_config)
             if (not delta or config in tried or len(delta) > rules.AGENT['max_changed_parameters']
-                    or len(parameter_diff(config, baseline_config)) > rules.AGENT['d_max_changed_parameters']
+                    or len(parameter_diff(config, baseline_config)) > limit
                     or not validate_candidate_config(config)['valid']):
+                continue
+            if fill_round and (parameter_diff(config, baseline_config) in blocked
+                               or preview_rejection(preview or {}, current, base['id'], delta, base['changes'])):
                 continue
             other = saved_final_map(store, source['result'].get('evaluation_run_id'))
             if other.keys() == final.keys() and any(other[q] for q in remaining):
                 combined = True
                 break
         if abc_exhausted or number >= rules.AGENT['max_rounds'] or experiment['evaluation_budget']['used'] >= MAX_EVALS - 1:
-            if directed:
-                checked = [group for plan in experiment['result'].get('round_planning', {}).values()
-                           if plan['base_id'] == base['id'] for group in plan['directed_checks']]
+            if directed and not fill_round:
                 options = round_opportunities(targets, base, baseline_config, candidates,
                     {'directed_checks': checked}, current, [], blocked=blocked, use_layered=True,
                     performance_gates=performance_gates)
-            combined = combined or any(row['available'] for row in options.values())
+            combined = combined or any(not fill_round or action['decision'] == '有证据'
+                                       for row in options.values() for action in row['available'])
     return {'remaining_count': len(remaining), 'untried_layers': [] if abc_exhausted else sorted(untried),
             'has_combination': combined}
 
@@ -691,6 +702,9 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
             if use_layered and experiment['result'].get('seed_round_planned') is False:
                 number = 0
             current = [c for c in abc if c['reasoning'].get('round', 1) == number]
+            if experiment['result'].get('bad_case_decision_version') == rules.BAD_CASE_DECISION_VERSION:
+                current.sort(key=lambda c: (c['status'] == 'generated',
+                                            c['reasoning'].get('evidence_status') != '有证据'))
             for candidate in current:
                 candidate = store.candidate(candidate['id'])
                 runnable = candidate['status'] in {'generated','running'} or candidate['status']=='failed' and candidate['result'].get('evaluation_run_id')

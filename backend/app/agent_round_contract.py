@@ -2,7 +2,7 @@
 from itertools import combinations
 
 from . import rules, verdict
-from .agent_mechanism import fault_stage, validate_mechanism
+from .agent_mechanism import fault_stage, preview_rejection, validate_mechanism
 from .composite import parameter_diff, pipeline_config
 from .policy import (PERFORMANCE_METRICS, SAFETY_METRICS, all_gates_pass, candidate_rank,
                      failed_performance_gates, validate_candidate_config)
@@ -33,7 +33,7 @@ def fault_layer(code):
 
 
 def target_layer(remaining_failures, gate_failures, severe_safety, *, decision_version=None):
-    current = decision_version == rules.BAD_CASE_DECISION_VERSION
+    current = rules.uses_bad_case_layers(decision_version)
     layers = LAYERS if current else LEGACY_LAYERS
     failures = [fault_layer(code) for code in remaining_failures if code != 'performance']
     counts = {layer: failures.count(layer) for layer in layers}
@@ -102,8 +102,8 @@ def layered_winner(store, baseline, candidates, *, connection=None):
     return winner
 
 
-def validate_layered_limits(config, current, baseline):
-    cumulative_limit = rules.AGENT['d_max_changed_parameters']
+def validate_layered_limits(config, current, baseline, *, decision_version=None):
+    cumulative_limit = rules.agent_change_limit(decision_version)
     round_limit = rules.AGENT['max_changed_parameters']
     if len(parameter_diff(config, pipeline_config(baseline))) > cumulative_limit:
         raise ValueError(f'相对 Baseline 最多改 {cumulative_limit} 个参数（含继承）')
@@ -147,9 +147,9 @@ def validate_base(proposal, base):
         raise ValueError('新增改动须保留 Winner 底座已有参数')
 
 
-def validate_combinations(candidates):
+def validate_combinations(candidates, *, decision_version=None):
     combined = [c for c in candidates if len(c['config_diff']) > 1]
-    if len(combined) > 1:
+    if len(combined) > 1 and decision_version != rules.BAD_CASE_DECISION_VERSION:
         raise ValueError('每轮最多一个组合方案')
     if any(c.get('attribution') != COMBINATION for c in combined):
         raise ValueError('组合方案须标注“组合探索，不可归因”')
@@ -157,20 +157,28 @@ def validate_combinations(candidates):
 
 def round_opportunities(targets, base, baseline, prior, preview, current, historical, *, blocked=(),
                         use_layered=False, reserved_keys=(), combination_used=False, performance_gates=(),
-                        before_directed_checks=False):
+                        before_directed_checks=False, decision_version=None, proposed_changes=()):
     """Check every supported single change and each potentially evidenced combination."""
     preview = preview or {}
+    exploratory = decision_version == rules.BAD_CASE_DECISION_VERSION
+    combination_used = combination_used and not exploratory
+    reserved_keys = set(reserved_keys)
+    baseline_config = pipeline_config(baseline)
+    limit = rules.agent_change_limit(decision_version)
     effective = {**baseline, **base['changes']}
-    trial_changes = [{key: value} for key in rules.AGENT['tunable']
-                     for value in (rules.AGENT['thinking_values'] if key == 'generation_thinking' else rules.PIPELINE_VALUES[key])
-                     if not (type(value) is type(effective.get(key)) and value == effective.get(key))]
+    singles = [{key: value} for key in rules.AGENT['tunable']
+               for value in (rules.AGENT['thinking_values'] if key == 'generation_thinking' else rules.PIPELINE_VALUES[key])
+               if not (type(value) is type(effective.get(key)) and value == effective.get(key))]
+    trial_changes = list(singles)
     if performance_gates and not combination_used:
         reductions = [change for change in trial_changes if all(
             rules.performance_reduction(key, value, effective.get(key)) for key, value in change.items())]
         trial_changes.extend({**left, **right} for left, right in combinations(reductions, 2)
                              if not left.keys() & right.keys())
     trial_changes.extend(row['changes'] for row in preview.get('directed_checks', [])
-                         if row['kind'] == 'retrieval' and len(row['changes']) > 1)
+                         if (row['kind'] == 'retrieval' or exploratory) and len(row['changes']) > 1)
+    if exploratory:
+        trial_changes.extend(change for change in proposed_changes if len(change) > 1)
     for variant in preview.get('configs', []):
         trial = {**effective, **variant.get('change', {})}
         changes = parameter_diff(trial, effective)
@@ -181,27 +189,42 @@ def round_opportunities(targets, base, baseline, prior, preview, current, histor
                          1 < len(r['changes']) <= rules.AGENT['max_changed_parameters'])
     saved_configs = [baseline, *[{k: v for k, v in c['config'].items() if k in rules.PIPELINE_VALUES}
                                  for c in prior]]
-    valid = []
-    for changes in trial_changes:
-        if (changes in valid or base['changes'].keys() & changes.keys()
+
+    def is_legal(changes):
+        if (not 0 < len(changes) <= rules.AGENT['max_changed_parameters'] or base['changes'].keys() & changes.keys()
                 or 'generation_thinking' in changes and changes['generation_thinking'] not in rules.AGENT['thinking_values']
                 or not set(changes).issubset(rules.AGENT['tunable']) or any(
                 type(value) is type(effective.get(key)) and value == effective.get(key) for key, value in changes.items())):
-            continue
+            return False
         config = {**effective, **changes}
         if config.get('hybrid_search') is False and 'hybrid_alpha' not in changes:
             config.pop('hybrid_alpha', None)
         if any(config.get(key) != value for key, value in base['changes'].items()):
-            continue
-        if use_layered and (changes.keys() & set(reserved_keys) or combination_used and len(changes) > 1
-                            or len(parameter_diff(config, pipeline_config(baseline))) > rules.AGENT['d_max_changed_parameters']):
-            continue
-        if parameter_diff(config, pipeline_config(baseline)) in blocked:
-            continue
+            return False
+        cumulative = parameter_diff(config, baseline_config)
+        if use_layered and (changes.keys() & reserved_keys or combination_used and len(changes) > 1
+                            or len(cumulative) > limit):
+            return False
+        if cumulative in blocked:
+            return False
+        if exploratory and preview_rejection(preview, ledger, base['id'], changes, base['changes']):
+            return False
         # Previously generated but skipped configurations are still reserved by the existing
         # unique-configuration guard. Historical observations remain evidence for a first v2 trial.
-        if validate_candidate_config(config, prior_configs=saved_configs)['valid']:
+        return validate_candidate_config(config, prior_configs=saved_configs)['valid']
+
+    valid = []
+    for changes in trial_changes:
+        if changes not in valid and is_legal(changes):
             valid.append(changes)
+    if exploratory:
+        # A pair can still add a slot when neither key has an untried single.
+        single_keys = {next(iter(changes)) for changes in valid if len(changes) == 1}
+        leftover = [change for change in singles if single_keys.isdisjoint(change)]
+        for left, right in combinations(leftover, 2):
+            changes = {**left, **right}
+            if len(changes) == 2 and changes not in valid and is_legal(changes):
+                valid.append(changes)
     next_actions = {
         'recall': '检查索引、分块和召回所需的原始资料',
         'ranking': '核对交付片段，补做同底座检索预演',
@@ -223,15 +246,19 @@ def round_opportunities(targets, base, baseline, prior, preview, current, histor
             # explanation. The actual proposal must still supply its own explanation.
             [check] = validate_mechanism({'config_diff': changes, 'cross_layer_mechanisms': {question: '待方案逐题说明'}},
                                          [{**target, 'mechanism_fault': fault}], base['id'], preview, ledger,
-                                         base_changes=base['changes'], hypothesis_only=before_directed_checks)
+                                         base_changes=base['changes'], hypothesis_only=before_directed_checks,
+                                         decision_version=decision_version)
             if check['decision'] != '拒绝':
                 available.append({'changes': changes, 'decision': check['decision']})
-        action = ('表格结构化或数据处理，再独立复测' if fault['subtype'] == '表格归类' else next_actions[fault['code']])
+        if exploratory:
+            available.sort(key=lambda item: item['decision'] != '有证据')
+        action = ('表格结构化或数据处理，再独立复测' if fault['subtype'] == '表格归类' else next_actions.get(
+            fault['code'], next_actions['unknown']))
         rows[question] = {'display_question_id': view.get('display_question_id') or question, 'fault': fault,
                           'available': available, 'next_action': action,
                           'reason': None if available else '无仍可提交且通过机制校验的未试配置'}
     if performance_gates:
-        available = [{'changes': changes, 'decision': '放行'} for changes in valid
+        available = [{'changes': changes, 'decision': '探索性' if exploratory else '放行'} for changes in valid
                      if all(rules.performance_reduction(key, value, effective.get(key))
                             for key, value in changes.items())]
         for metric in performance_gates:
@@ -261,7 +288,42 @@ def layer_capacity(rows, layer, count):
                 and len(set().union(*group)) == sum(map(len, group))), default=(0, 0))
 
 
+def fill_layer_plan(rows, gate_faults, severe, labels, decision_version):
+    codes = [row['fault']['code'] for row in rows.values()]
+    priority = []
+    target = target_layer(codes, gate_faults, severe, decision_version=decision_version)
+    while layer := target['layer']:
+        priority.append(target)
+        codes = [code for code in codes if fault_layer(code) != layer]
+        gate_faults = [code for code in gate_faults if fault_layer(code) != layer]
+        target = target_layer(codes, gate_faults, False, decision_version=decision_version)
+    if 'unknown' in codes:
+        priority.append({**target, 'layer': 'unknown', 'reason': '对尚未定位的错因提出可验证假设'})
+    by_keys = {}
+    for index, target in enumerate(priority):
+        for row in rows.values():
+            if fault_layer(row['fault']['code']) == target['layer']:
+                for action in row['available']:
+                    by_keys.setdefault(frozenset(action['changes']), index)
+    for size in range(len(labels), 0, -1):
+        counts = max((tuple(sum(by_keys[keys] == index for keys in group) for index in range(len(priority)))
+                      for group in combinations(by_keys, size)
+                      if len(set().union(*group)) == sum(map(len, group))), default=())
+        if counts:
+            allocation = {entry['layer']: count for entry, count in zip(priority, counts) if count}
+            selected = next(index for index, count in enumerate(counts) if count)
+            chosen = priority[selected]
+            return {**chosen, 'capacity': allocation[chosen['layer']], 'proposal_count': size,
+                    'layer_counts': allocation,
+                    'fallbacks': [{'layer': entry['layer'], 'reason': '无法在填满本轮的同时使用该层机会'}
+                                  for entry in priority[:selected]]}
+    return {**target, 'layer': None, 'reason': '没有合法且未试的配置',
+            'fallbacks': [], 'capacity': 0, 'proposal_count': 0, 'layer_counts': {}}
+
+
 def layer_plan(rows, gate_faults, severe, ledger, base_id, labels, *, decision_version=None, directed=False):
+    if decision_version == rules.BAD_CASE_DECISION_VERSION:
+        return fill_layer_plan(rows, gate_faults, severe, labels, decision_version)
     codes = [row['fault']['code'] for row in rows.values()]
     target = target_layer(codes, gate_faults, severe, decision_version=decision_version)
     selected = target
@@ -287,7 +349,7 @@ def layer_signals(store, run_id, gates, faults, *, decision_version=None):
     from .evaluation import gate_details
 
     cases = verdict.gate_cases(store, run_id)
-    current = decision_version == rules.BAD_CASE_DECISION_VERSION
+    current = rules.uses_bad_case_layers(decision_version)
     separate = (*PERFORMANCE_METRICS, *SAFETY_METRICS) if current else PERFORMANCE_METRICS
     failed = [gate for gate in gates if gate.get('status') == 'FAIL' and gate['metric'] not in separate]
     gate_faults = [faults[item['question_id']]['code'] for gate in gate_details(cases, failed)

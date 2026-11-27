@@ -84,7 +84,9 @@ class DirectedPlanning:
         self.base_id = base_id
         self.base = pipeline_config(self.run['config'])
         self.before = verdict.records(self.store, base_run_id)
-        self.baseline_id = engine.experiment()['baseline_run_id']
+        experiment = engine.experiment()
+        self.baseline_id = experiment['baseline_run_id']
+        self.decision_version = experiment['result'].get('bad_case_decision_version')
         baseline = self.store.evaluation_run(self.baseline_id)
         self.baseline = pipeline_config(baseline['config'])
         frozen = json.loads(baseline['dataset_snapshot_json']).get('corpus_fingerprint')
@@ -127,7 +129,7 @@ class DirectedPlanning:
         if (set(changes) & inherited or ('hybrid_alpha' in inherited and not config['hybrid_search'])
                 or len(changes) > rules.AGENT['max_changed_parameters']):
             raise ValueError('定向检查须保留底座改动并遵守单方案改动上限')
-        validate_layered_limits(config, self.base, self.baseline)
+        validate_layered_limits(config, self.base, self.baseline, decision_version=self.decision_version)
         return config
 
     def _normalize_checks(self, checks, prior):
@@ -335,6 +337,8 @@ class DirectedPlanning:
         if 'pre_review_prediction' not in self.state:
             first = {**prompt, 'planning_stage': 'hypotheses', 'max_hypotheses': 3,
                      'check_limit': self.limit, 'generation_sample_limit': SAMPLE_LIMIT}
+            if self.decision_version == rules.BAD_CASE_DECISION_VERSION:
+                first['check_policy'] = 'checks 可以为空。定向检查用于排序与识别已证实的回退，缺少正向预演仍可提出探索性机制假设。'
             errors = []
             for attempt in range(4):
                 raw = ask(HYPOTHESIS_SYSTEM, {**first, **({'validation_errors': errors} if errors else {})})

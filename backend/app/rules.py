@@ -65,7 +65,7 @@ GATES = {
 AGENT = {
     'candidate_labels': ['A', 'B', 'C'],
     'max_changed_parameters': 2,
-    'd_max_changed_parameters': 3,
+    'd_max_changed_parameters': 4,
     'budget': 12,
     'min_qualified_for_fusion': 2,
     'single_winner_after_round': 3,
@@ -92,7 +92,18 @@ AGENT = {
 }
 AGENT['candidates_per_round'] = len(AGENT['candidate_labels'])
 # Agent decision rules are versioned per experiment, independent of the frozen evaluation.
-BAD_CASE_DECISION_VERSION = '122f'
+BAD_CASE_DECISION_VERSION = '125a'
+LEGACY_AGENT_CHANGE_LIMIT = 3
+
+
+def uses_bad_case_layers(decision_version):
+    return decision_version in ('122f', BAD_CASE_DECISION_VERSION)
+
+
+def agent_change_limit(decision_version):
+    return AGENT['d_max_changed_parameters'] if decision_version == BAD_CASE_DECISION_VERSION else LEGACY_AGENT_CHANGE_LIMIT
+
+
 BAD_CASE_LAYERS = ('retrieval', 'generation', 'safety', 'performance')
 BAD_CASE_TYPES = {
     'recall': ('retrieval', '致命'),
@@ -193,6 +204,10 @@ RULES = {
     'consistency_check': CONSISTENCY_CHECK,
 }
 RULES_HASH = canonical_hash(RULES)[:12]
+# Agent planning limits are now frozen by experiment, outside the evaluation snapshot.
+EVALUATION_RULES_HASH = canonical_hash({
+    **RULES, 'agent': {**AGENT, 'd_max_changed_parameters': LEGACY_AGENT_CHANGE_LIMIT},
+})[:12]
 QC_REVIEW_SCORE = 85
 QC_CONTRACT = "golden-quality-p0-v2"
 # Historical 031e migration is bound to that experiment’s original authorization.

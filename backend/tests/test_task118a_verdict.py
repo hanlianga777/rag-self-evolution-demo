@@ -18,7 +18,7 @@ from app.policy import DEFAULT_PIPELINE_CONFIG, MAX_EVALS, validate_candidate_co
 def mark_legacy_planning(store, experiment):
     """Represent an experiment saved before 123b introduced a planning version."""
     with store.connection() as db:
-        db.execute("UPDATE experiments SET result_json=json_remove(result_json,'$.agent_planning_version') WHERE id=?",
+        db.execute("UPDATE experiments SET result_json=json_remove(json_set(result_json,'$.bad_case_decision_version','122f'),'$.agent_planning_version') WHERE id=?",
                    (experiment,))
 
 

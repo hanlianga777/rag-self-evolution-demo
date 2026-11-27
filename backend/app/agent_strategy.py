@@ -517,7 +517,7 @@ def _d_fusion_already_evaluated(history, qualified, base):
     return bool(combined) and combined in evaluated.values()
 
 
-def validate_d_mode(suggestion, winner, history, facts=None, *, use_layered=False):
+def validate_d_mode(suggestion, winner, history, facts=None, *, use_layered=False, decision_version=None):
     """规则总表六.7：多个合格方案可部分合并，组合已跑过时改为 Winner 加一项。
     优先用验证过的参数；没验证过的参数可以用，但已有可用的验证参数时不能全部用新参数。D 必须生成。"""
     mode = suggestion.get('combination_mode')
@@ -541,7 +541,7 @@ def validate_d_mode(suggestion, winner, history, facts=None, *, use_layered=Fals
         winner_config = pipeline_config(winner['config'])
         effective = effective_d_config({**winner_config, **addition}, addition)
         if effective is not None:
-            validate_d_parameter_limit(effective, base)
+            validate_d_parameter_limit(effective, base, decision_version=decision_version)
     min_fusion = rules.AGENT['min_qualified_for_fusion']
     fusion_repeated = len(qualified) >= min_fusion and base and _d_fusion_already_evaluated(history, qualified, base)
     if use_layered:
