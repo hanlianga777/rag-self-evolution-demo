@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import { openRetainedHistory } from './retained-history-test-fixture';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -24,15 +23,15 @@ it('old policy blocks batch execution and preserves historical data',async()=>{
  const candidate={id:'fixture-R2-A',status:'generated',config:{top_k:6},reasoning:{round:2,candidate_label:'A'}};
  await render(<EvolutionPage data={{workspace:{requires_policy_upgrade:true},evaluation:run,optimization:{id:'fixture-E',candidates:[candidate]}}}/>);
  expect([...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='运行本轮 A/B/C Sandbox')?.disabled).toBe(true);
- expect(document.body.textContent).toContain('旧实验只读');
+ expect(document.body.textContent).toContain('真实 Agent 启动已阻断');
 });
-it('latest candidate cards and history Drawer keep round provenance',async()=>{
+it('round selection stays within the current experiment',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const candidates=[1,2].flatMap(round=>['A','B','C'].map(label=>({id:`fixture-${round}-${label}`,status:round===1?'evaluated':'generated',config:{top_k:6},reasoning:{round,candidate_label:label,hypothesis:`saved ${round}-${label}`},result:{}})));
  await render(<EvolutionPage data={{evaluation:run,optimization:{id:'fixture-E',candidates}}}/>);await click('进化路线');await click('Round 2');
  expect(document.querySelectorAll('.candidate-card')).toHaveLength(3);expect(document.querySelector('.candidate-card')?.textContent).toContain('saved 2-A');
- await openRetainedHistory('agent');expect(document.querySelector('[role=dialog]')?.textContent).toContain('saved 1-A');
- expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('saved 2-A');
+ await click('Round 1');expect(document.querySelector('.candidate-card')?.textContent).toContain('saved 1-A');
+ expect(document.querySelector('[aria-label="选择 Agent 实验"]')).toBeNull();
 });
 it.each([true,false,'error'])('removes the Judge-only entry and its automatic preflight (%s)',async(eligible)=>{
  const calls=vi.fn(async(url:string)=>{

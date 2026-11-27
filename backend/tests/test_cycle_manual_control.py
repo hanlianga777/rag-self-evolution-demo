@@ -11,6 +11,10 @@ import test_candidate_resume as candidate_fixture
 
 class ManualCycleTests(unittest.TestCase):
     def setUp(self):
+        for module in ('corpus', 'governance'):
+            manifest = patch(f'app.{module}.current_manifest', return_value={'sources': []})
+            manifest.start()
+            self.addCleanup(manifest.stop)
         candidate_fixture.CandidateResumeTests.setUp(self)
         self.runtime.provider=object()
     tearDown=candidate_fixture.CandidateResumeTests.tearDown
@@ -57,6 +61,26 @@ class ManualCycleTests(unittest.TestCase):
             self.assertEqual(self.runtime.answers,[])
             self.assertEqual(self.store.evaluation_run(self.baseline['id']),old_baseline)
 
+
+    def test_stop_api_persists_pause_for_blocked_cycle(self):
+        claim_cycle(self.store, self.exp)
+        with self.store.connection() as db:
+            db.execute("UPDATE experiments SET result_json=json_set(result_json,'$.optimization_cycle.status','blocked') WHERE id=?", (self.exp,))
+            db.execute("UPDATE task_leases SET business_status='blocked',lease_expires_at=0 WHERE task_key=?", ('cycle:' + self.exp,))
+        with patch.object(main, 'store', self.store):
+            result = TestClient(main.app).post(f'/api/experiments/{self.exp}/stop-cycle').json()
+        self.assertEqual(result['status'], 'stopped')
+        self.assertIn('stop_request', result)
+        with self.store.connection() as db:
+            self.assertEqual(task_leases.row(db, 'cycle:' + self.exp)['business_status'], 'paused')
+
+    def test_archived_experiment_does_not_become_current_or_resume(self):
+        with self.store.connection() as db:
+            db.execute("UPDATE experiments SET status='archived' WHERE id=?", (self.exp,))
+        self.assertIsNone(self.store.current_baseline_identity()['current_experiment_id'])
+        self.assertEqual(self.store.experiment(self.exp)['status'], 'archived')
+        with self.assertRaisesRegex(ValueError, '已归档'):
+            claim_cycle(self.store, self.exp)
 
     def test_stop_during_last_price_check_does_not_wait_for_next_off_peak(self):
         from types import SimpleNamespace

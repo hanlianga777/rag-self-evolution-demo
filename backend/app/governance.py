@@ -2583,7 +2583,7 @@ class GovernanceStore:
             cases = connection.execute("SELECT question_id FROM evaluation_case_results WHERE run_id=?", (row["id"],)).fetchall()
             if sorted(case["question_id"] for case in cases) != sorted(snapshot["question_ids"]):
                 continue
-            experiment = connection.execute("SELECT id FROM experiments WHERE baseline_run_id=? AND status!='direct_release' ORDER BY created_at DESC, rowid DESC LIMIT 1", (row["id"],)).fetchone()
+            experiment = connection.execute("SELECT id FROM experiments WHERE baseline_run_id=? AND status NOT IN ('direct_release','archived') ORDER BY created_at DESC, rowid DESC LIMIT 1", (row["id"],)).fetchone()
             from .evaluation_contract import policy_current, evaluation_identity
             from .ai_service import generation_contract
             current_generation = generation_contract()
@@ -3142,7 +3142,7 @@ class GovernanceStore:
                 experiment_id = trigger["optimization_run_id"]
             if not experiment_id:
                 has_final = bool(verdict.records(self, baseline_run_id, connection=connection))
-                row = connection.execute("SELECT id FROM experiments WHERE baseline_run_id=? AND status!='direct_release'" +
+                row = connection.execute("SELECT id FROM experiments WHERE baseline_run_id=? AND status NOT IN ('direct_release','archived')" +
                     (" AND json_extract(result_json,'$.verdict_version')=?" if has_final else "") +
                     " ORDER BY created_at DESC, rowid DESC LIMIT 1",
                     (baseline_run_id, rules.RULES_VERSION) if has_final else (baseline_run_id,)).fetchone()
@@ -3150,6 +3150,8 @@ class GovernanceStore:
             existing = self.experiment(experiment_id,light=True) if experiment_id else None
             if experiment_id and (existing is None or existing["baseline_run_id"] != baseline_run_id):
                 raise ValueError("Optimization Run 不存在或不属于该 Baseline")
+            if existing and existing['status'] == 'archived':
+                raise ValueError('实验已归档')
             context = existing['result'] if existing else dict(NEW_EXPERIMENT_STRATEGY)
             strict = context.get('decision_contract_version') == '109c'
             compatible_contracts = {'agent-strategy-4'} if strict else {'agent-strategy-3', 'agent-strategy-4'}
@@ -4415,7 +4417,7 @@ class GovernanceStore:
 
     def latest_experiment(self):
         with self.connection() as connection:
-            row = connection.execute("SELECT id FROM experiments ORDER BY created_at DESC LIMIT 1").fetchone()
+            row = connection.execute("SELECT id FROM experiments WHERE status!='archived' ORDER BY created_at DESC, rowid DESC LIMIT 1").fetchone()
         return self.experiment(row["id"]) if row else None
 
     def with_agent_trace_strategies(self, experiment):

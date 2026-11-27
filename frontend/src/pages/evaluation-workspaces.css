@@ -486,14 +486,6 @@ body :is(.evolution-page.page-shell,.drawer.workbench-drawer) .candidate-story-b
 .verification-page .answer-text :is(.ui-clamp,.clamp-text-host) { color:inherit; font-weight:400; }
 .verification-page .monitoring-table th { white-space:nowrap; }
 
-.agent-experiment-select {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  font-weight: 600;
-}
-.agent-experiment-select select { min-width: 0; max-width: min(100%, 440px); }
 .round-narrative { min-width: 0; }
 .round-narrative > .section-head { flex-wrap: wrap; gap: 8px; }
 .round-story-grid {
@@ -525,7 +517,6 @@ body :is(.evolution-page.page-shell,.drawer.workbench-drawer) .candidate-story-b
 .release-formal-qualifications > div { display: flex; flex-direction: column; gap: 4px; }
 @media (max-width: 760px) {
   .round-story-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .agent-experiment-select select { max-width: min(calc(100vw - 100px), 330px); }
 }
 @media (max-width: 420px) {
   .round-story-grid { grid-template-columns: minmax(0, 1fr); }

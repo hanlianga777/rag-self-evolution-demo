@@ -49,7 +49,10 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
   const [agentConfirm, setAgentConfirm] = useState(false);
   const [triggerId, setTriggerId] = useState<string | null>(null);
   const [context, setContext] = useState<any>(null);
-  const trigger = (monitoring.triggers || []).find((row: any) => row.id === triggerId) || monitoring.triggers?.[0];
+  const currentExperimentId = monitoring.current_experiment_id === undefined
+    ? data.workspace?.current_experiment_id : monitoring.current_experiment_id;
+  const triggers = (monitoring.triggers || []).filter((row: any) => !row.optimization_run_id || row.optimization_run_id === currentExperimentId);
+  const trigger = triggers.find((row: any) => row.id === triggerId) || triggers[0];
   const contextId = trigger?.optimization_run_id;
   const selectedTrigger = useRef(trigger?.id); selectedTrigger.current = trigger?.id;
   const linkedContext = context?.id === contextId ? context : null;
@@ -62,7 +65,7 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
     return () => { cancelled = true; };
   }, [contextId]);
 
-  useDetailPrefetch((monitoring.triggers || []).filter((row: any) => row.optimization_run_id).map((row: any) => `/api/experiments/${encodeURIComponent(row.optimization_run_id)}`));
+  useDetailPrefetch(triggers.filter((row: any) => row.optimization_run_id).map((row: any) => `/api/experiments/${encodeURIComponent(row.optimization_run_id)}`));
   const requests = useRef(0);
   useEffect(() => { setMonitoring(data.monitoring || {}); setHistoryPage(1); }, [data.monitoring]);
   useEffect(() => () => { requests.current++; }, []);
@@ -132,7 +135,7 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
         <td>{event.localOnly ? "仅本机保存" : event.determinable ? event.bad_case ? event.severity === "critical" ? "人工安全 Bad Case" : "人工 Bad Case" : "人工判定正常" : "待人工标注"}</td>
         <td>{event.localOnly ? <button className="secondary small" onClick={()=>{setEventDetail(event);setAssessmentReason("");}}>查看记录</button> : <div className="monitoring-assessment"><button className="secondary small" disabled={busy} onClick={()=>void assess(event,false,"ordinary")}>正常</button><button className="secondary small" disabled={busy} onClick={()=>{setEventDetail(event);setAssessmentReason("");setAssessmentSeverity("ordinary");}}>Bad Case</button><button className="secondary small" disabled={busy} onClick={()=>{setEventDetail(event);setAssessmentReason("");setAssessmentSeverity("critical");}}>安全问题</button></div>}</td>
       </tr>)}</tbody></DataTable></div>}
-      <div className="monitoring-triggers">{(monitoring.triggers || []).map((row: any) => <div key={row.id}><div className="muted-prose"><TruncatedText lines={3}>{narrativeText(row.reason || "原因未采集")}</TruncatedText></div><Status value={row.status === "human_confirmed" ? "已人工确认" : row.status} /><button className="text-button" aria-pressed={row.id === selectedTrigger.current} onClick={() => { setTriggerId(row.id); setContextDetail(true); }}>查看进化上下文</button>{row.status === "pending_human_confirm" && <button className="secondary" disabled={busy} onClick={() => { setTriggerId(row.id); void confirm(row); }}>人工确认</button>}</div>)}</div>
+      <div className="monitoring-triggers">{triggers.map((row: any) => <div key={row.id}><div className="muted-prose"><TruncatedText lines={3}>{narrativeText(row.reason || "原因未采集")}</TruncatedText></div><Status value={row.status === "human_confirmed" ? "已人工确认" : row.status} /><button className="text-button" aria-pressed={row.id === selectedTrigger.current} onClick={() => { setTriggerId(row.id); setContextDetail(true); }}>查看进化上下文</button>{row.status === "pending_human_confirm" && <button className="secondary" disabled={busy} onClick={() => { setTriggerId(row.id); void confirm(row); }}>人工确认</button>}</div>)}</div>
       {trigger && <div className="monitoring-context"><div><strong>所选进化线索</strong><Status value={trigger.status === "human_confirmed" ? "已人工确认" : trigger.status} /></div>{linkedContext ? <><p>{currentContext ? "当前 Baseline" : "历史上下文，只读"} · {linkedContext.status === "pending_agent" ? "待启动Round 1" : `Agent 状态：${displayText(linkedContext.status)} · Round ${linkedContext.result?.round ?? linkedContext.rounds?.at(-1)?.round ?? "未记录"}`}</p>{linkedContext.status === "pending_agent" && <button className="primary" disabled={busy || !currentContext || !!data.workspace?.baseline_unavailable_reason} onClick={() => setAgentConfirm(true)}>启动此上下文 Agent · Round 1</button>}</> : contextId ? error ? <p role="alert">{error}</p> : <LoadingSkeleton label="正在读取关联上下文" /> : <p className="muted">尚未人工确认，未创建 Optimization 上下文。</p>}</div>}
     </Section><section className="panel monitoring-next-inputs" aria-label="下一轮已知输入">
       <div className="section-head"><h2><IconLabel name="rounds">问题怎样回流</IconLabel></h2></div><ol className="monitoring-reflow"><li>人工标注线上问题并填写原因</li><li>作为线索进入考卷候选池</li><li>经过证据校验、探针实测和质检</li><li>人工确认红线后冻结新考卷</li><li>重新评测、优化、回归与发布审批</li></ol>

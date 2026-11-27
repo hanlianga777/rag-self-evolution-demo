@@ -83,6 +83,8 @@ def claim_cycle(store, experiment_id, *, current_round_only=False, workflow_scop
         experiment = store.experiment(experiment_id, light=True)
         if not experiment:
             raise ValueError('实验不存在')
+        if experiment['status'] == 'archived':
+            raise ValueError('实验已归档')
         store.require_current_baseline(experiment['baseline_run_id'], connection)
         prior_cycle = experiment['result'].get('optimization_cycle', {})
         if task_leases.cycle_active(connection, experiment_id, prior_cycle):
@@ -189,11 +191,14 @@ def request_cycle_stop(store, experiment_id):
             raise ValueError('实验不存在')
         result = json.loads(row['result_json'])
         state = result.get('optimization_cycle', {})
-        if state.get('status') in {'running', 'queued', 'recovering'} or task_leases.cycle_active(connection, experiment_id, state):
+        active = task_leases.cycle_active(connection, experiment_id, state)
+        if state.get('status') in (*task_leases.ACTIVE_STATES, 'blocked') or active:
             state.setdefault('stop_request', {'requested_at': datetime.now(timezone.utc).isoformat(), 'reason': '用户停止运行'})
-            if not task_leases.cycle_active(connection, experiment_id, state):
+            if not active:
                 state['status'] = 'stopped'
                 task_leases.mark_paused(connection, 'cycle:' + experiment_id)
+                if not task_leases.agent_active(connection, experiment_id, result):
+                    task_leases.mark_paused(connection, 'agent:' + experiment_id)
             result['optimization_cycle'] = state
             connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (json.dumps(result, ensure_ascii=False), experiment_id))
             runs = connection.execute("""SELECT e.id FROM evaluation_runs e JOIN candidate_configs c

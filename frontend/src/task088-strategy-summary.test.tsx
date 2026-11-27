@@ -35,7 +35,8 @@ async function mount(result: object, candidates: object[], tab = 'route', experi
   history.replaceState(null, '', `#evolution?tab=${tab}`);
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}')));
   root = createRoot(document.body.appendChild(document.createElement('div')));
-  await act(async () => root.render(<EvolutionPage data={{ evaluation, optimization: { id: experimentId, baseline_run_id: evaluation.id, result, candidates } }} />));
+  const optimization = experimentId ? { id: experimentId, baseline_run_id: evaluation.id, result, candidates } : null;
+  await act(async () => root.render(<EvolutionPage data={{ evaluation, optimization }} />));
 }
 
 afterEach(() => {
@@ -104,38 +105,15 @@ it('uses saved reassessments as the main A/B verdict and preserves the former ve
   expect(document.body.textContent).not.toContain('选择合格 Winner');
 });
 
-const e2 = 'EXP-20261123010322145772';
-const e3 = 'EXP-20261123150407867927';
-it.each([
-  ['EXP', 'archive', 'EXP-20261120224619556715'],
-  [e3, e2, e2],
-  [e2, e3, e3],
-])('switches %s to %s with the selected experiment’s saved Baseline', async (current, archiveValue, archive) => {
-  await mount({}, [candidate], 'route', current);
-  const requests: string[] = [];
-  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-    expect(init?.method ?? 'GET').toBe('GET');
-    requests.push(url);
-    if (url.includes(`/experiments/${archive}`)) return Response.json({
-      id: archive, baseline_run_id: 'ARCHIVED-BASE', candidates: [{ ...candidate, status: 'generated' }], result: {},
-    });
-    if (url.endsWith('/evaluations/ARCHIVED-BASE')) return Response.json({ ...evaluation, id: 'ARCHIVED-BASE' });
-    if (url.includes('baseline_id=ARCHIVED-BASE')) return Response.json([]);
-    return Response.json({});
-  }));
-  const select = async (value: string) => act(async () => {
-    const input = document.querySelector<HTMLSelectElement>('[aria-label="选择 Agent 实验"]')!;
-    expect(Array.from(input.options, option => option.value)).toContain(value);
-    input.value = value;
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  await select(archiveValue);
-  expect(document.body.textContent).toContain(`旧实验只读 · ${archive}`);
-  expect(document.body.textContent).toContain('Baseline ARCHIVED-BASE');
-  expect(requests.some(url => url.includes('baseline_id=ARCHIVED-BASE'))).toBe(true);
-  expect(document.body.textContent).not.toContain('跳过此 Candidate');
-  expect(document.body.textContent).not.toContain('运行本轮 A/B/C Sandbox');
-  await select('current');
-  expect(document.body.textContent).not.toContain('旧实验只读');
+it('只展示当前实验的方案', async () => {
+  await mount({}, [candidate], 'route');
+  expect(document.querySelector('[aria-label="选择 Agent 实验"]')).toBeNull();
+  expect(document.body.textContent).not.toContain('历史实验');
   expect(document.querySelector('.candidate-result-line')?.textContent).toContain('43/50');
+});
+
+it('没有当前实验时显示尚未开始', async () => {
+  await mount({}, [], 'overview', '');
+  expect(document.querySelector('[role="status"]')?.textContent).toContain('尚未开始');
+  expect(document.querySelector('[aria-label="选择 Agent 实验"]')).toBeNull();
 });

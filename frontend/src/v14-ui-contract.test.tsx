@@ -305,7 +305,7 @@ it("review R4 pending Trigger ignores prior ABC and explicitly starts its same R
   let confirmed = false, started = false;
   const posts: any[] = [];
   const pending = { id: "T1", event_id: "M1", status: "pending_human_confirm", optimization_run_id: null, reason: "fixture human Bad Case" };
-  const monitoring = () => ({ events: [{ id: "M1", question: "Fixture QA", determinable: true }], triggers: [{ ...pending, status: confirmed ? "human_confirmed" : pending.status, optimization_run_id: confirmed ? "E-monitor" : null }] });
+  const monitoring = () => ({ current_experiment_id: confirmed ? "E-monitor" : "E-prior", events: [{ id: "M1", question: "Fixture QA", determinable: true }], triggers: [{ ...pending, status: confirmed ? "human_confirmed" : pending.status, optimization_run_id: confirmed ? "E-monitor" : null }] });
   const context = () => ({ id: "E-monitor", baseline_run_id: "B1", status: started ? "completed" : "pending_agent", result: { round: started ? 1 : 0 }, candidates: started ? ["A", "B", "C"].map(id => ({ id })) : [] });
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (init?.method === "POST") { posts.push({ url, body: JSON.parse(init.body as string) }); if (url.endsWith("/confirm")) confirmed = true; else if (url.endsWith("/experiments/run")) started = true; }
@@ -339,15 +339,12 @@ it("review R4 pending Trigger ignores prior ABC and explicitly starts its same R
   expect(document.querySelector('a[href="#evolution"]')).toBeNull();
 });
 
-it("review R4 selected historical Monitoring context is identified and cannot start under a new Baseline", async () => {
-  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/experiments/") ? { id: "E-history", baseline_run_id: "B0", status: "pending_agent", result: { round: 0 }, candidates: [] } : { triggers: [{ id: "T-history", status: "human_confirmed", optimization_run_id: "E-history" }], events: [] }))));
-  await render(<VerificationPage data={{ ...data("B1"), monitoring: { triggers: [{ id: "T-history", status: "human_confirmed", optimization_run_id: "E-history" }] } }} onOpenDocument={() => {}} onOpenCitation={() => {}} />);
-  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Monitoring")!.click());
-  await clickText("查看进化上下文");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("反馈状态：");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("关联优化：已建立");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Baseline：历史上下文，只读");
-  expect(document.querySelector(".monitoring-context")?.textContent).toContain("历史上下文，只读");
-  expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(x => x.textContent?.includes("启动此上下文"))?.disabled).toBe(true);
-  expect((fetch as any).mock.calls.every((call: any[]) => !call[1]?.method || call[1].method === "GET")).toBe(true);
+it("Monitoring omits historical experiment links and does not load their context", async () => {
+  const calls = vi.fn(async () => Response.json({}));
+  vi.stubGlobal("fetch", calls);
+  await render(<VerificationPage data={{ ...data("B1"), monitoring: { current_experiment_id: "E-current", triggers: [{ id: "T-history", status: "human_confirmed", optimization_run_id: "E-history" }] } }} onOpenDocument={() => {}} onOpenCitation={() => {}} />);
+  await clickText("Monitoring");
+  expect(document.querySelector(".monitoring-context")).toBeNull();
+  expect(document.body.textContent).not.toContain("查看进化上下文");
+  expect(calls).not.toHaveBeenCalledWith(expect.stringContaining("/experiments/E-history"), expect.anything());
 });
