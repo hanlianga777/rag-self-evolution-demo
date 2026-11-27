@@ -1735,31 +1735,38 @@ def case_list_row(row, *, light=False):
     return {**{k:v for k,v in row.items() if k not in {'result_json','diagnostic_view'}},'result':result, **({'details_loaded':False} if light else {})}
 
 
-def baseline_case_faults(baseline, rows):
-    from . import rules
+def baseline_case_faults(baseline, rows, diagnosis_version=None):
+    from . import evidence_roles, rules
     from .agent_mechanism import faults_for_cases
 
-    faults = faults_for_cases(baseline, [row['result'] for row in rows], rows, decision_version='122f')
+    version = evidence_roles.version_for(baseline, diagnosis_version)
+    faults = faults_for_cases(baseline, [row['result'] for row in rows], rows, decision_version=version)
+    if version == evidence_roles.VERSION:
+        return faults
     return {qid: {**fault, 'layer': rules.BAD_CASE_TYPES.get(fault['code'], (None,))[0]}
             for qid, fault in faults.items()}
 
 
 @app.get("/api/bad-cases")
 @read_view()
-def bad_cases(light: bool = False, baseline_id: str | None = None):
+def bad_cases(light: bool = False, baseline_id: str | None = None,
+              diagnosis_version: Literal['122f', '126b'] | None = None):
     current=baseline_id or store.current_baseline_identity()['current_baseline_id']
+    from . import evidence_roles, verdict
     from .agent_inputs import baseline_bad_case_rows
     baseline = store.evaluation_run(current) if current else None
-    rows = baseline_bad_case_rows(store, baseline)
-    faults = baseline_case_faults(baseline, rows)
+    version = evidence_roles.version_for(baseline, diagnosis_version)
+    use_final = version != evidence_roles.VERSION or bool(baseline and verdict.uses_final(baseline['result']))
+    rows = baseline_bad_case_rows(store, baseline, use_final=use_final)
+    faults = baseline_case_faults(baseline, rows, version)
     return [case_list_row({**row, 'result': {**row['result'], 'bad_case_fault': faults[row['question_id']]}},
                           light=light) for row in rows]
 
 
 @app.get("/api/bad-cases/{case_id}")
 @read_view()
-def bad_case(case_id: str):
-    from . import verdict
+def bad_case(case_id: str, diagnosis_version: Literal['122f', '126b'] | None = None):
+    from . import evidence_roles, verdict
     from .agent_inputs import baseline_bad_case_rows
 
     with store.connection() as connection:
@@ -1768,14 +1775,16 @@ def bad_case(case_id: str):
     if run_id is None and case_id.startswith('BC-EVAL-'):
         run_id = 'EVAL-' + case_id.removeprefix('BC-EVAL-').partition('-')[0]
     run = store.evaluation_run(run_id) if run_id else None
+    version = evidence_roles.version_for(run, diagnosis_version)
     item = None
-    if run and verdict.records(store, run_id):
-        item = next((r for r in baseline_bad_case_rows(store, run) if r['id'] == case_id), None)
+    if run and (version == evidence_roles.VERSION or verdict.records(store, run_id)):
+        use_final = version != evidence_roles.VERSION or verdict.uses_final(run['result'])
+        item = next((r for r in baseline_bad_case_rows(store, run, use_final=use_final) if r['id'] == case_id), None)
     elif row:
         item = {**dict(row),'result':{**json.loads(row['result_json']),'run_id':run_id,'question_id':row['question_id']}}
     if item is None:
         raise HTTPException(status_code=404, detail="Bad case not found")
-    fault = baseline_case_faults(run, [item])[item['question_id']]
+    fault = baseline_case_faults(run, [item], version)[item['question_id']]
     item = {**item, 'result': {**item['result'], 'bad_case_fault': fault}}
     return {**case_list_row(item),'dataset_snapshot':json.loads(run['dataset_snapshot_json']) if run else {}}
 
@@ -2244,7 +2253,7 @@ def start_followup(run_id: str, group: Literal['review', 'max', 'high', 'low']):
 @app.get("/api/evaluations/{run_id}")
 @evaluation_display
 @read_view()
-def evaluation_run(run_id: str, light: bool = False):
+def evaluation_run(run_id: str, light: bool = False, diagnosis_version: Literal['122f', '126b'] | None = None):
     if store.superseded_evaluation(run_id):raise HTTPException(status_code=404,detail='Evaluation run not found')
     run = store.evaluation_run(run_id, light=light)
     if run is None:
@@ -2258,7 +2267,7 @@ def evaluation_run(run_id: str, light: bool = False):
     cases = [{**row['result'], 'diagnostic_view': row['diagnostic_view']} for row in prepare_baseline_rows(run,
              [{'question_id': case['question_id'], 'result': case} for case in verdict.final_cases(store, run_id, use_final=use_final)])]
     if run['config'].get('run_target') == 'baseline':
-        faults = baseline_case_faults(run, baseline_bad_case_rows(store, run, use_final=use_final))
+        faults = baseline_case_faults(run, baseline_bad_case_rows(store, run, use_final=use_final), diagnosis_version)
         for case in cases:
             if case['question_id'] in faults:
                 case['bad_case_fault'] = faults[case['question_id']]

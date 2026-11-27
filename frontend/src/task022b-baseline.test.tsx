@@ -37,6 +37,26 @@ it('shows each saved Agent root cause once and uses the frozen question subtype'
   ]);
 });
 
+it('uses 126b subtype, frozen question type and root evidence in the same row', async () => {
+  const ranking = {...row('Q29', '检索层问题'), bad_case_fault: {
+    diagnosis_version:'126b', layer:'retrieval', code:'ranking', subtype:'找到但没交给模型',
+    question_type:'条件与跨段表达', reason:'IRB 1300 的 +45°C 在候选第 10 位，未进入 Final。', severity:'严重',
+  }};
+  const unknown = {...row('Q30', '生成层问题'), bad_case_fault: {
+    diagnosis_version:'126b', code:'unknown', subtype:'待确认', question_type:'条件与跨段表达',
+    reason:'缺少 Final 原文。',
+  }};
+  await mount(<BadCaseOverview rows={[ranking,unknown]} showJudgeReason onSelect={() => {}} />);
+  const table = document.querySelector('.diagnosis-list')!;
+  expect(table.textContent).toContain('根因依据');
+  expect(table.textContent).toContain('题型细分');
+  const rows = [...table.querySelectorAll<HTMLTableRowElement>('tbody tr')];
+  expect(rows[0].cells[4].textContent).toBe('条件与跨段表达');
+  expect(rows[0].cells[5].textContent).toBe('检索层 · 找到但没交给模型');
+  expect(rows[0].cells[6].textContent).toContain('候选第 10 位');
+  expect(rows[1].cells[5].textContent).toBe('待确认');
+});
+
 it('keeps the root-cause performance card empty when a slow answer passed', async () => {
   await mount(<BadCaseOverview useRootCauses rows={[]} allRows={[{...row('Q01','延迟'), passed:true,
     programmatic_metrics:{latency_ms:40000}}]} latencyGates={[{metric:'latency_p99_seconds',threshold:30}]}

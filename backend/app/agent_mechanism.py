@@ -312,6 +312,10 @@ def bad_case_fault(row, fault):
 
 def faults_for_cases(baseline, cases, bad_cases, *, decision_version=None):
     reference = {row['question_id']: row['id'] for row in bad_cases}
+    from . import evidence_roles
+
+    if decision_version == evidence_roles.VERSION:
+        return evidence_roles.faults(baseline, cases, reference)
     rows = [{'id': reference[c['question_id']], 'question_id': c['question_id'], 'result': c}
             for c in cases if c['question_id'] in reference]
     faults = {}

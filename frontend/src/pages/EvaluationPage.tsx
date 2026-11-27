@@ -16,7 +16,7 @@ import { mergeEvaluationProgress, hasEvaluationDetails } from "../evaluationProg
 import { StoryDisclosure } from "../components/Storytelling";
 import './evaluation-workspaces.css';
 import { savedDirections, businessDiagnosisRows, businessVerdict } from '../components/EvaluationDiagnosis';
-import { BadCaseOverview, baselineFaultDetail, baselineFaultLayer, ProductDiagnostics, productQuestionLabel, timingStages } from "../components/ProductDiagnostics";
+import { BadCaseOverview, baselineFaultLayer, baselineFaultTitle, ProductDiagnostics, productQuestionLabel, timingStages } from "../components/ProductDiagnostics";
 import { PageShell } from "../components/PageShell";
 
 import { useEffect, useState } from "react";
@@ -249,7 +249,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
       </div>}
       {tab === "gates" && <BaselineGates gates={gates} onSelect={gate=>setSelectedGate(details.find(row=>row.metric===gate.metric) || gate)} />}
 
-      {tab === "cases" && <><Section title={<IconLabel name="bad">{`Bad Case`}</IconLabel>}><BadCaseOverview showJudgeReason useRootCauses rows={businessCases} questions={snapshot.questions} onSelect={setSelectedCase} /></Section></>}
+      {tab === "cases" && <><Section title={<IconLabel name="bad">{`Bad Case`}</IconLabel>}><BadCaseOverview showJudgeReason useRootCauses={!businessCases.length} rows={businessCases} questions={snapshot.questions} onSelect={setSelectedCase} /></Section></>}
 
     </>}
 
@@ -263,6 +263,7 @@ export function BaselineCaseDetails({ item, snapshot, config, gates }: { item: R
   const evidence: Row[] = golden.evidence || golden.acceptable_evidence || [];
   const view = item.diagnostic_view || {};
   const fault = item.bad_case_fault;
+  const repairHint = fault?.diagnosis_version ? fault.repair_hint || '根因待确认。' : view.repair_hint || savedDirections(item);
 
   const passed = businessVerdict(item) === 'PASS';
   const summary = judgePresentation(item, golden);
@@ -293,13 +294,13 @@ export function BaselineCaseDetails({ item, snapshot, config, gates }: { item: R
   return <div className="case-details bad-case-details">
     <div className="case-review"><Badge tone={passed?"good":businessVerdict(item)==="FAIL"?"bad":"neutral"}>{conclusion}</Badge>{businessVerdict(item)==='FAIL' && item.baseline_review_label && <Badge tone={item.baseline_review?.status==='confirmed_regression'?'bad':item.baseline_review?.status==='fluctuation'?'warning':'neutral'}>{displayText(item.baseline_review_label)}</Badge>}</div>
     {fault && <section className="candidate-card drawer-section">
-      <h3>根因</h3><p>{baselineFaultLayer(fault)} · {baselineFaultDetail(fault)}</p><p>{fault.reason}</p>
+      <h3>根因</h3><p>{baselineFaultTitle(fault)}</p><p>{fault.reason}</p>
       <h4>连带现象</h4><p>{summary.text}</p>
     </section>}
     <section className="candidate-card drawer-section"><h3>业务问题</h3><p className="muted">{displayText(item.test_category || golden.test_category || '')}{item.negative_subtype && ` · ${displayText(item.negative_subtype)}`}</p><CaseAnswer text={item.question || golden.question || '历史未保存问题原文'} />{golden.business_scenario && <div className="muted-prose"><TruncatedText lines={3}>业务场景：{golden.business_scenario}</TruncatedText></div>}</section>
     <section className="candidate-card drawer-section"><h3>答案对比</h3><div className="case-answer-stack"><div><h4>参考答案</h4><CaseAnswer text={reference} reference final={(golden.evidence_details || []).flatMap((source: Row) => source.chunks || [])} />{typeof view.missing_points==='string' && view.missing_points !== '记录缺失：未保存完整的要点判分记录' && <div className="muted-prose muted"><TruncatedText lines={3}>{view.missing_points}</TruncatedText></div>}{missing.length>0 && <div className="missing-points"><strong>未答到的内容</strong><ul>{missing.map(point=><li key={point}>{point}</li>)}</ul></div>}</div><div><h4>实际回答</h4><CaseAnswer text={item.model_answer || '历史未保存回答'} final={final} /></div></div><div className="muted-prose case-difference"><TruncatedText lines={3}><span>{summary.text}</span></TruncatedText></div></section>
     <AnswerEvidence row={item} question={golden}/>
-    <section className="candidate-card drawer-section"><h3>优化方向</h3><div className="muted-prose"><TruncatedText lines={3}>{passed?'本题已答对，无失败优化目标。':view.repair_hint || savedDirections(item)}</TruncatedText></div></section>
+    <section className="candidate-card drawer-section"><h3>优化方向</h3><div className="muted-prose"><TruncatedText lines={3}>{passed?'本题已答对，无失败优化目标。':repairHint}</TruncatedText></div></section>
 
   </div>;
 }
