@@ -138,6 +138,8 @@ def test_directed_round_retries_short_reply_and_persists_abc(saved_runs):
         if len(phases) == 2:
             return json.dumps({'candidates': [], 'insufficient_evidence': '只有 A 做过定向检查'})
         assert '须填满 A/B/C' in prompt['validation_rejection']
+        assert json.loads(prompt['previous_response'])['candidates'] == []
+        assert prompt['validation_rejection_history'] == [prompt['validation_rejection']]
         conclusion = {'id': 'C1', 'conclusion': '标准证据缺失'}
         return json.dumps({
             'prior_round_review': {'summary': '无', 'plans': [], 'conclusions': [conclusion],
@@ -248,6 +250,51 @@ def test_saved_round_two_reply_can_repeat_unchanged_winner_value(saved_runs):
     candidate['config_diff']['multi_query'] = 3
     with pytest.raises(ValueError, match='保留 Winner 底座'):
         validate()
+
+
+def test_pre_review_menu_excludes_winner_parameters(saved_runs):
+    import json
+    from types import SimpleNamespace
+
+    from app.policy import search_space_contract
+    from app.workflow_engine import WorkflowEngine
+    from test_task123b_directed_planning import hypothesis
+
+    env, save = saved_runs
+    experiment = env.store.create_experiment(env.base)
+    winner, run = save(experiment, 'A', 2, {'Q01', 'Q02'}, multi_query=2, top_k=6)
+    planning = WorkflowEngine(env.store, SimpleNamespace(), experiment).directed_planning(3, winner, run)
+
+    def ask(system, prompt):
+        menu = prompt['search_space']
+        changes = {'multi_query': 4} if 'multi_query' in menu else {'candidate_k': 24}
+        return json.dumps({'hypotheses': [{**hypothesis(changes, targets=('Q03',)), 'checks': []}]})
+
+    planning.begin({'search_space': search_space_contract(for_agent=True)}, ask)
+    [prediction] = planning.review_input()['pre_review_prediction']
+    assert prediction['changes'] == {'candidate_k': 24}
+
+
+def test_formal_prompt_identifies_prior_results_with_inherited_multi_parameter_changes(saved_runs):
+    from app.optimization import build_agent_prompt
+
+    env, save = saved_runs
+    experiment = env.store.create_experiment(env.base)
+    save(experiment, 'C', 1, {'Q01'}, multi_query=2)
+    candidate_id, _ = save(experiment, 'A', 2, {'Q01', 'Q02'}, multi_query=2, top_k=6)
+    prior = env.store.experiment(experiment)['candidates']
+    prior[1]['reasoning'].update(changed_parameters={'top_k': 6},
+                                 changed_parameters_vs_baseline={'multi_query': 2, 'top_k': 6})
+
+    _, prompt = build_agent_prompt([], rules.BASELINE, prior, [], ['A'], causal_evidence=True)
+
+    assert prompt['prior_multi_parameter_reviews'] == [
+        {'candidate_id': candidate_id, 'changes_vs_baseline': {'multi_query': 2, 'top_k': 6}},
+    ]
+    assert prompt['prior_round_review_inputs'][1] == {
+        'candidate_id': candidate_id, 'fixed_question_ids': ['Q01', 'Q02'],
+        'new_failure_question_ids': [],
+    }
 
 
 def test_e6_frozen_evaluation_rules_hash_still_passes_preflight():

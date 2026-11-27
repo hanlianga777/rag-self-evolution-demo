@@ -519,6 +519,27 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
     if causal_evidence:
         from .agent_inputs import case_comparisons
         from .policy import candidate_rank
+        review_inputs = []
+        multi_parameter_reviews = []
+        for row in prior_results:
+            if row['status'] != 'evaluated':
+                continue
+            review_inputs.append({'candidate_id': row['id'],
+                                  'fixed_question_ids': row['result']['all_fixed_question_ids'] or [],
+                                  'new_failure_question_ids': row['result']['new_failure_question_ids']})
+            changes = row.get('changed_parameters_vs_baseline', row['changed_parameters'])
+            if len(changes) > 1:
+                multi_parameter_reviews.append({'candidate_id': row['id'], 'changes_vs_baseline': changes})
+        if review_inputs:
+            prompt['prior_round_review_inputs'] = review_inputs
+            system += ('把 prior_round_review_inputs 内程序保存的 fixed_question_ids 和 new_failure_question_ids '
+                       '按 candidate_id 原样复制进 plans，均相对原 Baseline。不要重新计算。'
+                       'causal_claims 必须覆盖这两组题的并集，无法归因时写不确定。')
+        if multi_parameter_reviews:
+            prompt['prior_multi_parameter_reviews'] = multi_parameter_reviews
+            system += ('prior_multi_parameter_reviews 列的是必须写多参数归因的所有历史方案，按相对原 Baseline 的完整改动计算，含继承。'
+                       '逐一用 candidate_id 对应 prior_round_review.plans 原有条目，显式填写非空的 most_likely_parameter 和 '
+                       'attribution_reason。证据不足时写不确定，并指出无法拆分的参数。')
         eligible = [c for c in prior_candidates if c['status']=='evaluated' and (candidate_cases or {}).get(c['id'])]
         winner = min(eligible, key=candidate_rank, default=None)
         prompt['case_comparisons'] = {c['id']:case_comparisons(baseline_cases or [], (candidate_cases or {}).get(c['id'], []), questions) for c in eligible}
@@ -1342,6 +1363,9 @@ class OptimizationAgent:
             audit['verdict_version'] = rules.RULES_VERSION
             if fill_round:
                 system += ('按 goal.candidate_labels 逐个填满，且各方案须有不同机制假设。'
+                           '每套 config_diff 必须与每道目标题的 available 中一个完整 changes 对象相同，不能拼接不同选项。'
+                           '上一轮承诺的改动若已锁定在当前 Winner 底座，须在 hypothesis_plan.deviation_reason 写明已继承，不能把它列为新增改动。'
+                           '逐题方案必须预测至少一道 target_bad_cases 中的题，包括探索性方案；整卷性能方案才用空预测题号。'
                            '优先选择并先列出有证据的改法，缺少预演或预演无改善时可用探索性改法并说明机制。'
                            '跨层或错因未知时写 cross_layer_mechanisms，按题逐条解释作用机制。'
                            '按 round_target_layer.layer_counts 从高到低用足各层机会，补位时说明 layer_reason。'
@@ -1360,6 +1384,18 @@ class OptimizationAgent:
                        '若重复prior_parameter_findings中标记无效或有副作用的参数方向，须对对应的lesson选择例外探索，'
                        '列出受影响方案，reason写成“上次：…；这次：…”，对照保存条件说明这次凭什么不同。'
                        '数值参数在Baseline同一侧视为同方向，分类参数同一取值视为同方向；继承的改动也检查。')
+            if fill_round and v2:
+                from .agent_strategy import parameter_direction
+
+                locked = base['changes']
+                inherited_findings = [row['lesson'] for row in prompt['prior_parameter_findings']
+                                      if row['parameter'] in locked and parameter_direction(
+                                          base_config.get(row['parameter']), locked[row['parameter']]) == row['direction']]
+                if inherited_findings:
+                    prompt['history_exceptions_required_for_all_candidates'] = inherited_findings
+                    system += ('history_exceptions_required_for_all_candidates 是每套方案都继承的历史参数方向。'
+                               '这些 lesson 的 decision 必须为例外探索，affected_candidates 填 goal.candidate_labels 全部标签，'
+                               'reason 按上次：…；这次：…说明原配置和当前前提的差异。')
         audit['round_policy'] = context.get('round_policy', {})
         if audit['round_policy'].get('mode') == 'full_rounds':
             prompt['proposal_generation'] = {'round':round_number, 'prior_failed_batches':
@@ -1420,6 +1456,13 @@ class OptimizationAgent:
                                     request['round_contract']['max_combination_candidates'] = len(current_labels)
                                 if rejection:
                                     request['validation_rejection'] = rejection
+                                    if fill_round:
+                                        request['previous_response'] = audit.get('provider_raw_text')
+                                        request['validation_rejection_history'] = [
+                                            row['reason'] for row in audit['validation_retries']]
+                                        request['revision_instruction'] = (
+                                            '依据程序保存的事实修正上次回包的拒绝项，保留正确字段，'
+                                            '同时核对历史拒绝项，返回完整合法 JSON。')
                                 if fill_round and not current_labels:
                                     content = json.dumps({'candidates': [], 'insufficient_evidence': target['reason']})
                                     break

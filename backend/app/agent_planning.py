@@ -4,7 +4,7 @@ import json
 from . import rules, verdict
 from .agent_inputs import evidence_positions
 from .telemetry import collect_usage
-from .composite import pipeline_config
+from .composite import parameter_diff, pipeline_config
 from .corpus import require_knowledge_binding, require_retrieval_identity
 from .judge_replay import resolve_question_ids
 
@@ -337,11 +337,21 @@ class DirectedPlanning:
         if 'pre_review_prediction' not in self.state:
             first = {**prompt, 'planning_stage': 'hypotheses', 'max_hypotheses': 3,
                      'check_limit': self.limit, 'generation_sample_limit': SAMPLE_LIMIT}
+            system = HYPOTHESIS_SYSTEM
             if self.decision_version == rules.BAD_CASE_DECISION_VERSION:
                 first['check_policy'] = 'checks 可以为空。定向检查用于排序与识别已证实的回退，缺少正向预演仍可提出探索性机制假设。'
+                locked = parameter_diff(self.base, self.baseline)
+                if locked:
+                    first['locked_winner_parameters'] = locked
+                    first['search_space'] = {key: value for key, value in first['search_space'].items()
+                                             if key not in locked}
+                    first['max_changed_parameters'] = min(rules.AGENT['max_changed_parameters'],
+                        rules.agent_change_limit(self.decision_version) - len(locked))
+                    system += ('locked_winner_parameters 中的参数由程序完整继承，不得在假设或 checks 的 changes 中提交。'
+                               '仅使用 search_space 中的参数，每个 changes 不得超过 max_changed_parameters 项。')
             errors = []
             for attempt in range(4):
-                raw = ask(HYPOTHESIS_SYSTEM, {**first, **({'validation_errors': errors} if errors else {})})
+                raw = ask(system, {**first, **({'validation_errors': errors} if errors else {})})
                 try:
                     reply = json.loads(raw)
                     self.submit_hypotheses(reply.get('hypotheses') if isinstance(reply, dict) else None)
