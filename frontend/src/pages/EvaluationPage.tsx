@@ -16,7 +16,7 @@ import { mergeEvaluationProgress, hasEvaluationDetails } from "../evaluationProg
 import { StoryDisclosure } from "../components/Storytelling";
 import './evaluation-workspaces.css';
 import { savedDirections, businessDiagnosisRows, businessVerdict } from '../components/EvaluationDiagnosis';
-import { BadCaseOverview, ProductDiagnostics, productQuestionLabel, timingStages } from "../components/ProductDiagnostics";
+import { BadCaseOverview, baselineFaultDetail, baselineFaultLayer, ProductDiagnostics, productQuestionLabel, timingStages } from "../components/ProductDiagnostics";
 import { PageShell } from "../components/PageShell";
 
 import { useEffect, useState } from "react";
@@ -92,6 +92,10 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
   const [selectedGate, setSelectedGate] = useState<Row | null>(null);
   const [selectedCase, setSelectedCase] = useState<Row | null>(null);
   const selectedDetail = run.cases?.find((row: Row) => row.question_id === selectedCase?.question_id) || selectedCase;
+  const selectedFault = selectedDetail?.bad_case_fault;
+  const selectedDiagnosis = selectedFault
+    ? [baselineFaultLayer(selectedFault), selectedFault.layer && selectedFault.severity].filter(Boolean).join(' · ')
+    : ['诊断', selectedDetail?.diagnostic_view?.severity_label].filter(Boolean).join(' · ');
 
   const [busy, setBusy] = useState(false);
   const [startConfirm, setStartConfirm] = useState(false);
@@ -250,7 +254,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
     </>}
 
     <Drawer className="workbench-drawer" open={!!selectedGate} onOpenChange={open => !open && setSelectedGate(null)} title={selectedGate ? gateNames[selectedGate.metric] || selectedGate.metric : "Hard Gate 详情"}><div className="drawer-body">{selectedGate && <><DrawerSection title="门槛是什么"><p>{gateDescription(selectedGate.metric)}</p><p>要求：{gateThreshold(selectedGate)}</p></DrawerSection><DrawerSection title="这次结果"><p>{gateValue(selectedGate)} · <Status value={selectedGate.status}/></p></DrawerSection><DrawerSection title="哪几题拉低了它"><div className="run-list gate-contributions">{(selectedGate.contributing_cases || []).filter((item:Row)=>selectedGate.metric.startsWith('latency_') ? item.value>selectedGate.threshold : item.value<selectedGate.threshold).map((item:Row)=><div key={item.question_id}><p>{cases.find(row=>row.question_id===item.question_id)?.question || '题目未记录'}</p><span>{format(item.value,selectedGate.metric.startsWith('latency_')?' 秒':'%')}</span><button className="text-button" onClick={()=>setSelectedCase(cases.find(row=>row.question_id===item.question_id) || null)}>查看案例</button></div>)}{!(selectedGate.contributing_cases || []).some((item:Row)=>selectedGate.metric.startsWith('latency_') ? item.value>selectedGate.threshold : item.value<selectedGate.threshold) && <p>没有保存的低于门槛题目。</p>}</div></DrawerSection></>}</div></Drawer>
-    <Drawer className="workbench-drawer" open={!!selectedCase} onOpenChange={open => !open && setSelectedCase(null)} title={selectedDetail ? `${productQuestionLabel(selectedDetail)} · ${selectedDetail.diagnostic_view?.diagnosis_category || '案例诊断'}${selectedDetail.diagnostic_view?.severity_label?` · ${selectedDetail.diagnostic_view.severity_label}`:''}` : '案例诊断'}><div className="drawer-body">{selectedDetail && (!run.cases ? error ? <p role="alert">案例详情读取失败：{error}</p> : <div className="case-detail-skeleton" role="status" aria-label="正在读取保存的案例详情">{[1,2,3].map(index=><span key={index} aria-hidden="true"/>)}</div> : <BaselineCaseDetails item={{...selectedDetail,optimization_strategy:(data.optimization?.candidates || []).filter((candidate:Row)=>(candidate.reasoning?.observed_evidence || candidate.reasoning?.target_bad_cases || []).some((id:string)=>id===selectedDetail.question_id || relatedBad.some(row=>row.id===id && row.question_id===selectedDetail.question_id))).map((candidate:Row)=>`${candidate.reasoning?.candidate_label || '未采集'}：${candidate.reasoning?.hypothesis || '假设未采集'}`).join('；')}} snapshot={snapshot} config={config} gates={details} />)}</div></Drawer>
+    <Drawer className="workbench-drawer" open={!!selectedCase} onOpenChange={open => !open && setSelectedCase(null)} title={selectedDetail ? `${productQuestionLabel(selectedDetail)} · ${selectedDiagnosis}` : '案例诊断'}><div className="drawer-body">{selectedDetail && (!run.cases ? error ? <p role="alert">案例详情读取失败：{error}</p> : <div className="case-detail-skeleton" role="status" aria-label="正在读取保存的案例详情">{[1,2,3].map(index=><span key={index} aria-hidden="true"/>)}</div> : <BaselineCaseDetails item={{...selectedDetail,optimization_strategy:(data.optimization?.candidates || []).filter((candidate:Row)=>(candidate.reasoning?.observed_evidence || candidate.reasoning?.target_bad_cases || []).some((id:string)=>id===selectedDetail.question_id || relatedBad.some(row=>row.id===id && row.question_id===selectedDetail.question_id))).map((candidate:Row)=>`${candidate.reasoning?.candidate_label || '未采集'}：${candidate.reasoning?.hypothesis || '假设未采集'}`).join('；')}} snapshot={snapshot} config={config} gates={details} />)}</div></Drawer>
   </PageShell>;
 }
 
@@ -258,6 +262,7 @@ export function BaselineCaseDetails({ item, snapshot, config, gates }: { item: R
   const golden = snapshot.questions?.find((row: Row) => row.id === item.question_id) || {};
   const evidence: Row[] = golden.evidence || golden.acceptable_evidence || [];
   const view = item.diagnostic_view || {};
+  const fault = item.bad_case_fault;
 
   const passed = businessVerdict(item) === 'PASS';
   const summary = judgePresentation(item, golden);
@@ -287,6 +292,10 @@ export function BaselineCaseDetails({ item, snapshot, config, gates }: { item: R
 
   return <div className="case-details bad-case-details">
     <div className="case-review"><Badge tone={passed?"good":businessVerdict(item)==="FAIL"?"bad":"neutral"}>{conclusion}</Badge>{businessVerdict(item)==='FAIL' && item.baseline_review_label && <Badge tone={item.baseline_review?.status==='confirmed_regression'?'bad':item.baseline_review?.status==='fluctuation'?'warning':'neutral'}>{displayText(item.baseline_review_label)}</Badge>}</div>
+    {fault && <section className="candidate-card drawer-section">
+      <h3>根因</h3><p>{baselineFaultLayer(fault)} · {baselineFaultDetail(fault)}</p><p>{fault.reason}</p>
+      <h4>连带现象</h4><p>{summary.text}</p>
+    </section>}
     <section className="candidate-card drawer-section"><h3>业务问题</h3><p className="muted">{displayText(item.test_category || golden.test_category || '')}{item.negative_subtype && ` · ${displayText(item.negative_subtype)}`}</p><CaseAnswer text={item.question || golden.question || '历史未保存问题原文'} />{golden.business_scenario && <div className="muted-prose"><TruncatedText lines={3}>业务场景：{golden.business_scenario}</TruncatedText></div>}</section>
     <section className="candidate-card drawer-section"><h3>答案对比</h3><div className="case-answer-stack"><div><h4>参考答案</h4><CaseAnswer text={reference} reference final={(golden.evidence_details || []).flatMap((source: Row) => source.chunks || [])} />{typeof view.missing_points==='string' && view.missing_points !== '记录缺失：未保存完整的要点判分记录' && <div className="muted-prose muted"><TruncatedText lines={3}>{view.missing_points}</TruncatedText></div>}{missing.length>0 && <div className="missing-points"><strong>未答到的内容</strong><ul>{missing.map(point=><li key={point}>{point}</li>)}</ul></div>}</div><div><h4>实际回答</h4><CaseAnswer text={item.model_answer || '历史未保存回答'} final={final} /></div></div><div className="muted-prose case-difference"><TruncatedText lines={3}><span>{summary.text}</span></TruncatedText></div></section>
     <AnswerEvidence row={item} question={golden}/>

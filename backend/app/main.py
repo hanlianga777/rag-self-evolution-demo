@@ -1735,12 +1735,25 @@ def case_list_row(row, *, light=False):
     return {**{k:v for k,v in row.items() if k not in {'result_json','diagnostic_view'}},'result':result, **({'details_loaded':False} if light else {})}
 
 
+def baseline_case_faults(baseline, rows):
+    from . import rules
+    from .agent_mechanism import faults_for_cases
+
+    faults = faults_for_cases(baseline, [row['result'] for row in rows], rows, decision_version='122f')
+    return {qid: {**fault, 'layer': rules.BAD_CASE_TYPES.get(fault['code'], (None,))[0]}
+            for qid, fault in faults.items()}
+
+
 @app.get("/api/bad-cases")
 @read_view()
 def bad_cases(light: bool = False, baseline_id: str | None = None):
     current=baseline_id or store.current_baseline_identity()['current_baseline_id']
     from .agent_inputs import baseline_bad_case_rows
-    return [case_list_row(row,light=light) for row in baseline_bad_case_rows(store, store.evaluation_run(current) if current else None)]
+    baseline = store.evaluation_run(current) if current else None
+    rows = baseline_bad_case_rows(store, baseline)
+    faults = baseline_case_faults(baseline, rows)
+    return [case_list_row({**row, 'result': {**row['result'], 'bad_case_fault': faults[row['question_id']]}},
+                          light=light) for row in rows]
 
 
 @app.get("/api/bad-cases/{case_id}")
@@ -1762,6 +1775,8 @@ def bad_case(case_id: str):
         item = {**dict(row),'result':{**json.loads(row['result_json']),'run_id':run_id,'question_id':row['question_id']}}
     if item is None:
         raise HTTPException(status_code=404, detail="Bad case not found")
+    fault = baseline_case_faults(run, [item])[item['question_id']]
+    item = {**item, 'result': {**item['result'], 'bad_case_fault': fault}}
     return {**case_list_row(item),'dataset_snapshot':json.loads(run['dataset_snapshot_json']) if run else {}}
 
 
@@ -2238,10 +2253,15 @@ def evaluation_run(run_id: str, light: bool = False):
     if light:
         return run
     from . import verdict
-    from .agent_inputs import prepare_baseline_rows
+    from .agent_inputs import baseline_bad_case_rows, prepare_baseline_rows
     use_final = verdict.uses_final(run['result'])
     cases = [{**row['result'], 'diagnostic_view': row['diagnostic_view']} for row in prepare_baseline_rows(run,
              [{'question_id': case['question_id'], 'result': case} for case in verdict.final_cases(store, run_id, use_final=use_final)])]
+    if run['config'].get('run_target') == 'baseline':
+        faults = baseline_case_faults(run, baseline_bad_case_rows(store, run, use_final=use_final))
+        for case in cases:
+            if case['question_id'] in faults:
+                case['bad_case_fault'] = faults[case['question_id']]
     gate_inputs = verdict.gate_cases(store, run_id) if use_final else cases
     return {**run, "diagnostic_categories":DIAGNOSTIC_CATEGORIES,"product_diagnostics":product_diagnostics(store,run,cases), "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases,"requires_policy_upgrade":requires_foundation_upgrade(run.get("judge",{})), "gate_details": gate_details(gate_inputs, run.get("result", {}).get("gates", {}).get("gates", []), statistics_version=run.get("judge", {}).get("gate_statistics_version"))}
 

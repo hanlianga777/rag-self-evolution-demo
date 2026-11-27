@@ -22,25 +22,33 @@ const costText = (value: any) => yuanText(value?.amount, value?.currency) ? `${y
 const gateLabels: Record<string, string> = { positive_correctness:'正向题（Positive）正确性', positive_faithfulness:'正向题（Positive）忠实性', positive_completeness:'正向题（Positive）完整性', ablation_correctness:'消融题（Ablation）正确性', ablation_faithfulness:'消融题（Ablation）忠实性', ablation_completeness:'消融题（Ablation）完整性', safe_rejection_rate:'安全拒答率', safety_critical_accuracy:'安全关键准确率', prompt_injection_resistance:'提示注入抵抗', latency_p50_seconds:'回答耗时中位数', latency_p99_seconds:'回答耗时（最慢 1%）' };
 export const productQuestionLabel = (row: Row) => caseData(row).diagnostic_view?.display_question_id || row.display_question_id || questionLabel(caseId(row));
 
+const faultLayers: Record<string, string> = {retrieval:'检索层', generation:'生成层', safety:'安全边界', performance:'性能'};
+const faultDetails: Record<string, string> = {
+ recall:'没检索到（召回失败）', ranking:'检索到但没进最终资料（排序或筛选）',
+ final:'检索到但没进最终资料（排序或筛选）', generation:'证据已进入最终资料，回答出错',
+ performance:'响应耗时超过门槛', judge_technical_failure:'判分执行异常',
+};
+export const baselineFaultLayer = (fault: Row) => faultLayers[fault.layer] || '根因待定位';
+export const baselineFaultDetail = (fault: Row) => faultDetails[fault.code] || fault.subtype || '暂无细分';
+
 export function BadCaseOverview({rows,allRows=[],categories=[],priorities=[],latencyGates=[],showJudgeReason=false,questions=[],onSelect}: {rows:Row[];allRows?:Row[];categories?:Row[];priorities?:Row[];latencyGates?:Row[];showJudgeReason?:boolean;questions?:Row[];onSelect:(row:Row)=>void}) {
  const [selected,setSelected]=useState('all');
  useEffect(()=>{setSelected('all');},[rows]);
- const cases=businessDiagnosisRows(rows).filter(row=>caseData(row).diagnostic_view?.diagnosis_category!=='延迟' && caseData(row).diagnostic_view?.diagnosis_category!=='性能问题');
+ const rootFaults=rows.some(row=>caseData(row).bad_case_fault);
+ const cases=businessDiagnosisRows(rows).filter(row=>rootFaults || !['延迟','性能问题'].includes(caseData(row).diagnostic_view?.diagnosis_category));
  const layerDefinitions: (Pick<LayerCard, 'key' | 'name' | 'icon'> & {labels:string[]})[] = [
   {key:'retrieval',name:'检索层',labels:['检索层问题','检索失败','检索噪声'],icon:'layers' as const},
   {key:'generation',name:'生成层',labels:['生成层问题','回答问题','过度拒答'],icon:'verify' as const},
   {key:'safety',name:'安全边界',labels:['安全边界问题','安全边界'],icon:'gate' as const},
   {key:'performance',name:'性能',labels:[],icon:'time' as const},
  ];
- const layerKey=(row:Row)=>layerDefinitions.find(layer=>layer.labels.includes(caseData(row).diagnostic_view?.diagnosis_category))?.key;
+ const layerKey=(row:Row)=>rootFaults ? caseData(row).bad_case_fault?.layer : layerDefinitions.find(layer=>layer.labels.includes(caseData(row).diagnostic_view?.diagnosis_category))?.key;
  const layerNames: Record<string,string>={retrieval:'检索层',generation:'生成层',safety:'安全边界'};
- // 一道错题可能同时有检索、生成、安全多个问题：有 issue_layers 时按它计入每一张卡片；旧记录没有时按主原因。
- const inLayer=(row:Row,key:string)=>{const layers=caseData(row).diagnostic_view?.issue_layers;return Array.isArray(layers)&&layers.length?layers.includes(layerNames[key]):layerKey(row)===key;};
- // 性能：按"单题回答耗时超过 P99 门槛（秒）"逐题统计，答对的慢题也算——性能不看对错。不计入 Bad Case 总数。
+ const inLayer=(row:Row,key:string)=>{const layers=caseData(row).diagnostic_view?.issue_layers;return !rootFaults&&Array.isArray(layers)&&layers.length?layers.includes(layerNames[key]):layerKey(row)===key;};
  const p99Limit=latencyGates.find(gate=>gate.metric==='latency_p99_seconds')?.threshold;
  const latencySeconds=(row:Row)=>{const value=(caseData(row).programmatic_metrics || row.programmatic_metrics || {}).latency_ms;return typeof value==='number' && Number.isFinite(value)?value/1000:null;};
- const slowRows=typeof p99Limit==='number'?allRows.filter(row=>{const seconds=latencySeconds(row);return seconds!==null && seconds>p99Limit;}):[];
- const visible=selected==='all'?cases:selected==='performance'?slowRows:cases.filter(row=>inLayer(row,selected));
+ const slowRows=!rootFaults&&typeof p99Limit==='number'?allRows.filter(row=>{const seconds=latencySeconds(row);return seconds!==null && seconds>p99Limit;}):[];
+ const visible=selected==='all'?cases:selected==='performance'&&!rootFaults?slowRows:cases.filter(row=>inLayer(row,selected));
  const incomplete=cases.filter(row=>!layerKey(row));
  const ranked=categories.map(category=>({...category,...priorities.find(item=>item.label===category.label)}));
  const severityOrder=['致命','严重','中等','轻微'];
@@ -51,14 +59,38 @@ export function BadCaseOverview({rows,allRows=[],categories=[],priorities=[],lat
    retrieval:'关键证据没有被找到，或者找到了却排得太靠后，没能交给模型。',
    generation:'证据已经交给模型，但回答漏了要点，或者该追问的时候没有追问。',
    safety:'该拒绝、该提醒风险的题，回答没有守住安全底线。',
-   performance:typeof p99Limit==='number'?`单题回答耗时超过 ${p99Limit} 秒（P99 门槛）的题，答对的也算；不计入 Bad Case 总数。`:'单题回答时间超出了 Hard Gate 规定的上限。',
+   performance:!rootFaults&&typeof p99Limit==='number'?`单题回答耗时超过 ${p99Limit} 秒（P99 门槛）的题，答对的也算；不计入 Bad Case 总数。`:'单题回答时间超出了 Hard Gate 规定的上限。',
   };
-  return {...layer,count:layer.key==='performance'?slowRows.length:cases.filter(row=>inLayer(row,layer.key)).length,severity,note:notes[layer.key]};
+  const members=cases.filter(row=>inLayer(row,layer.key));
+  const levels=severityOrder.map(label=>({label,count:members.filter(row=>caseData(row).bad_case_fault?.severity===label).length})).filter(level=>level.count);
+  return {...layer,count:layer.key==='performance'&&!rootFaults?slowRows.length:members.length,
+   severity:rootFaults?levels.map(({label,count})=>`${label} ${count}`).join(' / '):severity,note:notes[layer.key]};
  });
  return <div className="bad-case-overview">
   <div role="group" aria-label="Bad Case 分类"><BadCaseLayers total={cases.length} layers={layers} active={selected} onSelect={setSelected}/></div>
   {incomplete.length>0 && <p className="muted">{incomplete.length} 道题记录缺失：分类定义或诊断字段；保留在全部列表中。</p>}
-  <div className="table-scroll product-table diagnosis-list product-diagnosis-table"><DataTable><thead><tr><th>题号</th><th>问题</th><th>题型</th><th>负向子类</th><th>主题</th><th>层级与细分</th><th>{showJudgeReason ? "缺了什么" : "现象（子特征）"}</th><th>严重程度{severityHelp()}</th><th aria-label="打开详情"/></tr></thead><tbody>{visible.map(row=>{const item=caseData(row),view=item.diagnostic_view || {},summary=judgePresentation(item,questions.find(question=>question.id===caseId(row)));return <tr key={caseId(row)} role="button" tabIndex={0} onClick={()=>onSelect(row)} onKeyDown={event=>{if(event.target!==event.currentTarget)return;if(event.key==='Enter' || event.key===' '){event.preventDefault();onSelect(row);}}}><td className="id">{productQuestionLabel(row)}</td><td className="case-question"><TruncatedText lines={1}>{item.question || '记录缺失：问题原文'}</TruncatedText></td><td>{questionClassification({...questions.find(q=>q.id===caseId(row)),...item}).category}</td><td>{questionClassification({...questions.find(q=>q.id===caseId(row)),...item}).negative}</td><td>{questionClassification({...questions.find(q=>q.id===caseId(row)),...item}).topic}</td><td className="muted">{view.diagnosis_category || '分类未知'}<small className="diagnosis-subtype">{Array.isArray(view.issue_tags) && view.issue_tags.length ? view.issue_tags.map((tag:Row)=>`${tag.layer}·${tag.label}`).join('；') : view.subfeature || '细分未知'}</small></td><td onClick={event=>{if ((event.target as Element).closest('.ui-clamp[data-truncated="true"]')) event.stopPropagation();}}><HoverCard content={showJudgeReason ? summary.detail : view.subfeature || '记录缺失：子特征'}><span className="missing-point-summary" tabIndex={0}><ClampText lines={2} text={showJudgeReason ? summary.text : view.subfeature || '记录缺失：子特征'}/>{showJudgeReason && (summary.missingCount ?? 0) > 1 && <span className="missing-points-count">等 {summary.missingCount} 条</span>}</span></HoverCard></td><td><span className="severity-label"><i className={`severity-dot ${['致命','严重'].includes(view.severity_label) || item.severity==='critical'?'critical':'ordinary'}`}/>{['致命','严重'].includes(view.severity_label) || item.severity==='critical'?'严重':view.severity_label?'一般':'未知'}</span></td><td><span className="ui-row-go"><Icon name="go" size={15}/></span></td></tr>})}{!visible.length && <tr><td colSpan={9}>该分类暂无单题 Bad Case。</td></tr>}</tbody></DataTable></div>
+  <div className="table-scroll product-table diagnosis-list product-diagnosis-table"><DataTable>
+   <thead><tr><th>题号</th><th>问题</th><th>题型</th><th>负向子类</th><th>{rootFaults?'题型细分':'主题'}</th><th>层级与细分</th><th>{showJudgeReason ? "缺了什么" : "现象（子特征）"}</th><th>严重程度{!rootFaults&&severityHelp()}</th><th aria-label="打开详情"/></tr></thead>
+   <tbody>{visible.map(row=>{
+    const item=caseData(row),view=item.diagnostic_view || {},fault=item.bad_case_fault;
+    const question=questions.find(question=>question.id===caseId(row));
+    const classification=questionClassification({...question,...item});
+    const summary=judgePresentation(item,question),subfeature=view.subfeature || '记录缺失：子特征';
+    const critical=['致命','严重'].includes(fault?.severity ?? view.severity_label) || !rootFaults&&item.severity==='critical';
+    const severity=rootFaults?(severityOrder.includes(fault?.severity)?fault.severity:'待定位'):critical?'严重':view.severity_label?'一般':'未知';
+    const detail=rootFaults?(fault?baselineFaultDetail(fault):'暂无细分'):Array.isArray(view.issue_tags)&&view.issue_tags.length
+     ?view.issue_tags.map((tag:Row)=>`${tag.layer}·${tag.label}`).join('；'):view.subfeature || '细分未知';
+    return <tr key={caseId(row)} role="button" tabIndex={0} onClick={()=>onSelect(row)} onKeyDown={event=>{if(event.target!==event.currentTarget)return;if(event.key==='Enter' || event.key===' '){event.preventDefault();onSelect(row);}}}>
+     <td className="id">{productQuestionLabel(row)}</td><td className="case-question"><TruncatedText lines={1}>{item.question || '记录缺失：问题原文'}</TruncatedText></td>
+     <td>{classification.category}</td><td>{classification.negative}</td>
+     <td>{rootFaults?displayText(question?.question_subtype || item.question_subtype || question?.raw?.question_subtype || '—'):classification.topic}</td>
+     <td className="muted">{rootFaults?baselineFaultLayer(fault || {}):view.diagnosis_category || '分类未知'}<small className="diagnosis-subtype">{detail}</small></td>
+     <td onClick={event=>{if ((event.target as Element).closest('.ui-clamp[data-truncated="true"]')) event.stopPropagation();}}><HoverCard content={showJudgeReason ? summary.detail : subfeature}><span className="missing-point-summary" tabIndex={0}><ClampText lines={2} text={showJudgeReason ? summary.text : subfeature}/>{showJudgeReason && (summary.missingCount ?? 0) > 1 && <span className="missing-points-count">等 {summary.missingCount} 条</span>}</span></HoverCard></td>
+     <td><span className="severity-label"><i className={`severity-dot ${critical?'critical':'ordinary'}`}/>{severity}</span></td>
+     <td><span className="ui-row-go"><Icon name="go" size={15}/></span></td>
+    </tr>;
+   })}{!visible.length && <tr><td colSpan={9}>该分类暂无单题 Bad Case。</td></tr>}</tbody>
+  </DataTable></div>
  </div>;
 }
 

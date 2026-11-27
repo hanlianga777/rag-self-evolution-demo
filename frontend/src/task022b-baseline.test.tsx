@@ -13,6 +13,28 @@ const click = async (node: Element) => act(async () => (node as HTMLElement).cli
 const layer = (name: string) => [...document.querySelectorAll('.ui-bcl button')].find(button => button.textContent?.includes(name))!;
 const row = (id: string, category: string) => ({ question_id: id, question: `问题 ${id}`, passed: false, judge_result: { reason: '保存的缺失要点' }, diagnostic_view: { diagnosis_category: category, severity_label: '严重' } });
 
+it('shows each saved Agent root cause once and uses the frozen question subtype', async () => {
+  const rows = Array.from({length: 8}, (_, index) => ({
+    ...row(`Q${index + 1}`, '检索层问题'),
+    diagnostic_view: { issue_layers: ['检索层', '生成层'], subfeature: '回答漏了要点' },
+    bad_case_fault: {layer: 'retrieval', code: index < 3 ? 'recall' : 'ranking',
+      severity: index < 3 ? '致命' : '严重', reason: '标准证据没有进入最终资料。'},
+  }));
+  await mount(<BadCaseOverview rows={rows} questions={rows.map(item=>({id:item.question_id, question_subtype:'跨段信息整合'}))}
+    showJudgeReason onSelect={() => {}} />);
+  expect([...document.querySelectorAll('.ui-bcl button strong')].map(item=>item.textContent)).toEqual(['8','8','0','0','0']);
+  expect(layer('检索层').textContent).toContain('致命 3');
+  expect(layer('检索层').textContent).toContain('严重 5');
+  const table = document.querySelector('.diagnosis-list')!;
+  expect(table.textContent).toContain('题型细分');
+  expect(table.textContent).toContain('跨段信息整合');
+  expect(table.textContent).toContain('没检索到（召回失败）');
+  expect(table.textContent).toContain('检索到但没进最终资料（排序或筛选）');
+  expect([...table.querySelectorAll('.severity-label')].map(item=>item.textContent)).toEqual([
+    '致命','致命','致命','严重','严重','严重','严重','严重',
+  ]);
+});
+
 it('maps saved gate values, thresholds and verdicts to cards while preserving mouse and keyboard drilldowns', async () => {
   const gates = [
     { metric: 'positive_correctness', actual: 83, threshold: 90, operator: '>=', status: 'FAIL' },
