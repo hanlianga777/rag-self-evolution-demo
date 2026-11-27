@@ -70,12 +70,13 @@ export function BadCaseOverview({rows,allRows=[],categories=[],priorities=[],lat
   <div role="group" aria-label="Bad Case 分类"><BadCaseLayers total={cases.length} layers={layers} active={selected} onSelect={setSelected}/></div>
   {incomplete.length>0 && <p className="muted">{incomplete.length} 道题记录缺失：分类定义或诊断字段；保留在全部列表中。</p>}
   <div className="table-scroll product-table diagnosis-list product-diagnosis-table"><DataTable>
-   <thead><tr><th>题号</th><th>问题</th><th>题型</th><th>负向子类</th><th>{rootFaults?'题型细分':'主题'}</th><th>层级与细分</th><th>{showJudgeReason ? "缺了什么" : "现象（子特征）"}</th><th>严重程度{!rootFaults&&severityHelp()}</th><th aria-label="打开详情"/></tr></thead>
+   <thead><tr><th>题号</th><th>问题</th><th>题型</th><th>负向子类</th><th>{rootFaults?'题型细分':'主题'}</th><th>层级与细分</th><th>{rootFaults?'根因依据':showJudgeReason?'缺了什么':'现象（子特征）'}</th><th>严重程度{!rootFaults&&severityHelp()}</th><th aria-label="打开详情"/></tr></thead>
    <tbody>{visible.map(row=>{
     const item=caseData(row),view=item.diagnostic_view || {},fault=item.bad_case_fault;
     const question=questions.find(question=>question.id===caseId(row));
     const classification=questionClassification({...question,...item});
     const summary=judgePresentation(item,question),subfeature=view.subfeature || '记录缺失：子特征';
+    const explanation=rootFaults?fault?.reason || '暂无根因依据':showJudgeReason?summary.text:subfeature;
     const critical=['致命','严重'].includes(fault?.severity ?? view.severity_label) || !rootFaults&&item.severity==='critical';
     const severity=rootFaults?(severityOrder.includes(fault?.severity)?fault.severity:'待定位'):critical?'严重':view.severity_label?'一般':'未知';
     const detail=rootFaults?(fault?baselineFaultDetail(fault):'暂无细分'):Array.isArray(view.issue_tags)&&view.issue_tags.length
@@ -85,7 +86,7 @@ export function BadCaseOverview({rows,allRows=[],categories=[],priorities=[],lat
      <td>{classification.category}</td><td>{classification.negative}</td>
      <td>{rootFaults?displayText(question?.question_subtype || item.question_subtype || question?.raw?.question_subtype || '—'):classification.topic}</td>
      <td className="muted">{rootFaults?baselineFaultLayer(fault || {}):view.diagnosis_category || '分类未知'}<small className="diagnosis-subtype">{detail}</small></td>
-     <td onClick={event=>{if ((event.target as Element).closest('.ui-clamp[data-truncated="true"]')) event.stopPropagation();}}><HoverCard content={showJudgeReason ? summary.detail : subfeature}><span className="missing-point-summary" tabIndex={0}><ClampText lines={2} text={showJudgeReason ? summary.text : subfeature}/>{showJudgeReason && (summary.missingCount ?? 0) > 1 && <span className="missing-points-count">等 {summary.missingCount} 条</span>}</span></HoverCard></td>
+     <td onClick={event=>{if ((event.target as Element).closest('.ui-clamp[data-truncated="true"]')) event.stopPropagation();}}><HoverCard content={!rootFaults&&showJudgeReason?summary.detail:explanation}><span className="missing-point-summary" tabIndex={0}><ClampText lines={2} text={explanation}/>{!rootFaults&&showJudgeReason && (summary.missingCount ?? 0) > 1 && <span className="missing-points-count">等 {summary.missingCount} 条</span>}</span></HoverCard></td>
      <td><span className="severity-label"><i className={`severity-dot ${critical?'critical':'ordinary'}`}/>{severity}</span></td>
      <td><span className="ui-row-go"><Icon name="go" size={15}/></span></td>
     </tr>;

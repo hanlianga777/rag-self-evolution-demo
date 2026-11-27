@@ -28,6 +28,8 @@ it('shows each saved Agent root cause once and uses the frozen question subtype'
   const table = document.querySelector('.diagnosis-list')!;
   expect(table.textContent).toContain('题型细分');
   expect(table.textContent).toContain('跨段信息整合');
+  expect(table.textContent).toContain('标准证据没有进入最终资料。');
+  expect(table.textContent).not.toContain('保存的缺失要点');
   expect(table.textContent).toContain('没检索到（召回失败）');
   expect(table.textContent).toContain('检索到但没进最终资料（排序或筛选）');
   expect([...table.querySelectorAll('.severity-label')].map(item=>item.textContent)).toEqual([
