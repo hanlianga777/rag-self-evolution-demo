@@ -31,10 +31,10 @@ const faultDetails: Record<string, string> = {
 export const baselineFaultLayer = (fault: Row) => faultLayers[fault.layer] || '根因待定位';
 export const baselineFaultDetail = (fault: Row) => faultDetails[fault.code] || fault.subtype || '暂无细分';
 
-export function BadCaseOverview({rows,allRows=[],categories=[],priorities=[],latencyGates=[],showJudgeReason=false,questions=[],onSelect}: {rows:Row[];allRows?:Row[];categories?:Row[];priorities?:Row[];latencyGates?:Row[];showJudgeReason?:boolean;questions?:Row[];onSelect:(row:Row)=>void}) {
+export function BadCaseOverview({rows,allRows=[],categories=[],priorities=[],latencyGates=[],showJudgeReason=false,questions=[],useRootCauses=false,onSelect}: {rows:Row[];allRows?:Row[];categories?:Row[];priorities?:Row[];latencyGates?:Row[];showJudgeReason?:boolean;questions?:Row[];useRootCauses?:boolean;onSelect:(row:Row)=>void}) {
  const [selected,setSelected]=useState('all');
  useEffect(()=>{setSelected('all');},[rows]);
- const rootFaults=rows.some(row=>caseData(row).bad_case_fault);
+ const rootFaults=useRootCauses || rows.some(row=>caseData(row).bad_case_fault);
  const cases=businessDiagnosisRows(rows).filter(row=>rootFaults || !['延迟','性能问题'].includes(caseData(row).diagnostic_view?.diagnosis_category));
  const layerDefinitions: (Pick<LayerCard, 'key' | 'name' | 'icon'> & {labels:string[]})[] = [
   {key:'retrieval',name:'检索层',labels:['检索层问题','检索失败','检索噪声'],icon:'layers' as const},

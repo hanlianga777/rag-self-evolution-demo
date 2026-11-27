@@ -35,6 +35,13 @@ it('shows each saved Agent root cause once and uses the frozen question subtype'
   ]);
 });
 
+it('keeps the root-cause performance card empty when a slow answer passed', async () => {
+  await mount(<BadCaseOverview useRootCauses rows={[]} allRows={[{...row('Q01','延迟'), passed:true,
+    programmatic_metrics:{latency_ms:40000}}]} latencyGates={[{metric:'latency_p99_seconds',threshold:30}]}
+    onSelect={() => {}} />);
+  expect([...document.querySelectorAll('.ui-bcl button strong')].map(item=>item.textContent)).toEqual(['0','0','0','0','0']);
+});
+
 it('maps saved gate values, thresholds and verdicts to cards while preserving mouse and keyboard drilldowns', async () => {
   const gates = [
     { metric: 'positive_correctness', actual: 83, threshold: 90, operator: '>=', status: 'FAIL' },

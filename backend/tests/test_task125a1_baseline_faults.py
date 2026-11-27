@@ -1,4 +1,4 @@
-from app import main
+from api_fixture import main
 from app.agent_inputs import baseline_bad_case_rows
 from app.agent_mechanism import faults_for_cases
 

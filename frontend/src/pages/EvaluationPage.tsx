@@ -249,7 +249,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
       </div>}
       {tab === "gates" && <BaselineGates gates={gates} onSelect={gate=>setSelectedGate(details.find(row=>row.metric===gate.metric) || gate)} />}
 
-      {tab === "cases" && <><Section title={<IconLabel name="bad">{`Bad Case`}</IconLabel>}><BadCaseOverview showJudgeReason rows={businessCases} allRows={cases} questions={snapshot.questions} categories={run.diagnostic_categories || data.evaluation?.diagnostic_categories} priorities={run.product_diagnostics?.optimization_priorities} latencyGates={gates} onSelect={setSelectedCase} /></Section></>}
+      {tab === "cases" && <><Section title={<IconLabel name="bad">{`Bad Case`}</IconLabel>}><BadCaseOverview showJudgeReason useRootCauses rows={businessCases} questions={snapshot.questions} onSelect={setSelectedCase} /></Section></>}
 
     </>}
 
