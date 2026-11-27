@@ -227,6 +227,21 @@ class StrategyCycle:
             if rejected:
                 current_signals.append(policy.signal('S17', rejection=rejected[-1], consecutive=len(rejected)))
             request = {'context': context, 'signals': current_signals}
+            if context['phase'] == 'plan':
+                request['plan_instructions'] = (
+                    '每案用完整冻结题号。当前有错题的层须预测父方案至少一题尚未答对的题，'
+                    'possible_broken 只填同一父方案已答对的题，无明确风险则填空列表。'
+                    '使用推荐菜单外的工具或试撤销继承参数时，必填 exploration_reason。'
+                    'performance 只用于父方案确实没过的性能门槛，performance_targets 填对应门槛 ID 列表。'
+                    'S20 按三个方案实际改动选择：把任一继承参数改回 Baseline 须选 withdraw，'
+                    '只替换继承值须选 replace；两类方案都有时分别填写两个动作。')
+            elif context['phase'] == 'd':
+                request['d_instructions'] = (
+                    'actions 只逐条回应本请求顶层 signals，action 填一个合法字符串，'
+                    'proposal.signals 只能引用这些已回应的 ID。'
+                    '从 context.combinations 选一条，原样使用 changes，sources 填该条 source 的 ID。'
+                    '父方案 ID 用 context.winner_id。expected_fixed 填父方案尚未答对的完整冻结题号，'
+                    'possible_broken 填父方案已答对的完整冻结题号，无明确风险题时填空列表。')
             if len(rejected) >= 3:
                 request['structured_fields'] = self.field_form(context['phase'], current_signals, rejected[-1])
                 request['fill_instructions'] = ('按 structured_fields 的字段分组逐项填写。回复 {actions, field_values}。'
@@ -273,6 +288,10 @@ class StrategyCycle:
     @staticmethod
     def field_form(phase, signals, rejected):
         actions = [{'signal': row['id'], 'action': list(row['legal_actions']), 'reason': '逐条说明'} for row in signals]
+        for action, row in zip(actions, signals):
+            if row['id'] == 'S19':
+                action['revisions'] = {candidate['id']: '说明偏差和修订后的假设'
+                                       for candidate in row['evidence']['candidates']}
         fields = ['label', 'parent_id', 'changes', 'hypothesis', 'reason', 'expected_fixed', 'possible_broken',
                   'layer', 'signals', 'exploration_reason', 'cross_layer_reason', 'investigate_questions',
                   'performance_targets', 'combination_type', 'mitigation']
@@ -290,7 +309,17 @@ class StrategyCycle:
         expected = {'plan': set(policy.LABELS), 'review': {'decision'}, 'd': {'D'}, 'resume': set()}
         if not isinstance(form, dict) or set(form) != expected[phase] or any(not isinstance(row, dict) for row in form.values()):
             raise ValueError('field_values 必须按程序提供的分组逐项填写')
-        result = {'actions': response.get('actions')}
+        actions = response.get('actions')
+        if isinstance(actions, list):
+            normalized = []
+            for row in actions:
+                choice = row.get('action') if isinstance(row, dict) else None
+                if isinstance(choice, list) and choice:
+                    normalized.extend({**row, 'action': item} for item in choice)
+                else:
+                    normalized.append(row)
+            actions = normalized
+        result = {'actions': actions}
         if phase == 'plan':
             result['proposals'] = [{**form[label], 'label': label} for label in policy.LABELS]
         elif phase == 'd':
@@ -477,7 +506,9 @@ class StrategyCycle:
         context['phase'] = 'd'
         options = policy.complementary_combinations(context, state['ledger'])
         context['combinations'] = options
-        signals = [signal for signal in policy.planning_signals(context) if signal['id'] in {'S20', 'S21'}]
+        review_signals = state['rounds'][str(number)]['review']['signals']
+        signals = [row for row in review_signals if row['id'] in {'S8', 'S13'}]
+        signals.extend(row for row in policy.planning_signals(context) if row['id'] in {'S20', 'S21'})
 
         def validate(response, sent):
             selected = policy.validate_actions(response, sent)

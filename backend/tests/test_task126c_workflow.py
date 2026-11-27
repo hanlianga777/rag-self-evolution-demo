@@ -7,11 +7,88 @@ import pytest
 
 from app import agent126c as policy, verdict
 from app import agent126c_workflow as workflow
+from app.ai_service import AiService
 from app.evaluation import EvaluationRunner
 from app.paid_schedule import set_settings
-from app.providers import ProviderRequestError
+from app.providers import ProviderInvalidResponse, ProviderRequestError
 from app.workflow_engine import WorkflowEngine
 from test_task118a_verdict import OfflineEvaluation, scored
+
+
+def test_d_proposal_can_respond_to_saved_tradeoff_and_safety_signals():
+    base = policy.pipeline_config(workflow.rules.BASELINE)
+    source = {'id': 'branch', 'changes': {'top_k': 6}, 'passed': ['Q01', 'Q02'],
+              'labels': {'qualified': False}, 'side_effect': True}
+    saved_signals = [policy.signal('S4'), policy.signal('S8', candidates=['branch']),
+                     policy.signal('S13', candidates={'branch': source})]
+    state = {'rounds': {'2': {'review': {'signals': saved_signals}}},
+             'ledger': [source], 'd_attempts': []}
+    context = {'round': 2, 'baseline_id': 'baseline', 'winner_id': 'winner', 'baseline_config': base,
+               'question_ids': ['Q01', 'Q02'], 'priorities': ['retrieval'],
+               'performance': {'failed_gates': []}, 'previous_configs': [],
+               'parents': {'winner': {'config': {**base, 'multi_query': 2}, 'passed': ['Q01'],
+                                     'performance': {'failed_gates': []}}},
+               'targets_by_parent': {'winner': {}}, 'preview_risks': []}
+    cycle = workflow.StrategyCycle.__new__(workflow.StrategyCycle)
+    cycle.id = 'experiment'
+    cycle.engine = SimpleNamespace(save=lambda **_: None)
+    cycle.context = lambda *_: context
+    persisted = []
+    cycle.persist = lambda _, drafts: persisted.extend(drafts)
+
+    def model(_key, _, signals, validate):
+        proposal = {'label': 'D', 'parent_id': 'winner', 'changes': {'top_k': 6, 'prompt_strategy': 'Safe'},
+                    'hypothesis': '增加证据段数并用安全提示缓解回退', 'reason': '支线改善了 Q02',
+                    'expected_fixed': ['Q02'], 'possible_broken': ['Q01'], 'layer': 'retrieval',
+                    'signals': ['S8', 'S13'], 'sources': ['branch'],
+                    'combination_type': 'mitigation', 'mitigation': '安全提示避免扩大上下文后跟随注入'}
+        actions = [{'signal': code, 'action': 'mitigate', 'reason': '保留收益并缓解安全回退'}
+                   for code in ('S8', 'S13')]
+        return {'data': validate({'proposal': proposal, 'actions': actions}, signals),
+                'signals': signals, 'actions': actions}
+
+    cycle.ask = model
+    cycle.generate_d(state, 2)
+    assert persisted[0]['reasoning']['sources'] == ['branch']
+    assert state['d_attempts'][0]['candidate_id'] == 'experiment-R000002-D'
+
+
+def test_structured_retry_lists_saved_candidates_for_prediction_revisions():
+    signals = [policy.signal('S19', candidates=[{'id': 'earlier-B'}, {'id': 'earlier-C'}])]
+    form = workflow.StrategyCycle.field_form('plan', signals, '复盘缺少方案')
+    assert set(form['actions'][0]['revisions']) == {'earlier-B', 'earlier-C'}
+
+
+def test_structured_retry_expands_actions_without_bypassing_action_validation():
+    signal = policy.signal('S20')
+    action = {'signal': 'S20', 'action': ['replace', 'withdraw'], 'reason': '各方案改动不同'}
+    reply = {'actions': [action], 'field_values': {label: {} for label in ('A', 'B', 'C')}}
+
+    response = workflow.StrategyCycle.field_response(reply, 'plan')
+    assert policy.validate_actions(response, [signal])['S20'] == {'replace', 'withdraw'}
+
+    action['action'] = ['replace', 'unknown']
+    response = workflow.StrategyCycle.field_response(reply, 'plan')
+    with pytest.raises(ValueError, match='不允许的动作'):
+        policy.validate_actions(response, [signal])
+
+
+@pytest.mark.parametrize('complete_lines', [5, 6])
+def test_multi_query_uses_only_complete_requested_lines_after_truncation(complete_lines):
+    def truncated(*_):
+        raw = ''.join(f'检索问法 {index}\n' for index in range(complete_lines)) + '未写完'
+        raise ProviderInvalidResponse('DeepSeek output truncated', raw_provider_response=raw,
+                                      metadata={'finish_reason': 'length'})
+
+    runtime = AiService(None, None, SimpleNamespace(complete=truncated), True)
+    config = {**workflow.rules.BASELINE, 'multi_query': 6}
+    if complete_lines < config['multi_query']:
+        with pytest.raises(ProviderInvalidResponse):
+            runtime._retrieval_queries('测试问题', config)
+    else:
+        trace = {}
+        assert runtime._retrieval_queries('测试问题', config, trace) == [f'检索问法 {i}' for i in range(6)]
+        assert trace['query_labels'] == ['multi_query'] * 6
 
 
 def mock_actions(signals, *, step=None, branch=False):

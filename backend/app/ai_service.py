@@ -366,9 +366,23 @@ class AiService:
             labels.append('query_rewrite')
         count = config["multi_query"]
         if count:
-            with thinking_task('multi_query'):
-                text = self.provider.complete("将问题改写为互补检索查询，每行一条，不回答问题，不补充事实。", f"问题：{question}\n数量：{count}")
+            truncated = None
+            try:
+                with thinking_task('multi_query'):
+                    text = self.provider.complete("将问题改写为互补检索查询，每行一条，不回答问题，不补充事实。", f"问题：{question}\n数量：{count}")
+            except ProviderInvalidResponse as error:
+                raw = error.raw_provider_response
+                if error.response_metadata.get('finish_reason') != 'length' or not isinstance(raw, str):
+                    raise
+                # A line without a final newline may have been cut by the provider.
+                text = raw.rpartition('\n')[0]
+                truncated = error
             extra = [line.strip("-• ") for line in text.splitlines() if line.strip()]
+            if truncated is not None:
+                if len(extra) < count - len(queries) or not all(extra[:count - len(queries)]):
+                    raise truncated
+                if trace is not None:
+                    trace['multi_query_truncation_recovered'] = True
             queries.extend(extra); labels.extend('multi_query' for _ in extra)
             queries, labels = queries[:count], labels[:count]
         if config["hyde"]:
