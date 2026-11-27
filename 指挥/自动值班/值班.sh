@@ -392,10 +392,8 @@ while :; do
     fails=$((fails + 1))
     if [ "$fails" -ge 2 ]; then
       if [ "$NONSTOP" -eq 1 ]; then
-        # 一直跑模式：这张单先挪成草稿（文件名前加 _），值班继续做后面的单，交给总指挥处理
-        parked="$QUEUE/_暂缓-$(basename "$task")"
-        g mv "$task" "$parked" >/dev/null 2>&1 && g commit -q -m "值班：$(basename "$task" .md) 连续两次没做完，暂缓 (No SPEC Change)" >/dev/null 2>&1 && push_now
-        record "连续两次没做完，已暂缓（改名为草稿），继续后面的任务：${task}（本机日志：${RUN_LOG}）"
+        # 一直跑模式（11-27 用户裁定）：不暂缓、不停，5 分钟后从断点接着做同一张单，直到做完
+        record "连续 ${fails} 次没做完，不暂缓，5 分钟后从断点接着做：${task}（本机日志：${RUN_LOG}）"
         fails=0
         sleep "$CHECK_EVERY"; continue
       fi
