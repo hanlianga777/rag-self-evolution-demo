@@ -202,6 +202,54 @@ def test_three_inherited_edits_leave_a_next_round_before_d(saved_runs):
     assert staged_decision(4, 1, 12, version=rules.RULES_VERSION, **facts) == 'finish_winner'
 
 
+def test_saved_round_two_reply_can_repeat_unchanged_winner_value(saved_runs):
+    import json
+
+    from app.agent_inputs import baseline_bad_case_rows
+    from app.optimization import prepare_response
+
+    env, save = saved_runs
+    experiment = env.store.create_experiment(env.base)
+    winner, _ = save(experiment, 'C', 1, {'Q02'}, multi_query=2)
+    prior = env.store.experiment(experiment)['candidates']
+    cases = [row for row in baseline_bad_case_rows(env.store, env.baseline, use_final=True)
+             if row['question_id'] == 'Q01']
+    conclusion = {'id': 'C1', 'conclusion': '仍有错题'}
+    candidate = {'id': 'A', 'inherited_from': winner, 'inherited_parameters': {'multi_query': 2},
+                 'config_diff': {'multi_query': 2, 'top_k': 6}, 'hypothesis': '增加交付段数可以补证',
+                 'why': '标准证据未进入交付', 'risk': '可能引入噪声', 'expected_improvement': '修好 Q01',
+                 'direction': '检索排序', 'review_conclusion_ids': ['C1'], 'bad_case_conclusion_ids': ['C1'],
+                 'target_bad_cases': ['Q01'], 'predicted_fixed_question_ids': ['Q01'],
+                 'adjustments': [{'parameter': 'top_k', 'baseline_value': 4, 'candidate_value': 6,
+                                  'expected_impact': '增加 Q01 的交付证据'}],
+                 'risks': [{'question_ids': ['Q07'], 'reason': '可能引入噪声'}]}
+    reply = {'candidates': [candidate], 'prior_round_review': {'summary': '复盘', 'plans': [
+        {'candidate_id': winner, 'changes': {'multi_query': 2}, 'fixed_question_ids': ['Q02'],
+         'new_failure_question_ids': [], 'evidence_reason': '增加召回路径', 'conclusion': '修好 Q02'}],
+        'baseline_remaining_assessment': '仍有错题', 'conclusions': [conclusion]},
+        'bad_case_summary': {'groups': [], 'focus': '检索', 'conclusions': [conclusion]},
+        'hypothesis_plan': {'hypothesis': '扩大交付范围', 'test_candidate': 'A',
+                            'if_true': {'action': 'D'},
+                            'if_false': {'action': 'try', 'changes': {'multi_query': 2, 'candidate_k': 24}}}}
+    audit = {'bad_case_decision_version': VERSION, 'round_base': {'id': winner, 'changes': {'multi_query': 2}},
+             'ledger_inherit': [], 'ledger_exclude': [], 'bad_case_groups': [],
+             'previous_commitment': {'expected': {'action': 'try', 'changes': {'top_k': 6}}},
+             'strategy_contract': 'agent-strategy-4', 'optimization_run_id': experiment}
+
+    def validate():
+        return prepare_response(json.dumps(reply), rules.BASELINE, cases, prior, 1, 2, ['A'], None, [], audit)
+
+    result, [(_, config, reasoning)] = validate()
+    assert config['multi_query'] == 2
+    assert reasoning['changed_parameters'] == {'top_k': 6}
+    assert result['hypothesis_plan']['previous_check']['fulfilled'] is True
+    assert result['hypothesis_plan']['if_false']['changes'] == {'candidate_k': 24}
+    assert audit['parsed_candidates'][0]['config_diff'] == {'multi_query': 2, 'top_k': 6}
+    candidate['config_diff']['multi_query'] = 3
+    with pytest.raises(ValueError, match='保留 Winner 底座'):
+        validate()
+
+
 def test_e6_frozen_evaluation_rules_hash_still_passes_preflight():
     from app.evaluation_snapshot import require_resume_snapshot, run_snapshot
 

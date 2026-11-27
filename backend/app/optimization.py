@@ -617,9 +617,16 @@ def normalize_agent_candidate(candidate):
     return candidate
 
 
+def remove_repeated_inheritance(changes, inherited):
+    if not isinstance(changes, dict):
+        return changes
+    return {key: value for key, value in changes.items()
+            if key not in inherited or type(value) is not type(inherited[key]) or value != inherited[key]}
+
+
 def prepare_response(content,base_config,bad_cases,prior_candidates,completed,round_number,labels,trigger_id,
                      monitoring_target_event_ids,audit, *, planning=None):
-    """One offline validation path for fresh and already-paid responses; no semantic repairs."""
+    """Validate fresh or already-paid responses without changing proposed configurations."""
     from .agent_mechanism import CONTRACT, same_base, validate_mechanism
     from .composite import parameter_diff, pipeline_config
     if audit.get('decision_contract_version') == '109c' and audit.get('strategy_contract') != 'agent-strategy-4':
@@ -688,6 +695,13 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
                 raise ValueError('changed_parameters与config_diff必须一致')
             candidate['config_diff'] = changes
         if round_base:
+            if fill_round:
+                changes = candidate.get('config_diff')
+                delta = remove_repeated_inheritance(changes, round_base['changes'])
+                if delta != changes:
+                    audit.setdefault('normalized_fields', []).append({
+                        'candidate': candidate.get('id'), 'field': 'config_diff', 'from': changes})
+                    candidate['config_diff'] = delta
             validate_base(candidate, round_base)
         else:
             inherited_base(candidate, base_config, prior_candidates, round_number, audit.get('round_policy'))
@@ -719,7 +733,19 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
                                                   for diff in same_round]], decision_version=decision_version)
             if any(c['config_diff'].keys() & diff.keys() for c in candidates for diff in same_round):
                 raise ValueError('同轮方案不得共用参数（含引用的 A）')
-        plan = validate_hypothesis(result.get('hypothesis_plan'), candidates,
+        hypothesis_plan = result.get('hypothesis_plan')
+        if fill_round and isinstance(hypothesis_plan, dict):
+            hypothesis_plan = dict(hypothesis_plan)
+            for field in ('if_true', 'if_false'):
+                branch = hypothesis_plan.get(field)
+                if isinstance(branch, dict) and branch.get('action') == 'try':
+                    changes = branch.get('changes')
+                    delta = remove_repeated_inheritance(changes, round_base['changes'])
+                    if delta != changes:
+                        audit.setdefault('normalized_fields', []).append({
+                            'field': 'hypothesis_plan.' + field + '.changes', 'from': changes})
+                        hypothesis_plan[field] = {**branch, 'changes': delta}
+        plan = validate_hypothesis(hypothesis_plan, candidates,
                                    audit['ledger_inherit'], audit['ledger_exclude'], audit['previous_commitment'],
                                    performance_gates=performance_gates)
         result['hypothesis_plan'] = {**plan, 'candidate_id': f"{audit['optimization_run_id']}-R{round_number}-{plan['test_candidate']}"}
