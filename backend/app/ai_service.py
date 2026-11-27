@@ -412,7 +412,7 @@ class AiService:
             from .rubric_judge import DEFAULT_JUDGE_SAMPLES, aggregate_samples, rubric_verdict
             count = DEFAULT_JUDGE_SAMPLES
             from .evaluation_stage import _request_checkpoint
-            from .paid_policy import e6_accounting
+            from .paid_policy import uses_judge_fallback
             from .paid_run import current_paid_run
             checkpoint = _request_checkpoint.get()
             durable = checkpoint is not None and checkpoint[1] == 'judge' and checkpoint[0].get('verdict_sample')
@@ -428,7 +428,7 @@ class AiService:
                         one = reuse_result('judge', parts, lambda:self._judge_uncached(question,expected,answer,category,context=context))
                     except ProviderInvalidResponse as error:
                         votes = {rubric_verdict(category, prior)['passed'] for prior in samples}
-                        if (not durable or not e6_accounting(current_paid_run()) or len(samples) != 2 or len(votes) != 1
+                        if (not durable or not uses_judge_fallback(current_paid_run()) or len(samples) != 2 or len(votes) != 1
                                 or not getattr(error, 'provider_retry_exhausted', False)
                                 or getattr(error, 'request_execution_unknown', False)):
                             raise

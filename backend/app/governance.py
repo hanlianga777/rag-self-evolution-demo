@@ -4198,7 +4198,12 @@ class GovernanceStore:
             experiment = connection.execute("SELECT baseline_run_id, result_json FROM experiments WHERE id=?", (candidate["experiment_id"],)).fetchone()
             self.require_current_baseline(experiment["baseline_run_id"], connection)
             audit = gate_audit('gate3', actor, reviews=delegated_review)
-            workflow = _load(experiment['result_json'], {}).get('optimization_cycle', {})
+            experiment_result = _load(experiment['result_json'], {})
+            workflow = experiment_result.get('optimization_cycle', {})
+            from .paid_policy import E7_PRODUCTION, E7_TASK
+            if (experiment_result.get('paid_run', {}).get('ledger_identity', {}).get('task') == E7_TASK
+                    and (not workflow_release or workflow_release[0] != E7_PRODUCTION)):
+                raise ValueError('E7 必须通过统一编排完成线上三方复测与回滚演练后发布')
             if workflow_release:
                 task_leases.require(connection, 'cycle:' + candidate['experiment_id'],
                                     task_leases.current(self, 'cycle:' + candidate['experiment_id']))

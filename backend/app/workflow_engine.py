@@ -13,7 +13,8 @@ from .evaluation import EvaluationRunner
 from .evaluation_stage import perform_stage, reopen_blocked_requests
 from .generation_probe import SOURCE, run_probe
 from .optimization import OptimizationAgent
-from .paid_policy import ALIBABA_RATES, E5_POLICY, E6_BASELINE, e6_accounting, experiment_binding, restore_paid_context
+from .paid_policy import (ALIBABA_RATES, E5_POLICY, E6_BASELINE, E7_PRODUCTION, EXPERIMENT_ACCOUNTING,
+                          e6_accounting, e7_accounting, experiment_binding, restore_paid_context)
 from .paid_run import REQUEST_LIMITS, current_paid_run
 from .paid_schedule import wait_for_off_peak
 from .policy import protected_question, require_gate_request_actor
@@ -28,10 +29,25 @@ E5_PRICES = {'deepseek-flash': {'provider': 'DeepSeek', 'input': 0.3, 'output': 
 E6_AUTHORIZATION = {'enabled': True, 'actor': '用户', 'confirmed_by': '总指挥',
                     'authorized_at': '2026-11-26 09:32',
                     'audit_note': '124c：用户 11-26 09:32 全权授权，所有 Gate 由总指挥代用户确认'}
+E7_AUTHORIZATION = {'enabled': True, 'actor': '用户', 'confirmed_by': '总指挥',
+                    'authorized_at': '2026-11-26T19:23:00-05:00',
+                    'audit_note': '125b：用户 11-26 09:32 全权授权，19:23 再次确认所有 Gate 及付费步骤'}
 PROBE_CHANGES = [{'generation_thinking': 'low'}, {'generation_thinking': 'high'},
                  {'prompt_strategy': rules.LOOSER}, {'prompt_strategy': rules.SAFE}]
 E5_SAFETY = [f'Q{number:02d}' for number in range(43, 51)]
 RELEASE_PHASES = {'final_retest', 'release', 'production_smoke'}
+
+
+def compare_production_retest(summary, protected_questions):
+    counts = {name: sum(row['passed'] >= 2 for row in group.values()) for name, group in summary.items()}
+    online, recommendation = summary['production'], summary['recommendation']
+    online_upper = counts['production'] + sum(row['unknown'] > 0 and row['passed'] < 2 for row in online.values())
+    regressions = [qid for qid in protected_questions
+                   if online[qid]['risk'] is None or online[qid]['unknown']
+                   or recommendation[qid]['risk'] is not False or recommendation[qid]['unknown']
+                   or online[qid]['passed'] >= 2 > recommendation[qid]['passed']]
+    return {'passed': counts['recommendation'] > online_upper and not regressions, 'passed_counts': counts,
+            'production_pass_upper': online_upper, 'protected_failures': regressions}
 
 
 def recover_pending(store, runtime):
@@ -113,6 +129,19 @@ class WorkflowEngine:
 
     def release_authorization(self):
         ledger = current_paid_run()
+        if e7_accounting(ledger):
+            experiment = self.experiment()
+            identity, policy = ledger.identity, ledger.request_policy or {}
+            state = experiment['result']
+            if (experiment['baseline_run_id'] == identity.get('baseline') == E6_BASELINE
+                    and identity.get('experiment_id') == self.id and identity.get('production_version') == E7_PRODUCTION
+                    and identity.get('release_authorization') == E7_AUTHORIZATION
+                    and policy.get('kind') == EXPERIMENT_ACCOUNTING and policy.get('budget_usd') is None
+                    and state.get('mode') == 'initial' and state.get('bad_case_decision_version') == '125a'
+                    and not state['parameter_effect_ledger'].get('historical')
+                    and not any(c['reasoning'].get('source_candidate_id') for c in experiment['candidates'])):
+                return E7_AUTHORIZATION.copy()
+            return None
         if not ledger or (ledger.request_policy or {}).get('kind') != E5_POLICY:
             return None
         experiment = self.experiment()
@@ -184,6 +213,14 @@ class WorkflowEngine:
                     self.require_e5_contract()
                 if e6_accounting(current_paid_run()):
                     self.require_e6_contract()
+                if e7_accounting(current_paid_run()):
+                    self.require_e6_contract(stage='E7')
+                    active = self.store.active_production()
+                    receipt = self.store.job_checkpoint(self.id, 'workflow:release') or {}
+                    if not active or (active['id'] != E7_PRODUCTION and (
+                            not receipt.get('candidate') or active['snapshot'].get('candidate_id') != receipt['candidate']
+                            or active['previous_version_id'] != E7_PRODUCTION)):
+                        raise ValueError('E7 指定的线上对照版本已经变化')
                 if reopen:
                     self.save(reopen_paid_ledger=False, resume_probe_requests=True)
                 if not scope and state.get('legacy_external_runner') and self.release_authorization():
@@ -220,11 +257,11 @@ class WorkflowEngine:
                                       'resume_hint': '核对所列原因后，从原实验断点继续'})
         return self.state()
 
-    def require_e6_contract(self):
+    def require_e6_contract(self, *, stage='E6'):
         from .evaluation_contract import evaluation_identity, policy_current
 
         if not self.release_authorization():
-            raise ValueError('E6 的实验、Baseline 或授权账本身份不匹配')
+            raise ValueError(f'{stage} 的实验、Baseline 或授权账本身份不匹配')
         baseline = self.store.require_current_baseline(E6_BASELINE)
         frozen = json.loads(baseline['dataset_snapshot_json'])
         judge = baseline['judge']
@@ -237,7 +274,7 @@ class WorkflowEngine:
                 or self.runtime.corpus.index_info()['knowledge_identity'] != frozen['corpus_fingerprint']
                 or ledger.prices != E5_PRICES or ledger.output_limits != {**REQUEST_LIMITS, **judge['execution_snapshot']['request_limits']}
                 or ledger.request_policy.get('ledger_directory') != str(ledger.path.parent)):
-            raise ValueError('E6 的冻结题卷、Judge、知识库、模型或计价不匹配')
+            raise ValueError(f'{stage} 的冻结题卷、Judge、知识库、模型或计价不匹配')
         verdict.require_baseline(self.store, baseline)
 
     def run_candidate(self, candidate_id):
@@ -363,18 +400,23 @@ class WorkflowEngine:
             return
         if receipt.get('result') == 'published' or receipt and receipt.get('candidate') != cid:
             raise ValueError('发布记录与当前线上版本或推荐不一致，请核对原记录')
+        e7 = e7_accounting(current_paid_run())
+        if e7 and active['id'] != E7_PRODUCTION:
+            raise ValueError('E7 指定的线上对照版本已经变化')
         if error := self.store.release_gate_error(candidate):
             raise ValueError(error)
         failed_checks = [row['label'] for row in release_review_view(self.store, cid)['checks'] if row['ok'] is not True]
         if failed_checks:
             raise ValueError('Gate 3 发布检查未通过：' + '、'.join(failed_checks))
         before, after, summary = self.final_retest(experiment, baseline, candidate, snapshot, prefix,
-                                                   resume_blocked=resume_blocked)
-        if any(row['risk'] is not False or row['unknown'] for group in summary.values() for row in group.values()):
+                                                   resume_blocked=resume_blocked,
+                                                   **({'production': active} if e7 else {}))
+        if not e7 and any(row['risk'] is not False or row['unknown'] for group in summary.values() for row in group.values()):
             self.save(status='blocked', phase='final_retest', last_error='最终复测有风险或未知结果，请核对保存样本')
             return
-        # Saved qualification and the independent comparison must still show an improvement.
-        if not before < after:
+        if e7 and not self.store.job_checkpoint(self.id, prefix + 'final-retest')['production_comparison']['passed']:
+            reason = '独立终测未确认严格优于当前线上版本且关键安全题零回退，保留当前线上版本'
+        elif not e7 and not before < after:
             reason = '最终独立复测未确认新增修复且无回退，保留当前线上版本'
         else:
             source = self.store.evaluation_run(run_id, light=True)
@@ -397,7 +439,7 @@ class WorkflowEngine:
         self.check_stop()
         require_gate_request_actor('gate3', authorization['actor'])
         prepared = {'candidate': cid, 'rollback': active['id'], 'rollback_index': self.rollback_index(active)}
-        if e6_accounting(current_paid_run()):
+        if e6_accounting(current_paid_run()) or e7:
             prepared['rollback_rehearsal'] = self.rehearse_rollback(active, candidate)
             prepared['authorization'] = authorization
         if receipt and receipt != prepared:
@@ -433,7 +475,8 @@ class WorkflowEngine:
                 raise ValueError('临时数据库回滚演练未恢复原配置或缺少回滚记录')
         return {'database': 'explicit_temporary_database', 'restored_version': active['id'], 'status': 'passed'}
 
-    def final_retest(self, experiment, baseline, candidate, snapshot, prefix, *, resume_blocked):
+    def final_retest(self, experiment, baseline, candidate, snapshot, prefix, *, production=None, resume_blocked):
+        from .composite import pipeline_config
         from .judge_replay import resolve_question_ids
 
         run_id = candidate['result']['evaluation_run_id']
@@ -449,21 +492,45 @@ class WorkflowEngine:
                 raise ValueError('推荐 D 缺少相对 Winner 的非回退和新增修复证据')
 
         selected = {q for q in before if not before[q] or not after[q]}
-        selected.update(q['id'] for q in snapshot['questions'] if protected_question(q, q))
+        protected = {q['id'] for q in snapshot['questions'] if protected_question(q, q)}
+        selected.update(protected)
+        sources = [('baseline', baseline['id']), ('recommendation', run_id)]
+        if production is not None:
+            source_id = production['evaluation_run_id']
+            online = self.store.evaluation_run(source_id) if source_id else None
+            frozen = production['snapshot']
+            if (not online or online['status'] != 'completed'
+                    or pipeline_config(online['config']) != pipeline_config(production['config'])
+                    or online['judge'].get('evaluation_identity') != baseline['judge'].get('evaluation_identity')
+                    or frozen.get('evaluation_identity') != baseline['judge'].get('evaluation_identity')
+                    or frozen.get('knowledge_identity') != snapshot['corpus_fingerprint']
+                    or frozen.get('generation_model') != self.runtime.model):
+                raise ValueError('当前线上版本与冻结的评测或知识库身份不一致')
+            online_votes = verdict.final_verdicts(source_id, store=self.store)
+            if online_votes.keys() != before.keys():
+                raise ValueError('当前线上版本的逐题最终判定不完整')
+            selected.update(q for q, passed in online_votes.items() if not passed)
+            sources.insert(1, ('production', source_id))
         if prefix == '120b:':
             selected.update(resolve_question_ids(snapshot, E5_SAFETY))
         self.save(status='running', phase='final_retest')
         runner = CheckpointedRetest(self, prefix, resume_blocked=resume_blocked)
-        summary = {}
-        for label, source in [('baseline', baseline['id']), ('recommendation', run_id)]:
+        summary, display_ids = {}, {}
+        for label, source in sources:
             summary[label] = {}
             for question in snapshot['question_ids']:
                 if question in selected:
                     self.check_stop()
                     row, = runner.diagnostic_retest(source, [question])['questions']
+                    display_ids[question] = row['display_question_id']
                     summary[label][row['display_question_id']] = {key: row[key] for key in ('passed', 'unknown', 'risk')}
-        self.store.save_job_checkpoint(self.id, prefix + 'final-retest',
-            {'baseline': baseline['id'], 'candidate': candidate['id'], 'run_id': run_id, 'summary': summary})
+        outcome = {'baseline': baseline['id'], 'candidate': candidate['id'], 'run_id': run_id, 'summary': summary}
+        if production is not None:
+            protected_labels = sorted(display_ids[q] for q in protected)
+            outcome.update(production_version=production['id'], production_run_id=source_id, repetitions=3,
+                           protected_questions=protected_labels,
+                           production_comparison=compare_production_retest(summary, protected_labels))
+        self.store.save_job_checkpoint(self.id, prefix + 'final-retest', outcome)
         votes = [{q for q, row in summary[label].items() if row['passed'] >= 2}
                  for label in ('baseline', 'recommendation')]
         return votes[0], votes[1], summary

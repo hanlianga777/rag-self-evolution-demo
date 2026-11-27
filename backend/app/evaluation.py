@@ -491,7 +491,7 @@ class EvaluationRunner:
 
     def _diagnostic_trials(self, items, run, repetitions, diagnostic_id, snapshot, frozen, traces, *, resume=None):
         from .evaluation_stage import checkpoint_usage, exhausted_judge_attempt, perform_stage
-        from .paid_policy import e6_accounting
+        from .paid_policy import uses_judge_fallback
         from .paid_run import current_paid_run
         from .policy import protected_question
         from .providers import ProviderInvalidResponse, permanent_provider_error
@@ -503,7 +503,7 @@ class EvaluationRunner:
             answer_kwargs = {'saved_trace': traces[question_id]} if question_id in traces else {}
             protected = protected_question(item, item['raw'])
             trials = []
-            fallback = resume is not None and e6_accounting(current_paid_run())
+            fallback = resume is not None and uses_judge_fallback(current_paid_run())
             for index in range(repetitions):
                 trial_id = f'{diagnostic_id}-{len(questions) + 1}-{index + 1}'
                 checkpoint = {'attempts': []}
@@ -605,7 +605,7 @@ class EvaluationRunner:
                           experiment_id, baseline=None, winner=None, automatic=False):
         """Resume by question and sample and publish the complete verdict wave."""
         from .evaluation_stage import exhausted_judge_attempt
-        from .paid_policy import e6_accounting
+        from .paid_policy import uses_judge_fallback
         from .paid_run import current_paid_run
         from .providers import ProviderInvalidResponse
         from .request_reuse import experiment_scope
@@ -614,7 +614,7 @@ class EvaluationRunner:
         if saved := verdict.records(self.store, run_id):
             return saved
         original = baseline is None
-        fallback = original or e6_accounting(current_paid_run())
+        fallback = original or uses_judge_fallback(current_paid_run())
         raw = {case['question_id']: case for case in cases}
         if set(raw) != {item['id'] for item in items} or any(type(c.get('passed')) is not bool for c in raw.values()):
             raise ValueError('判定样本 1 缺少完整的冻结题集结果')
@@ -1180,11 +1180,11 @@ class EvaluationRunner:
 
     def _execute_baseline(self, run_id, approved, config):
         from .evaluation_stage import exhausted_judge_attempt
-        from .paid_policy import e6_accounting
+        from .paid_policy import uses_judge_fallback
         from .paid_run import current_paid_run
         from .providers import ProviderInvalidResponse
 
-        fallback = bool(config.get('candidate_id')) and e6_accounting(current_paid_run())
+        fallback = bool(config.get('candidate_id')) and uses_judge_fallback(current_paid_run())
         from .providers import permanent_provider_error, provider_error_details
         cases, checkpoints, phase, item = [], {}, 'initialization', None
         run = self.store.evaluation_run(run_id)

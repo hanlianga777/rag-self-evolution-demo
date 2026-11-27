@@ -762,9 +762,14 @@ def _run_staged(store, runtime, experiment_id, state, save, advance_qualified, r
                     wait_for_off_peak(store,'cycle:'+experiment_id,price_state,lambda:check_cycle_stop(store,experiment_id))
                 engine.generate_next(agent)
             except ProposalValidationExhausted as error:
+                from .paid_policy import e7_accounting
+                from .paid_run import current_paid_run
+
                 failures = state.setdefault('proposal_generation_failures', [])
                 failures.append({'round':number+1, 'reason':str(error), 'sandbox_budget_used':0,
                                  'at':datetime.now(timezone.utc).isoformat()})
+                if e7_accounting(current_paid_run()):
+                    return save('analysis_exhausted', 'analysis', str(error))
                 if sum(f['round'] == number+1 for f in failures) < 3:
                     save('running','analysis',str(error))
                     continue

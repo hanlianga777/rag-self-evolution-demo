@@ -9,6 +9,8 @@ from pathlib import Path
 E5_POLICY = 'e5_external_usd_cap'  # Persisted 120b policy name.
 E6_TASK = '124c'
 E6_BASELINE = 'EVAL-20261126212249302614'
+E7_TASK = '125b'
+E7_PRODUCTION = 'production-20261126232343'
 E5_EXCHANGE = 6.7120
 EXPERIMENT_ACCOUNTING = 'experiment_accounting_v1'
 ALIBABA_RATES = {model: {'provider':'Alibaba', 'input':0.5, 'output':0, 'max_output':0, 'currency':'CNY'}
@@ -17,6 +19,14 @@ ALIBABA_RATES = {model: {'provider':'Alibaba', 'input':0.5, 'output':0, 'max_out
 
 def e6_accounting(run):
     return bool(run and isinstance(run.identity, dict) and run.identity.get('task') == E6_TASK)
+
+
+def e7_accounting(run):
+    return bool(run and isinstance(run.identity, dict) and run.identity.get('task') == E7_TASK)
+
+
+def uses_judge_fallback(run):
+    return e6_accounting(run) or e7_accounting(run)
 
 
 def e5_cost(calls):

@@ -14,11 +14,12 @@ from test_task118a_verdict import scored
 from test_task120a2_layered import saved_runs
 
 
-def test_e6_sandbox_reuses_exhausted_judge_and_adopts_two_votes(tmp_path, monkeypatch):
+@pytest.mark.parametrize('task', ['124c', '125b'])
+def test_m2_sandbox_reuses_exhausted_judge_and_adopts_two_votes(tmp_path, monkeypatch, task):
     store = GovernanceStore(tmp_path / 'sandbox.db')
     runner = EvaluationRunner(store, None)
     monkeypatch.setattr('app.request_reuse.experiment_scope', lambda *_: nullcontext())
-    monkeypatch.setattr('app.paid_run.current_paid_run', lambda: SimpleNamespace(identity={'task': '124c'}))
+    monkeypatch.setattr('app.paid_run.current_paid_run', lambda: SimpleNamespace(identity={'task': task}))
     failure = {'phase': 'judge', 'status': 'error', 'error_type': 'ProviderInvalidResponse',
                'provider_error': {'failure_class': 'bounded_retry_stopped'},
                'retryable': False, 'request_execution_unknown': False, 'error': 'invalid fact'}
