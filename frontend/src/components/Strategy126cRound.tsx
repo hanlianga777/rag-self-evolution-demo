@@ -1,0 +1,71 @@
+import { DataTable } from './DataTable';
+import { Section } from './Primitives';
+import { schemeName, shortQuestionId } from './EvolutionStory';
+
+type Signal = { id: string; title: string; legal_actions: Record<string, string> };
+type Action = { signal: string; action: string; reason: string; revisions?: Record<string, string> };
+type Delta = { fixed: string[]; broken: string[] };
+type Labels = { qualified: boolean; effective: boolean; promoted: boolean; vs_baseline: Delta; vs_parent: Delta };
+type Decision = {
+  signals?: Signal[];
+  actions?: Action[];
+  winner_id?: string | null;
+  branch_id?: string | null;
+  selection_reason?: string;
+  reason?: string;
+  outcomes?: { id: string; labels: Labels }[];
+};
+type Round = {
+  plan?: Decision;
+  review?: Decision;
+  recoveries?: Decision[];
+  d?: Decision;
+  d_review?: Decision;
+};
+
+const ids = (values: string[]) => values.length ? values.map(shortQuestionId).join('、') : '无';
+
+export function Strategy126cRound({ round, saved, candidates }: { round: number; saved?: Round; candidates: any[] }) {
+  const { plan, review, recoveries = [], d, d_review } = saved || {};
+  const decisions = [plan, ...recoveries, review, d, d_review];
+  const latest = d_review ?? review;
+  const outcomes = new Map([...review?.outcomes ?? [], ...d_review?.outcomes ?? []].map(row => [row.id, row.labels]));
+  const mainName = latest?.winner_id ? schemeName(candidates.find(row => row.id === latest.winner_id), latest.winner_id) : 'Baseline';
+  return <Section title={`第 ${round} 轮 · Agent 决策`}>
+    <div className="round-story-grid">
+      <section className="round-story-cell"><h4>情况判断</h4>
+        {decisions.some(decision => decision?.signals?.length) ? decisions.flatMap((decision, index) =>
+          decision?.signals?.map(signal => <p key={`${index}-${signal.id}`}>{signal.id} {signal.title}</p>) ?? [])
+          : <p>{plan ? '本轮无特殊情况' : '等待 Agent 分析'}</p>}
+      </section>
+      <section className="round-story-cell"><h4>Agent 选择的动作和理由</h4>
+        {decisions.some(decision => decision?.actions?.length) ? decisions.flatMap((decision, index) =>
+          decision?.actions?.map(action => <p key={`${index}-${action.signal}-${action.action}`}>
+            <strong>{action.signal}</strong> {decision.signals?.find(signal => signal.id === action.signal)?.legal_actions[action.action] ?? action.action} · {action.reason}
+            {action.revisions && Object.entries(action.revisions).map(([id, note]) =>
+              <span className="round-cause-evidence" key={id}>{schemeName(candidates.find(row => row.id === id), id)} · {note}</span>)}
+          </p>) ?? []) : <p>{plan ? '按方案执行' : '等待选择'}</p>}
+      </section>
+      <section className="round-story-cell"><h4>主线与支线</h4>
+        <p>主线 · {mainName}</p>
+        <p>支线 · {latest?.branch_id ? schemeName(candidates.find(row => row.id === latest.branch_id), latest.branch_id) : '无'}</p>
+        {latest?.selection_reason && <p>{latest.selection_reason}</p>}
+        {latest?.reason && <p>{latest.reason}</p>}
+      </section>
+    </div>
+    {!!candidates.length && <div className="table-scroll"><DataTable aria-label={`第 ${round} 轮三层资格`}>
+      <thead><tr>{['方案', '三层资格', '相对 Baseline 修好 / 弄坏', '相对父方案修好 / 弄坏'].map(title => <th key={title} scope="col">{title}</th>)}</tr></thead>
+      <tbody>{candidates.filter(candidate => candidate.reasoning?.round === round).map(candidate => {
+        const labels: Labels | undefined = outcomes.get(candidate.id) ?? candidate.result?.strategy126c_labels;
+        const role = candidate.id === latest?.winner_id ? '主线' : candidate.id === latest?.branch_id ? '支线' : null;
+        const effective = labels?.effective ? '本轮有效' : labels?.vs_parent.broken.length ? '本轮有回退' : '本轮无增量';
+        return <tr key={candidate.id}>
+          <th scope="row">{schemeName(candidate)} {role && <strong>{role}</strong>}</th>
+          <td>{labels ? `${labels.qualified ? '合格' : '不合格'} · ${effective} · ${labels.promoted ? '晋升 Winner' : '未晋升'}` : '等待 Sandbox'}</td>
+          <td>{labels && <><span>{ids(labels.vs_baseline.fixed)}</span> / <span>{ids(labels.vs_baseline.broken)}</span></>}</td>
+          <td>{labels && <><span>{ids(labels.vs_parent.fixed)}</span> / <span>{ids(labels.vs_parent.broken)}</span></>}</td>
+        </tr>;
+      })}</tbody>
+    </DataTable></div>}
+  </Section>;
+}

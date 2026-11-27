@@ -45,7 +45,8 @@ def _save_state(store, experiment_id, **state):
         previous = result.get('optimization_cycle', {})
         updated = {**previous, **state, 'updated_at': datetime.now(timezone.utc).isoformat()}
         scope = updated.get('workflow_scope', {})
-        if scope.get('target') == 'release' and state.get('status') == 'recommended':
+        if (scope.get('target') == 'release' and state.get('status') == 'recommended'
+                and result.get('decision_contract_version') != '126c'):
             # The lease must remain recoverable between recommendation and retest.
             updated.update(status='running', phase='final_retest')
         if scope:
@@ -101,6 +102,9 @@ def claim_cycle(store, experiment_id, *, current_round_only=False, workflow_scop
             else:
                 workflow_scope = {**workflow_scope, 'target': 'cycle'}
             current_round_only = workflow_scope['target'] == 'current_round'
+        v126 = experiment['result'].get('decision_contract_version') == '126c'
+        if v126 and workflow_scope and workflow_scope['target'] == 'candidate':
+            raise ValueError('126c 请用轮次或统一流程执行 Sandbox')
         confirmation = experiment['result'].get('report_confirmation')
         if confirmation:
             winner = next((c for c in experiment['candidates'] if c['id'] == confirmation['winner_id']), None)
@@ -124,7 +128,7 @@ def claim_cycle(store, experiment_id, *, current_round_only=False, workflow_scop
                  'resume_stopped_runs':[c['result']['evaluation_run_id'] for c in experiment['candidates']
                      if c['status']=='failed' and c['result'].get('stop_request') and c['result'].get('evaluation_run_id')],
                  'used':experiment['evaluation_budget']['used'],
-                 'remaining':max(0, MAX_EVALS-experiment['evaluation_budget']['used']),
+                 'remaining':None if v126 else max(0, MAX_EVALS-experiment['evaluation_budget']['used']),
                  'reserved_for_d':experiment['evaluation_budget']['reserved_for_d'], 'last_error':None}
         if workflow_scope:
             if workflow_scope['target'] == 'release' and prior_cycle.get('phase') in {
@@ -134,6 +138,9 @@ def claim_cycle(store, experiment_id, *, current_round_only=False, workflow_scop
                 'at': datetime.now(timezone.utc).isoformat(), 'status': 'running', 'phase': state['phase'],
                 'scope': workflow_scope,
             }])
+        if v126 and prior_cycle.get('status') == 'budget_exhausted':
+            state.update(reopen_paid_ledger=True, resume_blocked_runs=[
+                c['result'].get('evaluation_run_id') for c in experiment['candidates'] if c['status'] == 'failed'])
         if prior_cycle.get('status') in {'blocked', 'stopped'} or (
                 workflow_scope and prior_cycle.get('external_runner') and prior_cycle.get('status') == 'failed'):
             state['reopen_paid_ledger'] = True
@@ -141,7 +148,7 @@ def claim_cycle(store, experiment_id, *, current_round_only=False, workflow_scop
                    if c['status']=='failed' and c['result'].get('evaluation_run_id')
                    and c['result'].get('auto_recovery', {}).get('state') == 'blocked']
         if blocked:
-            state.update(resume_blocked_runs=blocked, reopen_paid_ledger=True)
+            state.update(resume_blocked_runs=list(set(state.get('resume_blocked_runs', [])) | set(blocked)), reopen_paid_ledger=True)
         if layered(experiment['result']):
             previous_decision = experiment['result'].get('optimization_cycle', {}).get('staged_decision')
             if previous_decision:

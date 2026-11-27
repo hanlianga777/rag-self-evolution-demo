@@ -209,6 +209,16 @@ class WorkflowEngine:
             binding = experiment_binding(self.store, self.id, provider)
             with provider_retry_scope(self.check_stop, self.retry_state), (
                     restore_paid_context(self.store, binding, reopen=reopen) if binding else nullcontext()):
+                if experiment['result'].get('decision_contract_version') == '126c':
+                    from .agent126c_workflow import StrategyCycle, balance_exhausted
+
+                    try:
+                        return StrategyCycle(self).run(scope.get('target', 'cycle'))
+                    except Exception as error:
+                        if not balance_exhausted(error):
+                            raise
+                        self.save(status='budget_exhausted', last_error='DeepSeek 余额不足，已保存断点')
+                        return self.state()
                 if self.is_e5(experiment):
                     self.require_e5_contract()
                 if e6_accounting(current_paid_run()):
@@ -295,6 +305,8 @@ class WorkflowEngine:
         from .agent_planning import enabled
 
         experiment = self.experiment()
+        if experiment and experiment['result'].get('decision_contract_version') == '126c':
+            raise ValueError('126c 由轮次继续动作安排 D')
         if experiment and enabled(experiment['result']):
             return self.store.create_composite(self.id, self.runtime.provider, workflow=self)
         return self.store.create_composite(self.id, self.runtime.provider)

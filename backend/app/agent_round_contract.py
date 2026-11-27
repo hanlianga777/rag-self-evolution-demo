@@ -25,7 +25,7 @@ class GenerationDiagnosisRequired(ValueError):
 
 
 def layered(context):
-    return (context.get('verdict_version') or '') >= LAYERED_VERSION
+    return context.get('decision_contract_version') != '126c' and (context.get('verdict_version') or '') >= LAYERED_VERSION
 
 
 def fault_layer(code):

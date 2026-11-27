@@ -30,6 +30,8 @@ def release_review_view(store, candidate_id=None):
             if (candidate or {}).get('reasoning', {}).get('candidate_label') == 'D':
                 required.append('winner_non_regression')
         regression_ok = all(checks.get(key) is True for key in required)
+    if version == '126c':
+        regression_ok = qualification.get('qualified') is True
     fingerprint = snapshot.get('corpus_fingerprint')
     config = (candidate or {}).get('config')
     checks = [result.get('gates', {}).get('passed'),

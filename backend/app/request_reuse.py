@@ -140,11 +140,14 @@ def matching_configuration(store, run):
         return {k:v for k,v in config.items() if k in ALLOWED_SEARCH_SPACE or k == 'knowledge_identity'}
     experiment_id = reuse_experiment(store, run)
     with store.connection() as db:
-        ids = [r[0] for r in db.execute("SELECT id FROM evaluation_runs WHERE status='completed' AND dataset_version_id=? AND id<>? ORDER BY created_at,id", (run['dataset_version_id'],run['id']))]
+        query = "SELECT id FROM evaluation_runs WHERE status='completed' AND dataset_version_id=? AND id<>?"
+        params = [run['dataset_version_id'], run['id']]
+        if experiment_id:
+            query += " AND json_extract(config_json, '$.candidate_id') IN (SELECT id FROM candidate_configs WHERE experiment_id=?)"
+            params.append(experiment_id)
+        ids = [row[0] for row in db.execute(query + ' ORDER BY created_at,id', params)]
     for key in ids:
         source = store.evaluation_run(key)
-        if experiment_id and run_experiment(store, source) != experiment_id:
-            continue
         if (source['dataset_snapshot_json'] == run['dataset_snapshot_json'] and source['judge'] == run['judge']
                 and configuration(source['config']) == configuration(run['config'])
                 and source['result'].get('evaluation_complete') is True and source['result'].get('technical_failed') == 0):

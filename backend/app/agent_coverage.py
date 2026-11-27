@@ -114,6 +114,8 @@ def coverage_inputs(store,experiment_id):
     rows=[r for r in rows if business_verdict(r['result'])=='FAIL' or (r['result'].get('evaluation_outcome') or {}).get('contract_version')!='business-vnext-1' and r['result'].get('passed') is False]
     base={**DEFAULT_PIPELINE_CONFIG,**{k:v for k,v in baseline['config'].items() if k in ALLOWED_SEARCH_SPACE}}
     for key in ('run_target','knowledge_identity'):base.pop(key,None)
+    if experiment['result'].get('decision_contract_version') == '126c':
+        return experiment, baseline, rows, base, None
     number=max([c['reasoning'].get('round',1) for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}] or [1])
     report=plan_coverage(rows,base,experiment['candidates'],round_number=number)
     report['binding']=digest({'experiment':experiment,'baseline':baseline,'rows':rows,'plan':report})

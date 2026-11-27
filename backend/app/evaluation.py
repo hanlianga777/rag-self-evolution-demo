@@ -602,7 +602,7 @@ class EvaluationRunner:
         return verdict.make_sample(checkpoint['scored_result'], item['raw'], position, source, diagnostic_id)
 
     def _collect_verdicts(self, run, items, cases, checkpoints, persist, check_stop, *,
-                          experiment_id, baseline=None, winner=None, automatic=False):
+                          experiment_id, baseline=None, winner=None, incumbent=None, automatic=False):
         """Resume by question and sample and publish the complete verdict wave."""
         from .evaluation_stage import exhausted_judge_attempt
         from .paid_policy import uses_judge_fallback
@@ -618,7 +618,7 @@ class EvaluationRunner:
         raw = {case['question_id']: case for case in cases}
         if set(raw) != {item['id'] for item in items} or any(type(c.get('passed')) is not bool for c in raw.values()):
             raise ValueError('判定样本 1 缺少完整的冻结题集结果')
-        if not original and (set(raw) != set(baseline) or winner is not None and set(raw) != set(winner)):
+        if not original and any(set(raw) != set(ref) for ref in (baseline, winner, incumbent) if ref is not None):
             raise ValueError('Baseline 或 Winner 缺少完整的最终判定')
         final = {}
         with experiment_scope(self.store, experiment_id):
@@ -627,6 +627,8 @@ class EvaluationRunner:
                 key = item['id']
                 case = raw[key]
                 reason = None if original else verdict.recheck_reason(case['passed'], baseline[key], winner[key] if winner is not None else None)
+                if not reason and incumbent is not None and case['passed'] != incumbent[key]:
+                    reason = 'changed_vs_global_winner'
                 source = 'baseline_original' if original else 'sandbox'
                 diagnostic_id = case.get('diagnostic_id') or f'{run_id}:{key}:1'
                 samples = [verdict.make_sample(case, item['raw'], 1, source, diagnostic_id)]
@@ -1360,15 +1362,23 @@ class EvaluationRunner:
                     item = {'id': key}
                     persist()
 
-                winner = None
-                if owner['reasoning'].get('candidate_label') == 'D':
-                    winner_candidate = self.store.candidate(owner['reasoning']['winner_id'])
+                winner, incumbent = None, None
+                compare_parent = (owner['reasoning'].get('parent_id')
+                                  if experiment['result'].get('decision_contract_version') == '126c'
+                                  else owner['reasoning'].get('winner_id') if owner['reasoning'].get('candidate_label') == 'D' else None)
+                if compare_parent and compare_parent != experiment['baseline_run_id']:
+                    winner_candidate = self.store.candidate(compare_parent)
                     winner = verdict.final_verdicts(winner_candidate['result']['evaluation_run_id'], store=self.store)
+                if experiment['result'].get('decision_contract_version') == '126c':
+                    global_winner = experiment['result'].get('strategy126c', {}).get('winner_id')
+                    if global_winner and global_winner != compare_parent:
+                        item = self.store.candidate(global_winner)
+                        incumbent = verdict.final_verdicts(item['result']['evaluation_run_id'], store=self.store)
                 review = self._collect_verdicts(
                     run, approved, cases, checkpoints, save_trial, check_stop,
                     experiment_id=experiment['id'],
                     baseline=verdict.final_verdicts(experiment['baseline_run_id'], store=self.store),
-                    winner=winner, automatic=automatic)
+                    winner=winner, incumbent=incumbent, automatic=automatic)
                 final_summary = summarize_evaluation_cases([verdict.gate_case(c, review[c['question_id']]) for c in cases])
                 final_summary['verdict_version'] = rules.RULES_VERSION
             if automatic:lineage['auto_recovery']['state']='completed'
@@ -1474,6 +1484,15 @@ class EvaluationRunner:
             raise ValueError("Candidate 参数超出 Search Space")
         use_layered = layered(experiment['result'])
         decision_version = experiment['result'].get('bad_case_decision_version')
+        if experiment['result'].get('decision_contract_version') == '126c':
+            from .agent126c import changed_config
+
+            draft = candidate['reasoning']
+            parent_id = draft.get('parent_id')
+            parent = baseline if parent_id == baseline['id'] else next(
+                (item for item in experiment['candidates'] if item['id'] == parent_id and item['status'] == 'evaluated'), None)
+            if not parent or changed_config(baseline['config'], parent['config'], draft.get('changes')) != candidate['config']:
+                raise ValueError('126c 保存方案与父方案或改动不一致')
         if use_layered:
             reasoning = candidate['reasoning']
             parent = reasoning.get('winner_id') or reasoning.get('inherited_from')
@@ -1710,7 +1729,34 @@ class EvaluationRunner:
             result['qualification'] = {**result['qualification'], 'qualified': False, 'status': 'NO_EFFECT',
                                        'blocking_reason': no_effect['reason']}
             result['release_qualification'] = {**result['release_qualification'], 'qualified': False}
-        if candidate['reasoning'].get('candidate_label') == 'D':
+        if state.get('decision_contract_version') == '126c':
+            from .agent126c import VERSION, qualifications
+            from .agent126c_workflow import sandbox_facts
+
+            safety_ids = {q for q, question in frozen.items()
+                          if question.get('negative_subtype') in {'safety_critical', 'prompt_injection'}}
+            qids = list(frozen)
+            base = sandbox_facts(self.store, baseline, qids, safety_ids)
+            strategy = state.get('strategy126c', {})
+
+            def reference(cid):
+                if not cid or cid == baseline['id']:
+                    return base
+                item = self.store.candidate(cid)
+                return sandbox_facts(self.store, self.store.evaluation_run(item['result']['evaluation_run_id']), qids, safety_ids)
+
+            labels = qualifications(sandbox_facts(self.store, run, qids, safety_ids), base,
+                                    reference(candidate['reasoning']['parent_id']), reference(strategy.get('winner_id')))
+            result['qualification'] = {**qualification, 'rule_version': VERSION, 'qualified': labels['qualified'],
+                                       'checks': {'hard_gates': all_gates_pass(gates),
+                                                  'comparison_complete': comparison['comparison_complete'],
+                                                  'zero_new_failures': not labels['vs_baseline']['broken'],
+                                                  'at_least_one_fixed': bool(labels['vs_baseline']['fixed']),
+                                                  'no_safety_violation': labels['safe_vs_baseline']},
+                                       'status': 'QUALIFIED' if labels['qualified'] else 'NOT_QUALIFIED'}
+            result['release_qualification'] = result['qualification']
+            result['strategy126c_labels'] = {**labels, 'promoted': False}
+        elif candidate['reasoning'].get('candidate_label') == 'D':
             winner = self.store.candidate(candidate['reasoning']['winner_id'])
             winner_passed = verdict.final_verdicts(winner['result']['evaluation_run_id'], store=self.store, use_final=current)
             candidate_passed = verdict.final_verdicts(run_id, store=self.store, use_final=current)
