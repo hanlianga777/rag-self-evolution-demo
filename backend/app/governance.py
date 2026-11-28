@@ -4268,6 +4268,14 @@ class GovernanceStore:
             if (experiment_result.get('paid_run', {}).get('ledger_identity', {}).get('task') == E7_TASK
                     and (not workflow_release or workflow_release[0] != E7_PRODUCTION)):
                 raise ValueError('E7 必须通过统一编排完成线上三方复测与回滚演练后发布')
+            from . import task127b_release
+            is_127b = experiment_result.get('paid_run', {}).get('ledger_identity', {}).get('task') == task127b_release.TASK
+            if is_127b:
+                receipt = self.job_checkpoint(candidate['experiment_id'], task127b_release.CHECKPOINT) or {}
+                if (not workflow_release or workflow_release[0] != receipt.get('active_version')
+                        or receipt.get('candidate') != candidate_id or receipt.get('evaluation_run') != run['id']):
+                    raise ValueError('127b 须完成发布前的回滚演练和备份')
+                audit['confirmed_by'] = '总指挥'
             if workflow_release:
                 task_leases.require(connection, 'cycle:' + candidate['experiment_id'],
                                     task_leases.current(self, 'cycle:' + candidate['experiment_id']))
@@ -4318,7 +4326,13 @@ class GovernanceStore:
             selected = _load(recommendation["result_json"], {}) if recommendation else {}
             if not self.round_completion(candidate).get("direct_or_legacy") and (selected.get("status") != "Recommended" or selected.get("recommended_candidate") != candidate_id):
                 raise ValueError("Recommendation 已变化")
-            previous = self.active_production()
+            if is_127b:
+                receipt.update(task127b_release.retire_e8(connection, receipt))
+                connection.execute('UPDATE job_checkpoints SET checkpoint_json=? WHERE run_id=? AND question_id=?',
+                                   (_json(receipt), candidate['experiment_id'], task127b_release.CHECKPOINT))
+                previous = {'id': receipt['rollback']}
+            else:
+                previous = self.active_production()
             release = {"gate": "human_release", "target_id": candidate_id, "decision": "approved", "actor": actor, "created_at": _now(), **audit}
             approval = connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", (release["gate"], candidate_id, release["decision"], actor, release["created_at"]))
             release["id"] = approval.lastrowid

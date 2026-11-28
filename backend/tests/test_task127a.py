@@ -224,6 +224,22 @@ def test_127a_fallback_lists_and_accepts_untried_replacements_within_four_change
     assert all(len(row['reasoning']['changed_parameters_vs_baseline']) <= 4 for row in accepted)
 
 
+def test_127a_retry_menu_shows_untried_mainline_changes_for_their_own_questions():
+    base = policy.pipeline_config(policy.rules.BASELINE)
+    winner = {**base, 'query_rewrite': True, 'multi_query': 2}
+    context = {'baseline_id': 'baseline', 'baseline_config': base, 'winner_id': 'winner',
+               'parents': {'winner': {'config': winner}},
+               'previous_configs': [{**winner, 'top_k': 6}],
+               'targets_by_parent': {'winner': {
+                   'Q06': {'recommended': ['top_k'], 'exploratory': ['min_score']},
+                   'Q21': {'recommended': ['query_rewrite'], 'exploratory': ['hyde']},
+               }}}
+    menu = policy.retry_menu(context)
+    assert any(row == {'changes': {'hyde': True}, 'expected_fixed_options': ['Q21']} for row in menu)
+    assert all(row['changes'] != {'top_k': 6} for row in menu)
+    assert all(row['expected_fixed_options'] == ['Q06'] for row in menu if 'min_score' in row['changes'])
+
+
 def make_e8_fixture(tmp_path, monkeypatch, manifest=None):
     """A 42/50 source with R1-B at 45/50, a plateau in R2 and an old D."""
     from app.agent127a_inheritance import E8_ID

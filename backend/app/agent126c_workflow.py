@@ -1,6 +1,7 @@
 """Run the 126c Agent, Sandbox and convergence decisions under the cycle lease."""
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 from . import agent126c as policy, evidence_roles, rules, task_leases, verdict
 from .composite import pipeline_config
@@ -237,6 +238,16 @@ class StrategyCycle:
                     'performance 只用于父方案确实没过的性能门槛，performance_targets 填对应门槛 ID 列表。'
                     'S20 按三个方案实际改动选择：把任一继承参数改回 Baseline 须选 withdraw，'
                     '只替换继承值须选 replace；两类方案都有时分别填写两个动作。')
+                if self.final_only and rejected:
+                    request['plan_retry'] = {
+                        'a_parent_id': context['winner_id'] or context['baseline_id'],
+                        'untried_mainline_changes': policy.retry_menu(context),
+                        'recent_rejections': list(dict.fromkeys(rejected[-5:])),
+                        'instructions': ('A 的 parent_id 须等于 a_parent_id。优先从单项备选中选未试过的配置，'
+                                         'expected_fixed 从同一条的题号中选择，并说明机制。'
+                                         '备选通过配置检查，仍须满足本轮信号、风险和机理校验。'
+                                         '同一轮三个最终配置也须互不重复。B、C 可按本轮合法动作选择父方案。'),
+                    }
                 if context.get('remaining_configurations'):
                     request['plan_instructions'] += (
                         '诊断菜单内未试配置不足。可从 remaining_configurations 补齐三案，'
@@ -668,7 +679,22 @@ class StrategyCycle:
             if not all(check['ok'] is True for check in checks):
                 raise ValueError('发布检查缺失：' + '、'.join(row['label'] for row in checks if row['ok'] is not True))
             self.engine.save(status='running', phase='publish126c', active_candidate=None)
-            published = self.store.publish_candidate(winner, '用户')
+            from .task127b_release import AUTHORIZED_AT, TASK, prepare_release
+
+            identity = (self.engine.experiment()['result'].get('paid_run') or {}).get('ledger_identity') or {}
+            if identity.get('task') == TASK:
+                candidate = self.store.candidate(winner)
+                if error := self.store.release_gate_error(candidate):
+                    raise ValueError(error)
+                result = self.parent(winner)
+                base_passed, winner_passed = set(self.base_facts['passed']), set(result['passed'])
+                if not (policy.all_gates_pass(result['gates']) and base_passed < winner_passed):
+                    raise ValueError('127b 推荐须 11 项门槛全过、零新增错题且至少修好 1 题')
+                receipt = prepare_release(self.engine, candidate, Path(identity['pre_release_backup']))
+                published = self.store.publish_candidate(winner, '用户', workflow_release=(
+                    receipt['active_version'], candidate['result']['evaluation_run_id'], AUTHORIZED_AT))
+            else:
+                published = self.store.publish_candidate(winner, '用户')
         self.engine.save(status='completed', phase='published', production_version_id=published['id'],
                          active_candidate=None, used=self.engine.experiment()['evaluation_budget']['used'], last_error=None)
 

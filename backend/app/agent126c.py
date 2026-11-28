@@ -558,6 +558,26 @@ def round_actions(signals, *, closing=False):
             row['legal_actions']['record_tradeoff'] = '记录实测收益与副作用'
 
 
+def retry_menu(context):
+    """Show untried single changes for the mainline and their matching diagnosis targets."""
+    main = context['winner_id'] or context['baseline_id']
+    parent = context['parents'][main]['config']
+    targets = context['targets_by_parent'][main]
+    options = []
+    for key, allowed in ALLOWED_SEARCH_SPACE.items():
+        questions = [qid for qid, row in targets.items() if key in (*row['recommended'], *row['exploratory'])]
+        if not questions:
+            continue
+        for value in allowed:
+            changes = {key: value}
+            try:
+                changed_config(context['baseline_config'], parent, changes, previous=context['previous_configs'])
+            except ValueError:
+                continue
+            options.append({'changes': changes, 'expected_fixed_options': questions})
+    return options
+
+
 def remaining_configurations(context):
     """List executable single and paired changes when the diagnosis menu is thin."""
     from itertools import combinations
