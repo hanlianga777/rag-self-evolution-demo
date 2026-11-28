@@ -12,7 +12,7 @@ import contextvars
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import Query, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -282,7 +282,7 @@ class OwnerDelegatedReviewRequest(BaseModel):
 
 class ExperimentRequest(BaseModel):
     trigger_id: str | None = None
-    decision_contract_version: Literal['126c'] | None = None
+    decision_contract_version: Literal['126c', '127a'] | None = None
 
 
 class DelegatedGateReview(BaseModel):
@@ -1950,19 +1950,35 @@ def run_experiments(payload: ExperimentRequest | None = None):
         from . import agent126c
         current = store.experiment(current_id, light=True) if current_id else None
         chosen = payload.decision_contract_version if payload else None
-        if (agent126c.enabled((current or {}).get('result', {})) or chosen == agent126c.VERSION
+        if (agent126c.enabled((current or {}).get('result', {})) or chosen in agent126c.VERSIONS
                 or current is None and completed['id'] == agent126c.E8_BASELINE):
             if payload and payload.trigger_id:
                 raise ValueError('126c 从独立的 Baseline 从头建立实验')
-            run_id = current_id if agent126c.enabled((current or {}).get('result', {})) else store.create_experiment(
-                completed['id'], decision_contract_version=agent126c.VERSION)
+            current_result = (current or {}).get('result', {})
+            version = chosen or current_result.get('decision_contract_version') or agent126c.VERSION
+            use_current = current_result.get('decision_contract_version') == version
+            run_id = current_id if use_current else store.create_experiment(completed['id'], decision_contract_version=version)
             state = WorkflowEngine(store, ai_service, run_id).start('next_round', background=False)
-            if state.get('status') != 'completed':
-                raise ValueError(state.get('last_error') or '126c 仍在规划')
+            allowed = {'completed', 'recommended'} if version == agent126c.FINAL_ONLY_VERSION else {'completed'}
+            if state.get('status') not in allowed:
+                raise ValueError(state.get('last_error') or 'Agent 仍在规划')
             return store.experiment(run_id)
         return OptimizationAgent(store, ai_service.provider, runtime=ai_service).generate(completed["id"], payload.trigger_id if payload else None)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+class InheritRoundsRequest(BaseModel):
+    rounds: Annotated[int, Field(strict=True, gt=0)]
+
+
+@app.post('/api/experiments/{run_id}/inherit', status_code=201, dependencies=[Depends(require_trusted_origin)])
+def inherit_experiment_rounds(run_id: str, payload: InheritRoundsRequest):
+    try:
+        new_id = store.inherit_strategy_rounds(run_id, payload.rounds)
+        return light_value(store.experiment(new_id, light=True))
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
 
 
 @app.get("/api/experiments/{run_id}")

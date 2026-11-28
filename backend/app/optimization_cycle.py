@@ -6,7 +6,7 @@ import threading
 from contextvars import ContextVar
 from datetime import datetime, timezone
 
-from . import rules, task_leases
+from . import agent126c, rules, task_leases
 from .agent_mechanism import CONTRACT as MECHANISM_CONTRACT
 from .agent_round_contract import layered, layered_winner
 from .evaluation import EvaluationRunner
@@ -46,7 +46,7 @@ def _save_state(store, experiment_id, **state):
         updated = {**previous, **state, 'updated_at': datetime.now(timezone.utc).isoformat()}
         scope = updated.get('workflow_scope', {})
         if (scope.get('target') == 'release' and state.get('status') == 'recommended'
-                and result.get('decision_contract_version') != '126c'):
+                and not agent126c.enabled(result)):
             # The lease must remain recoverable between recommendation and retest.
             updated.update(status='running', phase='final_retest')
         if scope:
@@ -102,7 +102,7 @@ def claim_cycle(store, experiment_id, *, current_round_only=False, workflow_scop
             else:
                 workflow_scope = {**workflow_scope, 'target': 'cycle'}
             current_round_only = workflow_scope['target'] == 'current_round'
-        v126 = experiment['result'].get('decision_contract_version') == '126c'
+        v126 = agent126c.enabled(experiment['result'])
         if v126 and workflow_scope and workflow_scope['target'] == 'candidate':
             raise ValueError('126c 请用轮次或统一流程执行 Sandbox')
         confirmation = experiment['result'].get('report_confirmation')

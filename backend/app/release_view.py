@@ -1,5 +1,6 @@
 """Read-only release checks and signatures from saved evaluation records."""
 import json
+from .agent126c import VERSIONS
 from .corpus import current_manifest, manifest_identity
 from .policy import CANDIDATE_QUALIFICATION_VERSION, LEGACY_CANDIDATE_QUALIFICATION_VERSION, validate_candidate_config
 from .rules import QUALIFICATION
@@ -30,7 +31,7 @@ def release_review_view(store, candidate_id=None):
             if (candidate or {}).get('reasoning', {}).get('candidate_label') == 'D':
                 required.append('winner_non_regression')
         regression_ok = all(checks.get(key) is True for key in required)
-    if version == '126c':
+    if version in VERSIONS:
         regression_ok = qualification.get('qualified') is True
     fingerprint = snapshot.get('corpus_fingerprint')
     config = (candidate or {}).get('config')

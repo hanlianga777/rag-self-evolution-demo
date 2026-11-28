@@ -16,6 +16,7 @@ type Decision = {
   outcomes?: { id: string; labels: Labels }[];
 };
 type Round = {
+  inherited_from?: { experiment_id: string; label: string; round: number };
   plan?: Decision;
   review?: Decision;
   recoveries?: Decision[];
@@ -39,12 +40,13 @@ const text = (value: unknown): string => {
 const ids = (values: string[] = []) => values.length ? values.map(shortQuestionId).join('、') : '无';
 
 export function Strategy126cRound({ round, saved, candidates }: { round: number; saved?: Round; candidates: any[] }) {
-  const { plan, review, recoveries = [], d, d_review } = saved || {};
+  const { plan, review, recoveries = [], d, d_review, inherited_from } = saved || {};
   const decisions = [plan, ...recoveries, review, d, d_review];
   const latest = d_review ?? review;
   const outcomes = new Map([...review?.outcomes ?? [], ...d_review?.outcomes ?? []].map(row => [row.id, row.labels]));
   const mainName = latest?.winner_id ? schemeName(candidates.find(row => row.id === latest.winner_id), latest.winner_id) : 'Baseline';
   return <Section title={`第 ${round} 轮 · Agent 决策`}>
+    {inherited_from && <p className="muted">沿用自 {inherited_from.label} 第 {inherited_from.round} 轮</p>}
     <div className="round-story-grid">
       <section className="round-story-cell"><h4>情况判断</h4>
         {decisions.some(decision => decision?.signals?.length) ? decisions.flatMap((decision, index) =>

@@ -1,7 +1,7 @@
 """Round decisions for experiments using the v2 evidence ledger."""
 from itertools import combinations
 
-from . import rules, verdict
+from . import agent126c, rules, verdict
 from .agent_mechanism import fault_stage, preview_rejection, validate_mechanism
 from .composite import parameter_diff, pipeline_config
 from .policy import (PERFORMANCE_METRICS, SAFETY_METRICS, all_gates_pass, candidate_rank,
@@ -25,7 +25,7 @@ class GenerationDiagnosisRequired(ValueError):
 
 
 def layered(context):
-    return context.get('decision_contract_version') != '126c' and (context.get('verdict_version') or '') >= LAYERED_VERSION
+    return not agent126c.enabled(context) and (context.get('verdict_version') or '') >= LAYERED_VERSION
 
 
 def fault_layer(code):

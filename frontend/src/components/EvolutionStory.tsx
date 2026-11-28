@@ -16,6 +16,9 @@ import {savedSnapshot} from '../evaluationProgress';
 export const storyParameterNames:Record<string,string>={...parameterNames};
 export const storyValue=(value:unknown,key?:string):string => formatValue(value,key);
 
+export const usesRoundStrategy = (experiment: any): boolean =>
+  ['126c', '127a'].includes(experiment?.result?.decision_contract_version);
+
 export const recommendationOf = (experiment:any) => experiment?.recommendation?.result || experiment?.recommendation || {};
 export const schemeName = (candidate:any, id?:string, includeRound = true):string => {
   const match=(candidate?.id || id || '').match(/-R(\d+)-([ABCD])$/);
@@ -67,7 +70,7 @@ export function dProgressLabel(experiment:any):string {
 export function recommendationReason(experiment:any):string {
   const rec=recommendationOf(experiment),cs=experiment?.candidates || [],composite=experiment?.result?.composite || rec.composite || {};
   if(rec.status==='Recommended' && !rec.recommended_candidate)return `保持 Baseline：${storyText(rec.final_decision?.reason || rec.why || rec.reason)}`;
-  if(experiment?.result?.decision_contract_version==='126c') {
+  if(usesRoundStrategy(experiment)) {
     return storyText(rec.final_decision?.reason || rec.why || experiment.result.strategy126c?.final?.reason || rec.reason);
   }
   const d=cs.find((c:any)=>c.reasoning?.candidate_label==='D'),selected=cs.find((c:any)=>c.id===rec.recommended_candidate);
@@ -329,7 +332,7 @@ export function DStory({experiment,evaluation={},badCases=[],compact=false,onRep
 
 export function recommendationTradeoff(experiment:any):string {
   const base=recommendationReason(experiment);
-  if(experiment?.result?.decision_contract_version==='126c')return base;
+  if(usesRoundStrategy(experiment))return base;
   const {d,winner,result,fixed,broken}=dResultData(experiment);
   if(!result || recommendationOf(experiment).recommended_candidate!==d?.id)return base;
   const gate=result.gates?.gates?.find((item:any)=>item.metric==='latency_p99_seconds');

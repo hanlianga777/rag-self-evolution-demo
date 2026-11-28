@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from contextvars import copy_context
 from datetime import datetime, timezone
 
-from . import optimization_cycle as cycle, rules, task_leases, verdict
+from . import agent126c, optimization_cycle as cycle, rules, task_leases, verdict
 from .agent_round_contract import GenerationDiagnosisRequired, layered
 from .corpus import require_knowledge_binding, require_retrieval_identity
 from .evaluation import EvaluationRunner
@@ -209,7 +209,7 @@ class WorkflowEngine:
             binding = experiment_binding(self.store, self.id, provider)
             with provider_retry_scope(self.check_stop, self.retry_state), (
                     restore_paid_context(self.store, binding, reopen=reopen) if binding else nullcontext()):
-                if experiment['result'].get('decision_contract_version') == '126c':
+                if agent126c.enabled(experiment['result']):
                     from .agent126c_workflow import StrategyCycle, balance_exhausted
 
                     try:
@@ -305,7 +305,7 @@ class WorkflowEngine:
         from .agent_planning import enabled
 
         experiment = self.experiment()
-        if experiment and experiment['result'].get('decision_contract_version') == '126c':
+        if experiment and agent126c.enabled(experiment['result']):
             raise ValueError('126c 由轮次继续动作安排 D')
         if experiment and enabled(experiment['result']):
             return self.store.create_composite(self.id, self.runtime.provider, workflow=self)

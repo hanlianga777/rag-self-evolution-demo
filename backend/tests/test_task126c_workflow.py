@@ -112,6 +112,10 @@ def mock_actions(signals, *, step=None, branch=False):
 
 @pytest.mark.parametrize('d_result', ['promoted', 'not_promoted', 'not_generated'])
 def test_mock_provider_runs_strategy_through_release(tmp_path, monkeypatch, d_result):
+    run_mock_strategy(tmp_path, monkeypatch, d_result)
+
+
+def run_mock_strategy(tmp_path, monkeypatch, d_result):
     base_cases = {f'Q{i:02}': scored(False, scores=dict(correctness=90, faithfulness=90, completeness=90))
                   for i in range(1, 6)}
     base_cases.update(Q06=scored(True, category='ablation'),
@@ -269,3 +273,4 @@ def test_mock_provider_runs_strategy_through_release(tmp_path, monkeypatch, d_re
     assert used[('answer', winner(1, 'A'), 'Q01')] == 3
     assert used[('answer', winner(1, 'A'), 'Q06')] == 2
     assert not (tmp_path / 'verdict.db.provider-ledgers').exists()
+    return env, experiment_id, base_cases

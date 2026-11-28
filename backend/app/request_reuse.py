@@ -23,15 +23,30 @@ def run_experiment(store, run):
     return candidate['experiment_id'] if candidate else None
 
 
-def reuse_experiment(store, run):
+def reuse_owner(store, run):
     from .verdict import current
 
     experiment_id = run_experiment(store, run)
     if experiment_id:
         experiment = store.experiment(experiment_id, light=True)
         if experiment and current(experiment['result']):
-            return experiment_id
+            return experiment
     return None
+
+
+def reuse_experiment(store, run):
+    return (reuse_owner(store, run) or {}).get('id')
+
+
+def request_identity(snapshot, config, judge, experiment_id=None, *, cross_config=False):
+    if cross_config:
+        from .evaluation_snapshot import shared_judge
+
+        judge = shared_judge(judge)
+    values = [snapshot, config.get('knowledge_identity'), judge]
+    if experiment_id:
+        values.append(experiment_id)
+    return digest(values)
 
 
 @contextmanager
@@ -71,12 +86,12 @@ def fixed_decomposition(question, action):
 
 @contextmanager
 def reuse_scope(store, run):
-    snapshot = json.loads(run['dataset_snapshot_json'])
-    experiment_id = reuse_experiment(store, run)
-    values = [snapshot, run['config'].get('knowledge_identity'), run['judge']]
-    if experiment_id:
-        values.append(experiment_id)
-    identity = digest(values)
+    from .agent126c import FINAL_ONLY_VERSION
+
+    owner = reuse_owner(store, run) or {}
+    experiment_id = owner.get('id')
+    identity = request_identity(json.loads(run['dataset_snapshot_json']), run['config'], run['judge'], experiment_id,
+                                cross_config=owner.get('result', {}).get('decision_contract_version') == FINAL_ONLY_VERSION)
     with store.connection() as db:
         db.execute('CREATE TABLE IF NOT EXISTS model_request_reuse (identity TEXT, kind TEXT, request_hash TEXT, origin TEXT, result_json TEXT, PRIMARY KEY(identity,kind,request_hash))')
     token = _scope.set((store, identity, run['id']))

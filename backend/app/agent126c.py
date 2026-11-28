@@ -7,6 +7,8 @@ from .policy import (ALLOWED_SEARCH_SPACE, PERFORMANCE_METRICS, SAFETY_METRICS,
                      all_gates_pass, validate_candidate_config)
 
 VERSION = '126c'
+FINAL_ONLY_VERSION = '127a'
+VERSIONS = (VERSION, FINAL_ONLY_VERSION)
 E8_BASELINE = 'EVAL-20261126212249302614'
 LABELS = ('A', 'B', 'C')
 LAYERS = ('safety', 'retrieval', 'generation', 'performance')
@@ -43,7 +45,7 @@ SIGNALS = {
 
 
 def enabled(state):
-    return state.get('decision_contract_version') == VERSION
+    return state.get('decision_contract_version') in VERSIONS
 
 
 def menu(fault):
@@ -363,7 +365,9 @@ def validate_draft(draft, label, context, choices, previous):
         # S3/S4 allow reverting inherited changes instead of treating a withdrawal as a new tool.
         inherited = config_diff(parent['config'], context['baseline_config'])
         off_menu -= inherited.keys() if set(referenced) & {'S3', 'S4', 'S20'} else set()
-        if off_menu and label != 'C':
+        if off_menu and label != 'C' and not any(
+                row['parent_id'] == parent_id and row['changes'] == changes
+                for row in context.get('remaining_configurations', ())):
             raise ValueError('菜单外的参数只能由 C 作差异化探索')
         if off_menu or set(changes) - recommended:
             text_field(draft, 'exploration_reason')
@@ -389,7 +393,7 @@ def validate_draft(draft, label, context, choices, previous):
         'predicted_fixed_question_ids': expected, 'predicted_regression_question_ids': risk,
         'observed_evidence': expected + examined, 'core_idea': hypothesis,
         'proposal': draft['reason'], 'combination_note': COMBINATION if len(changes) == 2 else None,
-        'decision_contract_version': VERSION, 'planned_tools': {
+        'decision_contract_version': context.get('decision_contract_version', VERSION), 'planned_tools': {
             qid: sorted(set(changes) & set(targets[qid]['recommended'])) for qid in (*expected, *examined) if qid in targets},
     }}
 
@@ -538,3 +542,77 @@ def select_review(response, context, signals):
     if any('try_d' in values for values in choices.values()) and step != 'd':
         raise ValueError('所选综合动作须对应 next=d')
     return winner, branch, step
+
+
+def round_actions(signals, *, closing=False):
+    """Keep 127a round actions focused on A/B/C and recording tradeoffs."""
+    for row in signals:
+        code = row['id']
+        if code in {'S4', 'S5'}:
+            if closing:
+                row['legal_actions'] = {'record_plateau': '记录本轮无新增晋升'}
+            else:
+                actions_for([row], code, set(row['legal_actions']) - {'try_d', 'finish'})
+        if code == 'S8':
+            row['legal_actions'] = {k: v for k, v in row['legal_actions'].items() if not closing and k != 'leave_for_d'}
+            row['legal_actions']['record_tradeoff'] = '记录实测收益与副作用'
+
+
+def remaining_configurations(context):
+    """List executable single and paired changes when the diagnosis menu is thin."""
+    from itertools import combinations
+
+    result, ordinary = [], set()
+    main = context['winner_id'] or context['baseline_id']
+    for parent_id, parent in context['parents'].items():
+        if context['previous_round'].get('all_unqualified') and parent_id != main:
+            continue
+        targets = context['targets_by_parent'][parent_id].values()
+        menu = {k for row in targets for k in (*row['recommended'], *row['exploratory'])}
+        if parent['performance']['failed_gates']:
+            menu.update(parent['performance']['tools'])
+        prior = config_diff(parent['config'], context['baseline_config'])
+        current = pipeline_config(parent['config'])
+        values = [(key, value) for key, allowed in ALLOWED_SEARCH_SPACE.items() for value in allowed
+                  if value != current[key] and (len(prior) < 4 or key in prior)]
+        for patch in (*((item,) for item in values), *combinations(values, 2)):
+            changes = dict(patch)
+            if len(changes) != len(patch):
+                continue
+            try:
+                config = changed_config(context['baseline_config'], current, changes, previous=context['previous_configs'])
+            except ValueError:
+                continue
+            if changes.keys() <= menu:
+                ordinary.add(rules.canonical_hash(pipeline_config(config)))
+                if len(ordinary) >= 3:
+                    return []
+            operations = {key: 'withdraw' if value == context['baseline_config'][key] else 'replace'
+                          for key, value in changes.items() if key in prior}
+            result.append({'parent_id': parent_id, 'changes': changes, 'operations': operations})
+    return result
+
+
+def final_combinations(context):
+    """Offer mitigation retries and transfers of measured complementary gains."""
+    winner = context['parents'][context['winner_id']]
+    current = pipeline_config(winner['config'])
+    remaining = set(context['question_ids']) - set(winner['passed'])
+    ledger = context['ledger']
+    retry_questions = {row['id']: sorted(remaining & set(row['labels']['vs_parent']['fixed']))
+                       for row in ledger if row['side_effect'] and len(row['changes']) == 1}
+    retry_sources = [row for row in ledger if retry_questions.get(row['id'])]
+    retries = [{'sources': [row['source']], 'questions': retry_questions[row['source']], 'changes': row['changes']}
+               for row in complementary_combinations(context, retry_sources) if len(row['changes']) == 2]
+    merges = []
+    for row in ledger:
+        gained = remaining & set(row['labels']['vs_parent']['fixed'])
+        patch = {key: value for key, value in row['changes'].items() if value != current[key]}
+        if not gained or row['side_effect'] or not patch:
+            continue
+        try:
+            changed_config(context['baseline_config'], current, patch, previous=context['previous_configs'])
+        except ValueError:
+            continue
+        merges.append({'sources': [row['id']], 'questions': sorted(gained), 'changes': patch})
+    return {'d_retry': retries, 'd_merge': merges}

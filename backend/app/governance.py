@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .rubric_judge import NEGATIVE_EXPECTED_BEHAVIORS
-from . import task_leases
+from . import agent126c, task_leases
 from . import rules, verdict
 from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, MAX_EVALS, gate_audit, qualification_description, search_space_contract, evaluate_regression, protected_question
 from .paid_run import provider_task
@@ -2976,16 +2976,17 @@ class GovernanceStore:
 
     def create_experiment(self, baseline_run_id: str, status: str = "analyzing", *,
                           decision_contract_v2=False, historical_experiment_id=None, mode='initial', seed_candidates=None,
-                          decision_contract_version=None):
-        from . import agent126c
+                          decision_contract_version=None, inherit_from=None):
         from .agent_strategy import NEW_EXPERIMENT_STRATEGY
 
-        if decision_contract_version not in (None, agent126c.VERSION):
+        if decision_contract_version not in (None, *agent126c.VERSIONS):
             raise ValueError('不支持的决策版本')
-        use_126c = status != 'direct_release' and (
-            decision_contract_version == agent126c.VERSION or baseline_run_id == agent126c.E8_BASELINE)
-        if use_126c and (mode != 'initial' or seed_candidates):
-            raise ValueError('126c 必须从 Baseline 开始，不继承旧实验')
+        strategy_version = decision_contract_version or (agent126c.VERSION if baseline_run_id == agent126c.E8_BASELINE else None)
+        use_round_strategy = status != 'direct_release' and strategy_version is not None
+        if use_round_strategy and (mode != 'initial' or seed_candidates):
+            raise ValueError('轮次策略不支持旧版单候选继承或持续优化入口')
+        if inherit_from and (not use_round_strategy or strategy_version != agent126c.FINAL_ONLY_VERSION):
+            raise ValueError('继承完整轮次需要决策版本 127a')
         if mode not in ('initial', 'continuous') or status == 'direct_release' and mode != 'initial':
             raise ValueError('实验 mode 须为 initial 或 continuous，直接发布只支持 initial')
         if seed_candidates is not None and (not isinstance(seed_candidates, list) or seed_candidates and (
@@ -2995,8 +2996,17 @@ class GovernanceStore:
             raise ValueError('seed_candidates 仅接受一个已完成的第 1 轮 A，须给 experiment_id 和 candidate_id')
         experiment_id = f"EXP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         context = {} if status == 'direct_release' else dict(NEW_EXPERIMENT_STRATEGY)
-        with self.connection() as connection:
+        from .full_text import CORPUS_LOCK
+
+        with (CORPUS_LOCK if inherit_from else nullcontext()), self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
+            if inherit_from:
+                current = self.current_baseline_identity(connection)['current_experiment_id']
+                if current:
+                    row = connection.execute('SELECT result_json FROM experiments WHERE id=?', (current,)).fetchone()
+                    cycle = _load(row['result_json'], {}).get('optimization_cycle') or {}
+                    if task_leases.cycle_active(connection, current, cycle):
+                        raise ValueError('当前优化批次正在运行')
             if status != 'direct_release':
                 if historical_experiment_id:
                     raise ValueError('E4 参数效果账本 historical 必须为空')
@@ -3015,20 +3025,34 @@ class GovernanceStore:
                 else:
                     context.update(self.new_verdict_experiment(connection, baseline_run_id))
                 context['mode'] = mode
-                if use_126c:
+                if use_round_strategy:
                     for key in ('mechanism_contract', 'agent_planning_version', 'round_policy'):
                         context.pop(key, None)
-                    context.update(decision_contract_version=agent126c.VERSION,
-                                   strategy_contract='agent-strategy-126c', bad_case_decision_version='126b')
-            if decision_contract_v2 and not use_126c:
+                    context.update(decision_contract_version=strategy_version,
+                                   strategy_contract=f'agent-strategy-{strategy_version}', bad_case_decision_version='126b')
+            if decision_contract_v2 and not use_round_strategy:
                 from .agent_mechanism import CONTRACT
                 self.require_current_baseline(baseline_run_id, connection)
                 context['mechanism_contract'] = CONTRACT
                 context.setdefault('parameter_effect_ledger', {'current': [], 'historical': []})
             connection.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline_run_id, status, _json(context), _now()))
+            if inherit_from:
+                from .agent127a_inheritance import copy_rounds
+
+                copy_rounds(self, connection, experiment_id, baseline_run_id, context, *inherit_from)
             if seed_candidates:
                 self._seed_round_one(connection, experiment_id, baseline_run_id, context, seed_candidates[0])
         return experiment_id
+
+    def inherit_strategy_rounds(self, source_id: str, count: int):
+        if type(count) is not int or count < 1:
+            raise ValueError('继承轮数须为正整数')
+        with self.connection() as db:
+            row = db.execute('SELECT baseline_run_id FROM experiments WHERE id=?', (source_id,)).fetchone()
+        if not row:
+            raise ValueError('来源实验不存在')
+        return self.create_experiment(row['baseline_run_id'], decision_contract_version=agent126c.FINAL_ONLY_VERSION,
+                                      inherit_from=(source_id, count))
 
     def _seed_round_one(self, db, experiment_id, baseline_id, context, reference):
         from .agent_mechanism import effect_entries, same_base
@@ -3166,7 +3190,7 @@ class GovernanceStore:
             if existing and existing['status'] == 'archived':
                 raise ValueError('实验已归档')
             context = existing['result'] if existing else dict(NEW_EXPERIMENT_STRATEGY)
-            if context.get('decision_contract_version') == '126c':
+            if agent126c.enabled(context):
                 raise ValueError('请通过 126c 统一流程生成方案')
             strict = context.get('decision_contract_version') == '109c'
             compatible_contracts = {'agent-strategy-4'} if strict else {'agent-strategy-3', 'agent-strategy-4'}
@@ -3462,6 +3486,8 @@ class GovernanceStore:
                 raise ValueError('方案不存在')
             experiment = self.experiment(candidate['experiment_id'], light=True)
             self.require_current_baseline(experiment['baseline_run_id'], connection)
+            if experiment['result'].get('decision_contract_version') == agent126c.FINAL_ONLY_VERSION:
+                raise ValueError('127a 每轮须完成全部 A/B/C，不能跳过')
             if not automatic and experiment['result'].get('optimization_cycle', {}).get('status') == 'running':
                 raise ValueError('自动循环正在运行，不能手动跳过')
             if experiment['result'].get('report_confirmation'):
@@ -3555,7 +3581,7 @@ class GovernanceStore:
             staged = result.get('round_policy', {}).get('stop_rule') == 'staged-v1'
             limit = MAX_EVALS if is_d or staged and not layered(result) else MAX_EVALS - 1
             resuming = row['status']=='failed' and (product_interruption(candidate) or bool(candidate['result'].get('stop_request')))
-            v126 = result.get('decision_contract_version') == '126c'
+            v126 = agent126c.enabled(result)
             if v126 and not task_leases.current(self, 'cycle:' + candidate['experiment_id']):
                 raise ValueError('126c Sandbox 须从统一流程执行')
             if not v126 and used >= limit and not resuming:
@@ -3581,7 +3607,7 @@ class GovernanceStore:
             experiment = self.experiment(experiment_id,light=True)
             if not experiment:
                 raise ValueError('Experiment 不存在')
-            if experiment['result'].get('decision_contract_version') == '126c':
+            if agent126c.enabled(experiment['result']):
                 raise ValueError('126c 由 Agent 按收敛条件保存最终推荐')
             if experiment['result'].get('report_confirmation'):
                 raise ValueError('报告已确认')
@@ -4100,7 +4126,7 @@ class GovernanceStore:
             candidates = self.candidates(experiment_id,light=True)
             row = connection.execute('SELECT result_json FROM experiments WHERE id=?', (experiment_id,)).fetchone()
             state = _load(row[0], {}) if row else {}
-            if state.get('decision_contract_version') == '126c':
+            if agent126c.enabled(state):
                 strategy = state.get('strategy126c') or {}
                 final = strategy.get('final') or {}
                 selected = final.get('winner_id')
@@ -4257,13 +4283,13 @@ class GovernanceStore:
             elif workflow.get('workflow_scope', {}).get('target') == 'release' and task_leases.cycle_active(
                     connection, candidate['experiment_id'], workflow):
                 key = 'cycle:' + candidate['experiment_id']
-                if (experiment_result.get('decision_contract_version') != '126c'
+                if (not agent126c.enabled(experiment_result)
                         or workflow.get('phase') != 'publish126c' or not task_leases.current(self, key)):
                     raise ValueError('统一编排正在复测或发布，请查看本次运行进度')
                 task_leases.require(connection, key, task_leases.current(self, key))
                 if workflow.get('stop_request'):
                     raise InterruptedError('用户停止运行，断点已保存')
-            if experiment_result.get('decision_contract_version') == '126c':
+            if agent126c.enabled(experiment_result):
                 final = experiment_result.get('strategy126c', {}).get('final', {})
                 if final.get('winner_id') != candidate_id or not (final.get('full') or (bool(final.get('conditions')) and all(final['conditions'].values()))):
                     raise ValueError('126c 须收敛后才能发布最终 Winner')
@@ -4459,7 +4485,7 @@ class GovernanceStore:
             result['gate2_audit_correction'] = correction
         staged = result.get('round_policy', {}).get('stop_rule') == 'staged-v1' and not layered(result)
         seed_round_open = result.get('seed_round_planned') is False
-        v126 = result.get('decision_contract_version') == '126c'
+        v126 = agent126c.enabled(result)
         return {**dict(row), "result": result, "candidates": [{**item, "product_interruption":product_interruption(item), "release_state": self.release_state(item, peers=items, seed_round_open=seed_round_open)} for item in items], "rounds": [self._round_summary(items, number, seed_round_open=seed_round_open) for number in numbers], "evaluation_budget": {"used": sum(sandbox_attempts_used(item) for item in items), "max": None if v126 else MAX_EVALS, 'reserved_for_d': 0 if staged or v126 else 1}}
 
     def latest_experiment(self):

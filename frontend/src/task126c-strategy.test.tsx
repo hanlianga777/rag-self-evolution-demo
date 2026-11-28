@@ -50,3 +50,13 @@ it('shows the saved 126c recommendation when Candidate D stores a parameter obje
   };
   expect(recommendationTradeoff(experiment)).toBe(reason);
 });
+
+it('labels the source of an inherited round', () => {
+  const doc = document.createElement('div');
+  const root = createRoot(doc);
+  act(() => root.render(<Strategy126cRound round={2} candidates={[]} saved={{
+    inherited_from: { experiment_id: 'EXP-demo', label: 'E8', round: 2 },
+  }}/>));
+  expect(doc.textContent).toContain('沿用自 E8 第 2 轮');
+  act(() => root.unmount());
+});

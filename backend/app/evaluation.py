@@ -7,7 +7,7 @@ import json
 import time
 import math
 from contextlib import nullcontext
-from . import rules, verdict, task_leases
+from . import agent126c, rules, verdict, task_leases
 from functools import wraps
 from .safety_guard import check_safety, adjudicate
 from statistics import mean
@@ -1364,12 +1364,12 @@ class EvaluationRunner:
 
                 winner, incumbent = None, None
                 compare_parent = (owner['reasoning'].get('parent_id')
-                                  if experiment['result'].get('decision_contract_version') == '126c'
+                                  if agent126c.enabled(experiment['result'])
                                   else owner['reasoning'].get('winner_id') if owner['reasoning'].get('candidate_label') == 'D' else None)
                 if compare_parent and compare_parent != experiment['baseline_run_id']:
                     winner_candidate = self.store.candidate(compare_parent)
                     winner = verdict.final_verdicts(winner_candidate['result']['evaluation_run_id'], store=self.store)
-                if experiment['result'].get('decision_contract_version') == '126c':
+                if agent126c.enabled(experiment['result']):
                     global_winner = experiment['result'].get('strategy126c', {}).get('winner_id')
                     if global_winner and global_winner != compare_parent:
                         item = self.store.candidate(global_winner)
@@ -1484,7 +1484,7 @@ class EvaluationRunner:
             raise ValueError("Candidate 参数超出 Search Space")
         use_layered = layered(experiment['result'])
         decision_version = experiment['result'].get('bad_case_decision_version')
-        if experiment['result'].get('decision_contract_version') == '126c':
+        if agent126c.enabled(experiment['result']):
             from .agent126c import changed_config
 
             draft = candidate['reasoning']
@@ -1729,8 +1729,8 @@ class EvaluationRunner:
             result['qualification'] = {**result['qualification'], 'qualified': False, 'status': 'NO_EFFECT',
                                        'blocking_reason': no_effect['reason']}
             result['release_qualification'] = {**result['release_qualification'], 'qualified': False}
-        if state.get('decision_contract_version') == '126c':
-            from .agent126c import VERSION, qualifications
+        if agent126c.enabled(state):
+            from .agent126c import qualifications
             from .agent126c_workflow import sandbox_facts
 
             safety_ids = {q for q, question in frozen.items()
@@ -1747,7 +1747,7 @@ class EvaluationRunner:
 
             labels = qualifications(sandbox_facts(self.store, run, qids, safety_ids), base,
                                     reference(candidate['reasoning']['parent_id']), reference(strategy.get('winner_id')))
-            result['qualification'] = {**qualification, 'rule_version': VERSION, 'qualified': labels['qualified'],
+            result['qualification'] = {**qualification, 'rule_version': state['decision_contract_version'], 'qualified': labels['qualified'],
                                        'checks': {'hard_gates': all_gates_pass(gates),
                                                   'comparison_complete': comparison['comparison_complete'],
                                                   'zero_new_failures': not labels['vs_baseline']['broken'],
