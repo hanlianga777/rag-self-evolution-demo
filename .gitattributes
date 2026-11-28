@@ -1,0 +1,4 @@
+# 记录类文件：总指挥和值班会同时追加，合并时两边都保留
+指挥/值班记录.md merge=union
+指挥/互审/*.md merge=union
+指挥/规则总表.md merge=union
