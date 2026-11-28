@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 import { it, expect } from 'vitest';
 import { Strategy126cRound } from './components/Strategy126cRound';
+import { recommendationTradeoff } from './components/EvolutionStory';
 
 it('shows saved situations, decisions, distinct labels, question changes and paths', () => {
   const doc = document.createElement('div');
@@ -32,4 +33,20 @@ it('shows saved situations, decisions, distinct labels, question changes and pat
   expect(branch).toContain('Q07');
   expect(pending).toContain('等待 Sandbox');
   act(() => root.unmount());
+});
+
+it('shows the saved 126c recommendation when Candidate D stores a parameter object', () => {
+  const winner = 'EXP-demo-R000003-A';
+  const reason = '主线已收敛，可以发布。';
+  const experiment = {
+    result: { decision_contract_version: '126c', strategy126c: { final: { winner_id: winner, reason } } },
+    candidates: [
+      { id: winner, reasoning: { candidate_label: 'A', round: 3 } },
+      { id: 'EXP-demo-R000002-D', status: 'evaluated', result: {}, reasoning: {
+        candidate_label: 'D', changes: { prompt_strategy: 'StrictSafe', top_k: 6 },
+      } },
+    ],
+    recommendation: { result: { status: 'Recommended', recommended_candidate: winner, why: reason } },
+  };
+  expect(recommendationTradeoff(experiment)).toBe(reason);
 });

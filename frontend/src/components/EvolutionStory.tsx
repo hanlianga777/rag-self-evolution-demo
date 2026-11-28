@@ -67,6 +67,9 @@ export function dProgressLabel(experiment:any):string {
 export function recommendationReason(experiment:any):string {
   const rec=recommendationOf(experiment),cs=experiment?.candidates || [],composite=experiment?.result?.composite || rec.composite || {};
   if(rec.status==='Recommended' && !rec.recommended_candidate)return `保持 Baseline：${storyText(rec.final_decision?.reason || rec.why || rec.reason)}`;
+  if(experiment?.result?.decision_contract_version==='126c') {
+    return storyText(rec.final_decision?.reason || rec.why || experiment.result.strategy126c?.final?.reason || rec.reason);
+  }
   const d=cs.find((c:any)=>c.reasoning?.candidate_label==='D'),selected=cs.find((c:any)=>c.id===rec.recommended_candidate);
   const keep=selected ? `保留${schemeName(selected)}` : '保留已保存的 Winner 建议';
   if(!d && dProgressLabel(experiment)==='Agent 判断不做 D'){
@@ -325,7 +328,9 @@ export function DStory({experiment,evaluation={},badCases=[],compact=false,onRep
 }
 
 export function recommendationTradeoff(experiment:any):string {
-  const base=recommendationReason(experiment),{d,winner,result,fixed,broken}=dResultData(experiment);
+  const base=recommendationReason(experiment);
+  if(experiment?.result?.decision_contract_version==='126c')return base;
+  const {d,winner,result,fixed,broken}=dResultData(experiment);
   if(!result || recommendationOf(experiment).recommended_candidate!==d?.id)return base;
   const gate=result.gates?.gates?.find((item:any)=>item.metric==='latency_p99_seconds');
   const winnerGate=winner?.result?.gates?.gates?.find((item:any)=>item.metric==='latency_p99_seconds');
