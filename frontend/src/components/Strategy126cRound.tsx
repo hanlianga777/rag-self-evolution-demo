@@ -2,8 +2,8 @@ import { DataTable } from './DataTable';
 import { Section } from './Primitives';
 import { schemeName, shortQuestionId } from './EvolutionStory';
 
-type Signal = { id: string; title: string; legal_actions: Record<string, string> };
-type Action = { signal: string; action: string; reason: string; revisions?: Record<string, string> };
+type Signal = { id: string; title: string; legal_actions?: Record<string, unknown> };
+type Action = { signal: string; action: string; reason: unknown; revisions?: Record<string, unknown> };
 type Delta = { fixed: string[]; broken: string[] };
 type Labels = { qualified: boolean; effective: boolean; promoted: boolean; vs_baseline: Delta; vs_parent: Delta };
 type Decision = {
@@ -11,8 +11,8 @@ type Decision = {
   actions?: Action[];
   winner_id?: string | null;
   branch_id?: string | null;
-  selection_reason?: string;
-  reason?: string;
+  selection_reason?: unknown;
+  reason?: unknown;
   outcomes?: { id: string; labels: Labels }[];
 };
 type Round = {
@@ -23,7 +23,20 @@ type Round = {
   d_review?: Decision;
 };
 
-const ids = (values: string[]) => values.length ? values.map(shortQuestionId).join('、') : '无';
+// 后端字段可能是字符串，也可能是 {problem, fix} 等对象：统一转成文字，避免 React #31 页面崩溃
+const text = (value: unknown): string => {
+  if (value == null) return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) return value.map(text).filter(Boolean).join('；');
+  if (typeof value === 'object') {
+    const row = value as Record<string, unknown>;
+    if ('problem' in row || 'fix' in row) return [text(row.problem), text(row.fix)].filter(Boolean).join(' → ');
+    return Object.values(row).map(text).filter(Boolean).join('；');
+  }
+  return '';
+};
+
+const ids = (values: string[] = []) => values.length ? values.map(shortQuestionId).join('、') : '无';
 
 export function Strategy126cRound({ round, saved, candidates }: { round: number; saved?: Round; candidates: any[] }) {
   const { plan, review, recoveries = [], d, d_review } = saved || {};
@@ -35,22 +48,22 @@ export function Strategy126cRound({ round, saved, candidates }: { round: number;
     <div className="round-story-grid">
       <section className="round-story-cell"><h4>情况判断</h4>
         {decisions.some(decision => decision?.signals?.length) ? decisions.flatMap((decision, index) =>
-          decision?.signals?.map(signal => <p key={`${index}-${signal.id}`}>{signal.id} {signal.title}</p>) ?? [])
+          decision?.signals?.map(signal => <p key={`${index}-${signal.id}`}>{signal.id} {text(signal.title)}</p>) ?? [])
           : <p>{plan ? '本轮无特殊情况' : '等待 Agent 分析'}</p>}
       </section>
       <section className="round-story-cell"><h4>Agent 选择的动作和理由</h4>
         {decisions.some(decision => decision?.actions?.length) ? decisions.flatMap((decision, index) =>
-          decision?.actions?.map(action => <p key={`${index}-${action.signal}-${action.action}`}>
-            <strong>{action.signal}</strong> {decision.signals?.find(signal => signal.id === action.signal)?.legal_actions[action.action] ?? action.action} · {action.reason}
-            {action.revisions && Object.entries(action.revisions).map(([id, note]) =>
-              <span className="round-cause-evidence" key={id}>{schemeName(candidates.find(row => row.id === id), id)} · {note}</span>)}
+          decision?.actions?.map(action => <p key={`${index}-${action.signal}-${text(action.action)}`}>
+            <strong>{action.signal}</strong> {text(decision.signals?.find(signal => signal.id === action.signal)?.legal_actions?.[action.action]) || text(action.action)} · {text(action.reason)}
+            {action.revisions ? Object.entries(action.revisions).map(([id, note]) =>
+              <span className="round-cause-evidence" key={id}>{schemeName(candidates.find(row => row.id === id), id)} · {text(note)}</span>) : null}
           </p>) ?? []) : <p>{plan ? '按方案执行' : '等待选择'}</p>}
       </section>
       <section className="round-story-cell"><h4>主线与支线</h4>
         <p>主线 · {mainName}</p>
         <p>支线 · {latest?.branch_id ? schemeName(candidates.find(row => row.id === latest.branch_id), latest.branch_id) : '无'}</p>
-        {latest?.selection_reason && <p>{latest.selection_reason}</p>}
-        {latest?.reason && <p>{latest.reason}</p>}
+        {text(latest?.selection_reason) ? <p>{text(latest?.selection_reason)}</p> : null}
+        {text(latest?.reason) ? <p>{text(latest?.reason)}</p> : null}
       </section>
     </div>
     {!!candidates.length && <div className="table-scroll"><DataTable aria-label={`第 ${round} 轮三层资格`}>

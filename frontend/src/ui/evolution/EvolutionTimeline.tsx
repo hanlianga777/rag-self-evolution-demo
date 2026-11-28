@@ -17,9 +17,9 @@ import type { CandidateView, EvolutionModel } from "./model";
  */
 export type BaselineView = { correct: number | null; total: number; badCases: { id: string; layer: string; question?: string }[] };
 
-export function EvolutionTimeline({ model, experiment, sandbox, renderCandidate, onRoundChange, questionText, onOpen, children }: {
+export function EvolutionTimeline({ model, experiment, sandbox, renderCandidate, onRoundChange, questionText, onOpen, children, roundHeader }: {
   model: EvolutionModel; experiment?:any; renderCandidate?:(id:string)=>ReactNode; onRoundChange?:(round:number)=>void; sandbox?:(round:number)=>ReactNode; baseline?: BaselineView; questionText?: (id: string) => string | undefined;
-  onOpen?: (candidateId: string) => void; onOpenDiagnosis?: () => void; children?: ReactNode;
+  onOpen?: (candidateId: string) => void; onOpenDiagnosis?: () => void; children?: ReactNode; roundHeader?: (round: number) => ReactNode;
 }) {
   const [selection, setSelection] = useState<number | "D">(1);
   const selected = model.rounds.some(round => round.round === selection) ? selection : selection === "D" ? "D" : model.rounds[0]?.round;
@@ -34,6 +34,7 @@ export function EvolutionTimeline({ model, experiment, sandbox, renderCandidate,
     {model.rounds.filter(round => round.round === selected).map(round => <div className="ui-evo-round" key={round.round}>
       <div className="ui-evo-rail" aria-hidden="true"><span className={`ui-evo-dot${round.candidates.some(item => item.winner) ? " win" : ""}`} /></div>
       <div className="ui-evo-body">
+        {roundHeader?.(round.round)}
         <RoundNarrative experiment={experiment} round={round.round} onOpen={onOpen}/>
         <div className="ui-evo-cards candidate-cards">{round.candidates.map(item => renderCandidate?<Fragment key={item.id}>{renderCandidate(item.id)}</Fragment>:<CandidateCard key={item.id} item={item} fastest={item.id === round.fastestId} questionText={questionText} onOpen={onOpen}/>)}</div>{sandbox?.(round.round)}
       </div>
