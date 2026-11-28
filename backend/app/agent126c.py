@@ -8,7 +8,9 @@ from .policy import (ALLOWED_SEARCH_SPACE, PERFORMANCE_METRICS, SAFETY_METRICS,
 
 VERSION = '126c'
 FINAL_ONLY_VERSION = '127a'
-VERSIONS = (VERSION, FINAL_ONLY_VERSION)
+TERMINAL_D_VERSION = '128a'
+FULL_ROUND_VERSIONS = (FINAL_ONLY_VERSION, TERMINAL_D_VERSION)
+VERSIONS = (VERSION, *FULL_ROUND_VERSIONS)
 E8_BASELINE = 'EVAL-20261126212249302614'
 LABELS = ('A', 'B', 'C')
 LAYERS = ('safety', 'retrieval', 'generation', 'performance')
@@ -129,7 +131,7 @@ def config_diff(config, reference):
     return changes
 
 
-def changed_config(baseline, parent, changes, *, previous=()):
+def changed_config(baseline, parent, changes, *, previous=(), terminal_d=False):
     baseline, parent = pipeline_config(baseline), pipeline_config(parent)
     if not isinstance(changes, dict) or not changes or set(changes) - set(ALLOWED_SEARCH_SPACE):
         raise ValueError('改动必须来自参数白名单')
@@ -143,11 +145,13 @@ def changed_config(baseline, parent, changes, *, previous=()):
     actual = config_diff(config, parent)
     if not actual or set(actual) != set(changes):
         raise ValueError('每项改动都必须改变父方案配置')
-    if len(actual) > 2:
+    if len(actual) > 2 and not terminal_d:
         raise ValueError('相对父方案最多改 2 项')
     inherited = config_diff(parent, baseline)
     cumulative = config_diff(config, baseline)
-    if len(cumulative) > 4 or len(inherited) == 4 and set(cumulative) - set(inherited):
+    if len(cumulative) > 4 or not terminal_d and len(inherited) == 4 and set(cumulative) - set(inherited):
+        if terminal_d:
+            raise ValueError('D 相对 Baseline 累计最多 4 项')
         raise ValueError('累计最多 4 项，已到上限时只能替换取值或撤销已有项')
     if any(config == pipeline_config(other) for other in (baseline, *previous)):
         raise ValueError('配置重复')
@@ -305,11 +309,13 @@ def validate_draft(draft, label, context, choices, previous):
     if parent_id not in context['parents']:
         raise ValueError('父方案须为本实验的 Baseline、主线或支线')
     winner = context.get('winner_id')
-    if (context['round'] == 1 and parent_id != baseline or label in ('A', 'D') and parent_id != (winner or baseline)):
+    terminal_d = label == 'D' and context.get('decision_contract_version') == TERMINAL_D_VERSION
+    if (context['round'] == 1 and parent_id != baseline and not terminal_d
+            or label in ('A', 'D') and parent_id != (winner or baseline)):
         raise ValueError('首轮均用 Baseline，A 和 D 必须用当前主线')
     parent = context['parents'][parent_id]
     changes = draft.get('changes')
-    config = changed_config(context['baseline_config'], parent['config'], changes, previous=previous)
+    config = changed_config(context['baseline_config'], parent['config'], changes, previous=previous, terminal_d=terminal_d)
     hypothesis = text_field(draft, 'hypothesis')
     hypothesis_key = ''.join(ch.casefold() for ch in hypothesis if ch.isalnum())
     if not hypothesis_key or hypothesis_key in context.get('hypotheses', ()):
@@ -636,3 +642,67 @@ def final_combinations(context):
             continue
         merges.append({'sources': [row['id']], 'questions': sorted(gained), 'changes': patch})
     return {'d_retry': retries, 'd_merge': merges}
+
+
+def terminal_d_sources(ledger):
+    """Keep measured effects together when a Sandbox tested a bundle."""
+    return {row['id']: {'changes': row['changes'], 'fixed': row['labels']['vs_parent']['fixed'],
+                       'broken': row['labels']['vs_parent']['broken'],
+                       'performance_repaired': row['labels']['performance_repaired'],
+                       'requires_mitigation': row['side_effect'] or not row['labels']['qualified']}
+            for row in ledger if row['labels']['vs_parent']['fixed'] or row['labels']['performance_repaired']}
+
+
+def validate_terminal_d(proposal, context, choices):
+    if not isinstance(proposal, dict) or proposal.get('signals') != ['FINAL_D']:
+        raise ValueError('D 须提交完整方案并引用 FINAL_D')
+    changes = proposal.get('changes')
+    sources = proposal.get('sources')
+    if not isinstance(changes, dict) or not isinstance(sources, dict) or sources.keys() - changes.keys():
+        raise ValueError('D 须对并入的参数逐项填写账本来源')
+    new = changes.keys() - sources.keys()
+    if len(new) > 1:
+        raise ValueError('D 可新增的调节参数最多 1 项')
+    tuning = proposal.get('tuning')
+    if new:
+        parameter = next(iter(new))
+        if not isinstance(tuning, dict) or tuning.get('parameter') != parameter:
+            raise ValueError('tuning 须填写唯一新增的调节参数')
+        text_field(tuning, 'purpose')
+    elif tuning is not None:
+        raise ValueError('没有新增参数时 tuning 填 null')
+
+    choices = {**choices, 'S20': {'replace', 'withdraw'}, 'S21': {'mitigate'}}
+    draft = validate_draft(proposal, 'D', context, choices, context['previous_configs'])
+    config, reasoning = draft['config'], draft['reasoning']
+    if (len(context['parents'][context['winner_id']]['passed']) < len(context['question_ids'])
+            and not reasoning['predicted_fixed_question_ids']):
+        raise ValueError('D 须填写预计在 Winner 基础上修好的冻结题号')
+
+    available = context['verified_sources']
+    for parameter, cid in sources.items():
+        if (not isinstance(cid, str) or cid not in available or parameter not in available[cid]['changes']
+                or available[cid]['changes'][parameter] != changes[parameter]):
+            raise ValueError(f'{parameter} 须引用实际验证过该改动的账本方案')
+    mitigations = proposal.get('source_mitigations')
+    used = set(sources.values())
+    if not isinstance(mitigations, dict) or mitigations.keys() - used:
+        raise ValueError('source_mitigations 只填写本次引用的来源')
+    for cid in used:
+        row = available[cid]
+        if any(config.get(key) != value for key, value in row['changes'].items()):
+            raise ValueError(f'{cid} 的收益来自一组改动，须保留该组参数')
+        mitigation = mitigations.get(cid)
+        if row['requires_mitigation'] and (not isinstance(mitigation, str) or not mitigation.strip()):
+            raise ValueError(f'{cid} 须填写副作用缓解说明')
+
+    qualified = context['trigger']['qualified_ids']
+    ideas = proposal.get('qualified_ideas')
+    if not isinstance(ideas, dict) or len(ideas) != min(2, len(qualified)) or ideas.keys() - set(qualified):
+        raise ValueError('qualified_ideas 须引用触发时的两个合格方案，单一 Winner 收敛时引用 Winner')
+    for cid in ideas:
+        text_field(ideas, cid)
+    if tuning is not None:
+        reasoning['tuning'] = {**tuning, 'value': changes[tuning['parameter']]}
+    reasoning.update(winner_id=context['winner_id'], d_action='compose_d', d_trigger=context['trigger'])
+    return draft

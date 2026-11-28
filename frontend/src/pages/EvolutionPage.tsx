@@ -9,7 +9,7 @@ import { agentDisplayText } from "../display";
 import { Icon, IconLabel, IconTile } from "../ui/icons";
 import { CompareTable, type CompareRow } from "../ui/pages3";
 import { HoverCard } from "../ui/HoverCard";
-import {DStory, DSideEffects, questionText, schemeName, storyText, StoryText, recommendationReason, recommendationTradeoff, dProgressLabel, ChangedParameters, storyParameterNames, storyValue, shortQuestionId, usesRoundStrategy} from "../components/EvolutionStory";
+import {DStory, DSideEffects, TerminalDDetails, questionText, schemeName, storyText, StoryText, recommendationReason, recommendationTradeoff, dProgressLabel, ChangedParameters, storyParameterNames, storyValue, shortQuestionId, usesRoundStrategy} from "../components/EvolutionStory";
 import { AgentOverview } from "../ui/evolution/AgentOverview";
 import { FinalRecommendation } from "../ui/evolution/FinalRecommendation";
 import { EvolutionTimeline } from "../ui/evolution/EvolutionTimeline";
@@ -130,11 +130,15 @@ function EvolutionWorkspace({ data }: { data: any }) {
   const reviewCandidates = [...abc, ...(d ? [d] : [])];
   const budget = experiment?.evaluation_budget || data.optimization?.evaluation_budget || {};
   const v127 = experiment?.result?.decision_contract_version === '127a';
+  const v128 = experiment?.result?.decision_contract_version === '128a';
   const v126 = usesRoundStrategy(experiment);
   const strategy126 = experiment?.result?.strategy126c;
+  const dTrigger = strategy126?.rounds?.[roundNumber]?.review?.d_trigger;
+  const terminalDTitle = 'Candidate D · 终点';
   const dState = strategy126?.d_attempts?.at(-1)?.outcome ?? strategy126?.final?.d_outcome;
   const dStatus = v126 ? ({ promoted: 'D 已晋升', not_promoted: 'D 未晋升', not_generated: '无需 D',
-    pending: 'D 待完成' }[String(dState)] ?? (v127 ? '收敛后决定 D' : '按需安排 D')) : dProgressLabel(experiment);
+    pending: 'D 待完成' }[String(dState)] ?? (v128 ? dTrigger ? 'D 待生成' : '等待触发 D'
+      : v127 ? '收敛后决定 D' : '按需安排 D')) : dProgressLabel(experiment);
   const budgetKnown = Number.isFinite(budget.used) && Number.isFinite(budget.max);
   const latestRound = experiment?.rounds?.at(-1);
   const agentRule = searchSpace?.rules?.agent;
@@ -231,7 +235,8 @@ function EvolutionWorkspace({ data }: { data: any }) {
         throw new Error(`${message}。 ${guidance}`);
       }
     }));
-  const run126 = () => requestPaid('继续 Agent 优化', '按当前实验断点继续评测。策略分析、Sandbox 和需要时的 Judge 复核会调用模型。',
+  const run126 = () => requestPaid('继续 Agent 优化', '按当前实验断点继续评测。策略分析、Sandbox 和需要时的 Judge 复核会调用模型。'
+    + (v128 ? 'D 完成后，符合 Baseline 资格的最终推荐将自动发布。' : ''),
     () => void action('继续 Agent 优化', () => postJson(`/api/experiments/${experiment.id}/run-cycle`)));
   const run = (candidate: any) => candidate.resume_plan?.can_resume === false ? setError(candidate.resume_plan.reason || '当前无法继续，请查看原因') : requestPaid('运行 Candidate Sandbox', '继续完成尚未结束的评测；会产生模型费用。', () => void executeCandidate(candidate));
   const executeCandidate = async (candidate: any) => {
@@ -246,14 +251,15 @@ function EvolutionWorkspace({ data }: { data: any }) {
   const evaluatedCount = currentRound.filter(item => item.status === "evaluated").length;
   const roundComplete = !!currentRound.length && currentRound.every(item => item.status === "skipped" || item.status === "evaluated" && item.result?.evaluation_complete !== false);
   const recommendationTitle=invalidRecommendation ? "保存的推荐方案未通过当前资格" : recommendation.status === "Recommended" && !recommendation.recommended_candidate ? "保存推荐：保持 Baseline" : !roundComplete ? currentRound.some(c=>c.status === "failed") ? "本轮实验尚未完成 · 有运行失败" : "本轮实验尚未完成" : recommendation.status==="No Qualified Candidate" ? "保存结论：本轮暂无合格 Candidate" : recommendation.recommended_candidate ? savedRecommended ? `保存推荐：${candidateName(savedRecommended)}` : "已有保存推荐，Candidate 详情未采集" : currentRound.some(item=>typeof currentQualification(item.result)?.qualified !== "boolean") ? "资格或推荐结论未采集" : qualified.length ? "已有合格 Candidate，等待保存的最终决策" : "推荐结论未采集";
-  const activeCandidate = currentRound.find(candidate => ["running", "queued"].includes(candidate.status) || candidate.result?.price_pause?.paused);
+  const activeCandidate = (v128 && d ? [...currentRound, d] : currentRound)
+    .find(candidate => ["running", "queued"].includes(candidate.status) || candidate.result?.price_pause?.paused);
   const steps = [
     { label: "诊断", state: evaluation.status === "completed" ? "completed" : "blocked", detail: evaluation.status === "completed" ? `${evaluation.result?.bad_case_count ?? badCases.length} 个 Bad Case 已读取` : "等待有效 Baseline", onSelect: openDiagnosis },
     { label: "生成 A/B/C", state: planningIncomplete && (!roundComplete || Number.isFinite(roundSize) && currentRound.length < roundSize) || experiment?.status === "generating" ? "current" : experiment?.status === "failed" ? "blocked" : currentRound.length ? "completed" : "pending", detail: experiment?.status === "failed" ? "本轮 Candidate 生成失败" : planningIncomplete && (!roundComplete || Number.isFinite(roundSize) && currentRound.length < roundSize) ? `${currentRound.length} 个 Candidate · 有覆盖缺口` : `${currentRound.length} 个 Candidate`, onSelect: () => setStage("route") },
     { label: "Candidate A/B/C/D", state: planningIncomplete && (!roundComplete || Number.isFinite(roundSize) && currentRound.length < roundSize) ? "current" : currentRound.length ? "completed" : "pending", detail: `${currentRound.length} 个 Candidate · ${dStatus}`, onSelect: () => setStage("route") },
     { label: "Sandbox", state: sandboxPause || hasRunning ? "current" : currentRound.some(candidate => candidate.status === "failed") ? "blocked" : roundComplete ? "completed" : "pending", detail: activeCandidate ? `${activeCandidate.reasoning?.candidate_label} ${candidateProgress(activeCandidate, activeOperation(activeCandidate.id), sandboxPause)}` : sandboxPause ? "已暂停" : currentRound.length ? `${evaluatedCount}/${currentRound.length} 已评测` : "尚无待评测 Candidate", onSelect: () => setStage("route") },
     { label: "Regression Check", state: roundComplete ? "completed" : "pending", detail: roundComplete ? `${evaluatedCount} 个 Candidate 已保存判定` : "等待完整评测", onSelect: () => setStage("review") },
-    { label: "最终推荐", state: savedRecommended && confirmation ? "completed" : roundComplete ? "current" : "pending", detail: savedRecommended && confirmation ? schemeName(savedRecommended) : confirmation ? "等待组合 Candidate D" : "等待完整报告与人工确认", onSelect: () => setStage("review") },
+    { label: "最终推荐", state: savedRecommended && confirmation ? "completed" : roundComplete ? "current" : "pending", detail: savedRecommended && confirmation ? schemeName(savedRecommended) : v128 ? "等待终点 D 完成" : confirmation ? "等待组合 Candidate D" : "等待完整报告与人工确认", onSelect: () => setStage("review") },
   ] as const;
   const evolutionModel = buildEvolutionModel(experiment, evaluation.config, metric => gateNames[metric] ?? metric, schemeName);
   const candidateViews = [...evolutionModel.rounds.flatMap(round => round.candidates), ...(evolutionModel.d ? [evolutionModel.d] : [])];
@@ -263,9 +269,9 @@ function EvolutionWorkspace({ data }: { data: any }) {
   const production = data.overview?.production || data.versions?.find((item: any) => item.status === "active");
   const productionReleased = production?.provenance === "published" && !!savedRecommended && production.snapshot?.candidate_id === savedRecommended.id;
   const phaseDetails = [...new Set(steps.filter(step => step.state === "current" || step.state === "blocked").map(step => step.detail))].join(" · ");
-  const agentStatus = hasRunning || busy ? `${activeCandidate ? `${schemeName(activeCandidate)} · ${candidateProgress(activeCandidate, activeOperation(activeCandidate.id), sandboxPause)}` : "Agent 评测中"} · ${dStatus}${savedRecommended ? ` · 当前保存推荐：${schemeName(savedRecommended)}` : ""}` : keepBaseline ? '评测已完成，保持 Baseline' : productionReleased ? schemeName(savedRecommended).replace(/^Round \d+ · /, "") : savedRecommended ? `推荐 ${schemeName(savedRecommended)}，待人工发布 · ${dStatus}` : sandboxPause ? "已暂停，进度已保存" : `${latestRound ? `Round ${latestRound.round} · ${latestRound.evaluated ?? "未知"}/${latestRound.total ?? "未知"} · ` : ""}${phaseDetails || "等待生成优化 Candidate"}${!budgetKnown && experiment && !v126 ? " · 预算尚未同步" : ""}`;
+  const agentStatus = hasRunning || busy ? `${activeCandidate ? `${schemeName(activeCandidate)} · ${candidateProgress(activeCandidate, activeOperation(activeCandidate.id), sandboxPause)}` : "Agent 评测中"} · ${dStatus}${savedRecommended ? ` · 当前保存推荐：${schemeName(savedRecommended)}` : ""}` : keepBaseline ? '评测已完成，保持 Baseline' : productionReleased ? schemeName(savedRecommended).replace(/^Round \d+ · /, "") : savedRecommended ? `推荐 ${schemeName(savedRecommended)}，${v128 ? '待自动发布' : '待人工发布'} · ${dStatus}` : sandboxPause ? "已暂停，进度已保存" : `${latestRound ? `Round ${latestRound.round} · ${latestRound.evaluated ?? "未知"}/${latestRound.total ?? "未知"} · ` : ""}${phaseDetails || "等待生成优化 Candidate"}${!budgetKnown && experiment && !v126 ? " · 预算尚未同步" : ""}`;
 
-  const sandboxCandidates = [...displayedCandidates, ...(d ? [d] : [])];
+  const sandboxCandidates = [...displayedCandidates, ...(!v128 && d ? [d] : [])];
   const comparisonSources = [evaluation, ...sandboxCandidates];
   const compareValue = (source: any, key: string): number | string | null => {
     const result = source.result;
@@ -316,10 +322,11 @@ function EvolutionWorkspace({ data }: { data: any }) {
     {candidates.filter(candidate => !pricePause && candidate.result?.price_pause?.paused).map(candidate => <PricePauseNotice key={candidate.id} pause={candidate.result.price_pause} evaluationId={candidate.result.evaluation_run_id} onChanged={refresh} />)}
     {cycle?.status === "qualified" && !confirmation && <p className="workbench-status" role="status">本轮 A/B/C 已完成，等待人工确认报告与 Winner；确认后才能生成组合 Candidate D。</p>}
     {v126 && cycle?.status === "budget_exhausted" && <p className="workbench-status" role="status">{cycle.last_error}</p>}
+    {v128 && ["blocked", "failed"].includes(cycle?.status) && cycle?.last_error && <p className="error-notice" role="alert">{cycle.last_error}</p>}
     {!v126 && cycle?.status === "budget_exhausted" && <p className="workbench-status" role="status">优化循环已停止：已评测 {budget.used} / {budget.max} 次，剩余 {Math.max(0, budget.max - budget.used)} 次{reservedForD ? `（其中 ${reservedForD} 次留给 D）` : ""}。剩余次数不足以运行完整 A/B/C；只有合格 Winner 经人工确认后才能进入 D。</p>}
     {policyBlocked && <p className="error-notice">当前 Baseline 评测版本身份与运行代码不兼容，真实 Agent 启动已阻断。全部 Bad Case 保留在优化规划中；请先到 Baseline 查看身份预检，核对历史评测与当前规则的兼容性；需要新版评分时使用保存回答判分，不自动重新生成。</p>}
     <div className="header-actions agent-secondary-actions">{v126 ?
-      !strategy126?.final && <button className="primary" disabled={busy || policyBlocked || hasRunning} onClick={run126}><Play size={15} />继续 Agent 优化</button> :
+      (!strategy126?.final || v128 && cycle?.phase !== 'published') && <button className="primary" disabled={busy || policyBlocked || hasRunning} onClick={run126}><Play size={15} />继续 Agent 优化</button> :
       <>{triedSandbox ? null : planningBlocked && !published ? <button className={stage === "review" ? "secondary" : "primary"} disabled={busy || policyBlocked || hasRunning || !!confirmation} onClick={completePlan}>补齐本轮规划（不收费）</button> : pending.length ? <button className={stage === "review" ? "secondary" : "primary"} disabled={busy || !canBatch} onClick={() => void runBatch()}><Play size={15} />{batchRunning ? "本轮 Sandbox 运行中" : "运行本轮 A/B/C Sandbox"}</button> : <button className={stage === "review" ? "secondary" : "primary"} disabled={policyBlocked || busy || hasRunning || evaluation.status !== "completed" || (!!abc.length && !canContinue) || (!badCases.length && !experiment?.result?.monitoring_context)} onClick={() => void (canContinue ? continueRound() : generate())}><Play size={15} />{busy ? "处理中…" : canContinue ? "继续优化下一轮" : abc.length ? "本轮 Candidate 已生成" : "生成 A / B / C"}</button>}{!published && planningIncomplete && triedSandbox && <button className="secondary" disabled={busy || policyBlocked || hasRunning || !!confirmation} onClick={completePlan}>补齐本轮规划（不收费）</button>}{canBatch && triedSandbox && <button className="secondary" disabled={busy} onClick={() => void runBatch()}>运行本轮 A/B/C Sandbox</button>}{triedSandbox && canContinue && !pending.length && <button className="primary" disabled={policyBlocked || busy || hasRunning || evaluation.status !== "completed"} onClick={() => continueRound()}><Play size={15} />{busy ? "处理中…" : "继续优化下一轮"}</button>}</>}</div>
     {hasRunning && cycle?.next_action && <p role="status">{cycle.next_action}</p>}
     {error && <p ref={errorRef} tabIndex={-1} className="error-notice" role="alert">{error}</p>}
@@ -332,8 +339,10 @@ function EvolutionWorkspace({ data }: { data: any }) {
 
     {stage === "overview" && <AgentOverview experiment={experiment || data.optimization} model={{...evolutionModel, budget: budgetKnown ? budget : null}} evaluation={evaluation} chosenId={chosenView?.id} released={productionReleased} status={agentStatus} cases={processingCases} onCase={setSelectedBadCase}/>}
     {stage === "route" && <div className="route-timeline">
-      <EvolutionTimeline key={experiment?.id} model={evolutionModel} experiment={experiment} onRoundChange={setRoundSelection} roundHeader={v126 ? (round => <Strategy126cRound round={round} saved={strategy126?.rounds?.[round]} candidates={candidates} />) : undefined} renderCandidate={id=>{const candidate=candidates.find(c=>c.id===id);return <CandidateCard key={id} experiment={experiment} route routeWinner={id===evolutionModel.winnerId && currentQualification(candidate.result)?.qualified !== false} candidate={candidate} primaryRun={id===displayedCandidates.find(item=>['generated','failed'].includes(item.status))?.id} baseline={evaluation.config || {}} onDetail={()=>setSelectedCandidate(candidate)} onSkip={()=>void action('跳过未运行 Candidate',()=>postJson(`/api/candidates/${id}/skip`,{actor:'当前用户'}))} running={activeOperation(id)} busy={busy || planningBlocked || policyBlocked || hasRunning || !!confirmation} targets={targetRows(candidate,badCases)} onTargets={()=>setTargetCandidate(candidate)} onRun={()=>void run(candidate)}/>;}} sandbox={()=>sandboxTable}
+      <EvolutionTimeline key={experiment?.id} model={evolutionModel} experiment={experiment} dLabel={v128 ? terminalDTitle : undefined} onRoundChange={setRoundSelection} roundHeader={v126 ? (round => <Strategy126cRound round={round} saved={strategy126?.rounds?.[round]} candidates={candidates} terminalD={v128} />) : undefined} renderCandidate={id=>{const candidate=candidates.find(c=>c.id===id);return <CandidateCard key={id} experiment={experiment} route routeWinner={id===evolutionModel.winnerId && currentQualification(candidate.result)?.qualified !== false} candidate={candidate} primaryRun={id===displayedCandidates.find(item=>['generated','failed'].includes(item.status))?.id} baseline={evaluation.config || {}} onDetail={()=>setSelectedCandidate(candidate)} onSkip={()=>void action('跳过未运行 Candidate',()=>postJson(`/api/candidates/${id}/skip`,{actor:'当前用户'}))} running={activeOperation(id)} busy={busy || planningBlocked || policyBlocked || hasRunning || !!confirmation} targets={targetRows(candidate,badCases)} onTargets={()=>setTargetCandidate(candidate)} onRun={()=>void run(candidate)}/>;}} sandbox={()=>sandboxTable}
       questionText={id => questionText(id, evaluation, badCases)} onOpen={id => setSelectedCandidate(candidates.find(candidate => candidate.id === id))} >
+      {v128 && <Section title={terminalDTitle}><TerminalDDetails experiment={experiment} candidate={d} trigger={dTrigger}
+        onDetail={d ? () => setSelectedCandidate(d) : undefined}/></Section>}
       {!v126 && <section className="d-timeline" aria-label="Candidate D 决策">{evaluatedCandidate(d) && <Section title="组合方案 D 的四层结论">
         <dl className="candidate-four-layers">
           <div><dt>正式资格</dt><dd><QualificationVersions result={d.result}/></dd></div>
@@ -379,8 +388,9 @@ function EvolutionWorkspace({ data }: { data: any }) {
       <Section title="Candidate 内容"><p>{storyText(selectedCandidate.reasoning?.core_idea || selectedCandidate.reasoning?.hypothesis)}</p><StrategyPresentation reasoning={selectedCandidate.reasoning}/>{selectedCandidate.reasoning?.proposal && <p>{storyText(selectedCandidate.reasoning.proposal)}</p>}{selectedCandidate.reasoning?.why && <p>{storyText(selectedCandidate.reasoning.why)}</p>}{selectedCandidate.reasoning?.expected_improvement && <p>{storyText(selectedCandidate.reasoning.expected_improvement)}</p>}{selectedCandidate.reasoning?.evidence_assertions?.map((row:any,i:number)=><p key={i}>{storyText(row.observation)}</p>)}</Section>
       <Section title="参数差异" action={<button className="secondary" onClick={() => setSearchOpen(true)}>查看可调参数</button>}><ConfigDiff base={evaluation.config || {}} candidate={selectedCandidate}/></Section>
       <Section title="真实实验结果"><QualificationVersions result={selectedCandidate.result}/><p>{storyText(qualificationExplanation(selectedCandidate))}</p><p>{selectedCandidate.status === "evaluated" ? regressionText(selectedCandidate.result) : "没有完整 Sandbox，Regression 结论未判定。"}</p><p>Regression Check：{metricText(selectedCandidate.result,"regression")} · 目标修复 {metricText(selectedCandidate.result,"target_bad_cases_fixed")} · 净改善 {metricText(selectedCandidate.result,"net_improvement")}</p>{selectedCandidate.result?.evaluation_complete !== false && selectedCandidate.result?.regression_interpretation && <p>{selectedCandidate.result.regression_review ? qualificationRules : selectedCandidate.result.regression_interpretation}</p>}{selectedCandidate.result?.evaluation_complete === false ? <p>完整评测后判定修复与退化；历史部分比较保留在高级审计。</p> : <p>已修复：{(selectedCandidate.result?.all_fixed_question_ids || []).map(questionLabel).join("、") || "未采集"} · 新增 Bad Case：{(selectedCandidate.result?.new_regression_question_ids || []).map(questionLabel).join("、") || "未采集"}</p>}</Section>
-      {selectedCandidate.reasoning?.candidate_label === "D" && <Section title="组合来源与冲突"><div className="muted-prose"><TruncatedText lines={3}>基础 Winner：{candidateName(candidates.find(item=>item.id === selectedCandidate.reasoning.winner_id))}</TruncatedText></div>{(selectedCandidate.reasoning.sources || []).map((source:any,index:number)=><p key={source.candidate_id || index}>{(source.source_candidates || [source.candidate_id]).filter(Boolean).map((id:string)=>schemeName(candidates.find(item=>item.id===id),id)).join("、") || "来源 Candidate 待核对"} · <StoryText value={source.why_merge || source.reason}/></p>)}<div className="muted-prose"><TruncatedText lines={3}>冲突：{selectedCandidate.reasoning.conflicts ? Object.keys(selectedCandidate.reasoning.conflicts).join("、") || "无冲突" : "未采集"}</TruncatedText></div></Section>}
-      {selectedCandidate.reasoning?.candidate_label==='D' && <Section title="副作用检查"><DSideEffects changes={selectedCandidate.reasoning.changes || []}/></Section>}
+      {v128 && selectedCandidate.reasoning?.candidate_label === "D" && <Section title={terminalDTitle}><TerminalDDetails experiment={experiment} candidate={selectedCandidate} trigger={dTrigger}/></Section>}
+      {!v128 && selectedCandidate.reasoning?.candidate_label === "D" && <Section title="组合来源与冲突"><div className="muted-prose"><TruncatedText lines={3}>基础 Winner：{candidateName(candidates.find(item=>item.id === selectedCandidate.reasoning.winner_id))}</TruncatedText></div>{(selectedCandidate.reasoning.sources || []).map((source:any,index:number)=><p key={source.candidate_id || index}>{(source.source_candidates || [source.candidate_id]).filter(Boolean).map((id:string)=>schemeName(candidates.find(item=>item.id===id),id)).join("、") || "来源 Candidate 待核对"} · <StoryText value={source.why_merge || source.reason}/></p>)}<div className="muted-prose"><TruncatedText lines={3}>冲突：{selectedCandidate.reasoning.conflicts ? Object.keys(selectedCandidate.reasoning.conflicts).join("、") || "无冲突" : "未采集"}</TruncatedText></div></Section>}
+      {!v128 && selectedCandidate.reasoning?.candidate_label==='D' && <Section title="副作用检查"><DSideEffects changes={selectedCandidate.reasoning.changes || []}/></Section>}
 
 
     </>}</div></Drawer>
@@ -475,7 +485,7 @@ function CandidateCard({ candidate, experiment, baseline, onDetail, targets, onT
     <div className="candidate-card-footer">
       {targets.length > 0 && <button className="secondary small" onClick={onTargets}><Icon name="target" size={14}/>查看目标 {targets.length} 题</button>}
       <button className="secondary small" onClick={event => { event.currentTarget.focus(); onDetail(); }}><Icon name="report" size={14}/>查看 Candidate 与完整报告</button>
-      {experiment?.result?.decision_contract_version !== "127a" && candidate.status === "generated" && onSkip && <button className="text-button" disabled={busy || !!running} onClick={onSkip}>跳过此 Candidate</button>}
+      {!["127a", "128a"].includes(experiment?.result?.decision_contract_version) && candidate.status === "generated" && onSkip && <button className="text-button" disabled={busy || !!running} onClick={onSkip}>跳过此 Candidate</button>}
       {!usesRoundStrategy(experiment) && candidate.status !== "evaluated" && <CandidateAction primary={primaryRun} candidate={candidate} running={running} busy={busy} onRun={onRun}/>}
     </div>
   </article>;

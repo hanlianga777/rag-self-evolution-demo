@@ -39,11 +39,13 @@ const text = (value: unknown): string => {
 
 const ids = (values: string[] = []) => values.length ? values.map(shortQuestionId).join('、') : '无';
 
-export function Strategy126cRound({ round, saved, candidates }: { round: number; saved?: Round; candidates: any[] }) {
+export function Strategy126cRound({ round, saved, candidates, terminalD = false }: {
+  round: number; saved?: Round; candidates: any[]; terminalD?: boolean;
+}) {
   const { plan, review, recoveries = [], d, d_review, inherited_from } = saved || {};
-  const decisions = [plan, ...recoveries, review, d, d_review];
-  const latest = d_review ?? review;
-  const outcomes = new Map([...review?.outcomes ?? [], ...d_review?.outcomes ?? []].map(row => [row.id, row.labels]));
+  const decisions = [plan, ...recoveries, review, ...(terminalD ? [] : [d, d_review])];
+  const latest = (!terminalD && d_review) || review;
+  const outcomes = new Map([...(review?.outcomes ?? []), ...(terminalD ? [] : d_review?.outcomes ?? [])].map(row => [row.id, row.labels]));
   const mainName = latest?.winner_id ? schemeName(candidates.find(row => row.id === latest.winner_id), latest.winner_id) : 'Baseline';
   return <Section title={`第 ${round} 轮 · Agent 决策`}>
     {inherited_from && <p className="muted">沿用自 {inherited_from.label} 第 {inherited_from.round} 轮</p>}
@@ -70,7 +72,7 @@ export function Strategy126cRound({ round, saved, candidates }: { round: number;
     </div>
     {!!candidates.length && <div className="table-scroll"><DataTable aria-label={`第 ${round} 轮三层资格`}>
       <thead><tr>{['方案', '三层资格', '相对 Baseline 修好 / 弄坏', '相对父方案修好 / 弄坏'].map(title => <th key={title} scope="col">{title}</th>)}</tr></thead>
-      <tbody>{candidates.filter(candidate => candidate.reasoning?.round === round).map(candidate => {
+      <tbody>{candidates.filter(candidate => candidate.reasoning?.round === round && (!terminalD || candidate.reasoning?.candidate_label !== 'D')).map(candidate => {
         const labels: Labels | undefined = outcomes.get(candidate.id) ?? candidate.result?.strategy126c_labels;
         const role = candidate.id === latest?.winner_id ? '主线' : candidate.id === latest?.branch_id ? '支线' : null;
         const effective = labels?.effective ? '本轮有效' : labels?.vs_parent.broken.length ? '本轮有回退' : '本轮无增量';

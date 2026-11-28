@@ -3486,8 +3486,9 @@ class GovernanceStore:
                 raise ValueError('方案不存在')
             experiment = self.experiment(candidate['experiment_id'], light=True)
             self.require_current_baseline(experiment['baseline_run_id'], connection)
-            if experiment['result'].get('decision_contract_version') == agent126c.FINAL_ONLY_VERSION:
-                raise ValueError('127a 每轮须完成全部 A/B/C，不能跳过')
+            version = experiment['result'].get('decision_contract_version')
+            if version in agent126c.FULL_ROUND_VERSIONS:
+                raise ValueError(f'{version} 每轮须完成全部 A/B/C，不能跳过')
             if not automatic and experiment['result'].get('optimization_cycle', {}).get('status') == 'running':
                 raise ValueError('自动循环正在运行，不能手动跳过')
             if experiment['result'].get('report_confirmation'):
@@ -3503,15 +3504,19 @@ class GovernanceStore:
         return self.candidate(candidate_id)
 
     def round_completion(self, candidate: dict, *, peers=None, seed_round_open=None) -> dict:
-        number = candidate.get("reasoning", {}).get("round")
+        reasoning = candidate.get("reasoning", {})
+        number = reasoning.get("round")
         if not isinstance(number, int):
             return {"direct_or_legacy": True, "complete": True, "evaluated": 1, "total": 1}
         if seed_round_open is None and candidate['reasoning'].get('reuse') == '用户授权沿用':
             with self.connection() as db:
                 row = db.execute('SELECT result_json FROM experiments WHERE id=?', (candidate['experiment_id'],)).fetchone()
             seed_round_open = bool(row and _load(row[0], {}).get('seed_round_planned') is False)
-        return self._round_summary(peers if peers is not None else self.candidates(candidate["experiment_id"],light=True),
-                                   number, seed_round_open=seed_round_open)
+        items = peers if peers is not None else self.candidates(candidate["experiment_id"], light=True)
+        if reasoning.get('decision_contract_version') == agent126c.TERMINAL_D_VERSION:
+            is_d = reasoning.get('candidate_label') == 'D'
+            items = [row for row in items if (row['reasoning'].get('candidate_label') == 'D') == is_d]
+        return self._round_summary(items, number, seed_round_open=seed_round_open)
 
     def finish_candidate(self, candidate_id: str, status: str, result: dict):
         from .agent_inputs import new_failure_ids
@@ -4264,6 +4269,7 @@ class GovernanceStore:
             audit = gate_audit('gate3', actor, reviews=delegated_review)
             experiment_result = _load(experiment['result_json'], {})
             workflow = experiment_result.get('optimization_cycle', {})
+            terminal_d = experiment_result.get('decision_contract_version') == agent126c.TERMINAL_D_VERSION
             from .paid_policy import E7_PRODUCTION, E7_TASK
             if (experiment_result.get('paid_run', {}).get('ledger_identity', {}).get('task') == E7_TASK
                     and (not workflow_release or workflow_release[0] != E7_PRODUCTION)):
@@ -4288,7 +4294,7 @@ class GovernanceStore:
                 if not active or active['id'] != previous_id:
                     raise ValueError('发布前线上版本变化，请重新核对回滚点')
                 audit.update(authorized_at=authorized_at, executed_by='Codex')
-            elif workflow.get('workflow_scope', {}).get('target') == 'release' and task_leases.cycle_active(
+            elif (terminal_d or workflow.get('workflow_scope', {}).get('target') == 'release') and task_leases.cycle_active(
                     connection, candidate['experiment_id'], workflow):
                 key = 'cycle:' + candidate['experiment_id']
                 if (not agent126c.enabled(experiment_result)
@@ -4299,7 +4305,10 @@ class GovernanceStore:
                     raise InterruptedError('用户停止运行，断点已保存')
             if agent126c.enabled(experiment_result):
                 final = experiment_result.get('strategy126c', {}).get('final', {})
-                if final.get('winner_id') != candidate_id or not (final.get('full') or (bool(final.get('conditions')) and all(final['conditions'].values()))):
+                if terminal_d:
+                    if final.get('winner_id') != candidate_id or final.get('d_outcome') not in {'promoted', 'not_promoted'}:
+                        raise ValueError('128a 须完成终点 D 的 Sandbox 后才能发布最终推荐')
+                elif final.get('winner_id') != candidate_id or not (final.get('full') or (bool(final.get('conditions')) and all(final['conditions'].values()))):
                     raise ValueError('126c 须收敛后才能发布最终 Winner')
             if connection.execute("SELECT 1 FROM production_versions WHERE json_extract(snapshot_json, '$.candidate_id') = ?", (candidate_id,)).fetchone():
                 raise ValueError("Candidate 已发布")
@@ -4500,7 +4509,9 @@ class GovernanceStore:
         staged = result.get('round_policy', {}).get('stop_rule') == 'staged-v1' and not layered(result)
         seed_round_open = result.get('seed_round_planned') is False
         v126 = agent126c.enabled(result)
-        return {**dict(row), "result": result, "candidates": [{**item, "product_interruption":product_interruption(item), "release_state": self.release_state(item, peers=items, seed_round_open=seed_round_open)} for item in items], "rounds": [self._round_summary(items, number, seed_round_open=seed_round_open) for number in numbers], "evaluation_budget": {"used": sum(sandbox_attempts_used(item) for item in items), "max": None if v126 else MAX_EVALS, 'reserved_for_d': 0 if staged or v126 else 1}}
+        round_items = ([item for item in items if item['reasoning'].get('candidate_label') != 'D']
+                       if result.get('decision_contract_version') == agent126c.TERMINAL_D_VERSION else items)
+        return {**dict(row), "result": result, "candidates": [{**item, "product_interruption":product_interruption(item), "release_state": self.release_state(item, peers=items, seed_round_open=seed_round_open)} for item in items], "rounds": [self._round_summary(round_items, number, seed_round_open=seed_round_open) for number in numbers], "evaluation_budget": {"used": sum(sandbox_attempts_used(item) for item in items), "max": None if v126 else MAX_EVALS, 'reserved_for_d': 0 if staged or v126 else 1}}
 
     def latest_experiment(self):
         with self.connection() as connection:

@@ -83,7 +83,8 @@ class StrategyCycle:
         self.runner = EvaluationRunner(self.store, self.runtime)
         experiment = engine.experiment()
         self.version = experiment['result']['decision_contract_version']
-        self.final_only = self.version == policy.FINAL_ONLY_VERSION
+        self.final_only = self.version in policy.FULL_ROUND_VERSIONS
+        self.terminal_d = self.version == policy.TERMINAL_D_VERSION
         verdict.require_empty_history(experiment['result'].get('parameter_effect_ledger'))
         self.baseline = self.store.require_current_baseline(experiment['baseline_run_id'])
         if isinstance(self.runtime.provider, DeepSeekProvider):
@@ -259,6 +260,16 @@ class StrategyCycle:
                     '从 context.combinations 选一条，原样使用 changes，sources 填该条 source 的 ID。'
                     '父方案 ID 用 context.winner_id。expected_fixed 填父方案尚未答对的完整冻结题号，'
                     'possible_broken 填父方案已答对的完整冻结题号，无明确风险题时填空列表。')
+            elif context['phase'] == 'terminal_d':
+                request['d_instructions'] = (
+                    '必须在 Winner 上提交一个 D。sources 是 {参数名: verified_sources 中的方案 ID}，'
+                    '按原值转移有实测收益的改动，成组验证的改动应一起保留。'
+                    'requires_mitigation=true 的来源必须在 source_mitigations={方案ID: 如何缓解} 逐一说明。'
+                    '最多还有一个无账本来源的变化，用 tuning={parameter, purpose} 说明，没有则填 null。'
+                    '相对 Baseline 累计最多四项，qualified_ideas={方案ID: D 如何采用该方案的思路}，'
+                    '从 trigger.qualified_ids 中填两个，单一 Winner 收敛时填一个。'
+                    'expected_fixed 填 Winner 未答对的题，possible_broken 填可能受影响的已答对题，无则填空列表。'
+                    '保留完整解释，proposal.signals=[FINAL_D]。')
             if len(rejected) >= 3:
                 request['structured_fields'] = self.field_form(context['phase'], current_signals, rejected[-1])
                 request['fill_instructions'] = ('按 structured_fields 的字段分组逐项填写。回复 {actions, field_values}。'
@@ -273,7 +284,14 @@ class StrategyCycle:
 
                 try:
                     system = SYSTEM
-                    if self.final_only:
+                    if self.terminal_d:
+                        system = SYSTEM.replace('126c', self.version).replace(
+                            '、next、next_reason。若收敛且没有可组合项，也提交 no_d_reason。', '。').replace(
+                            '累计已到 4 项时只能改已有项的取值或撤销。', 'A/B/C 累计已到 4 项时只能改已有项的取值或撤销。') + (
+                            '\n每轮必须提交完整 A/B/C。程序根据复盘后的合格数和收敛情况决定下一步。'
+                            'terminal_d 阶段唯一动作是 compose_d，按 d_instructions 提交 D。'
+                            'D 可组合多项已验证改动，并额外试一个调节参数，累计最多四项。')
+                    elif self.final_only:
                         system = SYSTEM.replace('126c', self.version) + (
                             '\n每轮必须提交完整 A/B/C。轮次复盘 next 只按 legal 选择。'
                             'final 表示三案已经复盘且进入最终阶段。'
@@ -324,6 +342,7 @@ class StrategyCycle:
             'plan': {label: fields[1:] for label in policy.LABELS},
             'review': {'decision': ['winner_id', 'branch_id', 'selection_reason', 'next', 'next_reason', 'no_d_reason']},
             'd': {'D': [*fields[1:], 'sources']},
+            'terminal_d': {'D': [*fields[1:], 'sources', 'source_mitigations', 'qualified_ideas', 'tuning']},
             'final': {'decision': ['proposal']},  # Leave empty for d_skip.
             'resume': {},
         }
@@ -332,7 +351,8 @@ class StrategyCycle:
     @staticmethod
     def field_response(response, phase):
         form = response.get('field_values')
-        expected = {'plan': set(policy.LABELS), 'review': {'decision'}, 'd': {'D'}, 'final': {'decision'}, 'resume': set()}
+        expected = {'plan': set(policy.LABELS), 'review': {'decision'}, 'd': {'D'}, 'terminal_d': {'D'},
+                    'final': {'decision'}, 'resume': set()}
         if not isinstance(form, dict) or set(form) != expected[phase] or any(not isinstance(row, dict) for row in form.values()):
             raise ValueError('field_values 必须按程序提供的分组逐项填写')
         actions = response.get('actions')
@@ -348,7 +368,7 @@ class StrategyCycle:
         result = {'actions': actions}
         if phase == 'plan':
             result['proposals'] = [{**form[label], 'label': label} for label in policy.LABELS]
-        elif phase == 'd':
+        elif phase in ('d', 'terminal_d'):
             result['proposal'] = {**form['D'], 'label': 'D'}
         elif phase in ('review', 'final'):
             result = {**form['decision'], **result}
@@ -454,6 +474,7 @@ class StrategyCycle:
         old_winner = state['winner_id']
         outcomes = [self.outcome(candidate, state) for candidate in candidates]
         new_ledger = [*state['ledger'], *outcomes]
+        qualified_ids = [row['id'] for row in new_ledger if row['labels']['qualified']] if self.terminal_d else []
         promotions = [row['id'] for row in outcomes if row['labels']['promoted']]
         next_winners = promotions or [old_winner]
         older = self.context(number, state)
@@ -468,9 +489,16 @@ class StrategyCycle:
                                                             or not promotions and conditions['layers']
                                                             or any(len(policy.config_diff(p['config'], self.base_config)) == 4
                                                                    for p in ctx['parents'].values())))
+            trigger = None
             if self.final_only:
                 conditions.pop('d')
                 legal = self.final_steps(conditions, full=full)
+                if self.terminal_d:
+                    if len(qualified_ids) >= 2:
+                        trigger = {'reason': 'two_qualified', 'qualified_ids': qualified_ids}
+                    elif qualified_ids and (full or legal == ['final']):
+                        trigger = {'reason': 'converged', 'qualified_ids': qualified_ids}
+                    legal = ['final'] if trigger else ['continue']
             else:
                 legal = (['finish'] if full else ['continue'] + (['d'] if d_possible else [])
                          + (['finish'] if policy.may_finish(conditions, full=False) else []))
@@ -481,6 +509,8 @@ class StrategyCycle:
                 'd_available': d_possible, 'd_source_ids': sorted({row['source'] for row in combos}),
                 'legal': legal,
             }
+            if trigger:
+                check[winner or older['baseline_id']]['d_trigger'] = trigger
         overall_full = any(row['full'] for row in check.values())
         plateau = not promotions and (not after_d or series['review']['plateau'])
         streak = (state['streak'] + 1 if not after_d else state['streak']) if plateau else 0
@@ -500,6 +530,8 @@ class StrategyCycle:
             if not any(row['from_branch'] and check.get(row['id'], {}).get('full') for row in outcomes):
                 signals = [row for row in signals if row['id'] != 'S6']
             promotions = [cid for cid in promotions if check[cid]['full']]
+            if self.terminal_d:
+                signals = [row for row in signals if row['id'] != 'S16']
         branches = {key: row['branches'] for key, row in check.items()}
         branch_promotions = [row['id'] for row in outcomes if row['from_branch'] and row['id'] in promotions]
         sidelined = [row['id'] for row in outcomes if row['from_branch'] and row['higher_score']
@@ -513,6 +545,12 @@ class StrategyCycle:
             selected = review.get('winner_id')
             selected = selected if isinstance(selected, str) else older['baseline_id']
             selected_check = check.get(selected, {})
+            if self.terminal_d and selected_check:
+                review['next'] = selected_check['legal'][0]
+                trigger = selected_check.get('d_trigger')
+                reasons = {'two_qualified': '累计已有至少两个合格方案，进入 D',
+                           'converged': '只有一个合格方案且已收敛，进入 D'}
+                review['next_reason'] = reasons[trigger['reason']] if trigger else '未触发 D，继续下一轮'
             if (review.get('next') == 'finish' and not selected_check.get('full')
                     and not selected_check.get('d_source_ids') and not state['d_attempts']):
                 policy.text_field(review, 'no_d_reason')
@@ -538,6 +576,8 @@ class StrategyCycle:
                  'selection_reason': response['agent_response'].get('selection_reason'),
                  'reason': response['agent_response']['next_reason']}
         series['d_review' if after_d else 'review'] = trace
+        if trigger := selected.get('d_trigger'):
+            trace['d_trigger'] = trigger
         if step == 'finish':
             state['final'] = {'winner_id': winner, 'full': selected['full'], 'conditions': selected['conditions'],
                               'reason': trace['reason'], 'd_outcome': state['d_attempts'][-1]['outcome']
@@ -642,6 +682,24 @@ class StrategyCycle:
                               'd_action': 'd_skip', 'd_outcome': 'not_generated'}
             self.persist(state)
 
+    def compose_terminal_d(self, number, state):
+        series = state['rounds'][str(number)]
+        trigger = series['review']['d_trigger']
+        context = self.context(number, state)
+        context.update(phase='terminal_d', decision_contract_version=self.version, trigger=trigger,
+                       verified_sources=policy.terminal_d_sources(state['ledger']))
+        signals = [{'id': 'FINAL_D', 'title': '组合终点方案',
+                    'legal_actions': {'compose_d': '在 Winner 上组合 D'}, 'evidence': trigger}]
+
+        self.engine.save(status='running', phase='composite', active_candidate=None)
+        reply = self.ask(f'{self.version}:{number}:final', context, signals,
+                         lambda response, sent: policy.validate_terminal_d(
+                             response.get('proposal'), context, policy.validate_actions(response, sent)))
+        series['d'] = {key: reply[key] for key in ('signals', 'actions')}
+        state['d_attempts'].append({'round': number, 'winner_id': state['winner_id'],
+                                    'candidate_id': f'{self.id}-R{number:06d}-D', 'outcome': 'pending'})
+        self.persist(state, [reply['data']])
+
     def complete_final_d(self, number, state, candidate):
         outcome = self.outcome(candidate, state)
         series = state['rounds'][str(number)]
@@ -666,7 +724,7 @@ class StrategyCycle:
     def finish(self, state, target):
         self.store.refresh_recommendation(self.id)
         winner = state['final']['winner_id']
-        if target != 'release':
+        if target != 'release' and not self.terminal_d:
             self.engine.save(status='recommended', phase='before_release', active_candidate=None)
             return
         self.engine.check_stop()
@@ -740,7 +798,10 @@ class StrategyCycle:
                 self.review(number, state, candidates)
             elif self.final_only:
                 if 'd' not in series:
-                    self.choose_final(number, state)
+                    if self.terminal_d:
+                        self.compose_terminal_d(number, state)
+                    else:
+                        self.choose_final(number, state)
                     continue
                 candidate = self.sandbox(number, state['d_attempts'][-1]['candidate_id'], state)
                 if not candidate:

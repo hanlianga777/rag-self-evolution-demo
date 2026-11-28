@@ -17,7 +17,7 @@ export const storyParameterNames:Record<string,string>={...parameterNames};
 export const storyValue=(value:unknown,key?:string):string => formatValue(value,key);
 
 export const usesRoundStrategy = (experiment: any): boolean =>
-  ['126c', '127a'].includes(experiment?.result?.decision_contract_version);
+  ['126c', '127a', '128a'].includes(experiment?.result?.decision_contract_version);
 
 export const recommendationOf = (experiment:any) => experiment?.recommendation?.result || experiment?.recommendation || {};
 export const schemeName = (candidate:any, id?:string, includeRound = true):string => {
@@ -298,6 +298,43 @@ export function EvolutionRoute({evaluation,experiment,badCases,children,onDetail
     <Section title="最终推荐"><h3>{recommended ? schemeName(recommended) : '等待保存的最终推荐'}</h3><QualityComparison baseline={evaluation} candidate={recommended}/><p><StoryText value={recommendationReason(experiment)} evaluation={evaluation} badCases={badCases}/></p><a className="primary" href="#versions">{recommended?.release_state?.human_release ? '查看发布记录' : '去发布'}</a></Section>
     {children && <section className="route-planning"><h3>Agent 规划 · 逐题覆盖详情</h3>{children}</section>}
   </div>;
+}
+
+export function TerminalDDetails({experiment, candidate, trigger, onDetail}: {
+  experiment: any; candidate?: any; trigger?: {reason: string; qualified_ids: string[]}; onDetail?: () => void;
+}) {
+  const reasoning = candidate?.reasoning;
+  const saved = reasoning?.d_trigger || trigger;
+  const name = (id: string) => schemeName(experiment.candidates?.find((row: any) => row.id === id), id);
+  const parameter = (key: string, value: unknown) => `${storyParameterNames[key] || key} ${storyValue(value, key)}`;
+  const sources: Record<string, string> = reasoning?.sources || {};
+  const ideas: Record<string, string> = reasoning?.qualified_ideas || {};
+  const mitigations: Record<string, string> = reasoning?.source_mitigations || {};
+  const tuning = reasoning?.tuning;
+  const labels = candidate?.result?.strategy126c_labels;
+  const final = experiment.result?.strategy126c?.final;
+  const cycle = experiment.result?.optimization_cycle;
+  const questions = (ids: string[] | undefined) => ids ? ids.map(shortQuestionId).join('、') || '无' : '未知';
+  return <>
+    {saved ? <p>{saved.reason === 'two_qualified' ? '累计达到两个合格方案' : '收敛时只有一个合格方案'} · {saved.qualified_ids.map(name).join('、')}</p>
+      : <p>等待轮次复盘触发 D</p>}
+    {reasoning && <>
+      <p>组合底座 · {name(reasoning.winner_id)}</p>
+      {Object.entries(ideas).map(([id, idea]) => <p key={id}>{name(id)} · {storyText(idea)}</p>)}
+      <h4>并入的实测改动</h4>
+      {Object.keys(sources).length ? <ul>{Object.entries(sources).map(([key, id]) =>
+        <li key={key}>{parameter(key, reasoning.changes?.[key])} · 来源 {name(id)}</li>)}</ul> : <p>无</p>}
+      {Object.entries(mitigations).map(([id, reason]) => <p key={id}>{name(id)} 的副作用缓解 · {storyText(reason)}</p>)}
+      <h4>新增调节参数</h4>
+      <p>{tuning ? `${parameter(tuning.parameter, tuning.value)} · ${storyText(tuning.purpose)}` : '无'}</p>
+      <p>预计修好 {questions(reasoning.predicted_fixed_question_ids)} · 可能受影响 {questions(reasoning.predicted_regression_question_ids)}</p>
+    </>}
+    {saved && <><h4>最终结果</h4>
+      <p>{final ? storyText(final.reason) : dProgressLabel(experiment)}{cycle?.phase === 'published' ? ' · 已发布' : ''}</p>
+      {labels && <p>相对 Baseline {labels.qualified ? '合格' : '不合格'} · 相对 Winner 修好 {questions(labels.vs_winner?.fixed)} · 新增错题 {questions(labels.vs_winner?.broken)}</p>}
+    </>}
+    {onDetail && <button type="button" className="secondary" onClick={onDetail}>查看 D 详情</button>}
+  </>;
 }
 
 export function DStory({experiment,evaluation={},badCases=[],compact=false,onReport,onRecommendation}:{experiment:any;evaluation?:any;badCases?:any[];compact?:boolean;onReport?:()=>void;onRecommendation?:()=>void}) {

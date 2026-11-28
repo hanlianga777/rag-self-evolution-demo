@@ -1491,7 +1491,10 @@ class EvaluationRunner:
             parent_id = draft.get('parent_id')
             parent = baseline if parent_id == baseline['id'] else next(
                 (item for item in experiment['candidates'] if item['id'] == parent_id and item['status'] == 'evaluated'), None)
-            if not parent or changed_config(baseline['config'], parent['config'], draft.get('changes')) != candidate['config']:
+            terminal_d = (experiment['result']['decision_contract_version'] == agent126c.TERMINAL_D_VERSION
+                          and draft.get('candidate_label') == 'D')
+            if not parent or changed_config(baseline['config'], parent['config'], draft.get('changes'),
+                                            terminal_d=terminal_d) != candidate['config']:
                 raise ValueError('126c 保存方案与父方案或改动不一致')
         if use_layered:
             reasoning = candidate['reasoning']

@@ -17,9 +17,9 @@ import type { CandidateView, EvolutionModel } from "./model";
  */
 export type BaselineView = { correct: number | null; total: number; badCases: { id: string; layer: string; question?: string }[] };
 
-export function EvolutionTimeline({ model, experiment, sandbox, renderCandidate, onRoundChange, questionText, onOpen, children, roundHeader }: {
+export function EvolutionTimeline({ model, experiment, sandbox, renderCandidate, onRoundChange, questionText, onOpen, children, roundHeader, dLabel = "Candidate D" }: {
   model: EvolutionModel; experiment?:any; renderCandidate?:(id:string)=>ReactNode; onRoundChange?:(round:number)=>void; sandbox?:(round:number)=>ReactNode; baseline?: BaselineView; questionText?: (id: string) => string | undefined;
-  onOpen?: (candidateId: string) => void; onOpenDiagnosis?: () => void; children?: ReactNode; roundHeader?: (round: number) => ReactNode;
+  onOpen?: (candidateId: string) => void; onOpenDiagnosis?: () => void; children?: ReactNode; roundHeader?: (round: number) => ReactNode; dLabel?: string;
 }) {
   const [selection, setSelection] = useState<number | "D">(1);
   const selected = model.rounds.some(round => round.round === selection) ? selection : selection === "D" ? "D" : model.rounds[0]?.round;
@@ -27,7 +27,7 @@ export function EvolutionTimeline({ model, experiment, sandbox, renderCandidate,
   return <section className="ui-evo" aria-label="进化路线">
     <div className="story-round-switch route-round-switch" role="group" aria-label="进化轮次">
       {model.rounds.map(round => <button type="button" className="secondary" key={round.round} aria-pressed={selected === round.round} onClick={event => {setSelection(round.round);onRoundChange?.(round.round);const scroll=event.currentTarget.closest<HTMLElement>(".page-content");if(scroll)scroll.scrollTop=0;}}>Round {round.round}</button>)}
-      <button type="button" className="secondary" aria-pressed={selected === "D"} onClick={event => {setSelection("D");const scroll=event.currentTarget.closest<HTMLElement>(".page-content");if(scroll)scroll.scrollTop=0;}}>Candidate D</button>
+      <button type="button" className="secondary" aria-pressed={selected === "D"} onClick={event => {setSelection("D");const scroll=event.currentTarget.closest<HTMLElement>(".page-content");if(scroll)scroll.scrollTop=0;}}>{dLabel}</button>
     </div>
 
     {!model.rounds.length && <div><RoundNarrative experiment={experiment} round={1} onOpen={onOpen}/>{sandbox?.(1)}</div>}

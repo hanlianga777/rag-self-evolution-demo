@@ -282,7 +282,7 @@ class OwnerDelegatedReviewRequest(BaseModel):
 
 class ExperimentRequest(BaseModel):
     trigger_id: str | None = None
-    decision_contract_version: Literal['126c', '127a'] | None = None
+    decision_contract_version: Literal['126c', '127a', '128a'] | None = None
 
 
 class DelegatedGateReview(BaseModel):
@@ -1959,7 +1959,7 @@ def run_experiments(payload: ExperimentRequest | None = None):
             use_current = current_result.get('decision_contract_version') == version
             run_id = current_id if use_current else store.create_experiment(completed['id'], decision_contract_version=version)
             state = WorkflowEngine(store, ai_service, run_id).start('next_round', background=False)
-            allowed = {'completed', 'recommended'} if version == agent126c.FINAL_ONLY_VERSION else {'completed'}
+            allowed = {'completed', 'recommended'} if version in agent126c.FULL_ROUND_VERSIONS else {'completed'}
             if state.get('status') not in allowed:
                 raise ValueError(state.get('last_error') or 'Agent 仍在规划')
             return store.experiment(run_id)

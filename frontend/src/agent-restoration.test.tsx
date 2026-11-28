@@ -13,6 +13,42 @@ const data = { workspace: { current_baseline_id: "E1" }, evaluation: { id: "E1",
 async function mount(value: any = data) { vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} })))); root = createRoot(document.body.appendChild(document.createElement("div"))); await act(async () => root.render(<EvolutionPage data={value} />)); }
 async function click(label: string) { await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === label)!.click()); }
 
+it("places the 128a terminal D after the rounds and displays its saved evidence", async () => {
+  const [a, b, c] = candidates.map(candidate => ({ ...candidate, status: "evaluated" }));
+  const trigger = { reason: "two_qualified", qualified_ids: [a.id, b.id] };
+  const d = {
+    id: "EXP-R1-D", status: "evaluated",
+    reasoning: {
+      round: 1, candidate_label: "D", winner_id: a.id, d_trigger: trigger,
+      qualified_ideas: { [a.id]: "保留主线送证据的方式", [b.id]: "采用支线扩大候选池的思路" },
+      changes: { candidate_k: 24, rerank: false, generation_thinking: "low" },
+      sources: { candidate_k: b.id, rerank: c.id },
+      source_mitigations: { [c.id]: "收窄噪声范围" },
+      tuning: { parameter: "generation_thinking", value: "low", purpose: "补足证据分析" },
+      predicted_fixed_question_ids: ["Q02"], predicted_regression_question_ids: ["Q09"],
+    },
+    result: {
+      qualification: { qualified: true }, evaluation_complete: true,
+      strategy126c_labels: { qualified: true, vs_winner: { fixed: ["Q02"], broken: [] } },
+    },
+  };
+  const final = { winner_id: d.id, d_outcome: "promoted", reason: "D 保住主线成果且有严格增量，推荐 D" };
+  await mount({ ...data, optimization: { ...data.optimization, candidates: [a, b, c, d], result: {
+    decision_contract_version: "128a", strategy126c: { rounds: { 1: { review: { d_trigger: trigger } } }, final },
+    optimization_cycle: { status: "completed", phase: "published" },
+  } } });
+  await click("进化路线");
+  expect([...document.querySelectorAll(".route-round-switch button")].map(button => button.textContent))
+    .toEqual(["Round 1", "Candidate D · 终点"]);
+  expect(document.querySelector(".ui-evo-round tbody")?.textContent).not.toContain("Candidate D");
+  await click("Candidate D · 终点");
+  const text = document.querySelector(".ui-evo-final")?.textContent;
+  for (const part of ["R1-A", "R1-B", "R1-C", "采用支线扩大候选池的思路", "收窄噪声范围", "补足证据分析",
+    "预计修好", "Q02", "Q09", "推荐 D", "已发布"]) expect(text).toContain(part);
+  await click("查看 D 详情");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("补足证据分析");
+});
+
 it("restores stages and complete generated plans without inventing evaluated results", async () => {
   const frozen = JSON.stringify(data); await mount();
   expect(document.querySelectorAll(".tabs button")).toHaveLength(3); expect(document.querySelectorAll(".ui-agent-stats > div")).toHaveLength(4);

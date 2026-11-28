@@ -110,7 +110,7 @@ def claim_cycle(store, experiment_id, *, current_round_only=False, workflow_scop
             winner = next((c for c in experiment['candidates'] if c['id'] == confirmation['winner_id']), None)
             if not winner or winner['status'] != 'evaluated' or not winner['result'].get('qualification', {}).get('qualified'):
                 raise ValueError('Winner资格失效，不能续跑D')
-            if current_round_only:
+            if current_round_only and experiment['result'].get('decision_contract_version') != agent126c.TERMINAL_D_VERSION:
                 raise ValueError('报告已确认，只能续跑D')
         if workflow_scope:
             workflow_scope = dict(workflow_scope)
