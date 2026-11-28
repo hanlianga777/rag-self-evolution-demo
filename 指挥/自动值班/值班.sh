@@ -63,14 +63,82 @@ HARD_STOP_MIN=$(( STOP_NEW_MIN + HARD_STOP_AFTER ))
 say() { echo "[$(date '+%m-%d %H:%M')] $*"; }
 g() { git -C "$REPO" -c core.quotepath=off "$@"; }
 
+# ---------- 和 GitHub 同步（11-28 修：以前所有失败都报"网络问题"，其实多数是冲突卡住） ----------
+NET_ERR='could not resolve host|unable to access|timed out|connection (refused|reset|closed)|network is unreachable|ssl|could not read from remote|operation timed out|failed to connect'
+
+# 记录类文件两边都保留（总指挥和值班会同时往里追加），只在本机生效
+ensure_union_attrs() {
+  local f="$REPO/.git/info/attributes" line
+  mkdir -p "$REPO/.git/info"
+  for line in '指挥/值班记录.md merge=union' '指挥/互审/*.md merge=union' '指挥/规则总表.md merge=union'; do
+    grep -qxF "$line" "$f" 2>/dev/null || echo "$line" >> "$f"
+  done
+}
+
+# 冲突自动解开：放弃卡住的 rebase → 本机状态备份到本地分支 → 合并 GitHub 版本（冲突处以本机为准）→ 提交
+fix_sync() {
+  local why="$1" backup stashed=0 up
+  if [ -d "$REPO/.git/rebase-merge" ] || [ -d "$REPO/.git/rebase-apply" ]; then
+    g rebase --abort >/dev/null 2>&1 || g rebase --quit >/dev/null 2>&1
+  fi
+  [ -f "$REPO/.git/MERGE_HEAD" ] && g merge --abort >/dev/null 2>&1
+  ensure_union_attrs
+  if ! g diff --quiet 2>/dev/null || ! g diff --cached --quiet 2>/dev/null; then
+    g stash push -q -m "值班自动修复 $(date +%m%d-%H%M)" >/dev/null 2>&1 && stashed=1
+  fi
+  backup="值班备份-$(date +%Y%m%d-%H%M%S)"
+  g branch "$backup" HEAD >/dev/null 2>&1
+  # 备份分支最多留 2 个
+  g for-each-ref --sort=-refname --format='%(refname:short)' 'refs/heads/值班备份-*' | tail -n +3 | while read -r b; do g branch -D "$b" >/dev/null 2>&1; done
+  if ! g fetch -q origin >/dev/null 2>&1; then
+    [ "$stashed" -eq 1 ] && g stash pop -q >/dev/null 2>&1
+    say "从 GitHub 拉取失败：网络连不上，稍后再试"
+    return 1
+  fi
+  up="$(g rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || echo origin/main)"
+  if ! g -c merge.directoryRenames=false merge -q --no-edit -X ours -X no-renames "$up" >/dev/null 2>&1; then
+    # 剩下的是"一边改名/移动、一边改名/删除"这类结构冲突：按当前文件夹里的样子收下
+    g add -A >/dev/null 2>&1
+    g reset -q -- '*.db' '*.sqlite' '*.sqlite3' '.env' '.env.*' >/dev/null 2>&1
+    if ! g commit -q --no-edit >/dev/null 2>&1; then
+      g merge --abort >/dev/null 2>&1
+      [ "$stashed" -eq 1 ] && g stash pop -q >/dev/null 2>&1
+      say "和 GitHub 同步失败，自动合并也没成功（$(echo "$why" | head -1)）。本机状态已备份到本地分支 $backup，下一轮再试"
+      return 1
+    fi
+  fi
+  if [ "$stashed" -eq 1 ] && ! g stash pop -q >/dev/null 2>&1; then
+    say "注意：合并前没保存的改动暂存在 git stash 里（值班自动修复），没丢"
+  fi
+  say "拉取时和 GitHub 上的改动冲突（不是网络问题），已自动合并：冲突处以本机为准，合并前的状态备份在本地分支 $backup"
+  return 0
+}
+
+sync_pull() {
+  local out
+  if [ -d "$REPO/.git/rebase-merge" ] || [ -d "$REPO/.git/rebase-apply" ] || [ -f "$REPO/.git/MERGE_HEAD" ]; then
+    fix_sync "上次同步卡在半路"; return $?
+  fi
+  out="$(g -c merge.directoryRenames=false pull --rebase --autostash -q 2>&1)" && return 0
+  if echo "$out" | grep -qiE "$NET_ERR"; then
+    say "从 GitHub 拉取失败：网络连不上（$(echo "$out" | head -1)），稍后再试"
+    return 1
+  fi
+  fix_sync "$out"
+}
+
 push_now() {
-  local i
+  local i out=""
   for i in 1 2 3; do
-    if g push -q >/dev/null 2>&1; then return 0; fi
-    g pull --rebase --autostash -q >/dev/null 2>&1
+    out="$(g push -q 2>&1)" && return 0
+    sync_pull >/dev/null
     sleep 5
   done
-  say "推送到 GitHub 失败（可能是网络问题），下一轮再试"
+  if echo "$out" | grep -qiE "$NET_ERR"; then
+    say "推送到 GitHub 失败：网络连不上，下一轮再试"
+  else
+    say "推送到 GitHub 失败（$(echo "$out" | head -1)），下一轮再试"
+  fi
   return 1
 }
 
@@ -104,7 +172,7 @@ save_work() {
 record() {
   local msg="$1"
   say "$msg"
-  g pull --rebase --autostash -q >/dev/null 2>&1
+  sync_pull || true
   if [ ! -f "$REPO/$RECORD" ]; then
     printf '# 自动值班记录\n\n由 值班.sh 自动写入，最新的在最下面。\n\n' > "$REPO/$RECORD"
   fi
@@ -322,8 +390,7 @@ while :; do
     record "到点，值班结束"
     break
   fi
-  if ! g pull --rebase --autostash -q >/dev/null 2>&1; then
-    say "从 GitHub 拉取失败（可能是网络问题），稍后再试"
+  if ! sync_pull; then
     sleep "$CHECK_EVERY"; continue
   fi
   if [ -e "$REPO/$PAUSE_FILE" ]; then
