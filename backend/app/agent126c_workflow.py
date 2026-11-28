@@ -689,7 +689,7 @@ class StrategyCycle:
                 result = self.parent(winner)
                 base_passed, winner_passed = set(self.base_facts['passed']), set(result['passed'])
                 if not (policy.all_gates_pass(result['gates']) and base_passed < winner_passed):
-                    raise ValueError('127b 推荐须 11 项门槛全过、零新增错题且至少修好 1 题')
+                    raise ValueError('127b 推荐须全部门槛通过、零新增错题且至少修好 1 题')
                 receipt = prepare_release(self.engine, candidate, Path(identity['pre_release_backup']))
                 published = self.store.publish_candidate(winner, '用户', workflow_release=(
                     receipt['active_version'], candidate['result']['evaluation_run_id'], AUTHORIZED_AT))
